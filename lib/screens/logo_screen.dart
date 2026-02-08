@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/api_service.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -17,6 +19,7 @@ class _LogoScreenState extends State<LogoScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
+  bool _deviceRegistered = false;
 
   @override
   void initState() {
@@ -24,9 +27,53 @@ class _LogoScreenState extends State<LogoScreen> {
     _repo = DataRepository(SecureStore());
 
     _loadProfile();
+    _initPushAndRegister();
 
     // ✅ EXACT dwell time (15s)
     _timer = Timer(const Duration(seconds: 15), _openMenu);
+  }
+
+  /// 🔔 REQUEST PERMISSION + REGISTER DEVICE
+  Future<void> _initPushAndRegister() async {
+    if (_deviceRegistered) return;
+
+    try {
+      final messaging = FirebaseMessaging.instance;
+
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      final token = await messaging.getToken();
+      if (token == null) {
+        debugPrint("❌ FCM token is NULL");
+        return;
+      }
+
+      final store = SecureStore();
+      final email = await store.getString("userEmail");
+      final role = await store.getString("role");
+
+      if (email == null || role != "user") {
+        debugPrint("ℹ️ No user email or not a user — skipping device register");
+        return;
+      }
+
+      debugPrint("🔥 Registering device for $email");
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: token,
+        role: role,
+      );
+
+      _deviceRegistered = true;
+      debugPrint("✅ Device registration completed");
+    } catch (e) {
+      debugPrint("❌ Device registration error: $e");
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -89,7 +136,6 @@ class _LogoScreenState extends State<LogoScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ✅ LOGO
               Image.asset(
                 'assets/images/vitalink-logo-1.png',
                 width: 220,
@@ -98,7 +144,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
               const SizedBox(height: 28),
 
-              // ✅ PROFILE / LOADING
               if (_loading)
                 const CircularProgressIndicator(color: Colors.white70)
               else if (hasName) ...[
@@ -112,7 +157,6 @@ class _LogoScreenState extends State<LogoScreen> {
                 const SizedBox(height: 10),
               ],
 
-              // ✅ TAP ANYWHERE (PROMINENT)
               const Text(
                 'TAP ANYWHERE TO OPEN',
                 style: TextStyle(
@@ -125,14 +169,13 @@ class _LogoScreenState extends State<LogoScreen> {
 
               const SizedBox(height: 48),
 
-              // 🔴 BIG SQUARE EMERGENCY BUTTON
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(
                   width: 240,
                   height: 160,
                   decoration: BoxDecoration(
-                    color: Colors.red.shade700,
+                    color: Colors.red,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: Colors.redAccent,
