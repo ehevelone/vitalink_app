@@ -16,15 +16,26 @@ class SafeBottomButton extends StatelessWidget {
     this.color,
   });
 
+  bool _useDarkText(Color bg) {
+    // Simple luminance check for contrast
+    return bg.computeLuminance() > 0.6;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bgColor = color ?? Theme.of(context).primaryColor;
+    final useDarkText = _useDarkText(bgColor);
+    final fgColor = useDarkText ? Colors.black : Colors.white;
+
     return SafeArea(
       minimum: const EdgeInsets.all(16),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: loading ? null : onPressed,
-          icon: icon != null ? Icon(icon) : const Icon(Icons.arrow_forward),
+          icon: icon != null
+              ? Icon(icon, color: fgColor)
+              : Icon(Icons.arrow_forward, color: fgColor),
           label: loading
               ? const SizedBox(
                   width: 22,
@@ -34,9 +45,13 @@ class SafeBottomButton extends StatelessWidget {
                     color: Colors.white,
                   ),
                 )
-              : Text(label),
+              : Text(
+                  label,
+                  style: TextStyle(color: fgColor),
+                ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: color ?? Theme.of(context).primaryColor,
+            backgroundColor: bgColor,
+            foregroundColor: fgColor, // ✅ KEY FIX
             padding: const EdgeInsets.symmetric(vertical: 14),
             textStyle: const TextStyle(
               fontSize: 16,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 
@@ -14,6 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
   bool _loading = false;
   bool _rememberMe = false;
   bool _showPassword = false;
@@ -27,15 +27,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSaved() async {
     final store = SecureStore();
     final remember = await store.getBool("rememberMeUser") ?? false;
+    if (!remember) return;
+
     final email = await store.getString("savedUserEmail") ?? "";
     final pass = await store.getString("savedUserPassword") ?? "";
-    if (remember) {
-      setState(() {
-        _rememberMe = true;
-        _emailCtrl.text = email;
-        _passwordCtrl.text = pass;
-      });
-    }
+
+    setState(() {
+      _rememberMe = true;
+      _emailCtrl.text = email;
+      _passwordCtrl.text = pass;
+    });
   }
 
   Future<void> _login() async {
@@ -55,14 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await store.remove("agentLoggedIn");
       await store.setBool("userLoggedIn", true);
       await store.setString("role", "user");
-      await store.setString("userId", user["id"].toString());
-      await store.setString("userEmail", user["email"] ?? "");
-      await store.setString("userFirstName", user["firstName"] ?? "");
-      await store.setString("userLastName", user["lastName"] ?? "");
-      await store.setString("agent_id", user["agent_id"]?.toString() ?? "");
-      await store.setString("purchase_code", user["purchase_code"] ?? "");
 
-      // Remember Me handling
+      // ✅ cache validated DB values
+      await store.setString("userId", user["id"].toString());
+      await store.setString("userEmail", user["email"]);
+      await store.setString("agent_id", user["agent_id"]?.toString() ?? "");
+
       if (_rememberMe) {
         await store.setBool("rememberMeUser", true);
         await store.setString("savedUserEmail", _emailCtrl.text.trim());
@@ -73,24 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove("savedUserPassword");
       }
 
-      // 🔥 NEW — Register FCM token
-      try {
-        final fcm = await FirebaseMessaging.instance.getToken();
-        debugPrint("📱 FCM Token for USER: $fcm");
-        if (fcm != null) {
-          final reg = await ApiService.registerDeviceToken(
-            email: user["email"],
-            fcmToken: fcm,
-            role: "user",
-          );
-          debugPrint("📌 Device registration result: $reg");
-        }
-      } catch (e) {
-        debugPrint("⚠ Device registration failed: $e");
-      }
-
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, "/menu");
+
+      // ✅ ✅ ✅ CRITICAL FIX — ALWAYS GO TO LOGO
+      Navigator.pushReplacementNamed(context, "/logo");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res["error"] ?? "Invalid credentials")),
@@ -122,18 +107,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
-                    icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
+                    icon: Icon(
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                validator: (v) => v == null || v.isEmpty ? "Enter password" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter password" : null,
               ),
               const SizedBox(height: 12),
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) => setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
-                controlAffinity: ListTileControlAffinity.leading,
               ),
               const SizedBox(height: 24),
               _loading

@@ -16,23 +16,24 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    _checkStoredRole();
+    _checkStoredSession();
   }
 
-  /// 🔥 Restored auto-forward logic so app knows how to start
-  Future<void> _checkStoredRole() async {
+  /// ✅ Landing ONLY redirects if user is STILL logged in
+  Future<void> _checkStoredSession() async {
     final store = SecureStore();
     final role = await store.getString('role');
-    final agentRegistered = await store.getBool('agentRegistered') ?? false;
-    final userRegistered = await store.getBool('registered') ?? false;
+    final loggedIn = await store.getBool('loggedIn') ?? false;
 
     if (!mounted) return;
 
-    if (role != null || agentRegistered || userRegistered) {
+    // ✅ Logged in → Splash (Landing is skipped entirely)
+    if (role != null && loggedIn) {
       Navigator.pushReplacementNamed(context, '/splash');
       return;
     }
 
+    // ✅ Not logged in → stay on Landing
     setState(() => _loading = false);
   }
 
@@ -59,7 +60,7 @@ class _LandingScreenState extends State<LandingScreen> {
           title: const Text(
             "Already Registered?",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -81,7 +82,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       "User Login",
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.normal,
                         color: Color(0xFF4A3AFF),
                       ),
                     ),
@@ -95,7 +96,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       "Agent Login",
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.normal,
                         color: Color(0xFF4A3AFF),
                       ),
                     ),

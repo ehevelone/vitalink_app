@@ -1,6 +1,8 @@
-// lib/screens/menu_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import '../services/secure_store.dart';
+import '../services/api_service.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -16,12 +18,14 @@ class _MenuScreenState extends State<MenuScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
+  bool _deviceRegistered = false;
 
   @override
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
     _loadProfile();
+    _registerDevice(); // ✅ correct
   }
 
   Future<void> _loadProfile() async {
@@ -33,13 +37,46 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
+  /// ✅ FIXED — matches ApiService signature EXACTLY
+  Future<void> _registerDevice() async {
+    if (_deviceRegistered) return;
+
+    try {
+      final store = SecureStore();
+
+      final email = await store.getString('userEmail');
+      final role = await store.getString('role');
+
+      if (email == null || email.isEmpty || role == null) {
+        debugPrint("⚠️ Device registration skipped: missing email/role");
+        return;
+      }
+
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null || fcmToken.isEmpty) {
+        debugPrint("⚠️ Device registration skipped: no FCM token");
+        return;
+      }
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: fcmToken,
+        role: role,
+      );
+
+      _deviceRegistered = true;
+      debugPrint("✅ Device registered successfully");
+    } catch (e) {
+      debugPrint("❌ Device registration failed: $e");
+    }
+  }
+
   Future<void> _logout(BuildContext context) async {
     final store = SecureStore();
     await store.remove('userLoggedIn');
     await store.remove('rememberMe');
     await store.remove('role');
     await store.remove('authToken');
-    await store.remove('device_token');
 
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
@@ -76,7 +113,6 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
             ),
-
             _loading
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
@@ -85,97 +121,68 @@ class _MenuScreenState extends State<MenuScreen> {
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.person_pin_circle,
-                                    color: Colors.green),
-                                title: const Text("My Agent"),
-                                onTap: () => Navigator.pushNamed(
-                                    context, '/my_agent_user'),
-                              ),
-                            ),
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.medical_information,
-                                    color: Colors.green),
-                                title: const Text("Medications"),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/meds'),
-                              ),
-                            ),
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.people,
-                                    color: Colors.green),
-                                title: const Text("Doctors"),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/doctors'),
-                              ),
-                            ),
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.credit_card,
-                                    color: Colors.green),
-                                title: const Text("Insurance Cards"),
-                                onTap: () => Navigator.pushNamed(
-                                    context, '/insurance_cards_menu'),
-                              ),
-                            ),
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.policy,
-                                    color: Colors.green),
-                                title: const Text("Insurance Policies"),
-                                onTap: () => Navigator.pushNamed(
-                                    context, '/insurance_policies'),
-                              ),
-                            ),
-                            Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.person,
-                                    color: Colors.green),
-                                title: const Text("My Profile"),
-                                onTap: () =>
-                                    Navigator.pushNamed(context, '/my_profile'),
-                              ),
-                            ),
+                            _item(Icons.person_pin_circle, "My Agent",
+                                '/my_agent_user'),
+                            _item(Icons.medical_information, "Medications",
+                                '/meds'),
+                            _item(Icons.people, "Doctors", '/doctors'),
+                            _item(Icons.credit_card, "Insurance Cards",
+                                '/insurance_cards_menu'),
+                            _item(Icons.policy, "Insurance Policies",
+                                '/insurance_policies'),
+                            _item(Icons.person, "My Profile", '/my_profile'),
                           ],
                         ),
                       ),
-
+                      // 🔵 Blue / white
                       SafeBottomButton(
                         label: "Add Family Member",
                         icon: Icons.group_add,
                         color: Colors.blue.shade700,
                         onPressed: () => Navigator.pushNamed(
-                                context, '/new_profile')
-                            .then((_) => _loadProfile()),
+                          context,
+                          '/new_profile',
+                        ).then((_) => _loadProfile()),
                       ),
+                      // ⚫ Grey / white
                       SafeBottomButton(
                         label: "Switch Profile",
                         icon: Icons.swap_horiz,
-                        color: Colors.grey.shade800,
+                        color: Colors.grey.shade900,
                         onPressed: () => Navigator.pushNamed(
-                                context, '/profile_picker')
-                            .then((_) => _loadProfile()),
+                          context,
+                          '/profile_picker',
+                        ).then((_) => _loadProfile()),
                       ),
+                      // 🔴 Red / white
                       SafeBottomButton(
                         label: "Emergency Info",
                         icon: Icons.warning_amber_rounded,
-                        color: Colors.red.shade900,
-                        onPressed: () => Navigator.pushNamed(
-                            context, '/emergency'),
+                        color: Colors.red.shade800,
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/emergency'),
                       ),
+                      // 💗 Pink / red
                       SafeBottomButton(
                         label: "Log Out",
                         icon: Icons.logout,
-                        color: Colors.red.shade100,
+                        color: Colors.pink.shade100,
                         onPressed: () => _logout(context),
                       ),
                     ],
                   ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _item(IconData icon, String text, String route) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, color: Colors.green),
+        title: Text(text),
+        onTap: () => Navigator.pushNamed(context, route),
       ),
     );
   }

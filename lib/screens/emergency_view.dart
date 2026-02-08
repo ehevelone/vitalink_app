@@ -57,7 +57,11 @@ class _EmergencyViewState extends State<EmergencyView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.red),
+        ),
+      );
     }
 
     final p = _p!;
@@ -79,7 +83,11 @@ class _EmergencyViewState extends State<EmergencyView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Emergency Info${p.fullName.isNotEmpty ? " – ${p.fullName}" : ""}"),
+        backgroundColor: Colors.red.shade900, // ✅ red theme
+        foregroundColor: Colors.white,
+        title: Text(
+          "Emergency Info${p.fullName.isNotEmpty ? " – ${p.fullName}" : ""}",
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -109,13 +117,25 @@ class _EmergencyViewState extends State<EmergencyView> {
             padding: const EdgeInsets.all(16),
             children: [
               if (p.fullName.isNotEmpty)
-                ListTile(title: const Text("Name"), subtitle: Text(p.fullName)),
+                ListTile(
+                  title: const Text("Name"),
+                  subtitle: Text(p.fullName),
+                ),
               if (p.dob?.isNotEmpty == true)
-                ListTile(title: const Text("Date of Birth"), subtitle: Text(Formatters.dob(p.dob!))),
+                ListTile(
+                  title: const Text("Date of Birth"),
+                  subtitle: Text(Formatters.dob(p.dob!)),
+                ),
               if (e.allergies.isNotEmpty)
-                ListTile(title: const Text("Allergies"), subtitle: Text(e.allergies)),
+                ListTile(
+                  title: const Text("Allergies"),
+                  subtitle: Text(e.allergies),
+                ),
               if (e.conditions.isNotEmpty)
-                ListTile(title: const Text("Medical Conditions"), subtitle: Text(e.conditions)),
+                ListTile(
+                  title: const Text("Medical Conditions"),
+                  subtitle: Text(e.conditions),
+                ),
               if (e.contact.isNotEmpty || e.phone.isNotEmpty)
                 ListTile(
                   title: const Text("Emergency Contact"),
@@ -124,12 +144,24 @@ class _EmergencyViewState extends State<EmergencyView> {
                     if (e.phone.isNotEmpty) Formatters.phone(e.phone),
                   ].join(" • ")),
                 ),
-              const Divider(height: 32),
-              const Text("Show this QR code to emergency personnel:",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+
+              const Divider(height: 32, color: Colors.redAccent), // ✅ red accent
+
+              const Text(
+                "Show this QR code to emergency personnel:",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
               const SizedBox(height: 12),
               Center(
-                child: QrImageView(data: qrData, version: QrVersions.auto, size: 240),
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 240,
+                ),
               ),
             ],
           ),

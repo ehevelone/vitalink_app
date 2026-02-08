@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.etenterprises.vitalink"
-        minSdk = 23                      // ← FIXED HERE
+        minSdkVersion = flutter.minSdkVersion                      // ← FIXED HERE
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -21,19 +22,25 @@ class _LogoScreenState extends State<LogoScreen> {
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
+
     _loadProfile();
 
-    // Auto navigate after 15 seconds if idle
+    // ✅ EXACT dwell time (15s)
     _timer = Timer(const Duration(seconds: 15), _openMenu);
   }
 
   Future<void> _loadProfile() async {
-    final p = await _repo.loadProfile();
-    if (!mounted) return;
-    setState(() {
-      _p = p;
-      _loading = false;
-    });
+    try {
+      final p = await _repo.loadProfile();
+      if (!mounted) return;
+      setState(() {
+        _p = p;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -42,24 +49,26 @@ class _LogoScreenState extends State<LogoScreen> {
     super.dispose();
   }
 
-  /// ✅ Decide which menu based on stored role
+  /// ✅ ROUTING — NEVER LOOP
   Future<void> _openMenu() async {
     _timer?.cancel();
 
     final store = SecureStore();
-    final role = await store.getString('role') ?? 'user';
+    final role = await store.getString('role');
 
     if (!mounted) return;
+
     if (role == 'agent') {
       Navigator.pushReplacementNamed(context, '/agent_menu');
-    } else {
-      Navigator.pushReplacementNamed(context, '/menu');
+      return;
     }
-  }
 
-  void _openEmergencyView() {
-    _timer?.cancel();
-    Navigator.pushReplacementNamed(context, '/emergency_view');
+    if (role == 'user') {
+      Navigator.pushReplacementNamed(context, '/menu');
+      return;
+    }
+
+    Navigator.pushReplacementNamed(context, '/landing');
   }
 
   void _openEmergencyScreen() {
@@ -75,63 +84,99 @@ class _LogoScreenState extends State<LogoScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: InkWell(
-        onTap: _openMenu, // ✅ quick enter to menu
+        onTap: _openMenu,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // App logo
+              // ✅ LOGO
               Image.asset(
                 'assets/images/vitalink-logo-1.png',
                 width: 220,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 24),
 
-              // Profile greeting or spinner
+              const SizedBox(height: 28),
+
+              // ✅ PROFILE / LOADING
               if (_loading)
                 const CircularProgressIndicator(color: Colors.white70)
               else if (hasName) ...[
                 Text(
                   "Welcome, $name",
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
               ],
 
+              // ✅ TAP ANYWHERE (PROMINENT)
               const Text(
-                'Tap anywhere to open',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
+                'TAP ANYWHERE TO OPEN',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.1,
+                ),
               ),
 
               const SizedBox(height: 48),
 
-              // Emergency QR shortcut (for responders)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+              // 🔴 BIG SQUARE EMERGENCY BUTTON
+              GestureDetector(
+                onTap: _openEmergencyScreen,
+                child: Container(
+                  width: 240,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade700,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.redAccent,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withOpacity(0.4),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "EMERGENCY",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        "TAP FOR INFO",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                icon: const Icon(Icons.qr_code),
-                label: const Text("911 Emergency QR"),
-                onPressed: _openEmergencyView,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Emergency info shortcut (for user details)
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white70),
-                ),
-                icon: const Icon(Icons.assignment),
-                label: const Text("My Emergency Info"),
-                onPressed: _openEmergencyScreen,
               ),
             ],
           ),
