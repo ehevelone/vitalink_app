@@ -2,10 +2,8 @@
 const db = require("./services/db");
 
 /**
- * This endpoint resolves a secure onboarding token (from the URL)
- * to the real unlock_code in your Supabase `agents` table.
- * Example call:
- *   /.netlify/functions/resolve_token?token=abcd1234
+ * Resolve an onboarding token to an agent unlock code.
+ * Used ONLY for agent claim / onboarding.
  */
 exports.handler = async (event) => {
   try {
@@ -18,17 +16,18 @@ exports.handler = async (event) => {
       };
     }
 
-    // 1️⃣ Lookup agent by token
+    // 🔍 Lookup agent by onboarding token
     const result = await db.query(
-      `SELECT unlock_code, active
-       FROM agents
-       WHERE onboard_token = $1
-       LIMIT 1`,
+      `
+      SELECT unlock_code, active
+      FROM agents
+      WHERE onboard_token = $1
+      LIMIT 1
+      `,
       [token]
     );
 
-    // 2️⃣ Validate result
-    if (result.rows.length === 0) {
+    if (!result.rows.length) {
       return {
         statusCode: 404,
         headers: { "Content-Type": "application/json" },
@@ -38,24 +37,35 @@ exports.handler = async (event) => {
 
     const agent = result.rows[0];
 
-    // 3️⃣ Return unlock code
+    // 🔒 Enforce active agent
+    if (!agent.active) {
+      return {
+        statusCode: 403,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success: false,
+          error: "Agent is inactive",
+        }),
+      };
+    }
+
+    // ✅ Return unlock code
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         success: true,
         unlock_code: agent.unlock_code,
-        active: agent.active,
       }),
     };
   } catch (err) {
-    console.error("❌ Error in resolve_token:", err);
+    console.error("❌ resolve_token error:", err);
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         success: false,
-        error: "Server error: " + err.message,
+        error: "Server error",
       }),
     };
   }
