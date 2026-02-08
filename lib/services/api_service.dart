@@ -1,256 +1,172 @@
-// lib/services/api_service.dart
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-class ApiService {
-  /// ✅ Netlify Functions base URL (THIS IS CORRECT)
-  static const String _baseUrl =
-      "https://vitalink-app.netlify.app/.netlify/functions";
+import '../services/secure_store.dart';
+import '../services/api_service.dart';
 
-  // -------------------------------------------------------------
-  // 🔧 Internal POST helper
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> _postJson(
-    String path,
-    Map<String, dynamic> body,
-  ) async {
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+
+  bool _loading = false;
+  bool _rememberMe = false;
+  bool _showPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final store = SecureStore();
+    final remember = await store.getBool("rememberMeUser") ?? false;
+    if (!remember) return;
+
+    final email = await store.getString("savedUserEmail") ?? "";
+    final pass = await store.getString("savedUserPassword") ?? "";
+
+    setState(() {
+      _rememberMe = true;
+      _emailCtrl.text = email;
+      _passwordCtrl.text = pass;
+    });
+  }
+
+  // 🔥 REGISTER DEVICE AFTER LOGIN (CORRECT + WIRED)
+  Future<void> _registerDeviceAfterLogin(String email) async {
     try {
-      final url = Uri.parse("$_baseUrl/$path");
+      debugPrint("🔥 registerDeviceAfterLogin CALLED");
 
-      debugPrint("📡 POST → $url");
-      debugPrint("📦 BODY → $body");
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) {
+        debugPrint("❌ No FCM token available");
+        return;
+      }
 
-      final res = await http.post(
-        url,
-        headers: const {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode(body),
+      debugPrint("📨 Registering device token");
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: token,
+        role: "user",
       );
 
-      debugPrint("📥 STATUS (${path}): ${res.statusCode}");
-      debugPrint("📥 RAW BODY (${path}): ${res.body}");
-
-      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-      return decoded;
-    } catch (e, st) {
-      debugPrint("❌ API ERROR ($path): $e\n$st");
-      return {"success": false, "error": e.toString()};
+      debugPrint("✅ Device registration request sent");
+    } catch (e) {
+      debugPrint("❌ Device registration failed: $e");
     }
   }
 
-  // -------------------------------------------------------------
-  // 🔹 Insurance card parsing
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> parseInsurance(File image) async {
-    final bytes = await image.readAsBytes();
-    final base64 = base64Encode(bytes);
-    return _postJson("parse_insurance", {"imageBase64": base64});
-  }
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
 
-  // -------------------------------------------------------------
-  // 🔹 Agent unlock claim
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> claimAgentUnlock({
-    required String unlockCode,
-    required String email,
-    required String password,
-    required String npn,
-    String? phone,
-    String? name,
-  }) {
-    return _postJson("claim_agent_unlock", {
-      "unlockCode": unlockCode,
-      "email": email,
-      "password": password,
-      "npn": npn,
-      "phone": phone,
-      "name": name,
-    });
-  }
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
 
-  // -------------------------------------------------------------
-  // 🔹 Agent login
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> loginAgent({
-    required String email,
-    required String password,
-  }) async {
-    final res = await _postJson("check_agent", {
-      "email": email,
-      "password": password,
-    });
+    final res = await ApiService.loginUser(
+      email: email,
+      password: password,
+      platform: "android",
+    );
 
-    if (res["success"] != true || res["agent"] == null) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials",
-      };
+    if (res["success"] == true) {
+      final user = res["user"];
+      final store = SecureStore();
+
+      await store.remove("agentLoggedIn");
+      await store.setBool("userLoggedIn", true);
+      await store.setString("role", "user");
+
+      // cache DB-backed values
+      await store.setString("userId", user["id"].toString());
+      await store.setString("userEmail", user["email"]);
+      await store.setString("agent_id", user["agent_id"]?.toString() ?? "");
+
+      if (_rememberMe) {
+        await store.setBool("rememberMeUser", true);
+        await store.setString("savedUserEmail", email);
+        await store.setString("savedUserPassword", password);
+      } else {
+        await store.setBool("rememberMeUser", false);
+        await store.remove("savedUserEmail");
+        await store.remove("savedUserPassword");
+      }
+
+      // 🔑 THIS WAS THE MISSING PIECE
+      await _registerDeviceAfterLogin(email);
+
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, "/logo");
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res["error"] ?? "Invalid credentials")),
+      );
     }
 
-    return {
-      "success": true,
-      "agent": res["agent"],
-    };
+    if (mounted) setState(() => _loading = false);
   }
 
-  // -------------------------------------------------------------
-  // 🔹 User login
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> loginUser({
-    required String email,
-    required String password,
-    required String platform,
-  }) async {
-    final res = await _postJson("check_user", {
-      "email": email,
-      "password": password,
-      "platform": platform,
-    });
-
-    if (res["success"] != true || res["user"] == null) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials",
-      };
-    }
-
-    return {
-      "success": true,
-      "user": res["user"],
-    };
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Promo lookup
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> verifyPromo({
-    required String username,
-    required String promoCode,
-  }) {
-    return _postJson("vpc", {
-      "username": username,
-      "promoCode": promoCode,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Generate agent unlock code
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> issueAgentCode({
-    required String masterKey,
-    String? requestedEmail,
-    String? requestedName,
-    String? requestedNpn,
-  }) {
-    return _postJson("generate_agent_unlock", {
-      "masterKey": masterKey,
-      "email": requestedEmail,
-      "name": requestedName,
-      "npn": requestedNpn,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Request password reset
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> requestPasswordReset(
-      String emailOrPhone) {
-    return _postJson("request_reset", {"emailOrPhone": emailOrPhone});
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Complete password reset
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> resetPassword({
-    required String emailOrPhone,
-    required String code,
-    required String newPassword,
-  }) {
-    return _postJson("reset_password", {
-      "emailOrPhone": emailOrPhone,
-      "code": code,
-      "newPassword": newPassword,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔥 Get agent promo code
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentPromoCode(String email) {
-    return _postJson("get_agent_promo", {"email": email});
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Register device token
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> registerDeviceToken({
-    required String email,
-    required String fcmToken,
-    required String role,
-  }) {
-    return _postJson("register_device_v2", {
-      "email": email,
-      "role": role,
-      "deviceToken": fcmToken,
-      "platform": "android",
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔔 Send notification
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> sendNotification({
-    required String agentEmail,
-  }) {
-    return _postJson("send_notification", {"agentEmail": agentEmail});
-  }
-
-  // -------------------------------------------------------------
-  // 🧑‍💼 Update agent profile
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> updateAgentProfile({
-    required String email,
-    String? name,
-    String? phone,
-    String? npn,
-    String? agencyName,
-    String? agencyAddress,
-    String? password,
-  }) {
-    final body = {
-      "email": email,
-      "name": name,
-      "phone": phone,
-      "npn": npn,
-      "agency_name": agencyName,
-      "agency_address": agencyAddress,
-      "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
-
-    return _postJson("update_agent_profile", body);
-  }
-
-  // -------------------------------------------------------------
-  // 👤 Update user profile
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> updateUserProfile({
-    required String currentEmail,
-    required String email,
-    String? name,
-    String? phone,
-    String? password,
-  }) {
-    final body = {
-      "currentEmail": currentEmail,
-      "email": email,
-      "name": name,
-      "phone": phone,
-      "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
-
-    return _postJson("update_user_profile", body);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("User Login")),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              TextFormField(
+                controller: _emailCtrl,
+                decoration: const InputDecoration(labelText: "Email"),
+                validator: (v) => v == null || v.isEmpty ? "Enter email" : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passwordCtrl,
+                obscureText: !_showPassword,
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
+                  ),
+                ),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter password" : null,
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: _rememberMe,
+                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                title: const Text("Remember me"),
+              ),
+              const SizedBox(height: 24),
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      onPressed: _login,
+                      child: const Text("Login"),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
