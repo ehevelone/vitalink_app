@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 
@@ -39,6 +41,27 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  /// 🔑 REGISTER DEVICE AFTER LOGIN
+  Future<void> _registerDeviceAfterLogin(String email) async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) {
+        debugPrint("❌ No FCM token available");
+        return;
+      }
+
+      await ApiService.registerDevice(
+        email: email,
+        deviceToken: token,
+        platform: "android",
+      );
+
+      debugPrint("✅ Device registration sent");
+    } catch (e) {
+      debugPrint("❌ Device registration failed: $e");
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -72,9 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove("savedUserPassword");
       }
 
+      // 🚨 THIS WAS MISSING — REGISTER DEVICE ON LOGIN
+      await _registerDeviceAfterLogin(_emailCtrl.text.trim());
+
       if (!mounted) return;
 
-      // ✅ ✅ ✅ CRITICAL FIX — ALWAYS GO TO LOGO
+      // ✅ ALWAYS GO TO LOGO
       Navigator.pushReplacementNamed(context, "/logo");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                      _showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
