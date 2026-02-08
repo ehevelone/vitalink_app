@@ -1,0 +1,16 @@
+[build]
+  command = "echo 'API only'"
+  publish = "public"
+
+[functions]
+  directory = "functions"
+
+[functions."*"]
+  node_bundler = "esbuild"
+  external_node_modules = [
+    "pg",
+    "bcryptjs",
+    "firebase-admin",
+    "nodemailer",
+    "qrcode"
+  ]
