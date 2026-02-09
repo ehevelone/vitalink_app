@@ -22,7 +22,7 @@ function reply(statusCode, obj) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
     },
     body: JSON.stringify(obj),
@@ -31,25 +31,12 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ CORS preflight
+    // ✅ SINGLE, CLEAN CORS PREFLIGHT
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
@@ -59,44 +46,26 @@ if (event.httpMethod !== "POST") {
     // ✅ Safe body parsing
     let body = {};
     try {
-      if (event.isBase64Encoded) {
-        body = JSON.parse(
-          Buffer.from(event.body, "base64").toString("utf8")
-        );
-      } else {
-        body = JSON.parse(event.body || "{}");
-      }
-    } catch (e) {
-      return reply(400, {
-        success: false,
-        error: "Invalid request body",
-      });
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
+    } catch {
+      return reply(400, { success: false, error: "Invalid request body" });
     }
 
     const { agentEmail } = body;
     if (!agentEmail) {
-      return reply(400, {
-        success: false,
-        error: "Missing agentEmail",
-      });
+      return reply(400, { success: false, error: "Missing agentEmail" });
     }
 
     // ✅ Get agent
     const agentRes = await db.query(
-      `
-      SELECT id, name
-      FROM agents
-      WHERE LOWER(email) = LOWER($1)
-      LIMIT 1
-      `,
+      `SELECT id, name FROM agents WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [agentEmail.trim()]
     );
 
     if (!agentRes.rows.length) {
-      return reply(404, {
-        success: false,
-        error: "Agent not found",
-      });
+      return reply(404, { success: false, error: "Agent not found" });
     }
 
     const agent = agentRes.rows[0];
@@ -130,19 +99,29 @@ if (event.httpMethod !== "POST") {
     if (!devicesRes.rows.length) {
       return reply(404, {
         success: false,
-        error: "No registered devices for these users",
+        error: "No registered devices",
       });
     }
 
     const tokens = devicesRes.rows.map((d) => d.device_token);
 
-    // ✅ Send FCM multicast
+    // 🔔 REAL NOTIFICATION (NOT DATA-ONLY)
     const message = {
+      tokens,
+
       notification: {
         title: `Message from ${agent.name || "Your Agent"}`,
         body: "⏰ Time to send your Medicare information!",
       },
-      tokens,
+
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "high_importance_channel",
+          sound: "default",
+        },
+      },
+
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/authorization_form",
@@ -153,7 +132,6 @@ if (event.httpMethod !== "POST") {
 
     return reply(200, {
       success: true,
-      message: "Notifications sent ✅",
       successCount: response.successCount,
       failureCount: response.failureCount,
       totalDevices: tokens.length,
