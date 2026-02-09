@@ -7,7 +7,7 @@ import '../services/secure_store.dart';
 import '../models.dart';
 
 class QrScreen extends StatefulWidget {
-  final String data;
+  final String data; // JSON emergency payload
   final String? title;
 
   const QrScreen({super.key, required this.data, this.title});
@@ -20,7 +20,8 @@ class _QrScreenState extends State<QrScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
-  Map<String, dynamic>? _decoded;
+
+  late final String _qrUrl;
 
   @override
   void initState() {
@@ -28,12 +29,11 @@ class _QrScreenState extends State<QrScreen> {
     _repo = DataRepository(SecureStore());
     _load();
 
-    // decode data for small text summary only
-    try {
-      _decoded = jsonDecode(widget.data);
-    } catch (_) {
-      _decoded = null;
-    }
+    // 🔒 Encode payload safely for URL transport
+    final encoded = base64UrlEncode(utf8.encode(widget.data));
+
+    // ✅ QR NOW POINTS TO WEBSITE (NOT RAW JSON)
+    _qrUrl = "https://vitalink.app/emergency.html?data=$encoded";
   }
 
   Future<void> _load() async {
@@ -48,76 +48,62 @@ class _QrScreenState extends State<QrScreen> {
   @override
   Widget build(BuildContext context) {
     final titleText = _p?.fullName.isNotEmpty == true
-        ? "${widget.title ?? "QR Code"} – ${_p!.fullName}"
-        : widget.title ?? "QR Code";
+        ? "${widget.title ?? "Emergency QR"} – ${_p!.fullName}"
+        : widget.title ?? "Emergency QR";
 
     return Scaffold(
       appBar: AppBar(title: Text(titleText)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(20),
               children: [
-                // QR image
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FullscreenQr(data: widget.data),
-                      ),
-                    );
-                  },
-                  child: Center(
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FullscreenQr(url: _qrUrl),
+                        ),
+                      );
+                    },
                     child: QrImageView(
-                      data: widget.data,
+                      data: _qrUrl,
                       size: 260,
                       backgroundColor: Colors.white,
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 24),
 
-                if (_decoded != null) ..._summarySection(_decoded!),
+                const Text(
+                  "Emergency Access",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                const Text(
+                  "Scan this QR code to securely view emergency medical information.\n\n"
+                  "Access expires automatically. Rescan required for future access.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                ),
               ],
             ),
     );
   }
-
-  // Only show short emergency summary
-  List<Widget> _summarySection(Map<String, dynamic> d) {
-    Widget tile(String label, String value) => ListTile(
-          dense: true,
-          title: Text(label),
-          subtitle: Text(value.isNotEmpty ? value : "N/A"),
-        );
-
-    return [
-      const Text(
-        "Quick Emergency Summary",
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-      const Divider(),
-      if (d["name"] != null) tile("Name", d["name"]),
-      if (d["dob"] != null) tile("Date of Birth", d["dob"]),
-      if (d["bloodType"] != null) tile("Blood Type", d["bloodType"]),
-      if (d["emergencyContactName"] != null) tile("Emergency Contact", d["emergencyContactName"]),
-      if (d["emergencyContactPhone"] != null) tile("Emergency Phone", d["emergencyContactPhone"]),
-      if (d["allergies"] != null) tile("Allergies", d["allergies"]),
-      if (d["conditions"] != null) tile("Medical Conditions", d["conditions"]),
-      const SizedBox(height: 20),
-      const Text(
-        "⚠ Full medical / medication / doctor / insurance card info is embedded in the QR only.\nScanning device will receive full data.",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, color: Colors.black54),
-      ),
-    ];
-  }
 }
 
 class FullscreenQr extends StatelessWidget {
-  final String data;
-  const FullscreenQr({super.key, required this.data});
+  final String url;
+  const FullscreenQr({super.key, required this.url});
 
   @override
   Widget build(BuildContext context) {
@@ -125,10 +111,16 @@ class FullscreenQr extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Center(
         child: QrImageView(
-          data: data,
-          size: 390,
-          eyeStyle: const QrEyeStyle(color: Colors.white, eyeShape: QrEyeShape.square),
-          dataModuleStyle: const QrDataModuleStyle(color: Colors.white, dataModuleShape: QrDataModuleShape.square),
+          data: url,
+          size: 400,
+          eyeStyle: const QrEyeStyle(
+            color: Colors.white,
+            eyeShape: QrEyeShape.square,
+          ),
+          dataModuleStyle: const QrDataModuleStyle(
+            color: Colors.white,
+            dataModuleShape: QrDataModuleShape.square,
+          ),
         ),
       ),
     );
