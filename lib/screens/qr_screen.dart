@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -20,9 +21,7 @@ class _QrScreenState extends State<QrScreen> {
   Profile? _p;
   bool _loading = true;
 
-  /// ✅ THE ONLY CORRECT URL
-  static const String _qrUrl =
-      "https://myvitalink.app/emergency.html";
+  String? _qrUrl;
 
   @override
   void initState() {
@@ -33,9 +32,27 @@ class _QrScreenState extends State<QrScreen> {
 
   Future<void> _load() async {
     final p = await _repo.loadProfile();
-    if (!mounted) return;
+    if (!mounted || p == null) return;
+
+    // 🔐 Build emergency payload
+    final payload = {
+      "name": p.fullName,
+      "dob": p.dob,
+      "bloodType": p.bloodType,
+      "allergies": p.allergies,
+      "conditions": p.conditions,
+      "organDonor": p.organDonor,
+      "emergencyContactName": p.emergencyContactName,
+      "emergencyContactPhone": p.emergencyContactPhone,
+    };
+
+    final encoded =
+        base64UrlEncode(utf8.encode(jsonEncode(payload)));
+
     setState(() {
       _p = p;
+      _qrUrl =
+          "https://myvitalink.app/emergency.html?data=$encoded";
       _loading = false;
     });
   }
@@ -48,27 +65,16 @@ class _QrScreenState extends State<QrScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(titleText)),
-      body: _loading
+      body: _loading || _qrUrl == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const FullscreenQr(url: _qrUrl),
-                        ),
-                      );
-                    },
-                    child: QrImageView(
-                      data: _qrUrl,
-                      size: 260,
-                      backgroundColor: Colors.white,
-                    ),
+                  child: QrImageView(
+                    data: _qrUrl!,
+                    size: 260,
+                    backgroundColor: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -89,32 +95,6 @@ class _QrScreenState extends State<QrScreen> {
                 ),
               ],
             ),
-    );
-  }
-}
-
-class FullscreenQr extends StatelessWidget {
-  final String url;
-  const FullscreenQr({super.key, required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: QrImageView(
-          data: url,
-          size: 400,
-          eyeStyle: const QrEyeStyle(
-            color: Colors.white,
-            eyeShape: QrEyeShape.square,
-          ),
-          dataModuleStyle: const QrDataModuleStyle(
-            color: Colors.white,
-            dataModuleShape: QrDataModuleShape.square,
-          ),
-        ),
-      ),
     );
   }
 }
