@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -7,7 +6,7 @@ import '../services/secure_store.dart';
 import '../models.dart';
 
 class QrScreen extends StatefulWidget {
-  final String data; // JSON emergency payload
+  final String data; // still passed in, NOT used for QR
   final String? title;
 
   const QrScreen({super.key, required this.data, this.title});
@@ -21,19 +20,15 @@ class _QrScreenState extends State<QrScreen> {
   Profile? _p;
   bool _loading = true;
 
-  late final String _qrUrl;
+  /// 🔒 STATIC EMERGENCY PAGE — NO PARAMS, NO FUNCTIONS
+  static const String _qrUrl =
+      "https://vitalink.app/public/emergency.html";
 
   @override
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
     _load();
-
-    // 🔒 Encode payload safely for URL transport
-    final encoded = base64UrlEncode(utf8.encode(widget.data));
-
-    // ✅ QR NOW POINTS TO WEBSITE (NOT RAW JSON)
-    _qrUrl = "https://vitalink.app/emergency.html?data=$encoded";
   }
 
   Future<void> _load() async {
@@ -64,7 +59,8 @@ class _QrScreenState extends State<QrScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => FullscreenQr(url: _qrUrl),
+                          builder: (_) =>
+                              const FullscreenQr(url: _qrUrl),
                         ),
                       );
                     },
@@ -90,8 +86,8 @@ class _QrScreenState extends State<QrScreen> {
                 const SizedBox(height: 10),
 
                 const Text(
-                  "Scan this QR code to securely view emergency medical information.\n\n"
-                  "Access expires automatically. Rescan required for future access.",
+                  "Scan this QR code to view emergency information.\n\n"
+                  "If the page shows “Session expired”, rescan the QR.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Colors.black54),
                 ),
