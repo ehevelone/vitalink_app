@@ -20,9 +20,9 @@ class _QrScreenState extends State<QrScreen> {
   Profile? _p;
   bool _loading = true;
 
-  /// ✅ ONLY VALID URL — ROOT PATH
+  /// ✅ THE ONLY CORRECT URL
   static const String _qrUrl =
-      "https://vitalink.app/emergency.html";
+      "https://myvitalink.app/emergency/";
 
   @override
   void initState() {
