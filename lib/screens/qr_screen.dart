@@ -22,7 +22,7 @@ class _QrScreenState extends State<QrScreen> {
 
   /// ✅ THE ONLY CORRECT URL
   static const String _qrUrl =
-      "https://myvitalink.app/emergency/";
+      "https://myvitalink.app/emergency.html";
 
   @override
   void initState() {
