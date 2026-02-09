@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const headers = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -19,47 +19,38 @@ function reply(success, obj = {}, code = 200) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ PREFLIGHT
+    // ✅ CORS preflight
     if (event.httpMethod === "OPTIONS") {
       return { statusCode: 200, headers, body: "" };
     }
 
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(false, { error: "Method Not Allowed" }, 405);
     }
 
-    const { email, password, platform } = JSON.parse(event.body || "{}");
+    const { email, password } = JSON.parse(event.body || "{}");
 
     if (!email || !password) {
-      return reply(false, { error: "Email and password required" });
+      return reply(false, { error: "Email and password required" }, 400);
     }
 
     const result = await db.query(
-      `SELECT * FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [email]
+      `SELECT id, email, password_hash, first_name, last_name, agent_id
+       FROM users
+       WHERE LOWER(email) = LOWER($1)
+       LIMIT 1`,
+      [email.trim()]
     );
 
     if (!result.rows.length) {
-      return reply(false, { error: "User not found" });
+      return reply(false, { error: "User not found" }, 404);
     }
 
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
 
     if (!valid) {
-      return reply(false, { error: "Invalid password" });
+      return reply(false, { error: "Invalid password" }, 401);
     }
 
     return reply(true, {
@@ -71,9 +62,8 @@ if (event.httpMethod !== "POST") {
         agent_id: user.agent_id,
       },
     });
-
   } catch (err) {
-    console.error(err);
+    console.error("❌ check_user error:", err);
     return reply(false, { error: "Server error" }, 500);
   }
 };

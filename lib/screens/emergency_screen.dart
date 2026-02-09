@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -51,7 +50,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     final p = await _repo.loadProfile();
     if (!mounted) return;
     setState(() {
-      _p = p ?? Profile(); // ensures UI not blank
+      _p = p ?? Profile();
       _loading = false;
     });
   }
@@ -90,22 +89,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _addToLockScreen() async {
-    final channel = const MethodChannel("vitalink/shortcut");
-    try {
-      await channel.invokeMethod("requestPinShortcut");
-      await SecureStore().setBool("ls_added", true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Requested lock-screen shortcut"),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (err) {
-      debugPrint("Shortcut error: $err");
-    }
   }
 
   @override
@@ -181,22 +164,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   e.organDonor ? "YES" : "NO",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: e.organDonor ? Colors.green.shade800 : Colors.red.shade800,
+                    color: e.organDonor
+                        ? Colors.green.shade800
+                        : Colors.red.shade800,
                     fontSize: 17,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                icon: const Icon(Icons.lock),
-                label: const Text("Add to Lock Screen"),
-                onPressed: _addToLockScreen,
               ),
 
               const Divider(height: 32),

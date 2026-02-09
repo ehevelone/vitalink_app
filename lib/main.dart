@@ -5,6 +5,10 @@ import 'package:flutter/services.dart';
 // Firebase core only (NO messaging init yet)
 import 'package:firebase_core/firebase_core.dart';
 
+// ✅ ADD: FCM + local notifications (for foreground display)
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 // Local services
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
@@ -61,14 +65,61 @@ import 'models.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 const MethodChannel _navChannel = MethodChannel("vitalink/navigation");
 
+// ✅ ADD: local notifications plugin (foreground notification display)
+final FlutterLocalNotificationsPlugin localNotifications =
+    FlutterLocalNotificationsPlugin();
+
+Future<void> _initLocalNotifications() async {
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initSettings = InitializationSettings(android: androidInit);
+  await localNotifications.initialize(initSettings);
+}
+
+// ✅ ADD: show notifications while app is OPEN (foreground)
+void _setupForegroundNotifications() {
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    final notification = message.notification;
+    if (notification == null) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'vitalink_alerts',
+      'VitaLink Alerts',
+      channelDescription: 'Important VitaLink notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+    );
+
+    const platformDetails = NotificationDetails(android: androidDetails);
+
+    await localNotifications.show(
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      platformDetails,
+    );
+  });
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
+  // ✅ Local notifications init is safe even if Firebase fails
+  try {
+    await _initLocalNotifications();
+  } catch (e, st) {
+    debugPrint('🔥 Local notifications init failed: $e');
+    debugPrint('$st');
+  }
+
   // Firebase init wrapped so it can't crash startup
   try {
     await Firebase.initializeApp();
+
+    // ✅ Wire foreground notifications ONLY after Firebase is ready
+    _setupForegroundNotifications();
   } catch (e, st) {
     debugPrint('🔥 Firebase initialization failed: $e');
     debugPrint('$st');
@@ -119,8 +170,7 @@ class VitaLinkApp extends StatelessWidget {
         '/terms_user': (_) => const TermsUserScreen(),
         '/terms_agent': (_) => const TermsAgentScreen(),
         '/registration': (_) => const RegistrationScreen(),
-        '/agent_registration': (_) =>
-            const AgentRegistrationScreen(),
+        '/agent_registration': (_) => const AgentRegistrationScreen(),
         '/welcome': (_) => const WelcomeScreen(),
         '/my_profile': (_) => const MyProfileScreen(),
         '/logo': (_) => const LogoScreen(),
@@ -131,25 +181,17 @@ class VitaLinkApp extends StatelessWidget {
         '/meds': (_) => MedsScreen(),
         '/doctors': (_) => DoctorsScreen(),
         '/doctors_view': (_) => DoctorsView(),
-        '/insurance_policies': (_) =>
-            InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (_) =>
-            InsuranceCardsMenuScreen(),
-        '/authorization_form': (_) =>
-            const HipaaFormScreen(),
+        '/insurance_policies': (_) => InsurancePoliciesScreen(),
+        '/insurance_cards_menu': (_) => InsuranceCardsMenuScreen(),
+        '/authorization_form': (_) => const HipaaFormScreen(),
         '/new_profile': (_) => const NewProfileScreen(),
         '/profile_picker': (_) => const ProfilePickerScreen(),
-        '/profile_manager': (_) =>
-            const ProfileManagerScreen(),
+        '/profile_manager': (_) => const ProfileManagerScreen(),
         '/scan_card': (_) => ScanCard(),
-        '/request_reset': (_) =>
-            const RequestResetScreen(),
-        '/reset_password': (_) =>
-            const ResetPasswordScreen(),
-        '/agent_request_reset': (_) =>
-            const AgentRequestResetScreen(),
-        '/agent_reset_password': (_) =>
-            const AgentResetPasswordScreen(),
+        '/request_reset': (_) => const RequestResetScreen(),
+        '/reset_password': (_) => const ResetPasswordScreen(),
+        '/agent_request_reset': (_) => const AgentRequestResetScreen(),
+        '/agent_reset_password': (_) => const AgentResetPasswordScreen(),
       },
       onGenerateRoute: (settings) {
         switch (settings.name) {

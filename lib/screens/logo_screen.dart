@@ -27,13 +27,16 @@ class _LogoScreenState extends State<LogoScreen> {
     _repo = DataRepository(SecureStore());
 
     _loadProfile();
-    _initPushAndRegister();
 
-    // ✅ EXACT dwell time (15s)
+    // ✅ run after first frame so SecureStore is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initPushAndRegister();
+    });
+
     _timer = Timer(const Duration(seconds: 15), _openMenu);
   }
 
-  /// 🔔 REQUEST PERMISSION + REGISTER DEVICE
+  /// 🔔 REGISTER DEVICE (USER ONLY — HARD LOCKED)
   Future<void> _initPushAndRegister() async {
     if (_deviceRegistered) return;
 
@@ -54,10 +57,9 @@ class _LogoScreenState extends State<LogoScreen> {
 
       final store = SecureStore();
       final email = await store.getString("userEmail");
-      final role = await store.getString("role");
 
-      if (email == null || role != "user") {
-        debugPrint("ℹ️ No user email or not a user — skipping device register");
+      if (email == null) {
+        debugPrint("ℹ️ No user email — skipping device register");
         return;
       }
 
@@ -66,7 +68,7 @@ class _LogoScreenState extends State<LogoScreen> {
       await ApiService.registerDeviceToken(
         email: email,
         fcmToken: token,
-        role: role,
+        role: "user", // ✅ SOLID FIX
       );
 
       _deviceRegistered = true;
@@ -96,7 +98,6 @@ class _LogoScreenState extends State<LogoScreen> {
     super.dispose();
   }
 
-  /// ✅ ROUTING — NEVER LOOP
   Future<void> _openMenu() async {
     _timer?.cancel();
 
@@ -169,13 +170,14 @@ class _LogoScreenState extends State<LogoScreen> {
 
               const SizedBox(height: 48),
 
+              // 🔴 BIG RED EMERGENCY BUTTON — RESTORED
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(
                   width: 240,
                   height: 160,
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    color: Colors.red.shade700,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: Colors.redAccent,

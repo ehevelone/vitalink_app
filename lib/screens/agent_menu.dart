@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+
 import '../services/secure_store.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -101,7 +101,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                         ),
                       ),
 
-                      /// ⭐ ONLY Emergency + Logout (QR removed)
+                      /// ⭐ Emergency + Logout ONLY
                       SafeArea(
                         top: false,
                         minimum: const EdgeInsets.only(bottom: 16),
@@ -109,7 +109,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              // 🔥 Full width Emergency Info button
+                              // 🔥 Emergency Info
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
@@ -130,9 +130,10 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                       Navigator.pushNamed(context, '/emergency'),
                                 ),
                               ),
+
                               const SizedBox(height: 14),
 
-                              // 🔥 Full width Logout button
+                              // 🔓 Logout
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
