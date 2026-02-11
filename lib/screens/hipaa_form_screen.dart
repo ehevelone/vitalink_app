@@ -23,40 +23,78 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   final ScrollController _scrollCtrl = ScrollController();
 
   bool _saving = false;
-  bool _signed = false;
   bool _acknowledged = false;
   bool _canScroll = false;
 
-  Profile? _p;
+  Profile? _profile;
+
+  // ✅ AGENT COMES FROM SECURE STORE
+  String? _agentEmail;
+  String? _agentName;
+  String? _agentPhone;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadData();
 
     _scrollCtrl.addListener(() {
-      final atBottom = _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
-          !_scrollCtrl.position.outOfRange;
+      final atBottom =
+          _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
+              !_scrollCtrl.position.outOfRange;
       if (atBottom && !_canScroll) {
         setState(() => _canScroll = true);
       }
     });
   }
 
-  Future<void> _loadProfile() async {
-    final repo = DataRepository(SecureStore());   // ← FIXED
-    final profile = await repo.loadProfile();
+  Future<void> _loadData() async {
+    final store = SecureStore();
+    final repo = DataRepository(store);
+
+    final p = await repo.loadProfile();
+
+    final agentEmail = await store.getString('agentEmail');
+    final agentName = await store.getString('agentName');
+    final agentPhone = await store.getString('agentPhone');
+
     if (!mounted) return;
+
     setState(() {
-      _p = profile ?? Profile(meds: [], doctors: []);
+      _profile = p;
+      _agentEmail = agentEmail;
+      _agentName = agentName;
+      _agentPhone = agentPhone;
     });
+  }
+
+  Future<File> _buildCsv(Profile p) async {
+    final buffer = StringBuffer();
+    buffer.writeln("TYPE,NAME,DETAILS");
+
+    for (final m in p.meds) {
+      buffer.writeln(
+        "Medication,${m.name},${m.dose ?? ''} ${m.frequency ?? ''}",
+      );
+    }
+
+    for (final d in p.doctors) {
+      buffer.writeln(
+        "Doctor,${d.name},${d.specialty ?? ''} ${d.phone ?? ''}",
+      );
+    }
+
+    final dir = await getTemporaryDirectory();
+    final file = File("${dir.path}/vitalink_user_info.csv");
+    await file.writeAsString(buffer.toString());
+    return file;
   }
 
   Future<void> _openSignaturePopup() async {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: const Text("Sign Authorization"),
         content: SizedBox(
           height: 200,
@@ -79,7 +117,6 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
             onPressed: () {
               if (_sigCtrl.isEmpty) return;
               Navigator.pop(context);
-              setState(() => _signed = true);
               _saveAndSend();
             },
             child: const Text("Submit"),
@@ -90,11 +127,15 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   }
 
   Future<void> _saveAndSend() async {
-    if (_sigCtrl.isEmpty) return;
+    if (_sigCtrl.isEmpty || _profile == null) return;
 
-    if (_p?.agentEmail == null || _p!.agentEmail!.isEmpty) {
+    final agentEmail = _agentEmail;
+    final agentName = _agentName;
+    final agentPhone = _agentPhone;
+
+    if (agentEmail == null || agentEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Missing agent email. Please log in as agent.")),
+        const SnackBar(content: Text("❌ No agent is linked to this account.")),
       );
       return;
     }
@@ -103,21 +144,32 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
 
     try {
       final sigBytes = await _sigCtrl.toPngBytes();
-      final tempDir = await getTemporaryDirectory();
-      final sigFile = File("${tempDir.path}/signature.png");
-      await sigFile.writeAsBytes(sigBytes!);
+
+      // 🚨 HARD FAIL IF SIGNATURE MISSING (THIS WAS THE BUG)
+      if (sigBytes == null || sigBytes.isEmpty) {
+        throw Exception("Signature image missing");
+      }
 
       final pdf = pw.Document();
       final sigImg = pw.MemoryImage(sigBytes);
 
-      final timestamp = DateTime.now().toIso8601String().split(".").first.replaceAll(":", "-");
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .split(".")
+          .first
+          .replaceAll(":", "-");
 
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          build: (context) => [
-            pw.Text("HIPAA & SOA Authorization",
-                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+          build: (_) => [
+            pw.Text(
+              "HIPAA & SOA Authorization",
+              style: pw.TextStyle(
+                fontSize: 20,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
             pw.SizedBox(height: 12),
             pw.Text(
               "I understand that by signing below, I authorize my licensed insurance agent to access, discuss, and use my Protected Health Information (PHI) "
@@ -127,7 +179,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
               "Unless I revoke it sooner, this authorization will expire one (1) year from the date of my signature.\n\n"
               "This document also serves as a combined Scope of Appointment, allowing discussion of Medicare Advantage (MA), Prescription Drug (PDP), "
               "and Medicare Supplement (Medigap) plan options.\n\n"
-              "Discussion Topics:\n"
+              "Discussion Topics (Scope of Appointment):\n"
               "- Medicare Advantage (Part C) & Cost Plans\n"
               "- Prescription Drug Plan (Part D)\n"
               "- Medicare Supplement (Medigap) Plans\n"
@@ -136,151 +188,68 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
               "I acknowledge that I have read and understand this authorization.",
             ),
             pw.SizedBox(height: 20),
-            pw.Text("Recipient (Agent):", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Text("${_p?.agentName ?? ''}\n${_p?.agentEmail ?? ''}\n${_p?.agentPhone ?? ''}"),
+            pw.Text(
+              "Recipient (Agent):",
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text(
+              "${agentName ?? ''}\n$agentEmail\n${agentPhone ?? ''}",
+            ),
             pw.SizedBox(height: 24),
-            pw.Row(children: [
-              pw.Text("Signature:  "),
-              pw.Container(width: 150, height: 60, child: pw.Image(sigImg)),
-            ]),
+            pw.Row(
+              children: [
+                pw.Text("Signature: "),
+                pw.Container(
+                  width: 150,
+                  height: 60,
+                  child: pw.Image(sigImg),
+                ),
+              ],
+            ),
             pw.SizedBox(height: 8),
             pw.Text("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
-            pw.SizedBox(height: 8),
-            pw.Text("Expires: ${DateTime.now().add(const Duration(days: 365)).toLocal().toString().split(' ')[0]}"),
-            pw.NewPage(),
-            pw.Text("Medication List", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            if (_p!.meds.isEmpty) pw.Text("No medications on file."),
-            if (_p!.meds.isNotEmpty)
-              pw.Table.fromTextArray(
-                headers: ["Medication", "Dose", "Frequency", "Prescriber"],
-                data: _p!.meds
-                    .map((m) => [m.name, m.dose, m.frequency, m.prescriber])
-                    .toList(),
-              ),
-            pw.SizedBox(height: 16),
-            pw.Text("Doctors List", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            if (_p!.doctors.isEmpty) pw.Text("No doctors on file."),
-            if (_p!.doctors.isNotEmpty)
-              pw.Table.fromTextArray(
-                headers: ["Name", "Specialty", "Clinic", "Phone"],
-                data: _p!.doctors
-                    .map((d) => [d.name, d.specialty, d.clinic, d.phone])
-                    .toList(),
-              ),
-          ],
-        ),
-      );
-
-      final pdfFile = File("${tempDir.path}/HIPAA_SOA_Authorization_$timestamp.pdf");
-      await pdfFile.writeAsBytes(await pdf.save());
-
-      final buffer = StringBuffer();
-      buffer.writeln("Medication,Dose,Frequency,Prescriber");
-      for (var m in _p!.meds) {
-        buffer.writeln("${m.name},${m.dose},${m.frequency},${m.prescriber}");
-      }
-      buffer.writeln("");
-      buffer.writeln("Doctor,Specialty,Clinic,Phone");
-      for (var d in _p!.doctors) {
-        buffer.writeln("${d.name},${d.specialty},${d.clinic},${d.phone}");
-      }
-      final csvFile = File("${tempDir.path}/HIPAA_SOA_Data_$timestamp.csv");
-      await csvFile.writeAsString(buffer.toString());
-
-      final pdfBytes = await pdfFile.readAsBytes();
-      final csvBytes = await csvFile.readAsBytes();
-
-      final medsSummary = _p!.meds.isNotEmpty
-          ? _p!.meds.map((m) => "- ${m.name} ${m.dose} (${m.frequency})").join("\n")
-          : "None on file.";
-      final doctorsSummary = _p!.doctors.isNotEmpty
-          ? _p!.doctors.map((d) => "- ${d.name} (${d.specialty}) ${d.phone}").join("\n")
-          : "None on file.";
-
-      final bodyText = """
-Client: ${_p?.fullName ?? ""}
-Agent: ${_p?.agentName ?? ""}
-
-HIPAA & SOA Authorization signed at ${DateTime.now().toLocal()}
-
-Medications:
-$medsSummary
-
-Doctors:
-$doctorsSummary
-
-Attachments include the signed PDF and CSV export.
-""";
-
-      final payload = {
-        "agent": {
-          "name": _p?.agentName ?? "",
-          "email": _p?.agentEmail ?? "",
-          "phone": _p?.agentPhone ?? ""
-        },
-        "user": _p?.fullName ?? "",
-        "body": bodyText,
-        "attachments": [
-          {
-            "name": "HIPAA_SOA_Authorization_$timestamp.pdf",
-            "content": base64Encode(pdfBytes)
-          },
-          {
-            "name": "HIPAA_SOA_Data_$timestamp.csv",
-            "content": base64Encode(csvBytes)
-          }
-        ]
-      };
-
-      final resp = await http.post(
-        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/send_form_email"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(payload),
-      );
-
-      if (resp.statusCode == 200) {
-        if (!mounted) return;
-        await showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("Success"),
-            content: const Text("Authorization email sent successfully."),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final repo = DataRepository(SecureStore());
-                  final profile = await repo.loadProfile();
-                  if (!mounted) return;
-                  if (profile?.agentId != null) {
-                    Navigator.pushReplacementNamed(context, '/my_agent_agent');
-                  } else {
-                    Navigator.pushReplacementNamed(context, '/my_agent_user');
-                  }
-                },
-                child: const Text("OK"),
-              ),
-            ],
-          ),
-        );
-      } else {
-        throw Exception("Failed to send email: ${resp.body}");
-      }
-    } catch (e) {
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text("Error"),
-          content: Text("Failed to send authorization: $e"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
+            pw.Text(
+              "Expires: ${DateTime.now().add(const Duration(days: 365)).toLocal().toString().split(' ')[0]}",
             ),
           ],
         ),
       );
+
+      final dir = await getTemporaryDirectory();
+      final pdfFile =
+          File("${dir.path}/HIPAA_SOA_Authorization_$timestamp.pdf");
+      await pdfFile.writeAsBytes(await pdf.save());
+
+      final csvFile = await _buildCsv(_profile!);
+
+      final resp = await http.post(
+        Uri.parse(
+          "https://vitalink-app.netlify.app/.netlify/functions/send_form_email",
+        ),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "agent": {
+            "name": agentName ?? "",
+            "email": agentEmail,
+            "phone": agentPhone ?? ""
+          },
+          "user": _profile!.fullName ?? "",
+          "attachments": [
+            {
+              "name": pdfFile.path.split('/').last,
+              "content": base64Encode(await pdfFile.readAsBytes()),
+            },
+            {
+              "name": "vitalink_user_info.csv",
+              "content": base64Encode(await csvFile.readAsBytes()),
+            }
+          ]
+        }),
+      );
+
+      if (resp.statusCode != 200) {
+        throw Exception(resp.body);
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -297,12 +266,12 @@ Attachments include the signed PDF and CSV export.
           ListView(
             controller: _scrollCtrl,
             padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
+            children: const [
+              Text(
                 "Authorization to Disclose Health Information\n",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const Text(
+              Text(
                 "I understand that by signing below, I authorize my licensed insurance agent to access, discuss, and use my Protected Health Information (PHI) "
                 "for the purpose of helping me understand and enroll in Medicare health plans.\n\n"
                 "This authorization is voluntary and will not affect my eligibility for treatment or benefits. "
@@ -310,7 +279,7 @@ Attachments include the signed PDF and CSV export.
                 "Unless I revoke it sooner, this authorization will expire one (1) year from the date of my signature.\n\n"
                 "This document also serves as a combined Scope of Appointment, allowing discussion of Medicare Advantage (MA), Prescription Drug (PDP), "
                 "and Medicare Supplement (Medigap) plan options.\n\n"
-                "Discussion Topics:\n"
+                "Discussion Topics (Scope of Appointment):\n"
                 "- Medicare Advantage (Part C) & Cost Plans\n"
                 "- Prescription Drug Plan (Part D)\n"
                 "- Medicare Supplement (Medigap) Plans\n"
@@ -319,7 +288,7 @@ Attachments include the signed PDF and CSV export.
                 "I acknowledge that I have read and understand this authorization.",
                 style: TextStyle(fontSize: 16, height: 1.4),
               ),
-              const SizedBox(height: 300),
+              SizedBox(height: 300),
             ],
           ),
           if (_saving)
@@ -339,12 +308,12 @@ Attachments include the signed PDF and CSV export.
                 children: [
                   Checkbox(
                     value: _acknowledged,
-                    onChanged: (v) => setState(() => _acknowledged = v ?? false),
+                    onChanged: (v) =>
+                        setState(() => _acknowledged = v ?? false),
                   ),
                   const Expanded(
                     child: Text(
                       "I acknowledge and authorize my agent to discuss my Medicare information.",
-                      style: TextStyle(fontSize: 14),
                     ),
                   ),
                 ],
@@ -354,9 +323,6 @@ Attachments include the signed PDF and CSV export.
                 onPressed: canSubmit ? _openSignaturePopup : null,
                 icon: const Icon(Icons.send),
                 label: const Text("Sign & Send My Information"),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                ),
               ),
             ],
           ),

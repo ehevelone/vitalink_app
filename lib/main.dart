@@ -5,11 +5,11 @@ import 'package:flutter/services.dart';
 // Firebase core only (NO messaging init yet)
 import 'package:firebase_core/firebase_core.dart';
 
-// ✅ ADD: FCM + local notifications (for foreground display)
+// FCM + local notifications (foreground only)
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-// Local services
+// Core services
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
 
@@ -65,7 +65,7 @@ import 'models.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 const MethodChannel _navChannel = MethodChannel("vitalink/navigation");
 
-// ✅ ADD: local notifications plugin (foreground notification display)
+// Foreground local notifications
 final FlutterLocalNotificationsPlugin localNotifications =
     FlutterLocalNotificationsPlugin();
 
@@ -75,7 +75,6 @@ Future<void> _initLocalNotifications() async {
   await localNotifications.initialize(initSettings);
 }
 
-// ✅ ADD: show notifications while app is OPEN (foreground)
 void _setupForegroundNotifications() {
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     final notification = message.notification;
@@ -87,7 +86,6 @@ void _setupForegroundNotifications() {
       channelDescription: 'Important VitaLink notifications',
       importance: Importance.max,
       priority: Priority.high,
-      playSound: true,
     );
 
     const platformDetails = NotificationDetails(android: androidDetails);
@@ -103,31 +101,19 @@ void _setupForegroundNotifications() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  // ✅ Local notifications init is safe even if Firebase fails
   try {
     await _initLocalNotifications();
-  } catch (e, st) {
-    debugPrint('🔥 Local notifications init failed: $e');
-    debugPrint('$st');
-  }
+  } catch (_) {}
 
-  // Firebase init wrapped so it can't crash startup
   try {
     await Firebase.initializeApp();
-
-    // ✅ Wire foreground notifications ONLY after Firebase is ready
     _setupForegroundNotifications();
-  } catch (e, st) {
-    debugPrint('🔥 Firebase initialization failed: $e');
-    debugPrint('$st');
-  }
+  } catch (_) {}
 
   runApp(const VitaLinkApp());
 
-  // Lock screen shortcut only (safe)
   _navChannel.setMethodCallHandler((call) async {
     if (call.method == "openEmergency") {
       navigatorKey.currentState?.pushNamedAndRemoveUntil(
@@ -137,9 +123,6 @@ Future<void> main() async {
     }
     return null;
   });
-
-  // IMPORTANT:
-  // Messaging, token refresh, background handlers are DISABLED until app boots.
 }
 
 class VitaLinkApp extends StatelessWidget {
@@ -174,8 +157,11 @@ class VitaLinkApp extends StatelessWidget {
         '/welcome': (_) => const WelcomeScreen(),
         '/my_profile': (_) => const MyProfileScreen(),
         '/logo': (_) => const LogoScreen(),
-        '/my_agent_user': (_) => MyAgentUser(),
-        '/my_agent_agent': (_) => MyAgentAgent(),
+
+        // ✅ FIXED — CORRECT CLASS, CONST-SAFE
+        '/my_agent_user': (_) => const MyAgentUser(),
+        '/my_agent_agent': (_) => const MyAgentAgent(),
+
         '/emergency': (_) => EmergencyScreen(),
         '/emergency_view': (_) => EmergencyView(),
         '/meds': (_) => MedsScreen(),
@@ -226,17 +212,15 @@ class VitaLinkApp extends StatelessWidget {
           case '/reset_password':
             final emailOrPhone = settings.arguments as String?;
             return MaterialPageRoute(
-              builder: (_) => ResetPasswordScreen(
-                emailOrPhone: emailOrPhone,
-              ),
+              builder: (_) =>
+                  ResetPasswordScreen(emailOrPhone: emailOrPhone),
             );
 
           case '/agent_reset_password':
             final emailOrPhone = settings.arguments as String?;
             return MaterialPageRoute(
-              builder: (_) => AgentResetPasswordScreen(
-                emailOrPhone: emailOrPhone,
-              ),
+              builder: (_) =>
+                  AgentResetPasswordScreen(emailOrPhone: emailOrPhone),
             );
         }
         return null;

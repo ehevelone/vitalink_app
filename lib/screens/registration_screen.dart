@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/data_repository.dart';
+import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
-import 'qr_scanner_screen.dart'; // ← NEW scanner screen
+import 'qr_scanner_screen.dart';
 
 class PhoneNumberFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final b = StringBuffer();
-    for (int i = 0; i < digits.length; i++) {
+    for (int i = 0; i < digits.length && i < 10; i++) {
       if (i == 0) b.write('(');
       if (i == 3) b.write(')');
       if (i == 6) b.write('-');
@@ -33,84 +37,84 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameCtrl = TextEditingController();
+
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _promoCtrl = TextEditingController();
+  final _agentCodeCtrl = TextEditingController();
 
   bool _loading = false;
-  bool _showPassword = false;
-  bool _showConfirm = false;
-  bool _rememberMe = false;
 
-  // -------------------------------
-  // QR SCANNER → fills promo field
-  // -------------------------------
   Future<void> _scanQr() async {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => QrScannerScreen(
           onScanned: (value) {
-            setState(() => _promoCtrl.text = value);
+            setState(() => _agentCodeCtrl.text = value.trim());
           },
         ),
       ),
     );
   }
 
-  String? _validatePassword(String? pw) {
-    if (pw == null || pw.isEmpty) return "Enter a password";
-    if (pw.length < 10) return "≥ 10 characters";
-    if (!RegExp(r'[A-Z]').hasMatch(pw)) return "At least 1 uppercase letter";
-    if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(pw)) {
-      return "At least 1 special character";
-    }
-    return null;
-  }
-
-  Future<void> _registerLocal() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
     try {
       final store = SecureStore();
-      await store.setString('user_username', _usernameCtrl.text.trim());
-      await store.setString('user_password', _passwordCtrl.text.trim());
-      await store.setString('user_phone', _phoneCtrl.text.trim());
-      await store.setString('user_promo', _promoCtrl.text.trim());
-      await store.setBool('userLoggedIn', true);
+      final repo = DataRepository(store);
+
+      // 🔎 Resolve agent via QR / agent code
+      final code = _agentCodeCtrl.text.trim();
+      final res = await ApiService.resolveAgentByCode(code);
+
+      if (res['success'] != true || res['agent'] == null) {
+        throw Exception("Invalid or inactive agent code");
+      }
+
+      final agent = res['agent'];
+
+      // Load or create profile
+      final profile = await repo.loadProfile() ?? Profile();
+
+      profile.fullName = _nameCtrl.text.trim();
+      profile.emergency =
+          profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
+
+      // ✅ Agent info belongs on PROFILE
+      profile.agentId = agent['id'];
+      profile.agentName = agent['name'];
+      profile.agentEmail = agent['email'];
+      profile.agentPhone = agent['phone'];
+
+      profile.registered = true;
+      profile.updatedAt = DateTime.now();
+
+      await repo.saveProfile(profile);
+
+      // 🔐 Session / startup flags
+      await store.setBool('loggedIn', true);
       await store.setString('role', 'user');
-      await store.setBool('rememberMe', _rememberMe);
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/menu');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registration failed: $e")),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _goHome() async {
-    final store = SecureStore();
-    await store.remove('authToken');
-    await store.remove('device_token');
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
-  }
-
   @override
   Widget build(BuildContext context) {
-    const linkColor = Color(0xFF79CAE3);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("User Registration"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _goHome,
-        ),
-      ),
+      appBar: AppBar(title: const Text("User Registration")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -118,91 +122,62 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           child: ListView(
             children: [
               TextFormField(
-                controller: _usernameCtrl,
+                controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) => v == null || v.isEmpty ? "Enter your name" : null,
+                validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: "Phone Number"),
+                decoration: const InputDecoration(labelText: "Phone"),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                validator: (v) => v == null || v.isEmpty
-                    ? "Enter your phone number"
-                    : !RegExp(r'^\(\d{3}\)\d{3}-\d{4}$').hasMatch(v.trim())
-                        ? "Format must be (123)456-7890"
-                        : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _passwordCtrl,
-                obscureText: !_showPassword,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  helperText: "≥ 10 characters • 1 uppercase • 1 special character",
-                  suffixIcon: IconButton(
-                    icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
-                  ),
-                ),
-                validator: _validatePassword,
-                onChanged: (_) => setState(() {}),
+                obscureText: true,
+                decoration: const InputDecoration(labelText: "Password"),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Required" : null,
               ),
-
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _confirmCtrl,
-                obscureText: !_showConfirm,
-                decoration: InputDecoration(
-                  labelText: "Confirm Password",
-                  suffixIcon: IconButton(
-                    icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                  ),
-                ),
-                validator: (v) => v != _passwordCtrl.text ? "Passwords don’t match" : null,
-              ),
 
               const SizedBox(height: 12),
-
               TextFormField(
-                controller: _promoCtrl,
+                controller: _confirmCtrl,
+                obscureText: true,
+                decoration:
+                    const InputDecoration(labelText: "Confirm Password"),
+                validator: (v) =>
+                    v != _passwordCtrl.text ? "Passwords don’t match" : null,
+              ),
+
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _agentCodeCtrl,
                 decoration: InputDecoration(
-                  labelText: "Promo Code",
+                  labelText: "Agent Code",
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.qr_code),
                     onPressed: _scanQr,
                   ),
                 ),
-                validator: (v) => v == null || v.isEmpty ? "Enter your promo code" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Agent code required" : null,
               ),
-
-              const SizedBox(height: 16),
-
-              CheckboxListTile(
-                value: _rememberMe,
-                onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                title: const Text("Remember me on this device"),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-
-              const SizedBox(height: 16),
             ],
           ),
         ),
       ),
-
       bottomNavigationBar: SafeBottomButton(
         label: "Complete Registration",
         icon: Icons.check,
-        onPressed: _registerLocal,
         loading: _loading,
+        onPressed: _register,
       ),
     );
   }

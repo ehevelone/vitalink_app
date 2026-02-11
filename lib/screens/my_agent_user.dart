@@ -1,8 +1,9 @@
-// lib/screens/my_agent_user.dart
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../services/secure_store.dart';
+import '../services/data_repository.dart';
+import '../models.dart';
 
 class MyAgentUser extends StatefulWidget {
   const MyAgentUser({super.key});
@@ -28,13 +29,30 @@ class _MyAgentUserState extends State<MyAgentUser> {
 
   Future<void> _loadAgent() async {
     final store = SecureStore();
+    final repo = DataRepository(store);
+    final profile = await repo.loadProfile();
 
-    _agentName = await store.getString("agentName");
-    _agentPhone = await store.getString("agentPhone");
-    _agentEmail = await store.getString("agentEmail");
-    _agentNpn = await store.getString("agentId");
-    _agencyName = await store.getString("agencyName");
-    _agencyAddress = await store.getString("agencyAddress");
+    _agentName =
+        (await store.getString("agentName")) as String?
+            ?? profile?.agentName as String?;
+
+    _agentPhone =
+        (await store.getString("agentPhone")) as String?
+            ?? profile?.agentPhone as String?;
+
+    _agentEmail =
+        (await store.getString("agentEmail")) as String?
+            ?? profile?.agentEmail as String?;
+
+    _agentNpn =
+        (await store.getString("agentId")) as String?
+            ?? profile?.agentId as String?;
+
+    _agencyName =
+        (await store.getString("agencyName")) as String?;
+
+    _agencyAddress =
+        (await store.getString("agencyAddress")) as String?;
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -89,7 +107,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 ),
               ),
             ),
-
             Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -124,10 +141,13 @@ class _MyAgentUserState extends State<MyAgentUser> {
                             if (_agencyName?.isNotEmpty == true)
                               Text("🏢 ${_agencyName!}",
                                   style: const TextStyle(fontSize: 16)),
+
                             if (_agencyAddress?.isNotEmpty == true)
-                              Text("📍 ${_agencyAddress!}",
-                                  style: const TextStyle(fontSize: 16),
-                                  textAlign: TextAlign.center),
+                              Text(
+                                "📍 ${_agencyAddress!}",
+                                style: const TextStyle(fontSize: 16),
+                                textAlign: TextAlign.center,
+                              ),
                             const SizedBox(height: 8),
 
                             if (_agentPhone?.isNotEmpty == true)
@@ -164,14 +184,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
                       onPressed: _loadAgent,
                       icon: const Icon(Icons.refresh),
                       label: const Text("Reload Info"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 24,
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 20),
 
@@ -181,11 +193,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
                         icon: const Icon(Icons.send),
                         label: const Text("Send My Info to Agent"),
                         onPressed: _sendToAgent,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple.shade600,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
                       ),
                     ),
                   ],

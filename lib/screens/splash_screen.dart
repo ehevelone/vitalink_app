@@ -11,7 +11,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -26,18 +25,18 @@ class _SplashScreenState extends State<SplashScreen> {
     final store = SecureStore();
 
     try {
-      final role = await store.getString('role');
-      final loggedIn = await store.getBool('loggedIn') ?? false;
+      // 🔑 ONLY SOURCE OF TRUTH FOR STARTUP
+      final loggedIn = await store.getBool('userLoggedIn') ?? false;
 
       if (!mounted) return;
 
-      // ✅ Logged in → branding/logo flow
-      if (role != null && loggedIn) {
+      if (loggedIn) {
+        // ✅ ALWAYS go to LOGO when logged in
         Navigator.pushReplacementNamed(context, '/logo');
         return;
       }
 
-      // ✅ Not logged in → landing
+      // ❌ Not logged in → landing
       Navigator.pushReplacementNamed(context, '/landing');
     } catch (_) {
       if (!mounted) return;

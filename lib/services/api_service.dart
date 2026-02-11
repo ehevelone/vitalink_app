@@ -1,11 +1,10 @@
-// lib/services/api_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  /// ✅ Netlify Functions base URL (THIS IS CORRECT)
+  /// ✅ Netlify Functions base URL
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
 
@@ -24,17 +23,14 @@ class ApiService {
 
       final res = await http.post(
         url,
-        headers: const {
-          "Content-Type": "application/json",
-        },
+        headers: const {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );
 
-      debugPrint("📥 STATUS (${path}): ${res.statusCode}");
-      debugPrint("📥 RAW BODY (${path}): ${res.body}");
+      debugPrint("📥 STATUS ($path): ${res.statusCode}");
+      debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-      return decoded;
+      return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e, st) {
       debugPrint("❌ API ERROR ($path): $e\n$st");
       return {"success": false, "error": e.toString()};
@@ -84,16 +80,10 @@ class ApiService {
     });
 
     if (res["success"] != true || res["agent"] == null) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials",
-      };
+      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
     }
 
-    return {
-      "success": true,
-      "agent": res["agent"],
-    };
+    return {"success": true, "agent": res["agent"]};
   }
 
   // -------------------------------------------------------------
@@ -111,16 +101,10 @@ class ApiService {
     });
 
     if (res["success"] != true || res["user"] == null) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials",
-      };
+      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
     }
 
-    return {
-      "success": true,
-      "user": res["user"],
-    };
+    return {"success": true, "user": res["user"]};
   }
 
   // -------------------------------------------------------------
@@ -252,5 +236,26 @@ class ApiService {
     }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
 
     return _postJson("update_user_profile", body);
+  }
+
+  // -------------------------------------------------------------
+  // 🔎 Resolve agent by QR / agent code (USER REGISTRATION)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
+    final res = await _postJson("resolve_agent_code", {
+      "code": code,
+    });
+
+    if (res["success"] != true || res["agent"] == null) {
+      return {
+        "success": false,
+        "error": res["error"] ?? "Invalid agent code",
+      };
+    }
+
+    return {
+      "success": true,
+      "agent": res["agent"], // id, name, email, phone
+    };
   }
 }
