@@ -38,19 +38,34 @@ Attached:
       attachments: [],
     };
 
-    // 🔒 HARDENED ATTACHMENTS (Gmail-safe)
+    // ✅ FIXED ATTACHMENTS (PDF + CSV, Gmail-safe)
     body.attachments.forEach((att) => {
       if (!att.name || !att.content) return;
 
       const lower = att.name.toLowerCase();
       const isPdf = lower.endsWith(".pdf");
 
+      let buffer;
+
+      // Attempt base64 decode first
+      try {
+        buffer = Buffer.from(att.content, "base64");
+
+        // Guard: bad/empty decode (PDFs fail silently otherwise)
+        if (!buffer || buffer.length < 100) {
+          throw new Error("Invalid base64");
+        }
+      } catch {
+        // Fallback: raw binary or text
+        buffer = Buffer.isBuffer(att.content)
+          ? att.content
+          : Buffer.from(att.content);
+      }
+
       mailOptions.attachments.push({
         filename: att.name,
-        content: Buffer.from(att.content, "base64"),
-        encoding: "base64",
+        content: buffer,
         contentType: isPdf ? "application/pdf" : "text/csv",
-        contentDisposition: "attachment",
       });
     });
 
