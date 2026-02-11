@@ -38,23 +38,25 @@ Attached:
       attachments: [],
     };
 
-    // ✅ CRITICAL FIX: force MIME + encoding
+    // 🔒 HARDENED ATTACHMENTS (Gmail-safe)
     body.attachments.forEach((att) => {
-      if (att.name && att.content) {
-        const isPdf = att.name.toLowerCase().endsWith(".pdf");
+      if (!att.name || !att.content) return;
 
-        mailOptions.attachments.push({
-          filename: att.name,
-          content: Buffer.from(att.content, "base64"),
-          encoding: "base64",
-          contentType: isPdf ? "application/pdf" : "text/csv",
-        });
-      }
+      const lower = att.name.toLowerCase();
+      const isPdf = lower.endsWith(".pdf");
+
+      mailOptions.attachments.push({
+        filename: att.name,
+        content: Buffer.from(att.content, "base64"),
+        encoding: "base64",
+        contentType: isPdf ? "application/pdf" : "text/csv",
+        contentDisposition: "attachment",
+      });
     });
 
     await transporter.sendMail(mailOptions);
 
-    // ✅ keep your completion logic
+    // keep your AEP logic
     if (body.user) {
       await db.query(
         `UPDATE users
