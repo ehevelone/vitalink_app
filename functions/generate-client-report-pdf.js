@@ -1,4 +1,5 @@
 const PDFDocument = require("pdfkit");
+const path = require("path");
 
 module.exports = function generateClientReportPdf(client) {
   return new Promise((resolve, reject) => {
@@ -8,6 +9,11 @@ module.exports = function generateClientReportPdf(client) {
 
       doc.on("data", (c) => chunks.push(c));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
+
+      // 🔹 Use embedded font (prevents Helvetica.afm crash)
+      const fontPath = path.join(__dirname, "Roboto-Regular.ttf");
+      doc.registerFont("Roboto", fontPath);
+      doc.font("Roboto");
 
       // ===== HEADER =====
       doc

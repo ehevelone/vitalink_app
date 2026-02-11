@@ -40,7 +40,7 @@ Attached:
       attachments: [],
     };
 
-    // 🔹 Generate Client Report PDF (meds + providers)
+    // 🔹 Generate Client Report PDF
     const reportPdfBuffer = await generateClientReportPdf({
       name: body.user || "Client",
       email: body.user_email || "",
@@ -50,14 +50,14 @@ Attached:
       providers: body.providers || [],
     });
 
-    // 🔹 Attach the generated Client Report PDF
+    // 🔹 Attach generated PDF
     mailOptions.attachments.push({
       filename: "VitaLink_Client_Report.pdf",
       content: reportPdfBuffer,
       contentType: "application/pdf",
     });
 
-    // 🔹 Existing attachments (SOA PDF + CSV)
+    // 🔹 Existing attachments (SOA + CSV)
     body.attachments.forEach((att) => {
       if (!att.name || !att.content) return;
 
