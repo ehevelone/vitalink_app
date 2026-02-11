@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const db = require("./services/db");
+const generateClientReportPdf = require("./generate-client-report-pdf");
 
 exports.handler = async (event) => {
   try {
@@ -32,13 +33,31 @@ Your client ${body.user || "Client"} has signed their HIPAA & SOA authorization.
 
 Attached:
 • Signed HIPAA & SOA PDF
+• Client information report (PDF)
 • Client medication/doctor CSV
 
 – VitaLink`,
       attachments: [],
     };
 
-    // ✅ FIXED ATTACHMENTS (PDF + CSV, Gmail-safe)
+    // 🔹 Generate Client Report PDF (meds + providers)
+    const reportPdfBuffer = await generateClientReportPdf({
+      name: body.user || "Client",
+      email: body.user_email || "",
+      phone: body.user_phone || "",
+      dob: body.user_dob || "",
+      medications: body.medications || [],
+      providers: body.providers || [],
+    });
+
+    // 🔹 Attach the generated Client Report PDF
+    mailOptions.attachments.push({
+      filename: "VitaLink_Client_Report.pdf",
+      content: reportPdfBuffer,
+      contentType: "application/pdf",
+    });
+
+    // 🔹 Existing attachments (SOA PDF + CSV)
     body.attachments.forEach((att) => {
       if (!att.name || !att.content) return;
 
@@ -47,16 +66,12 @@ Attached:
 
       let buffer;
 
-      // Attempt base64 decode first
       try {
         buffer = Buffer.from(att.content, "base64");
-
-        // Guard: bad/empty decode (PDFs fail silently otherwise)
         if (!buffer || buffer.length < 100) {
           throw new Error("Invalid base64");
         }
       } catch {
-        // Fallback: raw binary or text
         buffer = Buffer.isBuffer(att.content)
           ? att.content
           : Buffer.from(att.content);
@@ -71,7 +86,6 @@ Attached:
 
     await transporter.sendMail(mailOptions);
 
-    // keep your AEP logic
     if (body.user) {
       await db.query(
         `UPDATE users
