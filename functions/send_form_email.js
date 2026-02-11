@@ -38,19 +38,23 @@ Attached:
       attachments: [],
     };
 
-    // ✅ ONLY attach what the app sends (PDF + CSV)
+    // ✅ CRITICAL FIX: force MIME + encoding
     body.attachments.forEach((att) => {
       if (att.name && att.content) {
+        const isPdf = att.name.toLowerCase().endsWith(".pdf");
+
         mailOptions.attachments.push({
           filename: att.name,
           content: Buffer.from(att.content, "base64"),
+          encoding: "base64",
+          contentType: isPdf ? "application/pdf" : "text/csv",
         });
       }
     });
 
     await transporter.sendMail(mailOptions);
 
-    // ✅ Keep your AEP completion logic
+    // ✅ keep your completion logic
     if (body.user) {
       await db.query(
         `UPDATE users
