@@ -4,13 +4,17 @@ const path = require("path");
 module.exports = function generateClientReportPdf(client) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({
+        margin: 50,
+        autoFirstPage: true,
+      });
+
       const chunks = [];
 
       doc.on("data", (c) => chunks.push(c));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
 
-      // 🔹 Use embedded font (prevents Helvetica.afm crash)
+      // 🔹 Register custom font BEFORE using any text
       const fontPath = path.join(__dirname, "Roboto-Regular.ttf");
       doc.registerFont("Roboto", fontPath);
       doc.font("Roboto");
