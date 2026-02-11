@@ -9,7 +9,7 @@ exports.handler = async (event) => {
     if (!body.agent || !body.agent.email || !Array.isArray(body.attachments)) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Invalid payload" }),
+        body: JSON.stringify({ success: false, error: "Invalid payload" }),
       };
     }
 
@@ -50,7 +50,6 @@ Attached:
       providers: body.providers || [],
     });
 
-    // 🔹 Attach generated PDF
     mailOptions.attachments.push({
       filename: "VitaLink_Client_Report.pdf",
       content: reportPdfBuffer,
@@ -84,8 +83,10 @@ Attached:
       });
     });
 
-    await transporter.sendMail(mailOptions);
+    // 🔥 Send email and capture confirmation
+    const info = await transporter.sendMail(mailOptions);
 
+    // Update user record
     if (body.user) {
       await db.query(
         `UPDATE users
@@ -96,15 +97,25 @@ Attached:
       );
     }
 
+    // ✅ Return confirmation details
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true }),
+      body: JSON.stringify({
+        success: true,
+        message: "Email sent successfully",
+        messageId: info.messageId,
+        accepted: info.accepted,
+      }),
     };
+
   } catch (err) {
     console.error("❌ send_form_email error", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({
+        success: false,
+        error: err.message,
+      }),
     };
   }
 };
