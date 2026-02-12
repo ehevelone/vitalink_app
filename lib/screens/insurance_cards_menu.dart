@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 
-// ✅ ML Kit import
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 
 import '../models.dart';
@@ -47,24 +46,25 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
     setState(() {});
   }
 
-  /// ✅ Scan insurance card (front + optional back) using ML Kit
+  /// ✅ Scan insurance card (front + optional back)
   Future<void> _scanCard() async {
     DocumentScanner? scanner;
     try {
-      // Configure ML Kit scanner (v0.4.0 API)
       final options = DocumentScannerOptions(
-        documentFormat: DocumentFormat.jpeg, // ✅ valid in v0.4.0
-        mode: ScannerMode.full,              // full scanner UI (crop/filters)
-        pageLimit: 1,                        // single page per scan
-        isGalleryImport: true,               // allow picking from gallery
+        mode: ScannerMode.full,
+        pageLimit: 1,
+        isGalleryImport: true,
       );
+
       scanner = DocumentScanner(options: options);
 
       // ---------- FRONT ----------
       final result = await scanner.scanDocument();
-      if (result == null || result.images.isEmpty) return;
+      final images = result?.images;
 
-      final frontPath = result.images.first; // cropped card image
+      if (images == null || images.isEmpty) return;
+
+      final frontPath = images.first;
 
       // ---------- BACK (optional) ----------
       final wantsBack = await showDialog<bool>(
@@ -86,19 +86,21 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
       );
 
       String? backPath;
+
       if (wantsBack == true) {
         final backScanner = DocumentScanner(options: options);
         try {
           final backResult = await backScanner.scanDocument();
-          if (backResult != null && backResult.images.isNotEmpty) {
-            backPath = backResult.images.first;
+          final backImages = backResult?.images;
+
+          if (backImages != null && backImages.isNotEmpty) {
+            backPath = backImages.first;
           }
         } finally {
           await backScanner.close();
         }
       }
 
-      // Save as orphan card for now
       setState(() {
         _p!.orphanCards.add(
           InsuranceCard(
@@ -112,6 +114,7 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
           ),
         );
       });
+
       await _save();
     } catch (e) {
       debugPrint("❌ Exception while scanning card: $e");
@@ -121,14 +124,12 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
         );
       }
     } finally {
-      // Release ML Kit resources
       try {
         await scanner?.close();
       } catch (_) {}
     }
   }
 
-  /// ✅ Delete card
   void _deleteCard(InsuranceCard card) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -145,6 +146,7 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
         ],
       ),
     );
+
     if (ok == true) {
       setState(() {
         _p!.orphanCards.removeWhere((c) => c.id == card.id);
@@ -156,7 +158,6 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
     }
   }
 
-  /// ✅ Helper: thumbnail row with front/back + delete button
   Widget _cardRow(InsuranceCard card) {
     final frontFile = File(card.frontImagePath);
     final backFile =
@@ -195,7 +196,6 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
     );
   }
 
-  /// ✅ Categorize cards into groups
   Map<String, List<InsuranceCard>> _categorizeCards(List<InsuranceCard> cards) {
     final Map<String, List<InsuranceCard>> buckets = {
       "Primary": [],
@@ -247,7 +247,6 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
       );
     }
 
-    // ✅ Gather all cards
     final allCards = [
       ..._p!.orphanCards,
       for (var ins in _p!.insurances) ...ins.cards,

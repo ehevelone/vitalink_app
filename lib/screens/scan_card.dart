@@ -17,22 +17,22 @@ class _ScanCardState extends State<ScanCard> {
     DocumentScanner? scanner;
     try {
       final options = DocumentScannerOptions(
-        documentFormat: DocumentFormat.jpeg, // ✅ valid in v0.4.0
-        mode: ScannerMode.full,              // full-screen scanner UI
+        mode: ScannerMode.full,
         pageLimit: 1,
         isGalleryImport: true,
       );
+
       scanner = DocumentScanner(options: options);
 
       final result = await scanner.scanDocument();
+      final images = result?.images;
 
       if (!mounted) return;
 
-      if (result != null && result.images.isNotEmpty) {
-        // ✅ Return cropped image path to caller
-        Navigator.pop(context, result.images.first);
+      if (images != null && images.isNotEmpty) {
+        Navigator.pop(context, images.first);
       } else {
-        Navigator.pop(context, null); // user canceled
+        Navigator.pop(context, null);
       }
     } catch (e) {
       debugPrint("❌ Document scan failed: $e");
@@ -44,8 +44,9 @@ class _ScanCardState extends State<ScanCard> {
       Navigator.pop(context, null);
     } finally {
       try {
-        await scanner?.close(); // release resources
+        await scanner?.close();
       } catch (_) {}
+
       if (mounted) setState(() => _scanning = false);
     }
   }
@@ -53,7 +54,6 @@ class _ScanCardState extends State<ScanCard> {
   @override
   void initState() {
     super.initState();
-    // Auto-start scan when page opens
     WidgetsBinding.instance.addPostFrameCallback((_) => _startScan());
   }
 

@@ -25,10 +25,10 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   bool _saving = false;
   bool _acknowledged = false;
   bool _canScroll = false;
+  bool _sent = false; // ✅ Added
 
   Profile? _profile;
 
-  // ✅ AGENT COMES FROM SECURE STORE
   String? _agentEmail;
   String? _agentName;
   String? _agentPhone;
@@ -145,7 +145,6 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
     try {
       final sigBytes = await _sigCtrl.toPngBytes();
 
-      // 🚨 HARD FAIL IF SIGNATURE MISSING (THIS WAS THE BUG)
       if (sigBytes == null || sigBytes.isEmpty) {
         throw Exception("Signature image missing");
       }
@@ -249,6 +248,34 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
 
       if (resp.statusCode != 200) {
         throw Exception(resp.body);
+      }
+
+      // ✅ SUCCESS DIALOG
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                SizedBox(width: 12),
+                Text("Sent Successfully"),
+              ],
+            ),
+            content: const Text(
+              "Your HIPAA & SOA authorization has been sent to your agent.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
