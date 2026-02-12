@@ -36,11 +36,11 @@ dependencies:
   in_app_purchase: 3.1.11
   url_launcher: 6.2.6
 
-  # ---- Camera + ML Scanning ----
+  # ---- Camera + ML Scanning (ALIGNED) ----
   camera: 0.10.5+9
-  google_mlkit_barcode_scanning: ^0.12.0
-  google_mlkit_document_scanner: ^0.4.0
-  google_mlkit_object_detection: ^0.12.0
+  google_mlkit_barcode_scanning: 0.12.0
+  google_mlkit_document_scanner: 0.4.1
+  google_mlkit_object_detection: 0.12.0
 
   # ---- Image Tools ----
   image_picker: 1.0.7
@@ -57,8 +57,8 @@ dependencies:
   firebase_messaging: 15.0.3
   firebase_analytics: 11.2.1
 
-  # ---- Notifications ----
-  flutter_local_notifications: ^17.1.2
+  # ---- Notifications (FIXED VERSION) ----
+  flutter_local_notifications: 17.2.4
 
 dev_dependencies:
   flutter_test:
