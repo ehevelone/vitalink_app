@@ -1,8 +1,9 @@
 // functions/agent_onboard.js
+
 const db = require("./services/db");
 const crypto = require("crypto");
 
-// 🔹 Utility to generate a random unlock code (prefix AG-XXXXXXX)
+// 🔹 Generate AG-XXXXXXXXXX unlock code
 function generateUnlockCode(prefix = "AG", length = 10) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -12,50 +13,88 @@ function generateUnlockCode(prefix = "AG", length = 10) {
   return `${prefix}-${code}`;
 }
 
-// 🔹 Utility to generate a secure random token
+// 🔹 Generate secure onboarding token
 function generateToken() {
-  return crypto.randomBytes(16).toString("hex"); // 32-char token
+  return crypto.randomBytes(16).toString("hex");
 }
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   try {
-    // 1️⃣ Generate both unlock code and secure token
+    // ✅ Allow CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return {
+        statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+        },
+        body: "",
+      };
+    }
+
+    // ✅ QR scans hit via GET
+    if (event.httpMethod !== "GET") {
+      return {
+        statusCode: 405,
+        body: "Method Not Allowed",
+      };
+    }
+
+    // 1️⃣ Generate unlock + token
     const unlockCode = generateUnlockCode();
     const onboardToken = generateToken();
 
-    // 2️⃣ Insert a new inactive agent record with both
+    // 2️⃣ Insert NEW agent row
     const result = await db.query(
-      `INSERT INTO agents (role, active, unlock_code, onboard_token, created_at)
-       VALUES ('agent', FALSE, $1, $2, NOW())
-       RETURNING id`,
+      `
+      INSERT INTO agents (
+        role,
+        active,
+        unlock_code,
+        onboard_token,
+        created_at
+      )
+      VALUES (
+        'agent',
+        FALSE,
+        $1,
+        $2,
+        NOW()
+      )
+      RETURNING id;
+      `,
       [unlockCode, onboardToken]
     );
 
     const agentId = result.rows[0].id;
 
-    // 3️⃣ Build redirect URL back to your Netlify onboarding page (token-based)
-    const redirectUrl = `https://vitalink-app.netlify.app/agent-onboard.html?token=${encodeURIComponent(onboardToken)}`;
+    // 3️⃣ Redirect to WEBSITE onboarding page
+    const redirectUrl =
+      `https://myvitalink.app/agent-onboard.html?token=${encodeURIComponent(onboardToken)}`;
 
-    console.log(`✅ Agent ${agentId} created`);
-    console.log(`🔐 Unlock code: ${unlockCode}`);
+    console.log("=================================");
+    console.log(`✅ Agent Created: ${agentId}`);
+    console.log(`🔐 Unlock Code: ${unlockCode}`);
     console.log(`🔑 Token: ${onboardToken}`);
     console.log(`🔗 Redirecting to: ${redirectUrl}`);
+    console.log("=================================");
 
-    // 4️⃣ Redirect browser to your hosted HTML page (Netlify)
     return {
       statusCode: 302,
       headers: {
         Location: redirectUrl,
       },
     };
+
   } catch (err) {
-    console.error("❌ Error in agent_onboard:", err);
+    console.error("❌ agent_onboard error:", err);
+
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         success: false,
-        error: "Server error: " + err.message,
+        error: err.message,
       }),
     };
   }
