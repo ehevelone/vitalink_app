@@ -12,7 +12,7 @@ class SecureStore {
     return await _storage.read(key: key);
   }
 
-  /// --- ALIAS for convenience ---
+  /// --- ALIAS ---
   Future<String?> get(String key) async {
     return await getString(key);
   }
@@ -31,6 +31,16 @@ class SecureStore {
   /// --- REMOVE SINGLE ITEM ---
   Future<void> remove(String key) async {
     await _storage.delete(key: key);
+  }
+
+  /// --- REMOVE MULTIPLE ---
+  Future<void> delete(String key) async {
+    await _storage.delete(key: key);
+  }
+
+  /// --- CLEAR ALL ---
+  Future<void> clear() async {
+    await _storage.deleteAll();
   }
 
   /// --- (OPTIONAL) REMOVE AUTH ITEMS ONLY ---

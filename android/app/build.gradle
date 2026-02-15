@@ -5,11 +5,27 @@ plugins {
     id "com.google.gms.google-services"
 }
 
+// 🔐 Load keystore AFTER plugins block (Gradle 8 requirement)
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.etenterprises.vitalink"
 
     compileSdk = 36
     ndkVersion = "25.1.8937393"
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties["keyAlias"]
+            keyPassword keystoreProperties["keyPassword"]
+            storeFile rootProject.file(keystoreProperties["storeFile"])
+            storePassword keystoreProperties["storePassword"]
+        }
+    }
 
     defaultConfig {
         applicationId = "com.etenterprises.vitalink"
@@ -20,7 +36,6 @@ android {
         multiDexEnabled = true
     }
 
-    // ✅ REQUIRED FOR flutter_local_notifications
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -33,7 +48,15 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
+
+            minifyEnabled true
+            shrinkResources true
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
@@ -44,7 +67,7 @@ flutter {
 
 dependencies {
     // Firebase BOM
-    implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
+    implementation platform("com.google.firebase:firebase-bom:33.6.0")
 
     implementation("com.google.firebase:firebase-messaging") {
         exclude group: "com.google.firebase", module: "firebase-iid"
@@ -56,7 +79,7 @@ dependencies {
     // Multidex
     implementation "androidx.multidex:multidex:2.0.1"
 
-    // ✅ REQUIRED for desugaring
+    // Required for Java 17 desugaring
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"
 }
 

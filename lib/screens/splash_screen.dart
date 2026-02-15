@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../services/secure_store.dart';
+import '../services/data_repository.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,21 +26,30 @@ class _SplashScreenState extends State<SplashScreen> {
     final store = SecureStore();
 
     try {
-      // 🔑 ONLY SOURCE OF TRUTH FOR STARTUP
       final loggedIn = await store.getBool('userLoggedIn') ?? false;
 
       if (!mounted) return;
 
       if (loggedIn) {
-        // ✅ ALWAYS go to LOGO when logged in
+        // 🔒 Validate profile integrity before routing
+        final repo = DataRepository(store);
+        final profile = await repo.loadProfile();
+
+        if (profile == null) {
+          // Corrupted or missing profile → auto-heal
+          await store.clear();
+          Navigator.pushReplacementNamed(context, '/landing');
+          return;
+        }
+
         Navigator.pushReplacementNamed(context, '/logo');
         return;
       }
 
-      // ❌ Not logged in → landing
       Navigator.pushReplacementNamed(context, '/landing');
     } catch (_) {
       if (!mounted) return;
+      await store.clear();
       Navigator.pushReplacementNamed(context, '/landing');
     }
   }

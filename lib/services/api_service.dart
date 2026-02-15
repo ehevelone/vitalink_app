@@ -108,6 +108,29 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // 🔹 Register user (SB)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> registerUser({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String password,
+    required String promoCode,
+    required String platform,
+  }) {
+    return _postJson("register_user", {
+      "firstName": firstName,
+      "lastName": lastName,
+      "email": email,
+      "phone": phone,
+      "password": password,
+      "promoCode": promoCode,
+      "platform": platform,
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔹 Promo lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> verifyPromo({
@@ -255,7 +278,7 @@ class ApiService {
 
     return {
       "success": true,
-      "agent": res["agent"], // id, name, email, phone
+      "agent": res["agent"],
     };
   }
 }

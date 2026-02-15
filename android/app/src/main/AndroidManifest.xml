@@ -1,10 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.etenterprises.vitalink">
 
-    <!-- 🔥 REQUIRED for API calls (missing in your manifest) -->
+    <!-- Required permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Helpful: avoid weird network state issues -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
@@ -22,38 +20,62 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Normal flutter theme -->
+            <!-- Flutter normal theme -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
-            <!-- Launch entrypoint -->
+            <!-- App launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- 🔥 Lock-screen Emergency Shortcut deep link -->
+            <!-- 🔴 Emergency Deep Link -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="vitalink" android:host="emergency" />
+                <data
+                    android:scheme="vitalink"
+                    android:host="emergency" />
             </intent-filter>
+
+            <!-- 🔵 Register Deep Link (Agent QR flow) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vitalink"
+                    android:host="register" />
+            </intent-filter>
+
+            <!-- 🟢 Agent Deep Link (unlock code display page) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vitalink"
+                    android:host="agent" />
+            </intent-filter>
+
         </activity>
 
-        <!-- Flutter plugin loader -->
+        <!-- Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
     </application>
 
-    <!-- Flutter engine requirement -->
+    <!-- Required for some text processing -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
     </queries>
+
 </manifest>

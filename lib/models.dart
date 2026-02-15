@@ -121,7 +121,8 @@ class InsuranceCard {
         backImagePath: json['backImagePath'],
         imagePath: json['imagePath'],
         source: json['source'] ?? 'Manual',
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -174,7 +175,8 @@ class Insurance {
         policyType: json['policyType'] ?? '',
         decPagePaths:
             (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
-        benefits: (json['benefits'] as List<dynamic>? ?? []).cast<String>(),
+        benefits:
+            (json['benefits'] as List<dynamic>? ?? []).cast<String>(),
         cards: (json['cards'] as List<dynamic>? ?? [])
             .map((c) => InsuranceCard.fromJson(c))
             .toList(),
@@ -190,7 +192,7 @@ class EmergencyInfo {
   String allergies;
   String conditions;
   String bloodType;
-  bool organDonor; // ⭐ NEW
+  bool organDonor;
 
   EmergencyInfo({
     this.contact = '',
@@ -198,7 +200,7 @@ class EmergencyInfo {
     this.allergies = '',
     this.conditions = '',
     this.bloodType = '',
-    this.organDonor = false, // ⭐ DEFAULT
+    this.organDonor = false,
   });
 
   EmergencyInfo copyWith({
@@ -207,7 +209,7 @@ class EmergencyInfo {
     String? allergies,
     String? conditions,
     String? bloodType,
-    bool? organDonor, // ⭐ NEW
+    bool? organDonor,
   }) {
     return EmergencyInfo(
       contact: contact ?? this.contact,
@@ -215,7 +217,7 @@ class EmergencyInfo {
       allergies: allergies ?? this.allergies,
       conditions: conditions ?? this.conditions,
       bloodType: bloodType ?? this.bloodType,
-      organDonor: organDonor ?? this.organDonor, // ⭐
+      organDonor: organDonor ?? this.organDonor,
     );
   }
 
@@ -225,16 +227,17 @@ class EmergencyInfo {
         'allergies': allergies,
         'conditions': conditions,
         'bloodType': bloodType,
-        'organDonor': organDonor, // ⭐
+        'organDonor': organDonor,
       };
 
-  factory EmergencyInfo.fromJson(Map<String, dynamic> json) => EmergencyInfo(
+  factory EmergencyInfo.fromJson(Map<String, dynamic> json) =>
+      EmergencyInfo(
         contact: json['contact'] ?? '',
         phone: json['phone'] ?? '',
         allergies: json['allergies'] ?? '',
         conditions: json['conditions'] ?? '',
         bloodType: json['bloodType'] ?? '',
-        organDonor: json['organDonor'] ?? false, // ⭐
+        organDonor: json['organDonor'] ?? false,
       );
 }
 
@@ -245,6 +248,9 @@ class Profile {
   String fullName;
   String? dob;
   DateTime updatedAt;
+
+  // ✅ NEW — USER’S OWN PHONE (separate from emergency phone)
+  String userPhone;
 
   List<Medication> meds;
   List<Doctor> doctors;
@@ -273,6 +279,10 @@ class Profile {
     this.fullName = '',
     this.dob,
     DateTime? updatedAt,
+
+    // ✅ NEW
+    this.userPhone = '',
+
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -303,6 +313,7 @@ class Profile {
     String? fullName,
     String? dob,
     DateTime? updatedAt,
+    String? userPhone, // ✅ NEW
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -327,6 +338,7 @@ class Profile {
       fullName: fullName ?? this.fullName,
       dob: dob ?? this.dob,
       updatedAt: updatedAt ?? this.updatedAt,
+      userPhone: userPhone ?? this.userPhone, // ✅ NEW
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
       insurances: insurances ?? this.insurances,
@@ -353,6 +365,7 @@ class Profile {
         'fullName': fullName,
         'dob': dob,
         'updatedAt': updatedAt.toIso8601String(),
+        'userPhone': userPhone, // ✅ NEW
         'meds': meds.map((m) => m.toJson()).toList(),
         'doctors': doctors.map((d) => d.toJson()).toList(),
         'insurances': insurances.map((i) => i.toJson()).toList(),
@@ -377,7 +390,9 @@ class Profile {
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        userPhone: json['userPhone'] ?? '', // ✅ NEW
         meds: (json['meds'] as List<dynamic>? ?? [])
             .map((m) => Medication.fromJson(m))
             .toList(),

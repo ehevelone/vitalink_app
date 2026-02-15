@@ -67,24 +67,45 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final store = SecureStore();
       final repo = DataRepository(store);
 
-      // 🔎 Resolve agent via QR / agent code
       final code = _agentCodeCtrl.text.trim();
-      final res = await ApiService.resolveAgentByCode(code);
 
-      if (res['success'] != true || res['agent'] == null) {
+      // 🔎 Resolve agent first
+      final agentRes = await ApiService.resolveAgentByCode(code);
+      if (agentRes['success'] != true || agentRes['agent'] == null) {
         throw Exception("Invalid or inactive agent code");
       }
 
-      final agent = res['agent'];
+      final agent = agentRes['agent'];
 
-      // Load or create profile
+      // 🔥 SPLIT NAME
+      final nameParts = _nameCtrl.text.trim().split(" ");
+      final firstName = nameParts.first;
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "";
+
+      // 🔥 CREATE USER IN SB
+      final registerRes = await ApiService.registerUser(
+        firstName: firstName,
+        lastName: lastName,
+        email:
+            "${_phoneCtrl.text.replaceAll(RegExp(r'\\D'), '')}@vitalink.app",
+        phone: _phoneCtrl.text.trim(),
+        password: _passwordCtrl.text.trim(),
+        promoCode: code,
+        platform: "android",
+      );
+
+      if (registerRes['success'] != true) {
+        throw Exception(registerRes['error'] ?? "Registration failed");
+      }
+
+      // ✅ Now save locally
       final profile = await repo.loadProfile() ?? Profile();
 
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
 
-      // ✅ Agent info belongs on PROFILE
       profile.agentId = agent['id'];
       profile.agentName = agent['name'];
       profile.agentEmail = agent['email'];
@@ -95,9 +116,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       await repo.saveProfile(profile);
 
-      // 🔐 Session / startup flags
+      // 🔐 Session flags
       await store.setBool('loggedIn', true);
       await store.setString('role', 'user');
+      await store.setString(
+          'userEmail',
+          "${_phoneCtrl.text.replaceAll(RegExp(r'\\D'), '')}@vitalink.app");
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/menu');
@@ -127,7 +151,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
@@ -135,7 +158,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 inputFormatters: [PhoneNumberFormatter()],
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: true,
@@ -145,7 +167,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
-
               const SizedBox(height: 12),
               TextFormField(
                 controller: _confirmCtrl,
@@ -155,7 +176,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
-
               const SizedBox(height: 16),
               TextFormField(
                 controller: _agentCodeCtrl,

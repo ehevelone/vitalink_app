@@ -27,32 +27,41 @@ class _MyAgentUserState extends State<MyAgentUser> {
     _loadAgent();
   }
 
+  // ✅ SURGICALLY FIXED METHOD
   Future<void> _loadAgent() async {
-    final store = SecureStore();
-    final repo = DataRepository(store);
-    final profile = await repo.loadProfile();
+    try {
+      final store = SecureStore();
+      final repo = DataRepository(store);
+      final profile = await repo.loadProfile();
 
-    _agentName =
-        (await store.getString("agentName")) as String?
-            ?? profile?.agentName as String?;
+      _agentName =
+          await store.getString("agentName") ??
+          profile?.agentName;
 
-    _agentPhone =
-        (await store.getString("agentPhone")) as String?
-            ?? profile?.agentPhone as String?;
+      _agentPhone =
+          await store.getString("agentPhone") ??
+          profile?.agentPhone;
 
-    _agentEmail =
-        (await store.getString("agentEmail")) as String?
-            ?? profile?.agentEmail as String?;
+      _agentEmail =
+          await store.getString("agentEmail") ??
+          profile?.agentEmail;
 
-    _agentNpn =
-        (await store.getString("agentId")) as String?
-            ?? profile?.agentId as String?;
+      // 🔥 FIXED — agentId is int in Profile
+      final storedAgentId = await store.getString("agentId");
 
-    _agencyName =
-        (await store.getString("agencyName")) as String?;
+      if (storedAgentId != null && storedAgentId.isNotEmpty) {
+        _agentNpn = storedAgentId;
+      } else if (profile?.agentId != null) {
+        _agentNpn = profile!.agentId.toString();
+      } else {
+        _agentNpn = null;
+      }
 
-    _agencyAddress =
-        (await store.getString("agencyAddress")) as String?;
+      _agencyName = await store.getString("agencyName");
+      _agencyAddress = await store.getString("agencyAddress");
+    } catch (e) {
+      debugPrint("Agent load error: $e");
+    }
 
     if (!mounted) return;
     setState(() => _loading = false);
