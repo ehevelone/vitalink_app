@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -16,7 +17,7 @@ class LogoScreen extends StatefulWidget {
 
 class _LogoScreenState extends State<LogoScreen> {
   Timer? _timer;
-  late final DataRepository _repo;
+  late final DataRepository _repo = DataRepository();
   Profile? _p;
   bool _loading = true;
   bool _deviceRegistered = false;
@@ -24,11 +25,9 @@ class _LogoScreenState extends State<LogoScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = DataRepository(SecureStore());
 
     _loadProfile();
 
-    // ✅ run after first frame so SecureStore is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initPushAndRegister();
     });
@@ -36,7 +35,6 @@ class _LogoScreenState extends State<LogoScreen> {
     _timer = Timer(const Duration(seconds: 15), _openMenu);
   }
 
-  /// 🔔 REGISTER DEVICE (USER ONLY — HARD LOCKED)
   Future<void> _initPushAndRegister() async {
     if (_deviceRegistered) return;
 
@@ -50,32 +48,21 @@ class _LogoScreenState extends State<LogoScreen> {
       );
 
       final token = await messaging.getToken();
-      if (token == null) {
-        debugPrint("❌ FCM token is NULL");
-        return;
-      }
+      if (token == null) return;
 
-      final store = SecureStore();
-      final email = await store.getString("userEmail");
+      final email = await AppState.getEmail();
+      final role = await AppState.getRole();
 
-      if (email == null) {
-        debugPrint("ℹ️ No user email — skipping device register");
-        return;
-      }
-
-      debugPrint("🔥 Registering device for $email");
+      if (email == null || role == null) return;
 
       await ApiService.registerDeviceToken(
         email: email,
         fcmToken: token,
-        role: "user", // ✅ SOLID FIX
+        role: role,
       );
 
       _deviceRegistered = true;
-      debugPrint("✅ Device registration completed");
-    } catch (e) {
-      debugPrint("❌ Device registration error: $e");
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
@@ -101,22 +88,22 @@ class _LogoScreenState extends State<LogoScreen> {
   Future<void> _openMenu() async {
     _timer?.cancel();
 
-    final store = SecureStore();
-    final role = await store.getString('role');
+    final loggedIn = await AppState.isLoggedIn();
+    final role = await AppState.getRole();
 
     if (!mounted) return;
+
+    if (!loggedIn) {
+      Navigator.pushReplacementNamed(context, '/landing');
+      return;
+    }
 
     if (role == 'agent') {
       Navigator.pushReplacementNamed(context, '/agent_menu');
       return;
     }
 
-    if (role == 'user') {
-      Navigator.pushReplacementNamed(context, '/menu');
-      return;
-    }
-
-    Navigator.pushReplacementNamed(context, '/landing');
+    Navigator.pushReplacementNamed(context, '/menu');
   }
 
   void _openEmergencyScreen() {
@@ -142,9 +129,7 @@ class _LogoScreenState extends State<LogoScreen> {
                 width: 220,
                 fit: BoxFit.contain,
               ),
-
               const SizedBox(height: 28),
-
               if (_loading)
                 const CircularProgressIndicator(color: Colors.white70)
               else if (hasName) ...[
@@ -157,7 +142,6 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
-
               const Text(
                 'TAP ANYWHERE TO OPEN',
                 style: TextStyle(
@@ -167,10 +151,7 @@ class _LogoScreenState extends State<LogoScreen> {
                   letterSpacing: 1.1,
                 ),
               ),
-
               const SizedBox(height: 48),
-
-              // 🔴 BIG RED EMERGENCY BUTTON — RESTORED
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(

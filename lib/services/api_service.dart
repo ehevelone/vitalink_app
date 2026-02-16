@@ -38,6 +38,15 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // 🔎 Get User's Assigned Agent  ✅ NEW (ONLY ADDITION)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> getUserAgent(String email) {
+    return _postJson("get_user_agent", {
+      "email": email,
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔹 Insurance card parsing
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> parseInsurance(File image) async {
@@ -262,7 +271,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔎 Resolve agent by QR / agent code (USER REGISTRATION)
+  // 🔎 Resolve agent by QR / agent code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
     final res = await _postJson("resolve_agent_code", {

@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,8 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadSaved() async {
     final store = SecureStore();
-    final remember = await store.getBool("rememberMeUser") ?? false;
-    if (!remember) return;
+    final remember = await store.getBool("rememberMeUser");
+    if (remember != true) return;
 
     final email = await store.getString("savedUserEmail") ?? "";
     final pass = await store.getString("savedUserPassword") ?? "";
@@ -41,45 +42,27 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  /// 🔑 REGISTER DEVICE AFTER LOGIN — DEBUG HARD WIRED
   Future<void> _registerDeviceAfterLogin(String email) async {
     try {
-      debugPrint("🔥 STEP A: registerDeviceAfterLogin CALLED");
-
       final messaging = FirebaseMessaging.instance;
-
-      debugPrint("🔥 STEP B: requesting FCM token");
       final token = await messaging.getToken();
 
-      debugPrint("🔥 STEP C: FCM token = $token");
-
-      if (token == null) {
-        debugPrint("❌ STOP: FCM TOKEN IS NULL");
-        return;
-      }
-
-      debugPrint("🔥 STEP D: calling register_device_v2");
+      if (token == null) return;
 
       await ApiService.registerDeviceToken(
         email: email,
         fcmToken: token,
         role: "user",
       );
-
-      debugPrint("✅ STEP E: register_device_v2 REQUEST SENT");
-    } catch (e) {
-      debugPrint("❌ Device registration failed: $e");
-    }
+    } catch (_) {}
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    final email = _emailCtrl.text.trim();
+    final email = _emailCtrl.text.trim().toLowerCase();
     final password = _passwordCtrl.text.trim();
-
-    debugPrint("🟢 STEP 1: calling check_user");
 
     final res = await ApiService.loginUser(
       email: email,
@@ -88,18 +71,24 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (res["success"] == true) {
-      debugPrint("🟢 STEP 2: login success");
-
       final user = res["user"];
       final store = SecureStore();
 
       await store.remove("agentLoggedIn");
-      await store.setBool("userLoggedIn", true);
-      await store.setString("role", "user");
 
+      // ✅ LOGIN STATE NOW STORED IN APPSTATE
+      await AppState.setLoggedIn(true);
+      await AppState.setRole("user");
+      await AppState.setEmail(user["email"]);
+
+      // Keep identity data in secure storage
       await store.setString("userId", user["id"].toString());
       await store.setString("userEmail", user["email"]);
-      await store.setString("agent_id", user["agent_id"]?.toString() ?? "");
+      await store.setString(
+          "agent_id", user["agent_id"]?.toString() ?? "");
+      await store.setString("agentName", user["agent_name"] ?? "");
+      await store.setString("agentEmail", user["agent_email"] ?? "");
+      await store.setString("agentPhone", user["agent_phone"] ?? "");
 
       if (_rememberMe) {
         await store.setBool("rememberMeUser", true);
@@ -111,13 +100,11 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove("savedUserPassword");
       }
 
-      // 🔥 DEVICE REGISTRATION TEST
-      await _registerDeviceAfterLogin(email);
+      _registerDeviceAfterLogin(email);
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, "/logo");
     } else {
-      debugPrint("❌ STEP 2 FAILED: ${res["error"]}");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res["error"] ?? "Invalid credentials")),
       );
@@ -139,7 +126,8 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
-                validator: (v) => v == null || v.isEmpty ? "Enter email" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -163,7 +151,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 12),
               CheckboxListTile(
                 value: _rememberMe,
-                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                onChanged: (v) =>
+                    setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
               const SizedBox(height: 24),

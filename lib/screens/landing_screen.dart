@@ -1,6 +1,5 @@
-// lib/screens/landing_screen.dart
 import 'package:flutter/material.dart';
-import '../services/secure_store.dart';
+import '../services/app_state.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -19,33 +18,26 @@ class _LandingScreenState extends State<LandingScreen> {
     _checkStoredSession();
   }
 
-  /// ✅ Landing ONLY redirects if user is STILL logged in
   Future<void> _checkStoredSession() async {
-    final store = SecureStore();
-    final role = await store.getString('role');
-    final loggedIn = await store.getBool('loggedIn') ?? false;
+    final loggedIn = await AppState.isLoggedIn();
 
     if (!mounted) return;
 
-    // ✅ Logged in → Splash (Landing is skipped entirely)
-    if (role != null && loggedIn) {
-      Navigator.pushReplacementNamed(context, '/splash');
+    if (loggedIn) {
+      Navigator.pushReplacementNamed(context, '/logo');
       return;
     }
 
-    // ✅ Not logged in → stay on Landing
     setState(() => _loading = false);
   }
 
   Future<void> _chooseAgent() async {
-    final store = SecureStore();
-    await store.setString('role', 'agent');
+    await AppState.setRole('agent');
     Navigator.pushReplacementNamed(context, '/terms_agent');
   }
 
   Future<void> _chooseUser() async {
-    final store = SecureStore();
-    await store.setString('role', 'user');
+    await AppState.setRole('user');
     Navigator.pushReplacementNamed(context, '/terms_user');
   }
 
@@ -55,12 +47,14 @@ class _LandingScreenState extends State<LandingScreen> {
       barrierDismissible: true,
       builder: (dialogCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
           backgroundColor: const Color(0xFFF2ECF7),
           title: const Text(
             "Already Registered?",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            style:
+                TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -71,7 +65,8 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               const SizedBox(height: 18),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceEvenly,
                 children: [
                   GestureDetector(
                     onTap: () {
@@ -82,7 +77,6 @@ class _LandingScreenState extends State<LandingScreen> {
                       "User Login",
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.normal,
                         color: Color(0xFF4A3AFF),
                       ),
                     ),
@@ -90,13 +84,13 @@ class _LandingScreenState extends State<LandingScreen> {
                   GestureDetector(
                     onTap: () {
                       Navigator.of(dialogCtx).pop();
-                      Navigator.pushNamed(context, '/agent_login');
+                      Navigator.pushNamed(
+                          context, '/agent_login');
                     },
                     child: const Text(
                       "Agent Login",
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.normal,
                         color: Color(0xFF4A3AFF),
                       ),
                     ),
@@ -116,7 +110,8 @@ class _LandingScreenState extends State<LandingScreen> {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(color: Colors.white70),
+          child: CircularProgressIndicator(
+              color: Colors.white70),
         ),
       );
     }
@@ -126,7 +121,8 @@ class _LandingScreenState extends State<LandingScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
                 const SizedBox(height: 10),
@@ -139,17 +135,23 @@ class _LandingScreenState extends State<LandingScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Image.asset('assets/images/vitalink-logo-2.png', width: 240),
+                Image.asset(
+                    'assets/images/vitalink-logo-2.png',
+                    width: 240),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: vitalinkBlue,
-                    minimumSize: const Size(double.infinity, 55),
+                    minimumSize:
+                        const Size(double.infinity, 55),
                   ),
-                  icon: const Icon(Icons.badge, color: Colors.black),
+                  icon: const Icon(Icons.badge,
+                      color: Colors.black),
                   label: const Text(
                     "I'm an Agent",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.black),
                   ),
                   onPressed: _chooseAgent,
                 ),
@@ -157,12 +159,16 @@ class _LandingScreenState extends State<LandingScreen> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    minimumSize: const Size(double.infinity, 55),
+                    minimumSize:
+                        const Size(double.infinity, 55),
                   ),
-                  icon: const Icon(Icons.person, color: Colors.black),
+                  icon: const Icon(Icons.person,
+                      color: Colors.black),
                   label: const Text(
                     "I'm a User",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.black),
                   ),
                   onPressed: _chooseUser,
                 ),

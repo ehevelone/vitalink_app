@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/app_state.dart';
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -39,6 +39,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -64,12 +65,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     setState(() => _loading = true);
 
     try {
-      final store = SecureStore();
-      final repo = DataRepository(store);
+      final repo = DataRepository();
 
       final code = _agentCodeCtrl.text.trim();
+      final email = _emailCtrl.text.trim().toLowerCase();
 
-      // 🔎 Resolve agent first
       final agentRes = await ApiService.resolveAgentByCode(code);
       if (agentRes['success'] != true || agentRes['agent'] == null) {
         throw Exception("Invalid or inactive agent code");
@@ -77,18 +77,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       final agent = agentRes['agent'];
 
-      // 🔥 SPLIT NAME
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
       final lastName =
           nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "";
 
-      // 🔥 CREATE USER IN SB
       final registerRes = await ApiService.registerUser(
         firstName: firstName,
         lastName: lastName,
-        email:
-            "${_phoneCtrl.text.replaceAll(RegExp(r'\\D'), '')}@vitalink.app",
+        email: email,
         phone: _phoneCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
         promoCode: code,
@@ -99,29 +96,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         throw Exception(registerRes['error'] ?? "Registration failed");
       }
 
-      // ✅ Now save locally
       final profile = await repo.loadProfile() ?? Profile();
 
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
 
-      profile.agentId = agent['id'];
-      profile.agentName = agent['name'];
-      profile.agentEmail = agent['email'];
-      profile.agentPhone = agent['phone'];
+      // 🔥 REMOVED LOCAL AGENT STORAGE (now backend-driven)
 
       profile.registered = true;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
 
-      // 🔐 Session flags
-      await store.setBool('loggedIn', true);
-      await store.setString('role', 'user');
-      await store.setString(
-          'userEmail',
-          "${_phoneCtrl.text.replaceAll(RegExp(r'\\D'), '')}@vitalink.app");
+      await AppState.setLoggedIn(true);
+      await AppState.setRole('user');
+      await AppState.setEmail(email);
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/menu');
@@ -151,6 +141,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
               const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _emailCtrl,
+                decoration: const InputDecoration(labelText: "Email"),
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "Email required";
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
+                    return "Invalid email";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
@@ -158,6 +163,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 inputFormatters: [PhoneNumberFormatter()],
               ),
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: true,
@@ -167,7 +173,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
+
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _confirmCtrl,
                 obscureText: true,
@@ -176,7 +184,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
+
               const SizedBox(height: 16),
+
               TextFormField(
                 controller: _agentCodeCtrl,
                 decoration: InputDecoration(

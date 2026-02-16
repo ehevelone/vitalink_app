@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/api_service.dart';
 import '../models.dart';
 
 class HipaaFormScreen extends StatefulWidget {
@@ -25,13 +26,49 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   bool _saving = false;
   bool _acknowledged = false;
   bool _canScroll = false;
-  bool _sent = false; // ✅ Added
 
   Profile? _profile;
 
   String? _agentEmail;
   String? _agentName;
   String? _agentPhone;
+
+  static const String _authorizationText = """
+HIPAA AUTHORIZATION & MEDICARE SCOPE OF APPOINTMENT
+
+By signing below, I authorize my licensed insurance agent and/or affiliated agency to access, receive, and use ONLY the following information for the purpose of assisting me with Medicare plan education and enrollment:
+
+• My listed medications
+• My listed physicians / healthcare providers
+
+No other medical records, diagnoses, treatment notes, financial data, or unrelated personal information will be shared through this authorization.
+
+I understand:
+
+• This authorization is voluntary.
+• I may refuse to sign without affecting my eligibility, treatment, or benefits.
+• I may revoke this authorization at any time in writing.
+• Revocation will not apply to information already disclosed.
+• Information disclosed may be subject to redisclosure and may no longer be protected by federal privacy regulations.
+• This authorization expires one (1) year from the date signed unless revoked earlier.
+
+MEDICARE SCOPE OF APPOINTMENT (CMS Required)
+
+I agree to discuss the following Medicare product types with my licensed agent:
+
+• Medicare Advantage (Part C)
+• Prescription Drug Plans (Part D)
+• Medicare Supplement (Medigap)
+• Dental / Vision / Hearing
+• Hospital Indemnity and related products
+
+I understand:
+
+• I am not required to enroll in any plan.
+• The agent may only discuss the product types listed above.
+• Signing does not obligate me to enroll.
+• This Scope of Appointment remains valid for twelve (12) months unless revoked.
+""";
 
   @override
   void initState() {
@@ -51,12 +88,23 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   Future<void> _loadData() async {
     final store = SecureStore();
     final repo = DataRepository(store);
-
     final p = await repo.loadProfile();
 
-    final agentEmail = await store.getString('agentEmail');
-    final agentName = await store.getString('agentName');
-    final agentPhone = await store.getString('agentPhone');
+    String? agentEmail;
+    String? agentName;
+    String? agentPhone;
+
+    final userEmail = await store.getString('userEmail');
+
+    if (userEmail != null && userEmail.isNotEmpty) {
+      final res = await ApiService.getUserAgent(userEmail);
+      if (res["success"] == true && res["agent"] != null) {
+        final agent = res["agent"];
+        agentEmail = agent["email"];
+        agentName = agent["name"];
+        agentPhone = agent["phone"];
+      }
+    }
 
     if (!mounted) return;
 
@@ -129,11 +177,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   Future<void> _saveAndSend() async {
     if (_sigCtrl.isEmpty || _profile == null) return;
 
-    final agentEmail = _agentEmail;
-    final agentName = _agentName;
-    final agentPhone = _agentPhone;
-
-    if (agentEmail == null || agentEmail.isEmpty) {
+    if (_agentEmail == null || _agentEmail!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("❌ No agent is linked to this account.")),
       );
@@ -144,19 +188,12 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
 
     try {
       final sigBytes = await _sigCtrl.toPngBytes();
-
       if (sigBytes == null || sigBytes.isEmpty) {
         throw Exception("Signature image missing");
       }
 
       final pdf = pw.Document();
       final sigImg = pw.MemoryImage(sigBytes);
-
-      final timestamp = DateTime.now()
-          .toIso8601String()
-          .split(".")
-          .first
-          .replaceAll(":", "-");
 
       pdf.addPage(
         pw.MultiPage(
@@ -170,29 +207,14 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
               ),
             ),
             pw.SizedBox(height: 12),
-            pw.Text(
-              "I understand that by signing below, I authorize my licensed insurance agent to access, discuss, and use my Protected Health Information (PHI) "
-              "for the purpose of helping me understand and enroll in Medicare health plans.\n\n"
-              "This authorization is voluntary and will not affect my eligibility for treatment or benefits. "
-              "I may revoke this authorization at any time by submitting a written request. "
-              "Unless I revoke it sooner, this authorization will expire one (1) year from the date of my signature.\n\n"
-              "This document also serves as a combined Scope of Appointment, allowing discussion of Medicare Advantage (MA), Prescription Drug (PDP), "
-              "and Medicare Supplement (Medigap) plan options.\n\n"
-              "Discussion Topics (Scope of Appointment):\n"
-              "- Medicare Advantage (Part C) & Cost Plans\n"
-              "- Prescription Drug Plan (Part D)\n"
-              "- Medicare Supplement (Medigap) Plans\n"
-              "- Dental / Vision / Hearing Products\n"
-              "- Hospital Indemnity Products\n\n"
-              "I acknowledge that I have read and understand this authorization.",
-            ),
+            pw.Text(_authorizationText),
             pw.SizedBox(height: 20),
             pw.Text(
               "Recipient (Agent):",
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(
-              "${agentName ?? ''}\n$agentEmail\n${agentPhone ?? ''}",
+              "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}",
             ),
             pw.SizedBox(height: 24),
             pw.Row(
@@ -207,16 +229,13 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
             ),
             pw.SizedBox(height: 8),
             pw.Text("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
-            pw.Text(
-              "Expires: ${DateTime.now().add(const Duration(days: 365)).toLocal().toString().split(' ')[0]}",
-            ),
           ],
         ),
       );
 
       final dir = await getTemporaryDirectory();
       final pdfFile =
-          File("${dir.path}/HIPAA_SOA_Authorization_$timestamp.pdf");
+          File("${dir.path}/HIPAA_SOA_Authorization.pdf");
       await pdfFile.writeAsBytes(await pdf.save());
 
       final csvFile = await _buildCsv(_profile!);
@@ -228,14 +247,14 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "agent": {
-            "name": agentName ?? "",
-            "email": agentEmail,
-            "phone": agentPhone ?? ""
+            "name": _agentName ?? "",
+            "email": _agentEmail,
+            "phone": _agentPhone ?? ""
           },
           "user": _profile!.fullName ?? "",
           "attachments": [
             {
-              "name": pdfFile.path.split('/').last,
+              "name": "HIPAA_SOA_Authorization.pdf",
               "content": base64Encode(await pdfFile.readAsBytes()),
             },
             {
@@ -250,21 +269,11 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
         throw Exception(resp.body);
       }
 
-      // ✅ SUCCESS DIALOG
       if (mounted) {
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.green, size: 32),
-                SizedBox(width: 12),
-                Text("Sent Successfully"),
-              ],
-            ),
+            title: const Text("Sent Successfully"),
             content: const Text(
               "Your HIPAA & SOA authorization has been sent to your agent.",
             ),
@@ -295,24 +304,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
             padding: const EdgeInsets.all(16),
             children: const [
               Text(
-                "Authorization to Disclose Health Information\n",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "I understand that by signing below, I authorize my licensed insurance agent to access, discuss, and use my Protected Health Information (PHI) "
-                "for the purpose of helping me understand and enroll in Medicare health plans.\n\n"
-                "This authorization is voluntary and will not affect my eligibility for treatment or benefits. "
-                "I may revoke this authorization at any time by submitting a written request. "
-                "Unless I revoke it sooner, this authorization will expire one (1) year from the date of my signature.\n\n"
-                "This document also serves as a combined Scope of Appointment, allowing discussion of Medicare Advantage (MA), Prescription Drug (PDP), "
-                "and Medicare Supplement (Medigap) plan options.\n\n"
-                "Discussion Topics (Scope of Appointment):\n"
-                "- Medicare Advantage (Part C) & Cost Plans\n"
-                "- Prescription Drug Plan (Part D)\n"
-                "- Medicare Supplement (Medigap) Plans\n"
-                "- Dental / Vision / Hearing Products\n"
-                "- Hospital Indemnity Products\n\n"
-                "I acknowledge that I have read and understand this authorization.",
+                _authorizationText,
                 style: TextStyle(fontSize: 16, height: 1.4),
               ),
               SizedBox(height: 300),
@@ -340,7 +332,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
                   ),
                   const Expanded(
                     child: Text(
-                      "I acknowledge and authorize my agent to discuss my Medicare information.",
+                      "I acknowledge and authorize my agent as described above.",
                     ),
                   ),
                 ],

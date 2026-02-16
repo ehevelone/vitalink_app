@@ -3,7 +3,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureStore {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// --- STRING ---
+  // =========================
+  // STRING
+  // =========================
   Future<void> setString(String key, String value) async {
     await _storage.write(key: key, value: value);
   }
@@ -12,40 +14,49 @@ class SecureStore {
     return await _storage.read(key: key);
   }
 
-  /// --- ALIAS ---
+  // Alias (your app uses this)
   Future<String?> get(String key) async {
-    return await getString(key);
+    return await _storage.read(key: key);
   }
 
-  /// --- BOOL ---
+  // =========================
+  // BOOL
+  // =========================
   Future<void> setBool(String key, bool value) async {
     await _storage.write(key: key, value: value.toString());
   }
 
-  Future<bool> getBool(String key) async {
+  Future<bool?> getBool(String key) async {
     final value = await _storage.read(key: key);
-    if (value == null) return false;
+    if (value == null) return null;
     return value.toLowerCase() == 'true';
   }
 
-  /// --- REMOVE SINGLE ITEM ---
+  // =========================
+  // REMOVE SINGLE
+  // =========================
   Future<void> remove(String key) async {
     await _storage.delete(key: key);
   }
 
-  /// --- REMOVE MULTIPLE ---
-  Future<void> delete(String key) async {
-    await _storage.delete(key: key);
-  }
-
-  /// --- CLEAR ALL ---
+  // =========================
+  // CLEAR ALL
+  // =========================
   Future<void> clear() async {
     await _storage.deleteAll();
   }
 
-  /// --- (OPTIONAL) REMOVE AUTH ITEMS ONLY ---
+  // =========================
+  // CLEAR AUTH
+  // =========================
   Future<void> clearAuth() async {
-    await _storage.delete(key: 'authToken');
+    await _storage.delete(key: 'loggedIn');
+    await _storage.delete(key: 'userLoggedIn');
+    await _storage.delete(key: 'agentLoggedIn');
+    await _storage.delete(key: 'role');
+    await _storage.delete(key: 'userEmail');
+    await _storage.delete(key: 'userId');
+    await _storage.delete(key: 'agent_id');
     await _storage.delete(key: 'device_token');
   }
 }

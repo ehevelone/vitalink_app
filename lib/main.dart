@@ -2,14 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// Firebase core only (NO messaging init yet)
 import 'package:firebase_core/firebase_core.dart';
-
-// FCM + local notifications (foreground only)
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-// Core services
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
 
@@ -18,10 +13,12 @@ import 'screens/landing_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/registration_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/account_setup_screen.dart';
 import 'screens/menu_screen.dart';
 import 'screens/agent_menu.dart';
 import 'screens/agent_registration_screen.dart';
 import 'screens/agent_login_screen.dart';
+import 'screens/agent_setup_screen.dart';
 import 'screens/terms_user_screen.dart';
 import 'screens/terms_agent_screen.dart';
 import 'screens/logo_screen.dart';
@@ -30,9 +27,8 @@ import 'screens/my_agent_user.dart';
 import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
-import 'screens/my_profile_screen.dart';
 
-// Medical / Insurance
+// Medical / insurance data
 import 'screens/meds_screen.dart';
 import 'screens/doctors_screen.dart';
 import 'screens/doctors_view.dart';
@@ -43,7 +39,7 @@ import 'screens/insurance_cards.dart';
 import 'screens/insurance_cards_menu.dart';
 import 'screens/insurance_card_detail.dart';
 
-// HIPAA + SOA
+// HIPAA
 import 'screens/hipaa_form_screen.dart';
 
 // Utilities
@@ -55,74 +51,95 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
-// Household / Family profiles
-import 'screens/new_profile_screen.dart';
-import 'screens/profile_picker.dart';
-import 'screens/profile_manager.dart';
-
 import 'models.dart';
 
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-const MethodChannel _navChannel = MethodChannel("vitalink/navigation");
-
-// Foreground local notifications
-final FlutterLocalNotificationsPlugin localNotifications =
-    FlutterLocalNotificationsPlugin();
-
-Future<void> _initLocalNotifications() async {
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidInit);
-  await localNotifications.initialize(initSettings);
-}
-
-void _setupForegroundNotifications() {
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    final notification = message.notification;
-    if (notification == null) return;
-
-    const androidDetails = AndroidNotificationDetails(
-      'vitalink_alerts',
-      'VitaLink Alerts',
-      channelDescription: 'Important VitaLink notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-
-    const platformDetails = NotificationDetails(android: androidDetails);
-
-    await localNotifications.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
-      platformDetails,
-    );
-  });
-}
+/// 🔔 NEW — global navigator key
+final GlobalKey<NavigatorState> navigatorKey =
+    GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  try {
-    await _initLocalNotifications();
-  } catch (_) {}
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
 
-  try {
-    await Firebase.initializeApp();
-    _setupForegroundNotifications();
-  } catch (_) {}
+  await Firebase.initializeApp();
+
+  FirebaseMessaging.onBackgroundMessage(
+    _firebaseMessagingBackgroundHandler,
+  );
+
+  await _setupFirebaseTokenListener();
 
   runApp(const VitaLinkApp());
+}
 
-  _navChannel.setMethodCallHandler((call) async {
-    if (call.method == "openEmergency") {
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/emergency',
-        (route) => false,
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
+Future<void> _setupFirebaseTokenListener() async {
+  final fcm = FirebaseMessaging.instance;
+  final store = SecureStore();
+
+  await fcm.requestPermission();
+
+  final token = await fcm.getToken();
+
+  if (token != null) {
+    final email = await store.get('lastEmail');
+    final role = await store.get('lastRole');
+
+    if (email != null && role != null) {
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: token,
+        role: role,
       );
     }
-    return null;
+  }
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    final email = await store.get('lastEmail');
+    final role = await store.get('lastRole');
+
+    if (email != null && role != null) {
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: newToken,
+        role: role,
+      );
+    }
   });
+
+  /// 🔔 NEW — when app opened from background
+  FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    _handleNotificationNavigation(message);
+  });
+
+  /// 🔔 NEW — when app launched from terminated state
+  final initialMessage = await fcm.getInitialMessage();
+  if (initialMessage != null) {
+    _handleNotificationNavigation(initialMessage);
+  }
+}
+
+/// 🔔 NEW — centralized routing
+void _handleNotificationNavigation(RemoteMessage message) {
+  final type = message.data['type'];
+
+  if (type == 'hipaa') {
+    navigatorKey.currentState
+        ?.pushNamed('/authorization_form');
+  }
+
+  if (type == 'emergency') {
+    navigatorKey.currentState
+        ?.pushNamed('/emergency');
+  }
 }
 
 class VitaLinkApp extends StatelessWidget {
@@ -131,99 +148,76 @@ class VitaLinkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // 🔔 NEW
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
+      initialRoute: '/splash',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
       ),
-      initialRoute: '/splash',
       routes: {
-        '/landing': (_) => const LandingScreen(),
-        '/splash': (_) => const SplashScreen(),
-        '/login': (_) => const LoginScreen(),
-        '/agent_login': (_) => const AgentLoginScreen(),
-        '/menu': (_) => const MenuScreen(),
-        '/agent_menu': (_) => AgentMenuScreen(),
-        '/terms_user': (_) => const TermsUserScreen(),
-        '/terms_agent': (_) => const TermsAgentScreen(),
-        '/registration': (_) => const RegistrationScreen(),
-        '/agent_registration': (_) => const AgentRegistrationScreen(),
-        '/welcome': (_) => const WelcomeScreen(),
-        '/my_profile': (_) => const MyProfileScreen(),
-        '/logo': (_) => const LogoScreen(),
+        '/landing': (context) => const LandingScreen(),
+        '/splash': (context) => const SplashScreen(),
 
-        // ✅ FIXED — CORRECT CLASS, CONST-SAFE
-        '/my_agent_user': (_) => const MyAgentUser(),
-        '/my_agent_agent': (_) => const MyAgentAgent(),
+        // User
+        '/terms_user': (context) => const TermsUserScreen(),
+        '/registration': (context) =>
+            const RegistrationScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/account_setup': (context) =>
+            const AccountSetupScreen(),
+        '/welcome': (context) => const WelcomeScreen(),
+        '/menu': (context) => MenuScreen(),
+        '/my_agent_user': (context) =>
+            MyAgentUser(),
 
-        '/emergency': (_) => EmergencyScreen(),
-        '/emergency_view': (_) => EmergencyView(),
-        '/meds': (_) => MedsScreen(),
-        '/doctors': (_) => DoctorsScreen(),
-        '/doctors_view': (_) => DoctorsView(),
-        '/insurance_policies': (_) => InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (_) => InsuranceCardsMenuScreen(),
-        '/authorization_form': (_) => const HipaaFormScreen(),
-        '/new_profile': (_) => const NewProfileScreen(),
-        '/profile_picker': (_) => const ProfilePickerScreen(),
-        '/profile_manager': (_) => const ProfileManagerScreen(),
-        '/scan_card': (_) => ScanCard(),
-        '/request_reset': (_) => const RequestResetScreen(),
-        '/reset_password': (_) => const ResetPasswordScreen(),
-        '/agent_request_reset': (_) => const AgentRequestResetScreen(),
-        '/agent_reset_password': (_) => const AgentResetPasswordScreen(),
-      },
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/insurance_policy_view':
-            return MaterialPageRoute(
-              builder: (_) =>
-                  InsurancePolicyView(index: settings.arguments as int),
-            );
+        // Agent
+        '/terms_agent': (context) =>
+            const TermsAgentScreen(),
+        '/agent_registration': (context) =>
+            const AgentRegistrationScreen(),
+        '/agent_login': (context) =>
+            const AgentLoginScreen(),
+        '/agent_setup': (context) =>
+            const AgentSetupScreen(),
+        '/agent_menu': (context) =>
+            AgentMenuScreen(),
+        '/my_agent_agent': (context) =>
+            MyAgentAgent(),
 
-          case '/insurance_policy_form':
-            final args = settings.arguments as Map<String, dynamic>;
-            return MaterialPageRoute(
-              builder: (_) => InsurancePolicyForm(
-                policy: args['policy'] as Insurance,
-                allPolicies: args['allPolicies'] as List<Insurance>,
-              ),
-            );
+        // Shared
+        '/logo': (context) => const LogoScreen(),
+        '/emergency': (context) =>
+            EmergencyScreen(),
+        '/emergency_view': (context) =>
+            EmergencyView(),
 
-          case '/insurance_cards':
-            return MaterialPageRoute(
-              builder: (_) =>
-                  InsuranceCardsScreen(index: settings.arguments as int),
-            );
+        // Medical
+        '/meds': (context) => MedsScreen(),
+        '/doctors': (context) =>
+            DoctorsScreen(),
+        '/doctors_view': (context) =>
+            DoctorsView(),
+        '/insurance_policies': (context) =>
+            InsurancePoliciesScreen(),
+        '/insurance_cards_menu': (context) =>
+            InsuranceCardsMenuScreen(),
 
-          case '/insurance_card_detail':
-            return MaterialPageRoute(
-              builder: (_) => InsuranceCardDetail(
-                card: settings.arguments as InsuranceCard,
-              ),
-            );
+        '/authorization_form': (context) =>
+            const HipaaFormScreen(),
 
-          case '/reset_password':
-            final emailOrPhone = settings.arguments as String?;
-            return MaterialPageRoute(
-              builder: (_) =>
-                  ResetPasswordScreen(emailOrPhone: emailOrPhone),
-            );
+        '/scan_card': (context) => ScanCard(),
 
-          case '/agent_reset_password':
-            final emailOrPhone = settings.arguments as String?;
-            return MaterialPageRoute(
-              builder: (_) =>
-                  AgentResetPasswordScreen(emailOrPhone: emailOrPhone),
-            );
-        }
-        return null;
+        '/request_reset': (context) =>
+            const RequestResetScreen(),
+        '/reset_password': (context) =>
+            const ResetPasswordScreen(),
+
+        '/agent_request_reset': (context) =>
+            const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) =>
+            const AgentResetPasswordScreen(),
       },
     );
   }

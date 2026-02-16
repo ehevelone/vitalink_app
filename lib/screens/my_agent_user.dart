@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/secure_store.dart';
-import '../services/data_repository.dart';
-import '../models.dart';
+import '../services/app_state.dart';
+import '../services/api_service.dart';
 
 class MyAgentUser extends StatefulWidget {
   const MyAgentUser({super.key});
@@ -16,7 +15,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
   String? _agentName;
   String? _agentPhone;
   String? _agentEmail;
-  String? _agentNpn;
   String? _agencyName;
   String? _agencyAddress;
   bool _loading = true;
@@ -27,48 +25,32 @@ class _MyAgentUserState extends State<MyAgentUser> {
     _loadAgent();
   }
 
-  // ✅ SURGICALLY FIXED METHOD
   Future<void> _loadAgent() async {
     try {
-      final store = SecureStore();
-      final repo = DataRepository(store);
-      final profile = await repo.loadProfile();
-
-      _agentName =
-          await store.getString("agentName") ??
-          profile?.agentName;
-
-      _agentPhone =
-          await store.getString("agentPhone") ??
-          profile?.agentPhone;
-
-      _agentEmail =
-          await store.getString("agentEmail") ??
-          profile?.agentEmail;
-
-      // 🔥 FIXED — agentId is int in Profile
-      final storedAgentId = await store.getString("agentId");
-
-      if (storedAgentId != null && storedAgentId.isNotEmpty) {
-        _agentNpn = storedAgentId;
-      } else if (profile?.agentId != null) {
-        _agentNpn = profile!.agentId.toString();
-      } else {
-        _agentNpn = null;
+      final userEmail = await AppState.getEmail();
+      if (userEmail == null || userEmail.isEmpty) {
+        setState(() => _loading = false);
+        return;
       }
 
-      _agencyName = await store.getString("agencyName");
-      _agencyAddress = await store.getString("agencyAddress");
+      // ✅ Pull agent directly from backend using user email
+      final res = await ApiService.getUserAgent(userEmail);
+
+      if (res["success"] == true && res["agent"] != null) {
+        final agent = res["agent"];
+
+        _agentName = agent["name"];
+        _agentPhone = agent["phone"];
+        _agentEmail = agent["email"];
+        _agencyName = agent["agency_name"];
+        _agencyAddress = agent["agency_address"];
+      }
     } catch (e) {
       debugPrint("Agent load error: $e");
     }
 
     if (!mounted) return;
     setState(() => _loading = false);
-  }
-
-  Future<void> _sendToAgent() async {
-    Navigator.pushNamed(context, '/authorization_form');
   }
 
   Future<void> _call() async {
@@ -87,6 +69,10 @@ class _MyAgentUserState extends State<MyAgentUser> {
     await launchUrl(uri);
   }
 
+  Future<void> _sendToAgent() async {
+    Navigator.pushNamed(context, '/authorization_form');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -97,118 +83,102 @@ class _MyAgentUserState extends State<MyAgentUser> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.blue,
         title: const Text(
           "My Agent",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: Opacity(
-                opacity: 0.18,
-                child: Image.asset(
-                  "assets/images/logo_icon.png",
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Card(
-                      elevation: 4,
-                      margin: const EdgeInsets.only(bottom: 24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              _agentName ?? "Unknown Agent",
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Card(
+                  elevation: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Text(
+                          _agentName ?? "No Agent Assigned",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (_agencyName?.isNotEmpty == true)
+                          Text("🏢 $_agencyName"),
+
+                        if (_agencyAddress?.isNotEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              "📍 $_agencyAddress",
                               textAlign: TextAlign.center,
+                            ),
+                          ),
+
+                        const SizedBox(height: 16),
+
+                        if (_agentPhone?.isNotEmpty == true)
+                          InkWell(
+                            onTap: _call,
+                            child: Text(
+                              "📞 $_agentPhone",
                               style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                          ),
 
-                            if (_agentNpn?.isNotEmpty == true)
-                              Text("NPN: $_agentNpn",
-                                  style: const TextStyle(fontSize: 16)),
-
-                            if (_agencyName?.isNotEmpty == true)
-                              Text("🏢 ${_agencyName!}",
-                                  style: const TextStyle(fontSize: 16)),
-
-                            if (_agencyAddress?.isNotEmpty == true)
-                              Text(
-                                "📍 ${_agencyAddress!}",
-                                style: const TextStyle(fontSize: 16),
-                                textAlign: TextAlign.center,
-                              ),
-                            const SizedBox(height: 8),
-
-                            if (_agentPhone?.isNotEmpty == true)
-                              InkWell(
-                                onTap: _call,
-                                child: Text(
-                                  "📞 ${_agentPhone!}",
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline,
-                                  ),
+                        if (_agentEmail?.isNotEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: InkWell(
+                              onTap: _email,
+                              child: Text(
+                                "📧 $_agentEmail",
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
                                 ),
                               ),
-
-                            if (_agentEmail?.isNotEmpty == true)
-                              InkWell(
-                                onTap: _email,
-                                child: Text(
-                                  "📧 ${_agentEmail!}",
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+                            ),
+                          ),
+                      ],
                     ),
-
-                    ElevatedButton.icon(
-                      onPressed: _loadAgent,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text("Reload Info"),
-                    ),
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.send),
-                        label: const Text("Send My Info to Agent"),
-                        onPressed: _sendToAgent,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+
+                ElevatedButton.icon(
+                  onPressed: _loadAgent,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("Reload Info"),
+                ),
+
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.send),
+                    label: const Text("Send My Info to Agent"),
+                    onPressed: _sendToAgent,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

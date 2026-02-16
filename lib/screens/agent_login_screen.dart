@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class AgentLoginScreen extends StatefulWidget {
   const AgentLoginScreen({super.key});
@@ -30,6 +32,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     final remember = await store.getBool("rememberMeAgent") ?? false;
     final email = await store.getString("savedAgentEmail") ?? "";
     final pass = await store.getString("savedAgentPassword") ?? "";
+
     if (remember) {
       setState(() {
         _rememberMe = true;
@@ -43,8 +46,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
+    final email = _emailCtrl.text.trim();
+
     final res = await ApiService.loginAgent(
-      email: _emailCtrl.text.trim(),
+      email: email,
       password: _passwordCtrl.text.trim(),
     );
 
@@ -52,18 +57,23 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       final agent = res["agent"];
       final store = SecureStore();
 
-      await store.remove("userLoggedIn");
-      await store.setBool("agentLoggedIn", true);
-      await store.setString("role", "agent");
+      // Clear user session
+      await AppState.clearAuth();
+
+      // ✅ Agent login now stored in AppState
+      await AppState.setLoggedIn(true);
+      await AppState.setRole("agent");
+      await AppState.setEmail(agent["email"]);
+
+      // Identity still in secure storage
       await store.setString("agentId", agent["id"].toString());
       await store.setString("agentEmail", agent["email"] ?? "");
       await store.setString("agentName", agent["name"] ?? "");
       await store.setString("agentPhone", agent["phone"] ?? "");
 
-      // Remember Me handling
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
-        await store.setString("savedAgentEmail", _emailCtrl.text.trim());
+        await store.setString("savedAgentEmail", email);
         await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
       } else {
         await store.setBool("rememberMeAgent", false);
@@ -71,21 +81,16 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
         await store.remove("savedAgentPassword");
       }
 
-      // 🔥 NEW – Register device token
       try {
         final fcm = await FirebaseMessaging.instance.getToken();
-        debugPrint("📱 FCM Token for AGENT: $fcm");
         if (fcm != null) {
-          final reg = await ApiService.registerDeviceToken(
+          await ApiService.registerDeviceToken(
             email: agent["email"],
             fcmToken: fcm,
             role: "agent",
           );
-          debugPrint("📌 Device registration result: $reg");
         }
-      } catch (e) {
-        debugPrint("⚠ Device registration failed: $e");
-      }
+      } catch (_) {}
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, "/logo");
@@ -111,7 +116,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Agent Email"),
-                validator: (v) => v == null || v.isEmpty ? "Enter your email" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter your email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -120,16 +126,21 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
-                    icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
+                    icon: Icon(_showPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                validator: (v) => v == null || v.isEmpty ? "Enter password" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter password" : null,
               ),
               const SizedBox(height: 12),
               CheckboxListTile(
                 value: _rememberMe,
-                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                onChanged: (v) =>
+                    setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
                 controlAffinity: ListTileControlAffinity.leading,
               ),

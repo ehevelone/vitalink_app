@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../services/secure_store.dart';
+import '../services/app_state.dart';
 import '../services/data_repository.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -12,32 +12,31 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _routed = false;
+
   @override
   void initState() {
     super.initState();
-
-    // Route AFTER first frame to avoid plugin race conditions
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _route();
-    });
+    SchedulerBinding.instance.addPostFrameCallback((_) => _route());
   }
 
   Future<void> _route() async {
-    final store = SecureStore();
+    if (_routed) return;
+    _routed = true;
 
     try {
-      final loggedIn = await store.getBool('userLoggedIn') ?? false;
+      final loggedIn = await AppState.isLoggedIn();
 
       if (!mounted) return;
 
       if (loggedIn) {
-        // 🔒 Validate profile integrity before routing
-        final repo = DataRepository(store);
+        final repo = DataRepository();
         final profile = await repo.loadProfile();
 
+        if (!mounted) return;
+
         if (profile == null) {
-          // Corrupted or missing profile → auto-heal
-          await store.clear();
+          await AppState.clearAuth();
           Navigator.pushReplacementNamed(context, '/landing');
           return;
         }
@@ -49,7 +48,6 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.pushReplacementNamed(context, '/landing');
     } catch (_) {
       if (!mounted) return;
-      await store.clear();
       Navigator.pushReplacementNamed(context, '/landing');
     }
   }
