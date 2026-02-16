@@ -1,4 +1,3 @@
-// functions/get_user_agent.js
 const db = require("./services/db");
 
 function ok(obj) {
@@ -47,10 +46,13 @@ exports.handler = async (event) => {
       return fail("Missing user email");
     }
 
-    // 🔎 1️⃣ Find user and their agent_id
+    // 1️⃣ Always normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 2️⃣ Fetch user and agent_id
     const userResult = await db.query(
-      "SELECT agent_id FROM users WHERE email = $1",
-      [email.toLowerCase()]
+      "SELECT id, agent_id FROM users WHERE email = $1 LIMIT 1",
+      [normalizedEmail]
     );
 
     if (!userResult.rows.length) {
@@ -59,23 +61,34 @@ exports.handler = async (event) => {
 
     const agentId = userResult.rows[0].agent_id;
 
+    // 3️⃣ If no agent assigned → return clean null
     if (!agentId) {
       return ok({ agent: null });
     }
 
-    // 🔎 2️⃣ Fetch agent record
+    // 4️⃣ Fetch agent details
     const agentResult = await db.query(
-      `SELECT id, name, email, phone, agency_name, agency_address 
-       FROM agents 
-       WHERE id = $1`,
+      `
+      SELECT
+        name,
+        email,
+        phone,
+        agency_name,
+        agency_address
+      FROM agents
+      WHERE id = $1
+      LIMIT 1
+      `,
       [agentId]
     );
 
     if (!agentResult.rows.length) {
-      return fail("Agent not found", 404);
+      return ok({ agent: null });
     }
 
-    return ok({ agent: agentResult.rows[0] });
+    return ok({
+      agent: agentResult.rows[0],
+    });
 
   } catch (e) {
     console.error("❌ get_user_agent error:", e);
