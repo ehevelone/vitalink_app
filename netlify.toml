@@ -12,5 +12,6 @@
     "bcryptjs",
     "firebase-admin",
     "nodemailer",
-    "qrcode"
+    "qrcode",
+    "speakeasy"
   ]
