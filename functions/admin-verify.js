@@ -1,20 +1,21 @@
 // @ts-nocheck
 
 const crypto = require("crypto");
+const admin = require("firebase-admin");
 const { Pool } = require("pg");
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(
+      JSON.parse(process.env.FCM_SERVICE_ACCOUNT)
+    )
+  });
+}
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
-function now() {
-  return new Date();
-}
-
-function addHours(d, hrs) {
-  return new Date(d.getTime() + hrs * 60 * 60 * 1000);
-}
 
 exports.handler = async function (event) {
   try {
@@ -22,85 +23,66 @@ exports.handler = async function (event) {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const { email, code } = JSON.parse(event.body || "{}");
-    if (!email || !code) return { statusCode: 400, body: "Missing verification data" };
+    const { idToken, email } = JSON.parse(event.body || "{}");
+
+    if (!idToken || !email) {
+      return { statusCode: 400, body: "Missing data" };
+    }
+
+    // 🔐 Verify Firebase ID token
+    const decoded = await admin.auth().verifyIdToken(idToken);
+
+    if (!decoded.phone_number) {
+      return { statusCode: 403, body: "Phone verification required" };
+    }
 
     const client = await pool.connect();
 
-    const r = await client.query(
-      "SELECT * FROM rsms WHERE email = $1 AND role = 'admin' AND active = true LIMIT 1",
+    const result = await client.query(
+      "SELECT id, phone FROM rsms WHERE email=$1 AND role='admin' AND active=true LIMIT 1",
       [email]
     );
 
-    if (r.rows.length === 0) {
+    if (result.rows.length === 0) {
       client.release();
       return { statusCode: 403, body: "Unauthorized" };
     }
 
-    const admin = r.rows[0];
-    const t = now();
+    const adminUser = result.rows[0];
 
-    // SMS lockout
-    if (admin.sms_fail_until && new Date(admin.sms_fail_until) > t) {
+    // Normalize phone comparison
+    const dbPhone = String(adminUser.phone).replace(/\D/g, "");
+    const firebasePhone = String(decoded.phone_number).replace(/\D/g, "");
+
+    if (dbPhone !== firebasePhone) {
       client.release();
-      return { statusCode: 429, body: "Locked. Try again later." };
+      return { statusCode: 403, body: "Phone mismatch" };
     }
 
-    const expiresOk = admin.sms_expires && new Date(admin.sms_expires) > t;
-    const codeOk = admin.sms_code && admin.sms_code === String(code).trim();
-
-    if (!expiresOk || !codeOk) {
-      const nextCount = (admin.sms_fail_count || 0) + 1;
-      let failUntil = null;
-      let resetCount = nextCount;
-
-      // lock after 5 bad codes for 30 minutes
-      if (nextCount >= 5) {
-        failUntil = new Date(t.getTime() + 30 * 60 * 1000);
-        resetCount = 0;
-      }
-
-      await client.query(
-        "UPDATE rsms SET sms_fail_count = $1, sms_fail_until = $2 WHERE id = $3",
-        [resetCount, failUntil, admin.id]
-      );
-
-      client.release();
-      return { statusCode: 403, body: "Invalid or expired code" };
-    }
-
-    // success: clear codes and create session token
-    const token = crypto.randomBytes(24).toString("hex"); // 48 chars
-    const sessionExp = addHours(t, 8);
-
-    const ip =
-      (event.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
-      event.headers["client-ip"] ||
-      "";
+    // ✅ Create secure session
+    const sessionToken = crypto.randomBytes(24).toString("hex");
+    const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
 
     await client.query(
-      `UPDATE rsms
-       SET sms_code = NULL,
-           sms_expires = NULL,
-           sms_fail_count = 0,
-           sms_fail_until = NULL,
-           admin_session_token = $1,
-           admin_session_expires = $2,
-           last_login_at = $3,
-           last_login_ip = $4
-       WHERE id = $5`,
-      [token, sessionExp, t, ip, admin.id]
+      "UPDATE rsms SET admin_session_token=$1, admin_session_expires=$2 WHERE id=$3",
+      [sessionToken, expires, adminUser.id]
     );
 
     client.release();
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, token, expiresAt: sessionExp.toISOString() })
+      body: JSON.stringify({
+        success: true,
+        token: sessionToken
+      })
     };
 
   } catch (err) {
     console.error("admin-verify error:", err);
-    return { statusCode: 500, body: JSON.stringify({ error: "Server error" }) };
+    return {
+      statusCode: 500,
+      body: "Verification failed"
+    };
   }
 };
