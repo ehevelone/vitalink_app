@@ -18,22 +18,52 @@ const pool = new Pool({
 });
 
 exports.handler = async function (event) {
+
+  // 🔥 REQUIRED CORS HEADERS
+  const headers = {
+    "Access-Control-Allow-Origin": "https://myvitalink.app",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS"
+  };
+
+  // Handle preflight
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: ""
+    };
+  }
+
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers,
+      body: "Method Not Allowed"
+    };
+  }
+
   try {
-    if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
-    }
 
     const { idToken, email } = JSON.parse(event.body || "{}");
 
     if (!idToken || !email) {
-      return { statusCode: 400, body: "Missing data" };
+      return {
+        statusCode: 400,
+        headers,
+        body: "Missing data"
+      };
     }
 
     // 🔐 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(idToken);
 
     if (!decoded.phone_number) {
-      return { statusCode: 403, body: "Phone verification required" };
+      return {
+        statusCode: 403,
+        headers,
+        body: "Phone verification required"
+      };
     }
 
     const client = await pool.connect();
@@ -45,7 +75,11 @@ exports.handler = async function (event) {
 
     if (result.rows.length === 0) {
       client.release();
-      return { statusCode: 403, body: "Unauthorized" };
+      return {
+        statusCode: 403,
+        headers,
+        body: "Unauthorized"
+      };
     }
 
     const adminUser = result.rows[0];
@@ -56,7 +90,11 @@ exports.handler = async function (event) {
 
     if (dbPhone !== firebasePhone) {
       client.release();
-      return { statusCode: 403, body: "Phone mismatch" };
+      return {
+        statusCode: 403,
+        headers,
+        body: "Phone mismatch"
+      };
     }
 
     // ✅ Create secure session
@@ -72,6 +110,7 @@ exports.handler = async function (event) {
 
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({
         success: true,
         token: sessionToken
@@ -82,6 +121,7 @@ exports.handler = async function (event) {
     console.error("admin-verify error:", err);
     return {
       statusCode: 500,
+      headers,
       body: "Verification failed"
     };
   }
