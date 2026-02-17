@@ -15,8 +15,7 @@ exports.handler = async function () {
       "SELECT COUNT(*) FROM agents WHERE active = true"
     );
     const totalUsers = await client.query("SELECT COUNT(*) FROM users");
-    const totalProfiles = await client.query("SELECT COUNT(*) FROM profiles");
-    const totalScans = await client.query("SELECT COUNT(*) FROM qr_scans");
+    const totalDevices = await client.query("SELECT COUNT(*) FROM user_devices");
 
     client.release();
 
@@ -27,8 +26,8 @@ exports.handler = async function () {
         totalAgents: parseInt(totalAgents.rows[0].count),
         activeAgents: parseInt(activeAgents.rows[0].count),
         totalUsers: parseInt(totalUsers.rows[0].count),
-        totalProfiles: parseInt(totalProfiles.rows[0].count),
-        totalScans: parseInt(totalScans.rows[0].count)
+        totalProfiles: parseInt(totalDevices.rows[0].count), // using devices instead
+        totalScans: 0 // you don't have a scan table yet
       })
     };
 
