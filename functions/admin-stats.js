@@ -1,59 +1,43 @@
-const { createClient } = require("@supabase/supabase-js");
+const { Pool } = require("pg");
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-exports.handler = async function (event) {
+exports.handler = async function () {
   try {
-    // RSM count
-    const { count: totalRSMs } = await supabase
-      .from("rsms")
-      .select("*", { count: "exact", head: true });
+    const client = await pool.connect();
 
-    // Agents count
-    const { count: totalAgents } = await supabase
-      .from("agents")
-      .select("*", { count: "exact", head: true });
+    const totalRSMs = await client.query("SELECT COUNT(*) FROM rsms");
+    const totalAgents = await client.query("SELECT COUNT(*) FROM agents");
+    const activeAgents = await client.query(
+      "SELECT COUNT(*) FROM agents WHERE active = true"
+    );
+    const totalUsers = await client.query("SELECT COUNT(*) FROM users");
+    const totalProfiles = await client.query("SELECT COUNT(*) FROM profiles");
+    const totalScans = await client.query("SELECT COUNT(*) FROM qr_scans");
 
-    // Active agents count
-    const { count: activeAgents } = await supabase
-      .from("agents")
-      .select("*", { count: "exact", head: true })
-      .eq("active", true);
-
-    // Users count
-    const { count: totalUsers } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true });
-
-    // Profiles count
-    const { count: totalProfiles } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true });
-
-    // QR scans count (change table name if different)
-    const { count: totalScans } = await supabase
-      .from("qr_scans")
-      .select("*", { count: "exact", head: true });
+    client.release();
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        totalRSMs: totalRSMs || 0,
-        totalAgents: totalAgents || 0,
-        activeAgents: activeAgents || 0,
-        totalUsers: totalUsers || 0,
-        totalProfiles: totalProfiles || 0,
-        totalScans: totalScans || 0
+        totalRSMs: parseInt(totalRSMs.rows[0].count),
+        totalAgents: parseInt(totalAgents.rows[0].count),
+        activeAgents: parseInt(activeAgents.rows[0].count),
+        totalUsers: parseInt(totalUsers.rows[0].count),
+        totalProfiles: parseInt(totalProfiles.rows[0].count),
+        totalScans: parseInt(totalScans.rows[0].count)
       })
     };
 
   } catch (err) {
+    console.error("Admin stats error:", err);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Server error", details: err.message })
+      body: JSON.stringify({ error: err.message })
     };
   }
 };
