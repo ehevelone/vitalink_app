@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+// functions/admin-stats.js
+const { requireAdmin } = require("./services/_adminAuth");
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -7,53 +7,53 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://myvitalink.app",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-token",
+  "Access-Control-Allow-Methods": "GET, OPTIONS"
+};
+
 exports.handler = async function (event) {
+
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 200, headers: corsHeaders, body: "" };
+  }
+
+  if (event.httpMethod !== "GET") {
+    return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
+  }
+
+  const auth = await requireAdmin(event);
+  if (auth.error) {
+    return { statusCode: 401, headers: corsHeaders, body: auth.error };
+  }
+
   try {
-    const token = event.headers["x-admin-session"];
-
-    if (!token) {
-      return { statusCode: 403, body: JSON.stringify({ error: "Unauthorized" }) };
-    }
-
     const client = await pool.connect();
 
-    const auth = await client.query(
-      `SELECT id FROM rsms
-       WHERE role = 'admin'
-         AND active = true
-         AND admin_session_token = $1
-         AND admin_session_expires > NOW()
-       LIMIT 1`,
-      [token]
+    // Total RSMs (exclude admin)
+    const rsmCount = await client.query(
+      "SELECT COUNT(*) FROM rsms WHERE role='rsm'"
     );
 
-    if (auth.rows.length === 0) {
-      client.release();
-      return { statusCode: 403, body: JSON.stringify({ error: "Unauthorized" }) };
-    }
-
-    const totalRSMs = await client.query("SELECT COUNT(*) FROM rsms WHERE role = 'rsm'");
-    const totalAgents = await client.query("SELECT COUNT(*) FROM agents");
-    const activeAgents = await client.query("SELECT COUNT(*) FROM agents WHERE active = true");
-    const totalUsers = await client.query("SELECT COUNT(*) FROM users");
-    const totalDevices = await client.query("SELECT COUNT(*) FROM user_devices");
+    // Total enrolled agents (active only)
+    const agentCount = await client.query(
+      "SELECT COUNT(*) FROM agents WHERE active=true"
+    );
 
     client.release();
 
     return {
       statusCode: 200,
+      headers: corsHeaders,
       body: JSON.stringify({
-        totalRSMs: parseInt(totalRSMs.rows[0].count),
-        totalAgents: parseInt(totalAgents.rows[0].count),
-        activeAgents: parseInt(activeAgents.rows[0].count),
-        totalUsers: parseInt(totalUsers.rows[0].count),
-        totalProfiles: parseInt(totalDevices.rows[0].count),
-        totalScans: 0
+        total_rsms: Number(rsmCount.rows[0].count),
+        total_enrolled_agents: Number(agentCount.rows[0].count)
       })
     };
 
   } catch (err) {
     console.error("admin-stats error:", err);
-    return { statusCode: 500, body: JSON.stringify({ error: "Server error" }) };
+    return { statusCode: 500, headers: corsHeaders, body: "Server error" };
   }
 };

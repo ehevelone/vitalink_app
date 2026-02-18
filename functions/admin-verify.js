@@ -17,20 +17,18 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://myvitalink.app",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
+};
+
 exports.handler = async function (event) {
-
-  // 🔥 REQUIRED CORS HEADERS
-  const headers = {
-    "Access-Control-Allow-Origin": "https://myvitalink.app",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS"
-  };
-
-  // Handle preflight
+  // 🔥 Handle preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
-      headers,
+      headers: corsHeaders,
       body: ""
     };
   }
@@ -38,30 +36,28 @@ exports.handler = async function (event) {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers,
+      headers: corsHeaders,
       body: "Method Not Allowed"
     };
   }
 
   try {
-
     const { idToken, email } = JSON.parse(event.body || "{}");
 
     if (!idToken || !email) {
       return {
         statusCode: 400,
-        headers,
+        headers: corsHeaders,
         body: "Missing data"
       };
     }
 
-    // 🔐 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(idToken);
 
     if (!decoded.phone_number) {
       return {
         statusCode: 403,
-        headers,
+        headers: corsHeaders,
         body: "Phone verification required"
       };
     }
@@ -77,14 +73,13 @@ exports.handler = async function (event) {
       client.release();
       return {
         statusCode: 403,
-        headers,
+        headers: corsHeaders,
         body: "Unauthorized"
       };
     }
 
     const adminUser = result.rows[0];
 
-    // Normalize phone comparison
     const dbPhone = String(adminUser.phone).replace(/\D/g, "");
     const firebasePhone = String(decoded.phone_number).replace(/\D/g, "");
 
@@ -92,14 +87,13 @@ exports.handler = async function (event) {
       client.release();
       return {
         statusCode: 403,
-        headers,
+        headers: corsHeaders,
         body: "Phone mismatch"
       };
     }
 
-    // ✅ Create secure session
     const sessionToken = crypto.randomBytes(24).toString("hex");
-    const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+    const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     await client.query(
       "UPDATE rsms SET admin_session_token=$1, admin_session_expires=$2 WHERE id=$3",
@@ -110,7 +104,7 @@ exports.handler = async function (event) {
 
     return {
       statusCode: 200,
-      headers,
+      headers: corsHeaders,
       body: JSON.stringify({
         success: true,
         token: sessionToken
@@ -121,7 +115,7 @@ exports.handler = async function (event) {
     console.error("admin-verify error:", err);
     return {
       statusCode: 500,
-      headers,
+      headers: corsHeaders,
       body: "Verification failed"
     };
   }
