@@ -1,4 +1,5 @@
 // functions/create-rsm.js
+const crypto = require("crypto");
 const { requireAdmin } = require("./_adminAuth");
 const { Pool } = require("pg");
 
@@ -23,7 +24,6 @@ exports.handler = async function (event) {
     return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
   }
 
-  // 🔐 Admin check
   const auth = await requireAdmin(event);
   if (auth.error) {
     return { statusCode: 401, headers: corsHeaders, body: auth.error };
@@ -42,7 +42,6 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // Prevent duplicates
     const existing = await client.query(
       "SELECT id FROM rsms WHERE email=$1 LIMIT 1",
       [email]
@@ -57,17 +56,28 @@ exports.handler = async function (event) {
       };
     }
 
+    const token = crypto.randomBytes(24).toString("hex");
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
     await client.query(
-      "INSERT INTO rsms (role, email, phone, active) VALUES ('rsm', $1, $2, true)",
-      [email, phone]
+      `INSERT INTO rsms 
+        (role, email, phone, active, onboard_token, onboard_token_expires) 
+       VALUES ('rsm', $1, $2, false, $3, $4)`,
+      [email, phone, token, expires]
     );
 
     client.release();
 
+    const onboardingUrl = `https://myvitalink.app/rsm-onboard.html?token=${token}`;
+
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ success: true })
+      body: JSON.stringify({
+        success: true,
+        onboard_url: onboardingUrl,
+        onboard_token: token
+      })
     };
 
   } catch (err) {
