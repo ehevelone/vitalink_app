@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 
@@ -17,46 +16,26 @@ const corsHeaders = {
 
 exports.handler = async function (event) {
 
-  // ✅ PREFLIGHT
+  // PREFLIGHT
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: corsHeaders, body: "" };
   }
 
-  // ✅ STATIC QR ENTRY (GET) — CREATE TOKEN + TEMP ROW + REDIRECT
+  // ==========================
+  // 🔹 QR HIT (GET)
+  // ==========================
   if (event.httpMethod === "GET") {
-    try {
-      const token = crypto.randomBytes(24).toString("hex");
-      const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-      const client = await pool.connect();
-
-      // IMPORTANT: email is NOT NULL in your table
-      const tempEmail = `pending_${token}@temp.local`;
-      const tempPhone = "0000000000";
-
-      await client.query(
-        `INSERT INTO rsms
-         (role, email, phone, active, onboard_token, onboard_token_expires)
-         VALUES ('rsm', $1, $2, false, $3, $4)`,
-        [tempEmail, tempPhone, token, expires]
-      );
-
-      client.release();
-
-      return {
-        statusCode: 302,
-        headers: {
-          Location: `${SITE}/rsm-onboard.html?token=${token}`
-        }
-      };
-
-    } catch (err) {
-      console.error("rsm-onboard GET error:", err);
-      return { statusCode: 500, body: "Server error" };
-    }
+    return {
+      statusCode: 302,
+      headers: {
+        Location: `${SITE}/rsm-onboard.html`
+      }
+    };
   }
 
-  // ✅ COMPLETE ONBOARD (POST)
+  // ==========================
+  // 🔹 COMPLETE REGISTRATION
+  // ==========================
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -66,51 +45,48 @@ exports.handler = async function (event) {
   }
 
   try {
-    const { token, password, name, region } = JSON.parse(event.body || "{}");
+    const { email, password, name, region, phone } = JSON.parse(event.body || "{}");
 
-    if (!token || !password || !name || !region) {
-      return { statusCode: 400, headers: corsHeaders, body: "Missing required fields" };
+    if (!email || !password || !name || !region || !phone) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: "Missing required fields"
+      };
     }
 
     if (password.length < 8) {
-      return { statusCode: 400, headers: corsHeaders, body: "Password must be at least 8 characters" };
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: "Password must be at least 8 characters"
+      };
     }
 
     const client = await pool.connect();
 
-    const result = await client.query(
-      `SELECT id, onboard_token_expires
-       FROM rsms
-       WHERE onboard_token = $1
-       AND role = 'rsm'
-       LIMIT 1`,
-      [token]
+    // Prevent duplicate
+    const existing = await client.query(
+      "SELECT id FROM rsms WHERE email=$1 LIMIT 1",
+      [email]
     );
 
-    if (result.rows.length === 0) {
+    if (existing.rows.length > 0) {
       client.release();
-      return { statusCode: 400, headers: corsHeaders, body: "Invalid link" };
-    }
-
-    const rsm = result.rows[0];
-
-    if (!rsm.onboard_token_expires || new Date(rsm.onboard_token_expires) < new Date()) {
-      client.release();
-      return { statusCode: 400, headers: corsHeaders, body: "Link expired" };
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: "Email already registered"
+      };
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
     await client.query(
-      `UPDATE rsms
-       SET password_hash = $1,
-           name = $2,
-           region = $3,
-           active = true,
-           onboard_token = NULL,
-           onboard_token_expires = NULL
-       WHERE id = $4`,
-      [hashedPassword, name, region, rsm.id]
+      `INSERT INTO rsms
+       (role, email, password_hash, name, region, phone, active, created_at)
+       VALUES ('rsm', $1, $2, $3, $4, $5, true, NOW())`,
+      [email, hashedPassword, name, region, phone]
     );
 
     client.release();
@@ -123,6 +99,10 @@ exports.handler = async function (event) {
 
   } catch (err) {
     console.error("rsm-onboard POST error:", err);
-    return { statusCode: 500, headers: corsHeaders, body: "Server error" };
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: "Server error"
+    };
   }
 };
