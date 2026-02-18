@@ -1,5 +1,5 @@
 // functions/admin-stats.js
-const { requireAdmin } = require("./services/_adminAuth");
+const { requireAdmin } = require("./_adminAuth");
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -31,15 +31,29 @@ exports.handler = async function (event) {
   try {
     const client = await pool.connect();
 
-    // Total RSMs (exclude admin)
-    const rsmCount = await client.query(
-      "SELECT COUNT(*) FROM rsms WHERE role='rsm'"
-    );
+    const rsmCount = await client.query(`
+      SELECT COUNT(*) 
+      FROM rsms 
+      WHERE role='rsm'
+    `);
 
-    // Total enrolled agents (active only)
-    const agentCount = await client.query(
-      "SELECT COUNT(*) FROM agents WHERE active=true"
-    );
+    const agentCount = await client.query(`
+      SELECT COUNT(*) 
+      FROM agents 
+      WHERE active=true
+    `);
+
+    const breakdown = await client.query(`
+      SELECT 
+        r.id,
+        r.email,
+        COUNT(a.id) FILTER (WHERE a.active = true) AS active_agents
+      FROM rsms r
+      LEFT JOIN agents a ON a.rsm_id = r.id
+      WHERE r.role='rsm'
+      GROUP BY r.id
+      ORDER BY r.email ASC
+    `);
 
     client.release();
 
@@ -48,7 +62,8 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         total_rsms: Number(rsmCount.rows[0].count),
-        total_enrolled_agents: Number(agentCount.rows[0].count)
+        total_enrolled_agents: Number(agentCount.rows[0].count),
+        breakdown: breakdown.rows
       })
     };
 
