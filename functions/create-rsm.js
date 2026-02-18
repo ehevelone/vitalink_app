@@ -1,5 +1,5 @@
 // functions/create-rsm.js
-const { requireAdmin } = require("./services/_adminAuth");
+const { requireAdmin } = require("./_adminAuth");
 const { Pool } = require("pg");
 
 const pool = new Pool({
