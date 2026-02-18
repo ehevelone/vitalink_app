@@ -24,72 +24,49 @@ const corsHeaders = {
 };
 
 exports.handler = async function (event) {
-  // 🔥 Handle preflight
+
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: ""
-    };
+    return { statusCode: 200, headers: corsHeaders, body: "" };
   }
 
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: "Method Not Allowed"
-    };
+    return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
   }
 
   try {
     const { idToken, email } = JSON.parse(event.body || "{}");
 
     if (!idToken || !email) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: "Missing data"
-      };
+      return { statusCode: 400, headers: corsHeaders, body: "Missing data" };
     }
 
     const decoded = await admin.auth().verifyIdToken(idToken);
 
     if (!decoded.phone_number) {
-      return {
-        statusCode: 403,
-        headers: corsHeaders,
-        body: "Phone verification required"
-      };
+      return { statusCode: 403, headers: corsHeaders, body: "Phone verification required" };
     }
 
     const client = await pool.connect();
 
+    // 🔥 Allow BOTH admin and rsm
     const result = await client.query(
-      "SELECT id, phone FROM rsms WHERE email=$1 AND role='admin' AND active=true LIMIT 1",
+      "SELECT id, phone, role FROM rsms WHERE email=$1 AND active=true LIMIT 1",
       [email]
     );
 
     if (result.rows.length === 0) {
       client.release();
-      return {
-        statusCode: 403,
-        headers: corsHeaders,
-        body: "Unauthorized"
-      };
+      return { statusCode: 403, headers: corsHeaders, body: "Unauthorized" };
     }
 
-    const adminUser = result.rows[0];
+    const user = result.rows[0];
 
-    const dbPhone = String(adminUser.phone).replace(/\D/g, "");
+    const dbPhone = String(user.phone).replace(/\D/g, "");
     const firebasePhone = String(decoded.phone_number).replace(/\D/g, "");
 
     if (dbPhone !== firebasePhone) {
       client.release();
-      return {
-        statusCode: 403,
-        headers: corsHeaders,
-        body: "Phone mismatch"
-      };
+      return { statusCode: 403, headers: corsHeaders, body: "Phone mismatch" };
     }
 
     const sessionToken = crypto.randomBytes(24).toString("hex");
@@ -97,7 +74,7 @@ exports.handler = async function (event) {
 
     await client.query(
       "UPDATE rsms SET admin_session_token=$1, admin_session_expires=$2 WHERE id=$3",
-      [sessionToken, expires, adminUser.id]
+      [sessionToken, expires, user.id]
     );
 
     client.release();
@@ -107,16 +84,13 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
-        token: sessionToken
+        token: sessionToken,
+        role: user.role   // 🔥 CRITICAL FIX
       })
     };
 
   } catch (err) {
     console.error("admin-verify error:", err);
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: "Verification failed"
-    };
+    return { statusCode: 500, headers: corsHeaders, body: "Verification failed" };
   }
 };
