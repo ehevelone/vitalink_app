@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -67,7 +68,9 @@ exports.handler = async function (event) {
       };
     }
 
-    // ADMIN → require 2FA
+    // ==========================
+    // ADMIN FLOW (2FA)
+    // ==========================
     if (user.role === "admin") {
 
       if (!user.phone) {
@@ -92,8 +95,21 @@ exports.handler = async function (event) {
       };
     }
 
-    // RSM → direct login
+    // ==========================
+    // RSM FLOW (ISSUE SESSION)
+    // ==========================
     if (user.role === "rsm") {
+
+      const sessionToken = crypto.randomBytes(32).toString("hex");
+      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
+      await client.query(
+        `UPDATE rsms
+         SET admin_session_token = $1,
+             admin_session_expires = $2
+         WHERE id = $3`,
+        [sessionToken, expires, user.id]
+      );
 
       client.release();
 
@@ -102,7 +118,8 @@ exports.handler = async function (event) {
         headers: corsHeaders(),
         body: JSON.stringify({
           step: "login_success",
-          role: "rsm"
+          role: "rsm",
+          token: sessionToken
         })
       };
     }
