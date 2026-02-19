@@ -16,25 +16,27 @@ const corsHeaders = {
 
 exports.handler = async function (event) {
 
+  // ==========================
   // PREFLIGHT
+  // ==========================
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: corsHeaders, body: "" };
   }
 
   // ==========================
-  // 🔹 QR HIT (GET)
+  // QR HIT (GET)
   // ==========================
   if (event.httpMethod === "GET") {
     return {
       statusCode: 302,
       headers: {
-        Location: `${SITE}/rsm-onboard.html`
+        Location: `${SITE}/core-node/rsm_onboard.html`
       }
     };
   }
 
   // ==========================
-  // 🔹 COMPLETE REGISTRATION
+  // COMPLETE REGISTRATION (POST)
   // ==========================
   if (event.httpMethod !== "POST") {
     return {
