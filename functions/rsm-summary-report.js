@@ -1,5 +1,6 @@
 // functions/rsm-summary-report.js
 const { Pool } = require("pg");
+const PDFDocument = require("pdfkit");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -31,7 +32,7 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // 🔐 Validate RSM session
+    // 🔐 Validate session
     const rsmResult = await client.query(`
       SELECT id
       FROM rsms
@@ -47,10 +48,108 @@ exports.handler = async function (event) {
     }
 
     const rsmId = rsmResult.rows[0].id;
+    const { search, download, id } = event.queryStringParameters || {};
 
-    const search = event.queryStringParameters?.search || "";
+    // =========================================================
+    // 📄 SINGLE AGENT PDF
+    // =========================================================
+    if (download === "agent" && id) {
 
-    // 🔎 Agent Search
+      const agent = await client.query(`
+        SELECT name, email, active, created_at
+        FROM agents
+        WHERE id = $1 AND rsm_id = $2
+        LIMIT 1
+      `, [id, rsmId]);
+
+      client.release();
+
+      if (agent.rows.length === 0) {
+        return { statusCode: 404, headers: corsHeaders, body: "Not found" };
+      }
+
+      const a = agent.rows[0];
+
+      const doc = new PDFDocument({ margin: 50 });
+      const buffers = [];
+      doc.on("data", buffers.push.bind(buffers));
+
+      doc.fontSize(18).text("Agent Report", { align: "center" });
+      doc.moveDown();
+
+      doc.fontSize(12);
+      doc.text(`Name: ${a.name || ""}`);
+      doc.text(`Email: ${a.email}`);
+      doc.text(`Status: ${a.active ? "Active" : "Inactive"}`);
+      doc.text(`Created: ${a.created_at}`);
+
+      doc.end();
+
+      await new Promise(resolve => doc.on("end", resolve));
+      const pdf = Buffer.concat(buffers);
+
+      return {
+        statusCode: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename=agent_${id}.pdf`
+        },
+        body: pdf.toString("base64"),
+        isBase64Encoded: true
+      };
+    }
+
+    // =========================================================
+    // 📊 FULL ROSTER PDF
+    // =========================================================
+    if (download === "roster") {
+
+      const agents = await client.query(`
+        SELECT name, email, active
+        FROM agents
+        WHERE rsm_id = $1
+        ORDER BY created_at DESC
+      `, [rsmId]);
+
+      client.release();
+
+      const doc = new PDFDocument({ margin: 40 });
+      const buffers = [];
+      doc.on("data", buffers.push.bind(buffers));
+
+      doc.fontSize(18).text("RSM Agent Roster", { align: "center" });
+      doc.moveDown();
+
+      doc.fontSize(12);
+
+      agents.rows.forEach(a => {
+        doc.text(
+          `${a.name || ""}  |  ${a.email}  |  ${a.active ? "Active" : "Inactive"}`
+        );
+      });
+
+      doc.end();
+
+      await new Promise(resolve => doc.on("end", resolve));
+      const pdf = Buffer.concat(buffers);
+
+      return {
+        statusCode: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": "attachment; filename=rsm_roster.pdf"
+        },
+        body: pdf.toString("base64"),
+        isBase64Encoded: true
+      };
+    }
+
+    // =========================================================
+    // 🔎 NORMAL UI JSON RESPONSE
+    // =========================================================
+
     const agents = await client.query(`
       SELECT id, name, email, active, created_at
       FROM agents
@@ -61,9 +160,8 @@ exports.handler = async function (event) {
         LOWER(email) LIKE LOWER($2)
       )
       ORDER BY created_at DESC
-    `, [rsmId, `%${search}%`]);
+    `, [rsmId, `%${search || ""}%`]);
 
-    // 📊 Count
     const count = await client.query(`
       SELECT COUNT(*)
       FROM agents
