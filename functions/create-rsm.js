@@ -62,16 +62,19 @@ exports.handler = async function (event) {
     const token = crypto.randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+    // 🔥 REQUIRED because password_hash is NOT NULL
+    const tempPasswordHash = "PENDING_SETUP";
+
     await client.query(
       `INSERT INTO rsms 
-        (role, email, phone, active, onboard_token, onboard_token_expires) 
-       VALUES ('rsm', $1, $2, false, $3, $4)`,
-      [email, phone, token, expires]
+        (role, email, password_hash, name, region, phone, active, created_at, onboard_token, onboard_token_expires) 
+       VALUES ('rsm', $1, $2, NULL, NULL, $3, false, NOW(), $4, $5)`,
+      [email, tempPasswordHash, phone, token, expires]
     );
 
     client.release();
 
-    // IMPORTANT: QR must point to FUNCTION
+    // QR must point to function (System A)
     const onboardingUrl = `${FUNCTION_URL}?token=${token}`;
 
     return {
