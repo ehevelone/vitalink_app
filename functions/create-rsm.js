@@ -8,8 +8,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const SITE = "https://myvitalink.app";
+const FUNCTION_URL = "https://vitalink-app.netlify.app/.netlify/functions/rsm-onboard";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://myvitalink.app",
+  "Access-Control-Allow-Origin": SITE,
   "Access-Control-Allow-Headers": "Content-Type, x-admin-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
@@ -57,7 +60,7 @@ exports.handler = async function (event) {
     }
 
     const token = crypto.randomBytes(24).toString("hex");
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await client.query(
       `INSERT INTO rsms 
@@ -68,7 +71,8 @@ exports.handler = async function (event) {
 
     client.release();
 
-    const onboardingUrl = `https://myvitalink.app/rsm-onboard.html?token=${token}`;
+    // IMPORTANT: QR must point to FUNCTION
+    const onboardingUrl = `${FUNCTION_URL}?token=${token}`;
 
     return {
       statusCode: 200,
