@@ -23,15 +23,15 @@ exports.handler = async function (event) {
   }
 
   try {
-    const token = event.headers["x-rsm-token"];
 
+    const token = event.headers["x-rsm-token"];
     if (!token) {
       return { statusCode: 401, headers: corsHeaders, body: "Missing token" };
     }
 
     const client = await pool.connect();
 
-    // Validate RSM session
+    // 🔐 Validate RSM session
     const rsmResult = await client.query(`
       SELECT id
       FROM rsms
@@ -48,8 +48,23 @@ exports.handler = async function (event) {
 
     const rsmId = rsmResult.rows[0].id;
 
-    // Count active agents for this RSM
-    const agentCount = await client.query(`
+    const search = event.queryStringParameters?.search || "";
+
+    // 🔎 Agent Search
+    const agents = await client.query(`
+      SELECT id, name, email, active, created_at
+      FROM agents
+      WHERE rsm_id = $1
+      AND (
+        $2 = '' OR
+        LOWER(name) LIKE LOWER($2) OR
+        LOWER(email) LIKE LOWER($2)
+      )
+      ORDER BY created_at DESC
+    `, [rsmId, `%${search}%`]);
+
+    // 📊 Count
+    const count = await client.query(`
       SELECT COUNT(*)
       FROM agents
       WHERE rsm_id = $1
@@ -62,7 +77,8 @@ exports.handler = async function (event) {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        active_agents: Number(agentCount.rows[0].count)
+        active_agents: Number(count.rows[0].count),
+        agents: agents.rows
       })
     };
 
