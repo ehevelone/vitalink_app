@@ -27,12 +27,55 @@ exports.handler = async function (event) {
   // QR HIT (GET)
   // ==========================
   if (event.httpMethod === "GET") {
-    return {
-      statusCode: 302,
-      headers: {
-        Location: `${SITE}/core-node/rsm_onboard.html`
+
+    const token = event.queryStringParameters?.token;
+
+    // No token → silent redirect
+    if (!token) {
+      return {
+        statusCode: 302,
+        headers: { Location: `${SITE}/admin.html` }
+      };
+    }
+
+    try {
+      const client = await pool.connect();
+
+      const result = await client.query(
+        `SELECT id
+         FROM rsms
+         WHERE onboard_token = $1
+         AND role = 'rsm'
+         AND onboard_token_expires > NOW()
+         LIMIT 1`,
+        [token]
+      );
+
+      client.release();
+
+      // Invalid or expired → silent redirect
+      if (result.rows.length === 0) {
+        return {
+          statusCode: 302,
+          headers: { Location: `${SITE}/admin.html` }
+        };
       }
-    };
+
+      // Valid token → redirect to setup page WITH token
+      return {
+        statusCode: 302,
+        headers: {
+          Location: `${SITE}/core-node/rsm_onboard.html?token=${token}`
+        }
+      };
+
+    } catch (err) {
+      console.error("rsm-onboard GET error:", err);
+      return {
+        statusCode: 302,
+        headers: { Location: `${SITE}/admin.html` }
+      };
+    }
   }
 
   // ==========================
@@ -47,9 +90,9 @@ exports.handler = async function (event) {
   }
 
   try {
-    const { email, password, name, region, phone } = JSON.parse(event.body || "{}");
+    const { token, password, name, region } = JSON.parse(event.body || "{}");
 
-    if (!email || !password || !name || !region || !phone) {
+    if (!token || !password || !name || !region) {
       return {
         statusCode: 400,
         headers: corsHeaders,
@@ -67,28 +110,48 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // Prevent duplicate
-    const existing = await client.query(
-      "SELECT id FROM rsms WHERE email=$1 LIMIT 1",
-      [email]
+    const result = await client.query(
+      `SELECT id, onboard_token_expires
+       FROM rsms
+       WHERE onboard_token = $1
+       AND role = 'rsm'
+       LIMIT 1`,
+      [token]
     );
 
-    if (existing.rows.length > 0) {
+    if (result.rows.length === 0) {
       client.release();
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: "Email already registered"
+        body: "Invalid link"
+      };
+    }
+
+    const rsm = result.rows[0];
+
+    if (!rsm.onboard_token_expires ||
+        new Date(rsm.onboard_token_expires) < new Date()) {
+      client.release();
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: "Link expired"
       };
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
     await client.query(
-      `INSERT INTO rsms
-       (role, email, password_hash, name, region, phone, active, created_at)
-       VALUES ('rsm', $1, $2, $3, $4, $5, true, NOW())`,
-      [email, hashedPassword, name, region, phone]
+      `UPDATE rsms
+       SET password_hash = $1,
+           name = $2,
+           region = $3,
+           active = true,
+           onboard_token = NULL,
+           onboard_token_expires = NULL
+       WHERE id = $4`,
+      [hashedPassword, name, region, rsm.id]
     );
 
     client.release();
