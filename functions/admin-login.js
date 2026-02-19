@@ -10,7 +10,6 @@ const pool = new Pool({
 
 exports.handler = async function (event) {
 
-  // Handle CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -20,6 +19,7 @@ exports.handler = async function (event) {
   }
 
   try {
+
     if (event.httpMethod !== "POST") {
       return {
         statusCode: 405,
@@ -41,7 +41,7 @@ exports.handler = async function (event) {
     const client = await pool.connect();
 
     const result = await client.query(
-      "SELECT id, password_hash, phone FROM rsms WHERE email = $1 AND role = 'admin' AND active = true LIMIT 1",
+      "SELECT id, password_hash, phone, role FROM rsms WHERE email = $1 AND active = true LIMIT 1",
       [email]
     );
 
@@ -54,13 +54,12 @@ exports.handler = async function (event) {
       };
     }
 
-    const admin = result.rows[0];
+    const user = result.rows[0];
 
-    const valid = await bcrypt.compare(password, admin.password_hash);
-
-    client.release();
+    const valid = await bcrypt.compare(password, user.password_hash);
 
     if (!valid) {
+      client.release();
       return {
         statusCode: 403,
         headers: corsHeaders(),
@@ -68,21 +67,52 @@ exports.handler = async function (event) {
       };
     }
 
-    if (!admin.phone) {
+    // ADMIN → require 2FA
+    if (user.role === "admin") {
+
+      if (!user.phone) {
+        client.release();
+        return {
+          statusCode: 400,
+          headers: corsHeaders(),
+          body: "Admin phone not configured"
+        };
+      }
+
+      client.release();
+
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers: corsHeaders(),
-        body: "Admin phone not configured"
+        body: JSON.stringify({
+          step: "firebase_2fa",
+          phone: user.phone,
+          role: "admin"
+        })
       };
     }
 
+    // RSM → direct login
+    if (user.role === "rsm") {
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "login_success",
+          role: "rsm"
+        })
+      };
+    }
+
+    client.release();
+
     return {
-      statusCode: 200,
+      statusCode: 403,
       headers: corsHeaders(),
-      body: JSON.stringify({
-        step: "firebase_2fa",
-        phone: admin.phone
-      })
+      body: "Unauthorized"
     };
 
   } catch (err) {
