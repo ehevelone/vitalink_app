@@ -7,7 +7,8 @@ function reply(statusCode, obj) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
     },
     body: JSON.stringify(obj),
   };
@@ -15,42 +16,23 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ Handle CORS preflight
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
       });
     }
 
-    // ✅ Safe body parsing (Flutter + Netlify)
     let body = {};
     try {
-      if (event.isBase64Encoded) {
-        body = JSON.parse(
-          Buffer.from(event.body, "base64").toString("utf8")
-        );
-      } else {
-        body = JSON.parse(event.body || "{}");
-      }
-    } catch (e) {
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
+    } catch {
       return reply(400, {
         success: false,
         error: "Invalid request body",
@@ -66,10 +48,10 @@ if (event.httpMethod !== "POST") {
       });
     }
 
-    // ✅ Lookup agent (case-insensitive)
-    const result = await db.query(
+    // 1️⃣ Get agent ID first
+    const agentResult = await db.query(
       `
-      SELECT id, name, email, promo_code, active
+      SELECT id, name, email, active
       FROM agents
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
@@ -77,26 +59,39 @@ if (event.httpMethod !== "POST") {
       [email.trim()]
     );
 
-    if (!result.rows.length) {
+    if (!agentResult.rows.length) {
       return reply(404, {
         success: false,
-        error: "No agent found with that email",
+        error: "No agent found",
       });
     }
 
-    const agent = result.rows[0];
+    const agent = agentResult.rows[0];
 
-    if (!agent.promo_code || agent.promo_code.trim() === "") {
+    // 2️⃣ Get latest promo from promo_codes table
+    const promoResult = await db.query(
+      `
+      SELECT code
+      FROM promo_codes
+      WHERE agent_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [agent.id]
+    );
+
+    if (!promoResult.rows.length) {
       return reply(400, {
         success: false,
-        error: "Agent has no promo code assigned",
+        error: "No promo code found for agent",
       });
     }
 
-    // ✅ EXACT response shape Flutter expects
+    const promoCode = promoResult.rows[0].code;
+
     return reply(200, {
       success: true,
-      promoCode: agent.promo_code,
+      promoCode,
       active: agent.active ?? false,
       agent: {
         id: agent.id,
