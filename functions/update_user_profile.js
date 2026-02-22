@@ -17,41 +17,20 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ CORS preflight
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
       });
     }
 
-    // ✅ Safe body parsing
     let body = {};
     try {
-      if (event.isBase64Encoded) {
-        body = JSON.parse(
-          Buffer.from(event.body, "base64").toString("utf8")
-        );
-      } else {
-        body = JSON.parse(event.body || "{}");
-      }
+      body = JSON.parse(event.body || "{}");
     } catch (e) {
       return reply(400, {
         success: false,
@@ -60,8 +39,8 @@ if (event.httpMethod !== "POST") {
     }
 
     const {
-      currentEmail, // ✅ existing email
-      email,        // ✅ optional new email
+      currentEmail,
+      email,
       name,
       phone,
       password,
@@ -74,23 +53,33 @@ if (event.httpMethod !== "POST") {
       });
     }
 
-    // ✅ Build dynamic update
     const updates = [];
     const values = [];
     let idx = 1;
+
+    // ✅ Split full name into first + last
+    if (name) {
+      const parts = name.trim().split(" ");
+      const firstName = parts.shift();
+      const lastName = parts.join(" ") || "";
+
+      updates.push(`first_name = $${idx++}`);
+      values.push(firstName);
+
+      updates.push(`last_name = $${idx++}`);
+      values.push(lastName);
+    }
 
     if (email) {
       updates.push(`email = $${idx++}`);
       values.push(email);
     }
-    if (name) {
-      updates.push(`name = $${idx++}`);
-      values.push(name);
-    }
+
     if (phone) {
       updates.push(`phone = $${idx++}`);
       values.push(phone);
     }
+
     if (password) {
       const hashed = await bcrypt.hash(password, 10);
       updates.push(`password_hash = $${idx++}`);
@@ -110,7 +99,7 @@ if (event.httpMethod !== "POST") {
       UPDATE users
       SET ${updates.join(", ")}
       WHERE LOWER(email) = LOWER($${idx})
-      RETURNING id, email, name, phone;
+      RETURNING id, email, first_name, last_name, phone;
     `;
 
     const result = await db.query(query, values);
@@ -129,7 +118,7 @@ if (event.httpMethod !== "POST") {
     });
 
   } catch (err) {
-    console.error("❌ update_user_profile error:", err);
+    console.error("❌ update_user_profile error:", err.message);
     return reply(500, {
       success: false,
       error: "Server error while updating user ❌",
