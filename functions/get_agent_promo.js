@@ -48,10 +48,10 @@ exports.handler = async (event) => {
       });
     }
 
-    // 1️⃣ Get agent ID first
+    // 1️⃣ Get agent including promo_code directly from agents table
     const agentResult = await db.query(
       `
-      SELECT id, name, email, active
+      SELECT id, name, email, active, promo_code
       FROM agents
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
@@ -68,30 +68,16 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    // 2️⃣ Get latest promo from promo_codes table
-    const promoResult = await db.query(
-      `
-      SELECT code
-      FROM promo_codes
-      WHERE agent_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-      `,
-      [agent.id]
-    );
-
-    if (!promoResult.rows.length) {
+    if (!agent.promo_code) {
       return reply(400, {
         success: false,
         error: "No promo code found for agent",
       });
     }
 
-    const promoCode = promoResult.rows[0].code;
-
     return reply(200, {
       success: true,
-      promoCode,
+      promoCode: agent.promo_code,
       active: agent.active ?? false,
       agent: {
         id: agent.id,
