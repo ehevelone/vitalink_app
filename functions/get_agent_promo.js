@@ -48,10 +48,10 @@ exports.handler = async (event) => {
       });
     }
 
-    // 1️⃣ Get agent including promo_code directly from agents table
+    // 1️⃣ Get agent including unlock_code directly from agents table
     const agentResult = await db.query(
       `
-      SELECT id, name, email, active, promo_code
+      SELECT id, name, email, active, unlock_code
       FROM agents
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
@@ -68,16 +68,16 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    if (!agent.promo_code) {
+    if (!agent.unlock_code) {
       return reply(400, {
         success: false,
-        error: "No promo code found for agent",
+        error: "No unlock code found for agent",
       });
     }
 
     return reply(200, {
       success: true,
-      promoCode: agent.promo_code,
+      promoCode: agent.unlock_code, // 👈 mapped to existing Flutter field
       active: agent.active ?? false,
       agent: {
         id: agent.id,
