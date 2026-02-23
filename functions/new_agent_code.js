@@ -11,14 +11,17 @@ const SITE = "https://myvitalink.app";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
-  "Access-Control-Allow-Headers": "Content-Type, x-rsm-token",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-session",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
-function generateUnlockCode() {
-  return Array.from({ length: 8 }, () =>
-    Math.floor(Math.random() * 36).toString(36).toUpperCase()
-  ).join("");
+function generateUnlockCode(prefix = "AG", length = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${code}`;
 }
 
 exports.handler = async (event) => {
@@ -41,13 +44,13 @@ exports.handler = async (event) => {
       };
     }
 
-    const rsmToken = event.headers["x-rsm-token"];
+    const adminToken = event.headers["x-admin-session"];
 
-    if (!rsmToken) {
+    if (!adminToken) {
       return {
         statusCode: 401,
         headers: corsHeaders,
-        body: JSON.stringify({ success: false, error: "Missing RSM session" })
+        body: JSON.stringify({ success: false, error: "Missing session" })
       };
     }
 
@@ -60,14 +63,14 @@ exports.handler = async (event) => {
       AND role = 'rsm'
       AND admin_session_expires > NOW()
       LIMIT 1
-    `, [rsmToken]);
+    `, [adminToken]);
 
     if (rsmResult.rows.length === 0) {
       client.release();
       return {
         statusCode: 401,
         headers: corsHeaders,
-        body: JSON.stringify({ success: false, error: "Invalid RSM session" })
+        body: JSON.stringify({ success: false, error: "Invalid session" })
       };
     }
 
