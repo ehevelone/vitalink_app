@@ -7,7 +7,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// 🔹 Random 8-char unlock code
+const SITE = "https://myvitalink.app";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": SITE,
+  "Access-Control-Allow-Headers": "Content-Type, x-rsm-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
+};
+
 function generateUnlockCode() {
   return Array.from({ length: 8 }, () =>
     Math.floor(Math.random() * 36).toString(36).toUpperCase()
@@ -17,11 +24,19 @@ function generateUnlockCode() {
 exports.handler = async (event) => {
   try {
 
-    // ✅ Require POST
+    // ✅ Handle CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: ""
+      };
+    }
+
     if (event.httpMethod !== "POST") {
       return {
         statusCode: 405,
-        headers: { "Content-Type": "application/json" },
+        headers: corsHeaders,
         body: JSON.stringify({ success: false, error: "Method Not Allowed" })
       };
     }
@@ -31,12 +46,11 @@ exports.handler = async (event) => {
     if (!rsmToken) {
       return {
         statusCode: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: corsHeaders,
         body: JSON.stringify({ success: false, error: "Missing RSM session" })
       };
     }
 
-    // 🔐 Validate RSM session
     const client = await pool.connect();
 
     const rsmResult = await client.query(`
@@ -52,7 +66,7 @@ exports.handler = async (event) => {
       client.release();
       return {
         statusCode: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: corsHeaders,
         body: JSON.stringify({ success: false, error: "Invalid RSM session" })
       };
     }
@@ -60,10 +74,8 @@ exports.handler = async (event) => {
     const rsmId = rsmResult.rows[0].id;
     client.release();
 
-    // 🔑 Generate unlock code
     const unlockCode = generateUnlockCode();
 
-    // 🧱 Insert agent tied to RSM
     const agentResult = await db.query(`
       INSERT INTO agents (unlock_code, active, role, rsm_id, created_at)
       VALUES ($1, FALSE, 'agent', $2, NOW())
@@ -74,7 +86,10 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         success: true,
         agentId,
@@ -86,7 +101,7 @@ exports.handler = async (event) => {
     console.error("❌ new_agent_code error:", err);
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: corsHeaders,
       body: JSON.stringify({ success: false, error: err.message })
     };
   }
