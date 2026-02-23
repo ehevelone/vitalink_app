@@ -92,9 +92,9 @@ exports.handler = async (event) => {
 
     const agentId = result.rows[0].id;
 
-    // 🔁 4️⃣ Redirect to claim page
+    // 🔁 4️⃣ Redirect to claim page (UPDATED PATH)
     const redirectUrl =
-      `https://myvitalink.app/agent-claim.html?code=${encodeURIComponent(unlockCode)}`;
+      `https://myvitalink.app/core-node/agent_claim.html?code=${encodeURIComponent(unlockCode)}`;
 
     console.log("=================================");
     console.log(`✅ Agent Created: ${agentId}`);
