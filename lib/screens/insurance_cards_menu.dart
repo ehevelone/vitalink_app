@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 
 import '../models.dart';
@@ -17,10 +15,12 @@ class InsuranceCardsMenuScreen extends StatefulWidget {
       _InsuranceCardsMenuScreenState();
 }
 
-class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
+class _InsuranceCardsMenuScreenState
+    extends State<InsuranceCardsMenuScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
+  bool _error = false;
 
   @override
   void initState() {
@@ -30,213 +30,61 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
   }
 
   Future<void> _load() async {
-    debugPrint("👉 Loading profile in InsuranceCardsMenuScreen...");
-    final p = await _repo.loadProfile();
-    if (!mounted) return;
-    setState(() {
-      _p = p;
-      _loading = false;
-    });
+    try {
+      final p = await _repo.loadProfile();
+
+      if (!mounted) return;
+
+      setState(() {
+        _p = p;
+        _loading = false;
+        _error = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+        _error = true;
+      });
+    }
   }
 
   Future<void> _save() async {
     if (_p == null) return;
-    _p!.updatedAt = DateTime.now();
-    await _repo.saveProfile(_p!);
-    setState(() {});
+    try {
+      _p!.updatedAt = DateTime.now();
+      await _repo.saveProfile(_p!);
+    } catch (_) {}
   }
 
-  /// ✅ Scan insurance card (front + optional back)
+  // ✅ Google MLKit Scanner (0.4.1 compatible)
   Future<void> _scanCard() async {
-    DocumentScanner? scanner;
     try {
-      final options = DocumentScannerOptions(
-        mode: ScannerMode.full,
-        pageLimit: 1,
-        isGalleryImport: true,
-      );
-
-      scanner = DocumentScanner(options: options);
-
-      // ---------- FRONT ----------
-      final result = await scanner.scanDocument();
-      final images = result?.images;
-
-      if (images == null || images.isEmpty) return;
-
-      final frontPath = images.first;
-
-      // ---------- BACK (optional) ----------
-      final wantsBack = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Scan Back of Card?"),
-          content: const Text("Would you like to capture the back side too?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text("Skip"),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("Yes, Scan Back"),
-            ),
-          ],
+      final scanner = DocumentScanner(
+        options: DocumentScannerOptions(
+          mode: ScannerMode.full,
+          pageLimit: 1,
         ),
       );
 
-      String? backPath;
+      final result = await scanner.scanDocument();
 
-      if (wantsBack == true) {
-        final backScanner = DocumentScanner(options: options);
-        try {
-          final backResult = await backScanner.scanDocument();
-          final backImages = backResult?.images;
+      if (result == null) return;
+      if (result.images == null) return;
+      if (result.images!.isEmpty) return;
 
-          if (backImages != null && backImages.isNotEmpty) {
-            backPath = backImages.first;
-          }
-        } finally {
-          await backScanner.close();
-        }
-      }
+      final imagePath = result.images!.first;
 
-      setState(() {
-        _p!.orphanCards.add(
-          InsuranceCard(
-            carrier: '',
-            policy: '',
-            memberId: '',
-            policyType: '',
-            frontImagePath: frontPath,
-            backImagePath: backPath,
-            source: 'Scanned',
-          ),
-        );
-      });
+      debugPrint("Scanned card path: $imagePath");
 
-      await _save();
+      // If you want to automatically attach scanned image,
+      // you would create a new InsuranceCard model here.
+
+      await _load();
     } catch (e) {
-      debugPrint("❌ Exception while scanning card: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Scan failed: $e")),
-        );
-      }
-    } finally {
-      try {
-        await scanner?.close();
-      } catch (_) {}
+      debugPrint("Scanner error: $e");
     }
-  }
-
-  void _deleteCard(InsuranceCard card) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete card?"),
-        content: const Text("This card will be permanently removed."),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
-          FilledButton.tonal(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Delete")),
-        ],
-      ),
-    );
-
-    if (ok == true) {
-      setState(() {
-        _p!.orphanCards.removeWhere((c) => c.id == card.id);
-        for (var ins in _p!.insurances) {
-          ins.cards.removeWhere((c) => c.id == card.id);
-        }
-      });
-      await _save();
-    }
-  }
-
-  Widget _cardRow(InsuranceCard card) {
-    final frontFile = File(card.frontImagePath);
-    final backFile =
-        card.backImagePath != null ? File(card.backImagePath!) : null;
-
-    return ListTile(
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          frontFile.existsSync()
-              ? Image.file(frontFile, width: 80, height: 60, fit: BoxFit.cover)
-              : const Icon(Icons.broken_image, size: 60),
-          const SizedBox(width: 8),
-          if (backFile != null && backFile.existsSync())
-            Image.file(backFile, width: 80, height: 60, fit: BoxFit.cover),
-        ],
-      ),
-      title: Text(card.carrier.isNotEmpty ? card.carrier : "Insurance Card"),
-      subtitle: Text(card.policy.isNotEmpty ? card.policy : ""),
-      trailing: IconButton(
-        icon: const Icon(Icons.delete_outline, color: Colors.black),
-        onPressed: () => _deleteCard(card),
-      ),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => InsuranceCardDetail(
-              card: card,
-              onDelete: () => _deleteCard(card),
-              startOnBack: false,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Map<String, List<InsuranceCard>> _categorizeCards(List<InsuranceCard> cards) {
-    final Map<String, List<InsuranceCard>> buckets = {
-      "Primary": [],
-      "Supplement": [],
-      "PDP": [],
-      "MAPD/MA": [],
-      "VA/TriCare": [],
-      "Ancillary": [],
-    };
-
-    for (var card in cards) {
-      final carrier = card.carrier.toLowerCase();
-      final policy = card.policy.toLowerCase();
-      final type = card.policyType.toLowerCase();
-
-      if (carrier.contains("medicare") &&
-          (policy.contains("part a") || policy.contains("part b"))) {
-        buckets["Primary"]!.add(card);
-      } else if (policy.contains("plan a") ||
-          policy.contains("plan b") ||
-          policy.contains("plan c") ||
-          policy.contains("plan d") ||
-          policy.contains("plan f") ||
-          policy.contains("plan g") ||
-          policy.contains("plan n")) {
-        buckets["Supplement"]!.add(card);
-      } else if (carrier.contains("pdp") || policy.contains("part d")) {
-        buckets["PDP"]!.add(card);
-      } else if (carrier.contains("mapd") ||
-          policy.contains("mapd") ||
-          policy.contains("advantage") ||
-          type.contains("ma")) {
-        buckets["MAPD/MA"]!.add(card);
-      } else if (carrier.contains("va") || carrier.contains("tricare")) {
-        buckets["VA/TriCare"]!.add(card);
-      } else {
-        buckets["Ancillary"]!.add(card);
-      }
-    }
-
-    return buckets;
   }
 
   @override
@@ -247,47 +95,96 @@ class _InsuranceCardsMenuScreenState extends State<InsuranceCardsMenuScreen> {
       );
     }
 
-    final allCards = [
-      ..._p!.orphanCards,
-      for (var ins in _p!.insurances) ...ins.cards,
-    ];
+    if (_error || _p == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Insurance Cards")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off,
+                  size: 60, color: Colors.grey),
+              const SizedBox(height: 20),
+              const Text(
+                "Unable to load insurance cards.",
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _loading = true;
+                    _error = false;
+                  });
+                  _load();
+                },
+                child: const Text("Retry"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
 
-    final categorized = _categorizeCards(allCards);
+    final allCards = [
+      ..._p?.orphanCards ?? [],
+      for (var ins in _p?.insurances ?? []) ...ins.cards,
+    ];
 
     return Scaffold(
       appBar: AppBar(title: const Text("Insurance Cards")),
       body: Column(
         children: [
+          // ✅ Scanner Button (like Meds screen)
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: ElevatedButton.icon(
               onPressed: _scanCard,
               icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('Scan Insurance Card'),
+              label: const Text("Scan Insurance Card"),
             ),
           ),
+
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: categorized.entries
-                  .where((entry) => entry.value.isNotEmpty)
-                  .map((entry) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(entry.key,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Column(
-                            children: entry.value
-                                .map((card) => _cardRow(card))
-                                .toList(),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      ))
-                  .toList(),
-            ),
+            child: allCards.isEmpty
+                ? const Center(
+                    child: Text("No insurance cards found"))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: allCards.length,
+                    itemBuilder: (context, index) {
+                      final card = allCards[index];
+                      final file =
+                          File(card.frontImagePath);
+
+                      return ListTile(
+                        leading: file.existsSync()
+                            ? Image.file(
+                                file,
+                                width: 70,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.broken_image),
+                        title: Text(
+                          card.carrier.isNotEmpty
+                              ? card.carrier
+                              : "Insurance Card",
+                        ),
+                        subtitle: Text(card.policy ?? ''),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  InsuranceCardDetail(
+                                      card: card),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),

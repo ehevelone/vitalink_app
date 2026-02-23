@@ -1,9 +1,8 @@
 // functions/agent_onboard.js
 
 const db = require("./services/db");
-const crypto = require("crypto");
 
-// 🔹 Generate AG-XXXXXXXXXX unlock code
+// 🔹 Generate AG-XXXXXXXX unlock code
 function generateUnlockCode(prefix = "AG", length = 10) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -11,11 +10,6 @@ function generateUnlockCode(prefix = "AG", length = 10) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `${prefix}-${code}`;
-}
-
-// 🔹 Generate secure onboarding token
-function generateToken() {
-  return crypto.randomBytes(16).toString("hex");
 }
 
 exports.handler = async (event) => {
@@ -33,7 +27,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // ✅ QR scans hit via GET
+    // ✅ Only allow GET (QR scan)
     if (event.httpMethod !== "GET") {
       return {
         statusCode: 405,
@@ -41,18 +35,47 @@ exports.handler = async (event) => {
       };
     }
 
-    // 1️⃣ Generate unlock + token
-    const unlockCode = generateUnlockCode();
-    const onboardToken = generateToken();
+    const params = event.queryStringParameters || {};
+    const rsmCode = params.rsm;
 
-    // 2️⃣ Insert NEW agent row
+    if (!rsmCode) {
+      return {
+        statusCode: 400,
+        body: "Missing RSM enrollment code",
+      };
+    }
+
+    // 🔎 1️⃣ Find RSM by agent_enroll_code
+    const rsmResult = await db.query(
+      `
+      SELECT id
+      FROM rsms
+      WHERE agent_enroll_code = $1
+      LIMIT 1
+      `,
+      [rsmCode]
+    );
+
+    if (rsmResult.rows.length === 0) {
+      return {
+        statusCode: 404,
+        body: "Invalid RSM enrollment code",
+      };
+    }
+
+    const rsmId = rsmResult.rows[0].id;
+
+    // 🔑 2️⃣ Generate agent unlock code
+    const unlockCode = generateUnlockCode();
+
+    // 🧱 3️⃣ Insert agent tied to RSM
     const result = await db.query(
       `
       INSERT INTO agents (
         role,
         active,
         unlock_code,
-        onboard_token,
+        rsm_id,
         created_at
       )
       VALUES (
@@ -64,19 +87,19 @@ exports.handler = async (event) => {
       )
       RETURNING id;
       `,
-      [unlockCode, onboardToken]
+      [unlockCode, rsmId]
     );
 
     const agentId = result.rows[0].id;
 
-    // 3️⃣ Redirect to WEBSITE onboarding page
+    // 🔁 4️⃣ Redirect to claim page
     const redirectUrl =
-      `https://myvitalink.app/agent-onboard.html?token=${encodeURIComponent(onboardToken)}`;
+      `https://myvitalink.app/agent-claim.html?code=${encodeURIComponent(unlockCode)}`;
 
     console.log("=================================");
     console.log(`✅ Agent Created: ${agentId}`);
     console.log(`🔐 Unlock Code: ${unlockCode}`);
-    console.log(`🔑 Token: ${onboardToken}`);
+    console.log(`👤 Bound to RSM ID: ${rsmId}`);
     console.log(`🔗 Redirecting to: ${redirectUrl}`);
     console.log("=================================");
 

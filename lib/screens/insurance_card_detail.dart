@@ -28,8 +28,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   bool _showFront = true;
   final ImagePicker _picker = ImagePicker();
   late final DataRepository _repo;
-
-  double _currentScale = 1.0; // ✅ track zoom level
+  double _currentScale = 1.0;
 
   @override
   void initState() {
@@ -39,15 +38,15 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   }
 
   void _toggleView() {
-    if (widget.card.backImagePath != null &&
-        widget.card.backImagePath!.isNotEmpty) {
+    if ((widget.card.backImagePath ?? '').isNotEmpty) {
       setState(() => _showFront = !_showFront);
     }
   }
 
   Future<void> _captureBack() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+      final XFile? image =
+          await _picker.pickImage(source: ImageSource.camera);
       if (image == null) return;
 
       File file = File(image.path);
@@ -56,7 +55,6 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_cards";
-      debugPrint("Calling: $url");
 
       final resp = await http.post(
         Uri.parse(url),
@@ -66,19 +64,21 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body);
-        debugPrint("AI Parsed Back: $parsed");
 
         String finalPath = file.path;
+
         if (parsed['card_image_base64'] != null) {
           try {
-            final croppedBytes = base64Decode(parsed['card_image_base64']);
-            final croppedFile = await File('${file.path}_back_cropped.png')
-                .writeAsBytes(croppedBytes);
+            final croppedBytes =
+                base64Decode(parsed['card_image_base64']);
+            final croppedFile =
+                await File('${file.path}_back_cropped.png')
+                    .writeAsBytes(croppedBytes);
             finalPath = croppedFile.path;
-          } catch (e) {
-            debugPrint("Failed to decode cropped back image: $e");
-          }
+          } catch (_) {}
         }
+
+        if (!mounted) return;
 
         setState(() {
           widget.card.backImagePath = finalPath;
@@ -97,14 +97,12 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
             }
           }
 
-          if (!updated) {
-            for (var ins in profile.insurances) {
-              for (var i = 0; i < ins.cards.length; i++) {
-                if (ins.cards[i] == widget.card) {
-                  ins.cards[i] = widget.card;
-                  updated = true;
-                  break;
-                }
+          for (var ins in profile.insurances) {
+            for (var i = 0; i < ins.cards.length; i++) {
+              if (ins.cards[i] == widget.card) {
+                ins.cards[i] = widget.card;
+                updated = true;
+                break;
               }
             }
           }
@@ -114,24 +112,28 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
             await _repo.saveProfile(profile);
           }
         }
-      } else {
-        debugPrint("Error cropping back: ${resp.statusCode} - ${resp.body}");
       }
-    } catch (e) {
-      debugPrint("Exception in _captureBack: $e");
-    }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final card = widget.card;
-    final imagePath =
-        _showFront ? card.frontImagePath : (card.backImagePath ?? '');
+
+    final imagePath = _showFront
+        ? card.frontImagePath
+        : (card.backImagePath ?? '');
+
+    final file = (imagePath.isNotEmpty)
+        ? File(imagePath)
+        : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          card.carrier.isNotEmpty ? card.carrier : "Insurance Card",
+          card.carrier.isNotEmpty
+              ? card.carrier
+              : "Insurance Card",
         ),
         actions: [
           if (widget.onDelete != null)
@@ -145,42 +147,43 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         children: [
           Expanded(
             child: Center(
-              child: (imagePath.isNotEmpty)
+              child: (file != null && file.existsSync())
                   ? GestureDetector(
                       onTapUp: (_) {
-                        // ✅ Only flip if scale is basically default
                         if (_currentScale == 1.0) {
                           _toggleView();
                         }
                       },
                       child: InteractiveViewer(
-                        panEnabled: true,
                         minScale: 1.0,
                         maxScale: 5.0,
                         onInteractionUpdate: (details) {
-                          setState(() => _currentScale = details.scale);
+                          setState(
+                              () => _currentScale = details.scale);
                         },
                         child: Image.file(
-                          File(imagePath),
+                          file,
                           fit: BoxFit.contain,
                         ),
                       ),
                     )
-                  : const Text("No image available"),
+                  : const Icon(Icons.broken_image,
+                      size: 120),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Padding(
-            padding: const EdgeInsets.only(bottom: 20),
+            padding:
+                const EdgeInsets.only(bottom: 20),
             child: ElevatedButton.icon(
               onPressed: _captureBack,
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: Text(card.backImagePath == null ||
-                      card.backImagePath!.isEmpty
-                  ? "Add Back of Card"
-                  : "Replace Back of Card"),
+              icon: const Icon(
+                  Icons.camera_alt_outlined),
+              label: Text(
+                (card.backImagePath ?? '').isEmpty
+                    ? "Add Back of Card"
+                    : "Replace Back of Card",
+              ),
             ),
           ),
         ],

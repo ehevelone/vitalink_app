@@ -28,6 +28,11 @@ import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
 
+// 🔥 PROFILE IMPORTS
+import 'screens/profile_agent_screen.dart';
+import 'screens/profile_user_screen.dart';
+import 'screens/edit_profile.dart'; // ✅ ADDED
+
 // Medical / insurance data
 import 'screens/meds_screen.dart';
 import 'screens/doctors_screen.dart';
@@ -53,7 +58,6 @@ import 'screens/agent_reset_password_screen.dart';
 
 import 'models.dart';
 
-/// 🔔 NEW — global navigator key
 final GlobalKey<NavigatorState> navigatorKey =
     GlobalKey<NavigatorState>();
 
@@ -115,19 +119,16 @@ Future<void> _setupFirebaseTokenListener() async {
     }
   });
 
-  /// 🔔 NEW — when app opened from background
   FirebaseMessaging.onMessageOpenedApp.listen((message) {
     _handleNotificationNavigation(message);
   });
 
-  /// 🔔 NEW — when app launched from terminated state
   final initialMessage = await fcm.getInitialMessage();
   if (initialMessage != null) {
     _handleNotificationNavigation(initialMessage);
   }
 }
 
-/// 🔔 NEW — centralized routing
 void _handleNotificationNavigation(RemoteMessage message) {
   final type = message.data['type'];
 
@@ -148,7 +149,7 @@ class VitaLinkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // 🔔 NEW
+      navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
@@ -160,7 +161,10 @@ class VitaLinkApp extends StatelessWidget {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
 
-        // User
+        // ✅ SHARED PROFILE ROUTE (FIX)
+        '/my_profile': (context) => const EditProfileScreen(),
+
+        // USER
         '/terms_user': (context) => const TermsUserScreen(),
         '/registration': (context) =>
             const RegistrationScreen(),
@@ -171,8 +175,10 @@ class VitaLinkApp extends StatelessWidget {
         '/menu': (context) => MenuScreen(),
         '/my_agent_user': (context) =>
             MyAgentUser(),
+        '/my_profile_user': (context) =>
+            const ProfileUserScreen(),
 
-        // Agent
+        // AGENT
         '/terms_agent': (context) =>
             const TermsAgentScreen(),
         '/agent_registration': (context) =>
@@ -185,15 +191,17 @@ class VitaLinkApp extends StatelessWidget {
             AgentMenuScreen(),
         '/my_agent_agent': (context) =>
             MyAgentAgent(),
+        '/my_profile_agent': (context) =>
+            const ProfileAgentScreen(),
 
-        // Shared
+        // SHARED
         '/logo': (context) => const LogoScreen(),
         '/emergency': (context) =>
             EmergencyScreen(),
         '/emergency_view': (context) =>
             EmergencyView(),
 
-        // Medical
+        // MEDICAL
         '/meds': (context) => MedsScreen(),
         '/doctors': (context) =>
             DoctorsScreen(),

@@ -31,15 +31,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   Future<void> _loadLocalProfile() async {
     final store = SecureStore();
 
-    // Try the various keys we've been using
-    final email =
-        await store.getString('user_username') ??
-        await store.getString('username') ??
-        await store.getString('savedUsername') ??
-        "";
+    // 🔥 Correct key used during login
+    final email = await store.getString('userEmail') ?? "";
 
     final name = await store.getString('profileName') ?? "";
     final phone = await store.getString('profilePhone') ?? "";
+
+    if (!mounted) return;
 
     setState(() {
       _currentEmail = email;
@@ -52,6 +50,15 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_currentEmail.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Session error. Please log in again."),
+        ),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     final store = SecureStore();
@@ -62,7 +69,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final newPassword = _passwordCtrl.text.trim();
 
     try {
-      // Call backend (Supabase)
       final res = await ApiService.updateUserProfile(
         currentEmail: _currentEmail,
         email: newEmail,
@@ -80,34 +86,23 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
         return;
       }
 
-      // Update local SecureStore so rest of app sees new data
+      // ✅ Sync SecureStore
       await store.setString('profileName', newName);
       await store.setString('profilePhone', newPhone);
+      await store.setString('userEmail', newEmail);
 
-      // Email used in many places → keep them all in sync
-      await store.setString('user_username', newEmail);
-      await store.setString('username', newEmail);
-      await store.setString('savedUsername', newEmail);
-      await store.setString('lastEmail', newEmail);
-
-      // If password changed, update local stored password too
       if (newPassword.isNotEmpty) {
-        await store.setString('user_password', newPassword);
-        await store.setString('password', newPassword);
-        await store.setString('savedPassword', newPassword);
+        await store.setString('userPassword', newPassword);
       }
 
-      // Ensure role stays "user"
-      await store.setString('role', 'user');
-
-      setState(() {
-        _currentEmail = newEmail;
-      });
+      _currentEmail = newEmail;
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated ✅")),
       );
+
       Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -127,9 +122,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
               children: [
                 const Text(
                   "User Profile",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
+
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(labelText: "Full Name"),
@@ -137,6 +136,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                       v == null || v.isEmpty ? "Enter your name" : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _emailCtrl,
                   decoration: const InputDecoration(labelText: "Email"),
@@ -145,18 +145,22 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                       v == null || v.isEmpty ? "Enter your email" : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _phoneCtrl,
                   decoration: const InputDecoration(labelText: "Phone"),
                 ),
+
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 12),
+
                 const Text(
                   "Change Password (optional)",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
@@ -170,6 +174,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
@@ -183,7 +188,9 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                     return null;
                   },
                 ),
+
                 const SizedBox(height: 24),
+
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton.icon(

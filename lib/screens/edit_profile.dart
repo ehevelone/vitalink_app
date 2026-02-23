@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -25,7 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _allergiesCtrl = TextEditingController();
   final _conditionsCtrl = TextEditingController();
 
-  bool _organDonor = false; // ⭐ NEW FIELD
+  bool _organDonor = false;
 
   @override
   void initState() {
@@ -51,13 +54,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _phoneCtrl.text = e.phone;
         _allergiesCtrl.text = e.allergies;
         _conditionsCtrl.text = e.conditions;
-        _organDonor = e.organDonor; // ⭐
+        _organDonor = e.organDonor;
       }
     });
   }
 
   Future<void> _save() async {
     if (_p == null) return;
+
+    final oldPhone = _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
+    final newPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
 
     setState(() => _loading = true);
 
@@ -70,13 +76,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         phone: _phoneCtrl.text.trim(),
         allergies: _allergiesCtrl.text.trim(),
         conditions: _conditionsCtrl.text.trim(),
-        organDonor: _organDonor, // ⭐
+        organDonor: _organDonor,
       ),
     );
 
     await _repo.saveProfile(_p!);
 
     if (!mounted) return;
+
+    // 🚀 If phone changed, launch SMS
+    if (newPhone.length == 10 && newPhone != oldPhone) {
+      String agentName = "";
+      String agentPhone = "";
+
+      try {
+        final userEmail = await AppState.getEmail();
+        if (userEmail != null && userEmail.isNotEmpty) {
+          final res = await ApiService.getUserAgent(userEmail);
+          if (res["success"] == true && res["agent"] != null) {
+            agentName = res["agent"]["name"] ?? "";
+            agentPhone = res["agent"]["phone"] ?? "";
+          }
+        }
+      } catch (_) {}
+
+      final agentLine = (agentName.isNotEmpty && agentPhone.isNotEmpty)
+          ? "\n\nTheir insurance agent is $agentName at $agentPhone."
+          : "\n\nOR contact — their insurance agent _______________.";
+
+      final message =
+          "You have been added as ${_p!.fullName}'s emergency contact in the VitaLink app. "
+          "Learn more at https://myvitalink.app — OR contact — their insurance agent.$agentLine";
+
+      final smsUri = Uri.parse(
+        "sms:$newPhone?body=${Uri.encodeComponent(message)}",
+      );
+
+      await launchUrl(
+        smsUri,
+        mode: LaunchMode.externalApplication,
+      );
+    }
+
     Navigator.pop(context);
   }
 
@@ -180,7 +221,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 24),
 
-            // ⭐ Organ Donor Toggle
             SwitchListTile(
               value: _organDonor,
               onChanged: (v) => setState(() => _organDonor = v),

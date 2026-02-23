@@ -11,6 +11,16 @@ const pool = new Pool({
 const SITE = "https://myvitalink.app";
 const FUNCTION_URL = "https://vitalink-app.netlify.app/.netlify/functions/rsm-onboard";
 
+// ✅ NEW: Generate permanent RSM agent enrollment code
+function generateRsmEnrollCode(prefix = "RSM", length = 8) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${code}`;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
   "Access-Control-Allow-Headers": "Content-Type, x-admin-token",
@@ -65,10 +75,13 @@ exports.handler = async function (event) {
     // Required because password_hash is NOT NULL
     const tempPasswordHash = "PENDING_SETUP";
 
+    // ✅ NEW: generate permanent agent enrollment code
+    const enrollCode = generateRsmEnrollCode();
+
     await client.query(
       `INSERT INTO rsms 
-        (role, email, password_hash, name, region, phone, active, created_at, onboard_token, onboard_token_expires) 
-       VALUES ('rsm', $1, $2, $3, $4, $5, false, NOW(), $6, $7)`,
+        (role, email, password_hash, name, region, phone, active, created_at, onboard_token, onboard_token_expires, agent_enroll_code) 
+       VALUES ('rsm', $1, $2, $3, $4, $5, false, NOW(), $6, $7, $8)`,
       [
         email,
         tempPasswordHash,
@@ -76,7 +89,8 @@ exports.handler = async function (event) {
         "",        // region placeholder
         phone,
         token,
-        expires
+        expires,
+        enrollCode
       ]
     );
 
@@ -90,7 +104,8 @@ exports.handler = async function (event) {
       body: JSON.stringify({
         success: true,
         onboard_url: onboardingUrl,
-        onboard_token: token
+        onboard_token: token,
+        agent_enroll_code: enrollCode   // ✅ returned for admin visibility if needed
       })
     };
 

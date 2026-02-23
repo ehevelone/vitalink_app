@@ -1,7 +1,13 @@
 // functions/new_agent_code.js
 const db = require("./services/db");
+const { Pool } = require("pg");
 
-// ✅ Simple random alphanumeric generator (8 chars, A-Z0-9)
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// ✅ Simple random alphanumeric generator
 function generateUnlockCode() {
   return Array.from({ length: 8 }, () =>
     Math.floor(Math.random() * 36).toString(36).toUpperCase()
@@ -10,45 +16,83 @@ function generateUnlockCode() {
 
 exports.handler = async (event) => {
   try {
-    // Generate a random unlock code
+
+    let rsmId = null;
+    const rsmToken = event.headers["x-rsm-token"];
+
+    // ====================================================
+    // 🔐 If RSM token exists → validate session
+    // ====================================================
+    if (rsmToken) {
+
+      const client = await pool.connect();
+
+      const rsmResult = await client.query(`
+        SELECT id
+        FROM rsms
+        WHERE admin_session_token = $1
+        AND role = 'rsm'
+        AND admin_session_expires > NOW()
+        LIMIT 1
+      `, [rsmToken]);
+
+      if (rsmResult.rows.length === 0) {
+        client.release();
+        return {
+          statusCode: 401,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ success: false, error: "Invalid RSM session" })
+        };
+      }
+
+      rsmId = rsmResult.rows[0].id;
+      client.release();
+    }
+
+    // ====================================================
+    // 🔑 Generate unlock code
+    // ====================================================
     const unlockCode = generateUnlockCode();
 
-    // Create stub agent row
+    // ====================================================
+    // 🧱 Insert agent (NO promo logic anymore)
+    // ====================================================
     const agentResult = await db.query(
-      `INSERT INTO agents (unlock_code, active, role)
-       VALUES ($1, FALSE, 'agent')
-       RETURNING id`,
-      [unlockCode]
+      `
+      INSERT INTO agents (unlock_code, active, role, rsm_id, created_at)
+      VALUES ($1, FALSE, 'agent', $2, NOW())
+      RETURNING id
+      `,
+      [unlockCode, rsmId]
     );
 
     const agentId = agentResult.rows[0].id;
 
-    // Log promo code
-    await db.query(
-      `INSERT INTO promo_codes (code, redeemed, used_count)
-       VALUES ($1, FALSE, 0)`,
-      [unlockCode]
-    );
-
-    // ✅ If request comes from the app → return JSON
-    if (event.headers.accept && event.headers.accept.includes("application/json")) {
+    // ====================================================
+    // 📱 JSON response for dashboard/app
+    // ====================================================
+    if (
+      event.headers.accept &&
+      event.headers.accept.includes("application/json")
+    ) {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           success: true,
           agentId,
-          unlockCode,
+          unlockCode
         }),
       };
     }
 
-    // ✅ Otherwise → redirect into app with fallback
+    // ====================================================
+    // 🌐 Redirect fallback
+    // ====================================================
     const deepLink = `vitalink://agent/onboard?code=${unlockCode}`;
     const playStoreLink =
       "https://play.google.com/store/apps/details?id=com.vitalink.app";
 
-    // Try deep link first (302 redirect). If app isn’t installed → fallback to HTML
     return {
       statusCode: 302,
       headers: {
@@ -62,7 +106,7 @@ exports.handler = async (event) => {
           <meta charset="utf-8"/>
           <title>VitaLink Agent Unlock</title>
           <style>
-            body { font-family: Arial, sans-serif; text-align: center; margin: 40px; }
+            body { font-family: Arial; text-align: center; margin: 40px; }
             .code { font-size: 24px; font-weight: bold; color: #0077cc; margin: 20px 0; }
             a.button {
               display: inline-block; padding: 12px 20px; margin: 10px;
@@ -75,16 +119,16 @@ exports.handler = async (event) => {
           <h2>Welcome to VitaLink</h2>
           <p>Your unique agent unlock code:</p>
           <div class="code">${unlockCode}</div>
-          <p>If you already downloaded the VitaLink app, it should open automatically.<br/>
-             If not, use the buttons below:</p>
+          <p>If the app is installed, it should open automatically.</p>
           <p>
-            <a href="${deepLink}" class="button">➡️ Open in App</a>
-            <a href="${playStoreLink}" class="button secondary">📥 Download VitaLink</a>
+            <a href="${deepLink}" class="button">Open in App</a>
+            <a href="${playStoreLink}" class="button secondary">Download App</a>
           </p>
         </body>
         </html>
       `,
     };
+
   } catch (err) {
     console.error("❌ Error generating new agent code:", err);
     return {

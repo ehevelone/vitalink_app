@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -25,7 +26,7 @@ class _MenuScreenState extends State<MenuScreen> {
     super.initState();
     _repo = DataRepository(SecureStore());
     _loadProfile();
-    _registerDevice(); // ✅ correct
+    _registerDevice();
   }
 
   Future<void> _loadProfile() async {
@@ -37,7 +38,6 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
-  /// ✅ FIXED — matches ApiService signature EXACTLY
   Future<void> _registerDevice() async {
     if (_deviceRegistered) return;
 
@@ -47,16 +47,10 @@ class _MenuScreenState extends State<MenuScreen> {
       final email = await store.getString('userEmail');
       final role = await store.getString('role');
 
-      if (email == null || email.isEmpty || role == null) {
-        debugPrint("⚠️ Device registration skipped: missing email/role");
-        return;
-      }
+      if (email == null || email.isEmpty || role == null) return;
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint("⚠️ Device registration skipped: no FCM token");
-        return;
-      }
+      if (fcmToken == null || fcmToken.isEmpty) return;
 
       await ApiService.registerDeviceToken(
         email: email,
@@ -65,21 +59,30 @@ class _MenuScreenState extends State<MenuScreen> {
       );
 
       _deviceRegistered = true;
-      debugPrint("✅ Device registered successfully");
-    } catch (e) {
-      debugPrint("❌ Device registration failed: $e");
-    }
+    } catch (_) {}
   }
 
+  /// 🔥 REAL logout fix
   Future<void> _logout(BuildContext context) async {
     final store = SecureStore();
+
+    // Clear SecureStore
     await store.remove('userLoggedIn');
     await store.remove('rememberMe');
     await store.remove('role');
     await store.remove('authToken');
+    await store.remove('userEmail');
+
+    // 🔥 Clear SharedPreferences (THIS is what Splash checks)
+    await AppState.clearAuth();
 
     if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/landing',
+      (route) => false,
+    );
   }
 
   @override
@@ -130,11 +133,10 @@ class _MenuScreenState extends State<MenuScreen> {
                                 '/insurance_cards_menu'),
                             _item(Icons.policy, "Insurance Policies",
                                 '/insurance_policies'),
-                            _item(Icons.person, "My Profile", '/my_profile'),
+                            _item(Icons.person, "My Profile", '/my_profile_user'),
                           ],
                         ),
                       ),
-                      // 🔵 Blue / white
                       SafeBottomButton(
                         label: "Add Family Member",
                         icon: Icons.group_add,
@@ -144,7 +146,6 @@ class _MenuScreenState extends State<MenuScreen> {
                           '/new_profile',
                         ).then((_) => _loadProfile()),
                       ),
-                      // ⚫ Grey / white
                       SafeBottomButton(
                         label: "Switch Profile",
                         icon: Icons.swap_horiz,
@@ -154,7 +155,6 @@ class _MenuScreenState extends State<MenuScreen> {
                           '/profile_picker',
                         ).then((_) => _loadProfile()),
                       ),
-                      // 🔴 Red / white
                       SafeBottomButton(
                         label: "Emergency Info",
                         icon: Icons.warning_amber_rounded,
@@ -162,7 +162,6 @@ class _MenuScreenState extends State<MenuScreen> {
                         onPressed: () =>
                             Navigator.pushNamed(context, '/emergency'),
                       ),
-                      // 💗 Pink / red
                       SafeBottomButton(
                         label: "Log Out",
                         icon: Icons.logout,

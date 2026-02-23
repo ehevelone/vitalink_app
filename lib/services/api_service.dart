@@ -38,10 +38,21 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔎 Get User's Assigned Agent  ✅ NEW (ONLY ADDITION)
+  // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getUserAgent(String email) {
     return _postJson("get_user_agent", {
+      "email": email,
+    });
+  }
+
+  // -------------------------------------------------------------
+  // 🔎 Get full agent profile  ✅ ADDED
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> getAgentProfile({
+    required String email,
+  }) {
+    return _postJson("get_agent_profile", {
       "email": email,
     });
   }
@@ -117,7 +128,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Register user (SB)
+  // 🔹 Register user
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerUser({
     required String firstName,
@@ -241,8 +252,8 @@ class ApiService {
       "name": name,
       "phone": phone,
       "npn": npn,
-      "agency_name": agencyName,
-      "agency_address": agencyAddress,
+      "agencyName": agencyName,
+      "agencyAddress": agencyAddress,
       "password": password,
     }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
 

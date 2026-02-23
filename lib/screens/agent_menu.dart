@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../services/secure_store.dart';
-import '../models.dart';
 import '../services/data_repository.dart';
+import '../services/app_state.dart';
+import '../models.dart';
 
 class AgentMenuScreen extends StatefulWidget {
   const AgentMenuScreen({super.key});
@@ -29,6 +30,8 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     final p = await _repo.loadProfile();
     final storedName = await store.getString("agentName");
 
+    if (!mounted) return;
+
     setState(() {
       _p = p;
       agentName = storedName?.isNotEmpty == true ? storedName! : "Agent";
@@ -36,7 +39,13 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     });
   }
 
+  // 🔥 FINAL LOGOUT
   Future<void> _logout(BuildContext context) async {
+    // Clear SharedPreferences (what Splash reads)
+    await AppState.setLoggedIn(false);
+    await AppState.clearAuth();
+
+    // Optional: manually clear secure store keys if needed
     final store = SecureStore();
     await store.remove('loggedIn');
     await store.remove('userLoggedIn');
@@ -44,9 +53,16 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     await store.remove('role');
     await store.remove('authToken');
     await store.remove('device_token');
+    await store.remove('agentName');
+    await store.remove('lastEmail');
+    await store.remove('lastRole');
 
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/landing');
+
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/landing',
+      (route) => false,
+    );
   }
 
   @override
@@ -61,7 +77,10 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: Image.asset("assets/images/app_icon_big.png", height: 32),
+            child: Image.asset(
+              "assets/images/app_icon_big.png",
+              height: 32,
+            ),
           ),
         ],
       ),
@@ -77,7 +96,6 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                 ),
               ),
             ),
-
             _loading
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
@@ -85,13 +103,13 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
+                              horizontal: 16, vertical: 10),
                           children: [
                             _item(Icons.badge, "My Agent", '/my_agent_agent'),
-                            _item(Icons.person, "My Profile", '/my_profile'),
-                            _item(Icons.medical_information, "Medications", '/meds'),
+                            _item(Icons.person, "My Profile",
+                                '/my_profile_agent'),
+                            _item(Icons.medical_information, "Medications",
+                                '/meds'),
                             _item(Icons.people, "Doctors", '/doctors'),
                             _item(Icons.credit_card, "Insurance Cards",
                                 '/insurance_cards_menu'),
@@ -100,49 +118,55 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                           ],
                         ),
                       ),
-
-                      /// ⭐ Emergency + Logout ONLY
                       SafeArea(
                         top: false,
                         minimum: const EdgeInsets.only(bottom: 16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              // 🔥 Emergency Info
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red.shade900,
+                                    backgroundColor:
+                                        Colors.red.shade900,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding:
+                                        const EdgeInsets.symmetric(
+                                            vertical: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                                      borderRadius:
+                                          BorderRadius.circular(30),
                                     ),
                                   ),
-                                  icon: const Icon(Icons.warning_amber_rounded),
+                                  icon: const Icon(
+                                      Icons.warning_amber_rounded),
                                   label: const Text(
                                     "Emergency Info",
                                     style: TextStyle(fontSize: 17),
                                   ),
                                   onPressed: () =>
-                                      Navigator.pushNamed(context, '/emergency'),
+                                      Navigator.pushNamed(
+                                          context, '/emergency'),
                                 ),
                               ),
-
                               const SizedBox(height: 14),
-
-                              // 🔓 Logout
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red.shade100,
-                                    foregroundColor: Colors.red.shade700,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    backgroundColor:
+                                        Colors.red.shade100,
+                                    foregroundColor:
+                                        Colors.red.shade700,
+                                    padding:
+                                        const EdgeInsets.symmetric(
+                                            vertical: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                                      borderRadius:
+                                          BorderRadius.circular(30),
                                     ),
                                   ),
                                   icon: const Icon(Icons.logout),
