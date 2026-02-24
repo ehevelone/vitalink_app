@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
+import '../utils/phone_formatter.dart'; // ✅ ADDED
 
 class AccountSetupScreen extends StatefulWidget {
   const AccountSetupScreen({super.key});
@@ -53,6 +54,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.isEmpty ? "Enter a username" : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
@@ -61,6 +63,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.length < 6 ? "Min 6 characters" : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
@@ -69,6 +72,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v != _passwordCtrl.text ? "Passwords don’t match" : null,
                 ),
                 const SizedBox(height: 24),
+
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(labelText: "Full Name"),
@@ -76,13 +80,20 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.isEmpty ? "Enter your name" : null,
                 ),
                 const SizedBox(height: 12),
+
+                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    PhoneNumberFormatter(),
+                  ],
                   decoration: const InputDecoration(labelText: "Phone"),
                   validator: (v) =>
                       v == null || v.isEmpty ? "Enter your phone" : null,
                 ),
                 const SizedBox(height: 24),
+
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(

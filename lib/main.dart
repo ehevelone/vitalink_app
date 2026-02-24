@@ -31,7 +31,9 @@ import 'screens/emergency_view.dart';
 // 🔥 PROFILE IMPORTS
 import 'screens/profile_agent_screen.dart';
 import 'screens/profile_user_screen.dart';
-import 'screens/edit_profile.dart'; // ✅ ADDED
+import 'screens/edit_profile.dart';
+import 'screens/profile_picker.dart';        // ✅ FIXED
+import 'screens/new_profile_screen.dart';   // ✅ FIXED
 
 // Medical / insurance data
 import 'screens/meds_screen.dart';
@@ -161,52 +163,43 @@ class VitaLinkApp extends StatelessWidget {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
 
-        // ✅ SHARED PROFILE ROUTE (FIX)
+        // Shared profile edit
         '/my_profile': (context) => const EditProfileScreen(),
 
         // USER
         '/terms_user': (context) => const TermsUserScreen(),
-        '/registration': (context) =>
-            const RegistrationScreen(),
+        '/registration': (context) => const RegistrationScreen(),
         '/login': (context) => const LoginScreen(),
-        '/account_setup': (context) =>
-            const AccountSetupScreen(),
+        '/account_setup': (context) => const AccountSetupScreen(),
         '/welcome': (context) => const WelcomeScreen(),
         '/menu': (context) => MenuScreen(),
-        '/my_agent_user': (context) =>
-            MyAgentUser(),
-        '/my_profile_user': (context) =>
-            const ProfileUserScreen(),
+        '/my_agent_user': (context) => MyAgentUser(),
+        '/my_profile_user': (context) => const ProfileUserScreen(),
+
+        // 🔥 FIXED PROFILE ROUTES
+        '/profile_picker': (context) => const ProfilePickerScreen(),
+        '/new_profile': (context) => const NewProfileScreen(),
 
         // AGENT
-        '/terms_agent': (context) =>
-            const TermsAgentScreen(),
+        '/terms_agent': (context) => const TermsAgentScreen(),
         '/agent_registration': (context) =>
             const AgentRegistrationScreen(),
-        '/agent_login': (context) =>
-            const AgentLoginScreen(),
-        '/agent_setup': (context) =>
-            const AgentSetupScreen(),
-        '/agent_menu': (context) =>
-            AgentMenuScreen(),
-        '/my_agent_agent': (context) =>
-            MyAgentAgent(),
+        '/agent_login': (context) => const AgentLoginScreen(),
+        '/agent_setup': (context) => const AgentSetupScreen(),
+        '/agent_menu': (context) => AgentMenuScreen(),
+        '/my_agent_agent': (context) => MyAgentAgent(),
         '/my_profile_agent': (context) =>
             const ProfileAgentScreen(),
 
         // SHARED
         '/logo': (context) => const LogoScreen(),
-        '/emergency': (context) =>
-            EmergencyScreen(),
-        '/emergency_view': (context) =>
-            EmergencyView(),
+        '/emergency': (context) => EmergencyScreen(),
+        '/emergency_view': (context) => EmergencyView(),
 
         // MEDICAL
         '/meds': (context) => MedsScreen(),
-        '/doctors': (context) =>
-            DoctorsScreen(),
-        '/doctors_view': (context) =>
-            DoctorsView(),
+        '/doctors': (context) => DoctorsScreen(),
+        '/doctors_view': (context) => DoctorsView(),
         '/insurance_policies': (context) =>
             InsurancePoliciesScreen(),
         '/insurance_cards_menu': (context) =>

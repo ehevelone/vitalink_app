@@ -24,7 +24,7 @@ class _MedsScreenState extends State<MedsScreen> {
   @override
   void initState() {
     super.initState();
-    _repo = DataRepository(SecureStore());   // ← FIXED
+    _repo = DataRepository(SecureStore());
     _load();
   }
 
@@ -152,17 +152,51 @@ class _MedsScreenState extends State<MedsScreen> {
     await _save();
   }
 
+  // 🔥 UPDATED MULTI-IMAGE SCAN
   Future<void> _scanLabel() async {
     try {
-      final img = await _picker.pickImage(source: ImageSource.camera);
-      if (img == null) return;
+      final List<String> base64Images = [];
+      bool keepScanning = true;
 
-      final base64Image = base64Encode(await File(img.path).readAsBytes());
-      const url = "https://vitalink-app.netlify.app/.netlify/functions/parse_label";
+      while (keepScanning) {
+        final img = await _picker.pickImage(source: ImageSource.camera);
+        if (img == null) break;
 
-      final resp = await http.post(Uri.parse(url),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"imageBase64": base64Image}));
+        final base64Image =
+            base64Encode(await File(img.path).readAsBytes());
+        base64Images.add(base64Image);
+
+        keepScanning = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Add Another Photo?"),
+                content: Text(
+                    "Captured ${base64Images.length} image(s).\n\nScan another side of the bottle?"),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Done")),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Add More")),
+                ],
+              ),
+            ) ??
+            false;
+      }
+
+      if (base64Images.isEmpty) return;
+
+      const url =
+          "https://vitalink-app.netlify.app/.netlify/functions/parse_label";
+
+      final resp = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "images": base64Images, // 🔥 ARRAY SENT
+        }),
+      );
 
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body);

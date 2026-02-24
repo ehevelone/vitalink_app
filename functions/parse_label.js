@@ -1,11 +1,9 @@
 import OpenAI from "openai";
 
-// Initialize OpenAI client
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async (req) => {
   try {
-    // ✅ Parse body safely
     const raw = await req.text();
     let body = {};
     try {
@@ -14,28 +12,42 @@ export default async (req) => {
       console.error("Invalid JSON body:", raw);
     }
 
-    // ✅ Ensure we have either imageUrl or imageBase64
-    let imageInput;
-    if (body.imageUrl) {
-      imageInput = { type: "image_url", image_url: { url: body.imageUrl } };
-    } else if (body.imageBase64) {
-      imageInput = {
+    // 🔥 SUPPORT MULTIPLE IMAGES
+    let imageInputs = [];
+
+    if (body.images && Array.isArray(body.images)) {
+      imageInputs = body.images.map(base64 => ({
         type: "image_url",
-        image_url: { url: `data:image/png;base64,${body.imageBase64}` },
-      };
+        image_url: {
+          url: `data:image/png;base64,${base64}`,
+        },
+      }));
+    } else if (body.imageBase64) {
+      imageInputs = [{
+        type: "image_url",
+        image_url: {
+          url: `data:image/png;base64,${body.imageBase64}`,
+        },
+      }];
+    } else if (body.imageUrl) {
+      imageInputs = [{
+        type: "image_url",
+        image_url: {
+          url: body.imageUrl,
+        },
+      }];
     } else {
       return new Response(
         JSON.stringify({
-          error: "No image provided (need imageUrl or imageBase64)",
+          error: "No image provided",
           receivedBody: body,
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // ✅ Call OpenAI Vision
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-mini", // Vision-capable
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -47,9 +59,10 @@ export default async (req) => {
           content: [
             {
               type: "text",
-              text: "Extract details from this medication label. Return JSON with keys: name, dose, frequency, prescribing_doctor, pharmacy.",
+              text:
+                "Extract details from these medication label images. Combine all visible information and return JSON with keys: name, dose, frequency, prescribing_doctor, pharmacy.",
             },
-            imageInput,
+            ...imageInputs,
           ],
         },
       ],
@@ -61,17 +74,18 @@ export default async (req) => {
 
     return new Response(
       JSON.stringify({
-        version: "v3-json-strict",
+        version: "v4-multi-image",
         data: parsed,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
+
   } catch (err) {
     console.error("Parse-label error:", err);
+
     return new Response(
       JSON.stringify({
         error: err.message,
-        receivedBody: {},
         details: err.response?.data || null,
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }

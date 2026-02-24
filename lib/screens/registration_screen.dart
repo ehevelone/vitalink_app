@@ -7,26 +7,8 @@ import '../services/app_state.dart';
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
+import '../utils/phone_formatter.dart'; // ✅ USE GLOBAL FORMATTER
 import 'qr_scanner_screen.dart';
-
-class PhoneNumberFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final b = StringBuffer();
-    for (int i = 0; i < digits.length && i < 10; i++) {
-      if (i == 0) b.write('(');
-      if (i == 3) b.write(')');
-      if (i == 6) b.write('-');
-      b.write(digits[i]);
-    }
-    return TextEditingValue(
-      text: b.toString(),
-      selection: TextSelection.collapsed(offset: b.length),
-    );
-  }
-}
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -75,8 +57,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         throw Exception("Invalid or inactive agent code");
       }
 
-      final agent = agentRes['agent'];
-
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
       final lastName =
@@ -101,8 +81,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
-
-      // 🔥 REMOVED LOCAL AGENT STORAGE (now backend-driven)
 
       profile.registered = true;
       profile.updatedAt = DateTime.now();
@@ -156,11 +134,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 12),
 
+              // ✅ STANDARDIZED PHONE FIELD
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
                 keyboardType: TextInputType.phone,
-                inputFormatters: [PhoneNumberFormatter()],
+                inputFormatters: [
+                  PhoneNumberFormatter(),
+                ],
               ),
               const SizedBox(height: 12),
 

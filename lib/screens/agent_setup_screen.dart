@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
+import '../utils/phone_formatter.dart'; // ✅ ADDED
 
 class AgentSetupScreen extends StatefulWidget {
   const AgentSetupScreen({super.key});
@@ -14,7 +15,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
-  final _licenseCtrl = TextEditingController(); // the NPN / license #
+  final _licenseCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
@@ -31,7 +32,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     _nameCtrl.text = await store.getString('agentName') ?? '';
     _phoneCtrl.text = await store.getString('agentPhone') ?? '';
     _agencyCtrl.text = await store.getString('agencyName') ?? '';
-    _licenseCtrl.text = await store.getString('agentId') ?? ''; // NPN
+    _licenseCtrl.text = await store.getString('agentId') ?? '';
     setState(() {});
   }
 
@@ -45,8 +46,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     await store.setString('agentName', _nameCtrl.text.trim());
     await store.setString('agentPhone', _phoneCtrl.text.trim());
     await store.setString('agencyName', _agencyCtrl.text.trim());
-    await store.setString('agencyAddress', ""); // compatibility placeholder
-    await store.setString('agentId', _licenseCtrl.text.trim()); // NPN
+    await store.setString('agencyAddress', "");
+    await store.setString('agentId', _licenseCtrl.text.trim());
 
     if (_passwordCtrl.text.isNotEmpty) {
       await store.setString('agentPassword', _passwordCtrl.text.trim());
@@ -75,18 +76,26 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                       v == null || v.isEmpty ? "Enter your name" : null,
                 ),
                 const SizedBox(height: 12),
+
+                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    PhoneNumberFormatter(),
+                  ],
                   decoration: const InputDecoration(labelText: "Phone"),
                   validator: (v) =>
                       v == null || v.isEmpty ? "Enter your phone" : null,
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _agencyCtrl,
                   decoration: const InputDecoration(labelText: "Agency"),
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _licenseCtrl,
                   decoration: const InputDecoration(labelText: "NPN / License #"),
@@ -94,17 +103,22 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                       v == null || v.isEmpty ? "Enter your NPN" : null,
                 ),
                 const SizedBox(height: 24),
+
                 const Divider(),
                 const SizedBox(height: 12),
-                const Text("Update Password (optional)",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  "Update Password (optional)",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(labelText: "New Password"),
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
@@ -119,6 +133,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
+
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(

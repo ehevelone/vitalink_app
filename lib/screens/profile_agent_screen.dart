@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../widgets/password_rules.dart';
+import '../utils/phone_formatter.dart'; // ✅ ADDED
 
 class ProfileAgentScreen extends StatefulWidget {
   const ProfileAgentScreen({super.key});
@@ -64,7 +65,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
     try {
       final res = await ApiService.updateAgentProfile(
-        email: _emailCtrl.text.trim(), // immutable identifier
+        email: _emailCtrl.text.trim(),
         name: _nameCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
         agencyName: _agencyNameCtrl.text.trim().isNotEmpty
@@ -84,7 +85,6 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         return;
       }
 
-      // ✅ Sync SecureStore (used by My Agent + HIPAA)
       await store.setString('agentName', _nameCtrl.text.trim());
       await store.setString('agentPhone', _phoneCtrl.text.trim());
       await store.setString('agentEmail', _emailCtrl.text.trim());
@@ -132,8 +132,13 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               ),
               const SizedBox(height: 12),
 
+              // ✅ FIXED PHONE FIELD
               TextFormField(
                 controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  PhoneNumberFormatter(),
+                ],
                 decoration: const InputDecoration(labelText: "Phone"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Required" : null,

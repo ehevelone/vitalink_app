@@ -7,6 +7,7 @@ import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import '../utils/phone_formatter.dart'; // ✅ ADDED
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -121,27 +122,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     Navigator.pop(context);
   }
 
-  String _formatPhone(String raw) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 10) return raw;
-    return "(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6, 10)}";
-  }
-
   Future<void> _pickDob() async {
-    final initial = DateTime.tryParse(_dobCtrl.text) ?? DateTime(1990);
     final date = await showDatePicker(
       context: context,
-      initialDate: initial,
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      initialDate: DateTime(1990),
     );
+
     if (date != null) {
-      setState(() {
-        _dobCtrl.text =
-            "${date.month.toString().padLeft(2, '0')}/"
-            "${date.day.toString().padLeft(2, '0')}/"
-            "${date.year}";
-      });
+      _dobCtrl.text =
+          "${date.month.toString().padLeft(2, '0')}/"
+          "${date.day.toString().padLeft(2, '0')}/"
+          "${date.year}";
     }
   }
 
@@ -188,24 +181,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 12),
 
+            // ✅ FIXED PHONE FIELD
             TextField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: "Emergency Phone"),
               inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(10),
+                PhoneNumberFormatter(),
               ],
-              onChanged: (value) {
-                final digits = value.replaceAll(RegExp(r'\D'), '');
-                if (digits.length == 10) {
-                  final formatted = _formatPhone(digits);
-                  _phoneCtrl.value = TextEditingValue(
-                    text: formatted,
-                    selection: TextSelection.collapsed(offset: formatted.length),
-                  );
-                }
-              },
+              decoration: const InputDecoration(
+                labelText: "Emergency Phone",
+              ),
             ),
             const SizedBox(height: 12),
 

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../utils/phone_formatter.dart'; // ✅ ADDED
 
 class ProfileUserScreen extends StatefulWidget {
   const ProfileUserScreen({super.key});
@@ -31,9 +32,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   Future<void> _loadLocalProfile() async {
     final store = SecureStore();
 
-    // 🔥 Correct key used during login
     final email = await store.getString('userEmail') ?? "";
-
     final name = await store.getString('profileName') ?? "";
     final phone = await store.getString('profilePhone') ?? "";
 
@@ -86,7 +85,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
         return;
       }
 
-      // ✅ Sync SecureStore
       await store.setString('profileName', newName);
       await store.setString('profilePhone', newPhone);
       await store.setString('userEmail', newEmail);
@@ -146,8 +144,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 ),
                 const SizedBox(height: 12),
 
+                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    PhoneNumberFormatter(),
+                  ],
                   decoration: const InputDecoration(labelText: "Phone"),
                 ),
 
