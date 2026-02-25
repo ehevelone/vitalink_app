@@ -57,15 +57,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       final agent = res["agent"];
       final store = SecureStore();
 
-      // Clear user session
       await AppState.clearAuth();
-
-      // ✅ Agent login now stored in AppState
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
       await AppState.setEmail(agent["email"]);
 
-      // Identity still in secure storage
       await store.setString("agentId", agent["id"].toString());
       await store.setString("agentEmail", agent["email"] ?? "");
       await store.setString("agentName", agent["name"] ?? "");
@@ -103,6 +99,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  void _goToReset() {
+    Navigator.pushNamed(context, "/reset-password");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,9 +126,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
-                    icon: Icon(_showPassword
-                        ? Icons.visibility_off
-                        : Icons.visibility),
+                    icon: Icon(
+                      _showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
                   ),
@@ -136,7 +138,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter password" : null,
               ),
-              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _goToReset,
+                  child: const Text("Forgot Password?"),
+                ),
+              ),
+
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>

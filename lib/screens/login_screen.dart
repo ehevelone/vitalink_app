@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -76,12 +77,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await store.remove("agentLoggedIn");
 
-      // ✅ LOGIN STATE NOW STORED IN APPSTATE
       await AppState.setLoggedIn(true);
       await AppState.setRole("user");
       await AppState.setEmail(user["email"]);
 
-      // Keep identity data in secure storage
       await store.setString("userId", user["id"].toString());
       await store.setString("userEmail", user["email"]);
       await store.setString(
@@ -113,6 +112,24 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  void _goToReset() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResetPasswordScreen(
+          emailOrPhone: _emailCtrl.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -148,14 +166,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter password" : null,
               ),
-              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _goToReset,
+                  child: const Text("Forgot Password?"),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>
                     setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
+
               const SizedBox(height: 24),
+
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(

@@ -1,47 +1,42 @@
 // functions/request_reset.js
+
 const db = require("./services/db");
 const nodemailer = require("nodemailer");
 
-function reply(statusCode, obj) {
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function reply(statusCode, body) {
   return {
     statusCode,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-    body: JSON.stringify(obj),
+    headers: CORS_HEADERS,
+    body: JSON.stringify(body),
   };
 }
 
 exports.handler = async (event) => {
   try {
-    // ✅ Handle preflight (important for mobile / WebView)
+    // ✅ CORS preflight
     if (event.httpMethod === "OPTIONS") {
-      return reply(200, {});
+      return {
+        statusCode: 200,
+        headers: CORS_HEADERS,
+        body: "",
+      };
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
       });
     }
 
-    // ✅ Safe body parsing (Netlify + Flutter)
+    // ✅ Safe body parsing
     let body = {};
     try {
       if (event.isBase64Encoded) {
@@ -51,7 +46,7 @@ if (event.httpMethod !== "POST") {
       } else {
         body = JSON.parse(event.body || "{}");
       }
-    } catch (e) {
+    } catch {
       return reply(400, {
         success: false,
         error: "Invalid request body",
@@ -59,6 +54,7 @@ if (event.httpMethod !== "POST") {
     }
 
     const { emailOrPhone } = body;
+
     if (!emailOrPhone) {
       return reply(400, {
         success: false,
@@ -66,15 +62,15 @@ if (event.httpMethod !== "POST") {
       });
     }
 
-    // 🔢 Generate 6-digit reset code
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const email = emailOrPhone.trim().toLowerCase();
 
-    // 🔎 Locate account (case-insensitive)
-    let user, table;
+    // 🔎 Locate account
+    let user = null;
+    let table = null;
 
     const agentRes = await db.query(
-      `SELECT id, email FROM agents WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [emailOrPhone.trim()]
+      `SELECT id, email FROM agents WHERE LOWER(email) = $1 LIMIT 1`,
+      [email]
     );
 
     if (agentRes.rows.length) {
@@ -82,9 +78,10 @@ if (event.httpMethod !== "POST") {
       table = "agents";
     } else {
       const userRes = await db.query(
-        `SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        [emailOrPhone.trim()]
+        `SELECT id, email FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+        [email]
       );
+
       if (userRes.rows.length) {
         user = userRes.rows[0];
         table = "users";
@@ -94,11 +91,16 @@ if (event.httpMethod !== "POST") {
     if (!user) {
       return reply(404, {
         success: false,
-        error: "No account found for this email ❌",
+        error: "No account found ❌",
       });
     }
 
-    // 🕒 Store reset code
+    // 🔢 Generate 6-digit code
+    const resetCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    // 🕒 Store reset code (20 min expiration)
     await db.query(
       `
       UPDATE ${table}
@@ -123,7 +125,7 @@ if (event.httpMethod !== "POST") {
     const subject =
       table === "agents"
         ? "VitaLink Agent Password Reset Code"
-        : "VitaLink User Password Reset Code";
+        : "VitaLink Password Reset Code";
 
     const message = `
 Hi,
@@ -134,7 +136,7 @@ ${resetCode}
 
 This code expires in 20 minutes.
 
-If you did not request this, ignore this email.
+If you did not request this, you can ignore this email.
 
 – VitaLink Support
 `.trim();
@@ -151,9 +153,8 @@ If you did not request this, ignore this email.
     return reply(200, {
       success: true,
       message: "Reset code sent successfully ✅",
-      expiresIn: "20 minutes",
+      expiresIn: 20,
       sentTo: user.email,
-      role: table,
     });
 
   } catch (err) {

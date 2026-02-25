@@ -1,47 +1,42 @@
 // functions/reset_password.js
+
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
 
-function reply(statusCode, obj) {
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function reply(statusCode, body) {
   return {
     statusCode,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-    body: JSON.stringify(obj),
+    headers: CORS_HEADERS,
+    body: JSON.stringify(body),
   };
 }
 
 exports.handler = async (event) => {
   try {
-    // ✅ Handle CORS preflight
+    // ✅ CORS Preflight
     if (event.httpMethod === "OPTIONS") {
-      return reply(200, {});
+      return {
+        statusCode: 200,
+        headers: CORS_HEADERS,
+        body: "",
+      };
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
       });
     }
 
-    // ✅ Safe body parsing (Flutter + Netlify)
+    // ✅ Safe body parsing
     let body = {};
     try {
       if (event.isBase64Encoded) {
@@ -51,7 +46,7 @@ if (event.httpMethod !== "POST") {
       } else {
         body = JSON.parse(event.body || "{}");
       }
-    } catch (e) {
+    } catch {
       return reply(400, {
         success: false,
         error: "Invalid request body",
@@ -67,17 +62,20 @@ if (event.httpMethod !== "POST") {
       });
     }
 
-    // 🔎 Lookup account (case-insensitive)
-    let user, table;
+    const email = emailOrPhone.trim().toLowerCase();
+
+    // 🔎 Lookup account (agents first)
+    let user = null;
+    let table = null;
 
     const agentRes = await db.query(
       `
       SELECT id, email, reset_code, reset_expires
       FROM agents
-      WHERE LOWER(email) = LOWER($1)
+      WHERE LOWER(email) = $1
       LIMIT 1
       `,
-      [emailOrPhone.trim()]
+      [email]
     );
 
     if (agentRes.rows.length) {
@@ -88,10 +86,10 @@ if (event.httpMethod !== "POST") {
         `
         SELECT id, email, reset_code, reset_expires
         FROM users
-        WHERE LOWER(email) = LOWER($1)
+        WHERE LOWER(email) = $1
         LIMIT 1
         `,
-        [emailOrPhone.trim()]
+        [email]
       );
 
       if (userRes.rows.length) {
@@ -103,12 +101,12 @@ if (event.httpMethod !== "POST") {
     if (!user) {
       return reply(404, {
         success: false,
-        error: "No account found for this email ❌",
+        error: "No account found ❌",
       });
     }
 
-    // ✅ Validate reset code
-    if (user.reset_code !== code) {
+    // ✅ Validate reset code (force string comparison)
+    if (String(user.reset_code) !== String(code)) {
       return reply(400, {
         success: false,
         error: "Invalid reset code ❌",
@@ -123,10 +121,9 @@ if (event.httpMethod !== "POST") {
       });
     }
 
-    // 🔐 Hash new password
-    const hashed = await bcrypt.hash(newPassword, 10);
+    // 🔐 Hash new password (stronger cost factor)
+    const hashed = await bcrypt.hash(newPassword, 12);
 
-    // ✅ Update password + clear reset fields
     await db.query(
       `
       UPDATE ${table}
@@ -143,8 +140,6 @@ if (event.httpMethod !== "POST") {
     return reply(200, {
       success: true,
       message: "Password reset successful ✅",
-      role: table,
-      email: user.email,
     });
 
   } catch (err) {
