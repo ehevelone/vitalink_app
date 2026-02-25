@@ -1,3 +1,4 @@
+// lib/screens/meds_screen.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ class _MedsScreenState extends State<MedsScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
+  bool _scanning = false;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -30,6 +32,7 @@ class _MedsScreenState extends State<MedsScreen> {
 
   Future<void> _load() async {
     final p = await _repo.loadProfile();
+    if (!mounted) return;
     setState(() {
       _p = p ?? Profile(meds: [], doctors: []);
       _loading = false;
@@ -39,7 +42,53 @@ class _MedsScreenState extends State<MedsScreen> {
   Future<void> _save() async {
     _p!.updatedAt = DateTime.now();
     await _repo.saveProfile(_p!);
-    setState(() {});
+    if (mounted) setState(() {});
+  }
+
+  // ----------------------------
+  // NORMALIZATION HELPERS
+  // ----------------------------
+
+  String _normalizeMed(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'hcl'), '')
+        .replaceAll(RegExp(r'hydrochloride'), '')
+        .replaceAll(",", "")
+        .replaceAll("-", " ")
+        .replaceAll(RegExp(r'\s+'), " ")
+        .trim();
+  }
+
+  String _normalizeName(String name) {
+    final cleaned = name
+        .toLowerCase()
+        .replaceAll(",", " ")
+        .replaceAll(RegExp(r'\s+'), " ")
+        .trim();
+
+    final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
+    parts.sort();
+    return parts.join(" ");
+  }
+
+  String _toLastFirstFormat(String name) {
+    final cleaned = name
+        .replaceAll(",", " ")
+        .replaceAll(RegExp(r'\s+'), " ")
+        .trim();
+
+    final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
+    if (parts.length < 2) return cleaned;
+
+    final last = parts.last;
+    final firstMiddle = parts.sublist(0, parts.length - 1).join(" ");
+    return "$last, $firstMiddle";
+  }
+
+  bool _doctorExistsByNormalizedName(String docName) {
+    final target = _normalizeName(docName);
+    return _p!.doctors.any((d) => _normalizeName(d.name) == target);
   }
 
   Map<String, dynamic> _normalizeParsed(dynamic parsed) {
@@ -64,18 +113,35 @@ class _MedsScreenState extends State<MedsScreen> {
     return {};
   }
 
+  String _buildPharmacyDisplay(Map<String, dynamic> data) {
+    final pharm = (data['pharmacy'] ?? "").toString().trim();
+    final pharmPhone = (data['pharmacy_phone'] ?? "").toString().trim();
+
+    if (pharm.isEmpty && pharmPhone.isEmpty) return "";
+
+    if (pharm.isNotEmpty && pharmPhone.isNotEmpty) {
+      return "$pharm\n$pharmPhone";
+    }
+
+    return pharm.isNotEmpty ? pharm : pharmPhone;
+  }
+
+  // ----------------------------
+  // ADD / EDIT DIALOG
+  // ----------------------------
+
   Future<void> _addOrEdit({
     Medication? existing,
     int? index,
     Map<String, dynamic>? prefill,
   }) async {
-    final name =
+    final nameCtrl =
         TextEditingController(text: prefill?['name'] ?? existing?.name ?? '');
-    final dose =
+    final doseCtrl =
         TextEditingController(text: prefill?['dose'] ?? existing?.dose ?? '');
-    final freq = TextEditingController(
+    final freqCtrl = TextEditingController(
         text: prefill?['frequency'] ?? existing?.frequency ?? '');
-    final pharmacy = TextEditingController(
+    final pharmacyCtrl = TextEditingController(
         text: prefill?['prescriber'] ?? existing?.prescriber ?? '');
 
     final ok = await showDialog<bool>(
@@ -85,10 +151,14 @@ class _MedsScreenState extends State<MedsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-            TextField(controller: dose, decoration: const InputDecoration(labelText: 'Dose / Strength')),
-            TextField(controller: freq, decoration: const InputDecoration(labelText: 'Frequency')),
-            TextField(controller: pharmacy, decoration: const InputDecoration(labelText: 'Pharmacy / Prescriber')),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+            TextField(controller: doseCtrl, decoration: const InputDecoration(labelText: 'Dose / Strength')),
+            TextField(controller: freqCtrl, decoration: const InputDecoration(labelText: 'Frequency')),
+            TextField(
+              controller: pharmacyCtrl,
+              decoration: const InputDecoration(labelText: 'Pharmacy (and phone)'),
+              maxLines: 2,
+            ),
           ],
         ),
         actions: [
@@ -101,59 +171,33 @@ class _MedsScreenState extends State<MedsScreen> {
     if (ok != true) return;
 
     final m = Medication(
-      name: name.text.trim(),
-      dose: dose.text.trim(),
-      frequency: freq.text.trim(),
-      prescriber: pharmacy.text.trim(),
+      name: nameCtrl.text.trim(),
+      dose: doseCtrl.text.trim(),
+      frequency: freqCtrl.text.trim(),
+      prescriber: pharmacyCtrl.text.trim(),
       source: existing?.source ?? (prefill != null ? 'Scanned' : 'Manual'),
       updatedAt: DateTime.now(),
     );
 
-    final meds = _p!.meds;
-
-    final matchIndex = meds.indexWhere((x) =>
-        x.name.toLowerCase() == m.name.toLowerCase() &&
-        x.dose.toLowerCase() == m.dose.toLowerCase());
-
-    if (existing == null && matchIndex != -1) {
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text("Duplicate Medication Detected"),
-          content: Text("Medication '${m.name}' already exists. What do you want to do?"),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, "cancel"), child: const Text("Cancel")),
-            TextButton(onPressed: () => Navigator.pop(context, "add"), child: const Text("Add New")),
-            FilledButton(onPressed: () => Navigator.pop(context, "update"), child: const Text("Update Existing")),
-          ],
-        ),
-      );
-
-      if (choice == "update") {
-        setState(() => meds[matchIndex] = m);
-        await _save();
-        return;
-      } else if (choice == "add") {
-        setState(() => meds.add(m));
-        await _save();
-        return;
-      } else {
-        return;
-      }
-    }
-
     setState(() {
       if (existing == null) {
-        meds.add(m);
+        _p!.meds.add(m);
       } else {
-        meds[index!] = m;
+        _p!.meds[index!] = m;
       }
     });
+
     await _save();
   }
 
-  // 🔥 UPDATED MULTI-IMAGE SCAN
+  // ----------------------------
+  // SCAN LABEL
+  // ----------------------------
+
   Future<void> _scanLabel() async {
+    if (_scanning) return;
+    setState(() => _scanning = true);
+
     try {
       final List<String> base64Images = [];
       bool keepScanning = true;
@@ -162,23 +206,26 @@ class _MedsScreenState extends State<MedsScreen> {
         final img = await _picker.pickImage(source: ImageSource.camera);
         if (img == null) break;
 
-        final base64Image =
-            base64Encode(await File(img.path).readAsBytes());
+        final base64Image = base64Encode(await File(img.path).readAsBytes());
         base64Images.add(base64Image);
 
         keepScanning = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
-                title: const Text("Add Another Photo?"),
+                title: const Text(
+                  "Did we get all sides of the bottle?",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 content: Text(
-                    "Captured ${base64Images.length} image(s).\n\nScan another side of the bottle?"),
+                  "You have taken ${base64Images.length} photo(s).\n\nIf the label wraps around the bottle, take another photo.",
+                ),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Done")),
+                      child: const Text("Yes, Continue")),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Add More")),
+                      child: const Text("Take Another Photo")),
                 ],
               ),
             ) ??
@@ -193,34 +240,128 @@ class _MedsScreenState extends State<MedsScreen> {
       final resp = await http.post(
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "images": base64Images, // 🔥 ARRAY SENT
-        }),
+        body: jsonEncode({"images": base64Images}),
       );
 
-      if (resp.statusCode == 200) {
-        final parsed = jsonDecode(resp.body);
-        final data = _normalizeParsed(parsed['data'] ?? parsed);
+      if (resp.statusCode != 200) return;
 
-        _addOrEdit(prefill: data);
+      final parsed = jsonDecode(resp.body);
+      final data = _normalizeParsed(parsed['data'] ?? parsed);
 
-        final docName = data['prescribing_doctor'];
-        if (docName != null && docName.toString().isNotEmpty) {
-          if (!_p!.doctors.any((d) => d.name == docName)) {
-            setState(() {
-              _p!.doctors.add(Doctor(
-                name: docName,
-                specialty: "",
-                clinic: "",
-                phone: "",
-              ));
-            });
-            await _save();
-          }
+      final scannedName = (data['name'] ?? "").toString().trim();
+      final scannedDose = (data['dose'] ?? "").toString().trim();
+      final scannedFreq = (data['frequency'] ?? "").toString().trim();
+      final pharmacyDisplay = _buildPharmacyDisplay(data);
+
+      if (scannedName.isEmpty) return;
+
+      final normalizedScannedName = _normalizeMed(scannedName);
+
+      final existingIndex = _p!.meds.indexWhere(
+        (m) => _normalizeMed(m.name) == normalizedScannedName,
+      );
+
+      if (existingIndex != -1) {
+        final existing = _p!.meds[existingIndex];
+
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text(
+              "This Medication Is Already Saved",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("You already have:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text("${existing.name} ${existing.dose}".trim()),
+                const SizedBox(height: 12),
+                const Text("The bottle says:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text("$scannedName $scannedDose".trim()),
+                const SizedBox(height: 16),
+                const Text("What would you like to do?",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, "cancel"),
+                  child: const Text("Cancel")),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, "add"),
+                  child: const Text("Keep Both")),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, "replace"),
+                  child: const Text("Update This Medication")),
+            ],
+          ),
+        );
+
+        if (choice == "replace") {
+          setState(() {
+            _p!.meds[existingIndex] = Medication(
+              name: scannedName,
+              dose: scannedDose,
+              frequency: scannedFreq,
+              prescriber: pharmacyDisplay,
+              source: "Scanned",
+              updatedAt: DateTime.now(),
+            );
+          });
+          await _save();
+        } else if (choice == "add") {
+          setState(() {
+            _p!.meds.add(Medication(
+              name: scannedName,
+              dose: scannedDose,
+              frequency: scannedFreq,
+              prescriber: pharmacyDisplay,
+              source: "Scanned",
+              updatedAt: DateTime.now(),
+            ));
+          });
+          await _save();
+        }
+      } else {
+        await _addOrEdit(prefill: {
+          "name": scannedName,
+          "dose": scannedDose,
+          "frequency": scannedFreq,
+          "prescriber": pharmacyDisplay,
+        });
+      }
+
+      final docName = (data['prescribing_doctor'] ?? "").toString().trim();
+      if (docName.isNotEmpty) {
+        final normalizedParsed = _normalizeName(docName);
+        final normalizedProfile = _normalizeName(_p!.fullName);
+
+        if (normalizedParsed != normalizedProfile &&
+            !_doctorExistsByNormalizedName(docName)) {
+          final formatted = _toLastFirstFormat(docName);
+
+          setState(() {
+            _p!.doctors.add(Doctor(
+              name: formatted,
+              specialty: "",
+              clinic: "",
+              phone: "",
+            ));
+          });
+
+          await _save();
         }
       }
     } catch (e) {
       debugPrint("Scan error: $e");
+    } finally {
+      if (mounted) setState(() => _scanning = false);
     }
   }
 
@@ -253,32 +394,54 @@ class _MedsScreenState extends State<MedsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Medications')),
-      body: Column(
+      body: Stack(
         children: [
-          ElevatedButton.icon(
-            onPressed: _scanLabel,
-            icon: const Icon(Icons.camera_alt_outlined),
-            label: const Text('Scan Medication Label'),
+          Column(
+            children: [
+              ElevatedButton.icon(
+                onPressed: _scanning ? null : _scanLabel,
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('Scan Medication Label'),
+              ),
+              Expanded(
+                child: meds.isEmpty
+                    ? const Center(child: Text('No medications yet. Tap + to add.'))
+                    : ListView.builder(
+                        itemCount: meds.length,
+                        itemBuilder: (_, i) {
+                          final m = meds[i];
+                          return ListTile(
+                            title: Text(m.name),
+                            subtitle: Text("${m.dose} ${m.frequency}".trim()),
+                            onTap: () => _addOrEdit(existing: m, index: i),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _delete(i),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-          Expanded(
-            child: meds.isEmpty
-                ? const Center(child: Text('No medications yet. Tap + to add.'))
-                : ListView.builder(
-                    itemCount: meds.length,
-                    itemBuilder: (_, i) {
-                      final m = meds[i];
-                      return ListTile(
-                        title: Text(m.name),
-                        subtitle: Text("${m.dose} ${m.frequency}".trim()),
-                        onTap: () => _addOrEdit(existing: m, index: i),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(i),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+          if (_scanning)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text(
+                      "Reading your medication label...",
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
