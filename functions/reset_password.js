@@ -21,106 +21,63 @@ function reply(statusCode, body) {
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
-      return {
-        statusCode: 200,
-        headers: CORS_HEADERS,
-        body: "",
-      };
+      return { statusCode: 200, headers: CORS_HEADERS, body: "" };
     }
 
     if (event.httpMethod !== "POST") {
-      return reply(405, {
-        success: false,
-        error: "Method Not Allowed",
-      });
+      return reply(405, { success: false, error: "Method Not Allowed" });
     }
 
     let body = {};
     try {
-      if (event.isBase64Encoded) {
-        body = JSON.parse(
-          Buffer.from(event.body, "base64").toString("utf8")
-        );
-      } else {
-        body = JSON.parse(event.body || "{}");
-      }
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
     } catch {
-      return reply(400, {
-        success: false,
-        error: "Invalid request body",
-      });
+      return reply(400, { success: false, error: "Invalid request body" });
     }
 
-    const { emailOrPhone, code, newPassword } = body;
+    const { emailOrPhone, code, newPassword, role } = body;
 
-    if (!emailOrPhone || !code || !newPassword) {
-      return reply(400, {
-        success: false,
-        error: "Missing required fields ❌",
-      });
+    if (!emailOrPhone || !code || !newPassword || !role) {
+      return reply(400, { success: false, error: "Missing required fields" });
     }
 
     const email = emailOrPhone.trim().toLowerCase();
 
-    let user = null;
-    let table = null;
+    if (role !== "users" && role !== "agents") {
+      return reply(400, { success: false, error: "Invalid role" });
+    }
 
-    const agentRes = await db.query(
+    const result = await db.query(
       `
       SELECT id, email, reset_code, reset_expires
-      FROM agents
+      FROM ${role}
       WHERE LOWER(email) = $1
       LIMIT 1
       `,
       [email]
     );
 
-    if (agentRes.rows.length) {
-      user = agentRes.rows[0];
-      table = "agents";
-    } else {
-      const userRes = await db.query(
-        `
-        SELECT id, email, reset_code, reset_expires
-        FROM users
-        WHERE LOWER(email) = $1
-        LIMIT 1
-        `,
-        [email]
-      );
-
-      if (userRes.rows.length) {
-        user = userRes.rows[0];
-        table = "users";
-      }
+    if (!result.rows.length) {
+      return reply(404, { success: false, error: "No account found" });
     }
 
-    if (!user) {
-      return reply(404, {
-        success: false,
-        error: "No account found ❌",
-      });
-    }
+    const user = result.rows[0];
 
     if (String(user.reset_code) !== String(code)) {
-      return reply(400, {
-        success: false,
-        error: "Invalid reset code ❌",
-      });
+      return reply(400, { success: false, error: "Invalid reset code" });
     }
 
     if (!user.reset_expires || new Date(user.reset_expires) < new Date()) {
-      return reply(400, {
-        success: false,
-        error: "Reset code expired ❌",
-      });
+      return reply(400, { success: false, error: "Reset code expired" });
     }
 
     const hashed = await bcrypt.hash(newPassword, 12);
 
-    const result = await db.query(
+    const update = await db.query(
       `
-      UPDATE ${table}
+      UPDATE ${role}
       SET password_hash = $1,
           reset_code = NULL,
           reset_expires = NULL
@@ -130,29 +87,16 @@ exports.handler = async (event) => {
       [hashed, user.id]
     );
 
-    console.log("Updating table:", table);
-    console.log("User ID:", user.id);
-    console.log("Rows updated:", result.rowCount);
-
-    if (result.rowCount === 0) {
-      return reply(500, {
-        success: false,
-        error: "Password update failed ❌",
-      });
+    if (update.rowCount === 0) {
+      return reply(500, { success: false, error: "Password update failed" });
     }
 
-    console.log(`✅ Password reset for ${user.email} (${table})`);
+    console.log(`✅ Password reset for ${user.email} (${role})`);
 
-    return reply(200, {
-      success: true,
-      message: "Password reset successful ✅",
-    });
+    return reply(200, { success: true });
 
   } catch (err) {
     console.error("❌ reset_password error:", err);
-    return reply(500, {
-      success: false,
-      error: "Server error during password reset ❌",
-    });
+    return reply(500, { success: false, error: "Server error" });
   }
 };
