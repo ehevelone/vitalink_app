@@ -195,6 +195,9 @@ I understand:
       final pdf = pw.Document();
       final sigImg = pw.MemoryImage(sigBytes);
 
+      final meds = _profile!.meds;
+      final doctors = _profile!.doctors;
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -208,25 +211,58 @@ I understand:
             ),
             pw.SizedBox(height: 12),
             pw.Text(_authorizationText),
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 18),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
             pw.Text(
-              "Recipient (Agent):",
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              "User Information Shared (Per Authorization)",
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+              ),
             ),
-            pw.Text(
-              "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}",
-            ),
-            pw.SizedBox(height: 24),
-            pw.Row(
-              children: [
-                pw.Text("Signature: "),
-                pw.Container(
-                  width: 150,
-                  height: 60,
-                  child: pw.Image(sigImg),
+            pw.SizedBox(height: 10),
+            pw.Text("Medications",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            if (meds.isEmpty)
+              pw.Text("None listed.")
+            else
+              ...meds.map(
+                (m) => pw.Bullet(
+                  text:
+                      "${m.name}${m.dose != null ? " — ${m.dose}" : ""}${m.frequency != null ? " — ${m.frequency}" : ""}",
                 ),
-              ],
-            ),
+              ),
+            pw.SizedBox(height: 12),
+            pw.Text("Physicians / Healthcare Providers",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            if (doctors.isEmpty)
+              pw.Text("None listed.")
+            else
+              ...doctors.map(
+                (d) => pw.Bullet(
+                  text:
+                      "${d.name}${d.specialty != null ? " — ${d.specialty}" : ""}${d.phone != null ? " — ${d.phone}" : ""}",
+                ),
+              ),
+            pw.SizedBox(height: 16),
+            pw.Divider(),
+            pw.SizedBox(height: 14),
+            pw.Text("Recipient (Agent):",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+                "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
+            pw.SizedBox(height: 24),
+            pw.Row(children: [
+              pw.Text("Signature: "),
+              pw.Container(
+                width: 150,
+                height: 60,
+                child: pw.Image(sigImg),
+              ),
+            ]),
             pw.SizedBox(height: 8),
             pw.Text("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
           ],
@@ -239,6 +275,8 @@ I understand:
       await pdfFile.writeAsBytes(await pdf.save());
 
       final csvFile = await _buildCsv(_profile!);
+      final store = SecureStore();
+      final userEmail = await store.getString('userEmail') ?? "";
 
       final resp = await http.post(
         Uri.parse(
@@ -252,6 +290,19 @@ I understand:
             "phone": _agentPhone ?? ""
           },
           "user": _profile!.fullName ?? "",
+          "user_email": userEmail,
+          "user_phone": "",
+          "user_dob": _profile!.dob ?? "",
+          "medications": meds.map((m) => {
+                "name": m.name,
+                "dose": m.dose,
+                "frequency": m.frequency,
+              }).toList(),
+          "providers": doctors.map((d) => {
+                "name": d.name,
+                "specialty": d.specialty,
+                "phone": d.phone,
+              }).toList(),
           "attachments": [
             {
               "name": "HIPAA_SOA_Authorization.pdf",

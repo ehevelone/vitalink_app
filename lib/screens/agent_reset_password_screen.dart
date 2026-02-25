@@ -54,8 +54,10 @@ class _AgentResetPasswordScreenState
       emailOrPhone: _emailCtrl.text.trim(),
       code: _codeCtrl.text.trim(),
       newPassword: _newPassCtrl.text.trim(),
-      role: "agents", // 🔥 REQUIRED
+      role: "agents",
     );
+
+    if (mounted) setState(() => _loading = false);
 
     if (data['success'] == true) {
       final store = SecureStore();
@@ -65,9 +67,18 @@ class _AgentResetPasswordScreenState
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Agent password reset successful"),
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Success"),
+          content: const Text(
+              "Agent password has been reset successfully."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
         ),
       );
 
@@ -77,8 +88,6 @@ class _AgentResetPasswordScreenState
         SnackBar(content: Text(data['error'] ?? "Reset failed")),
       );
     }
-
-    if (mounted) setState(() => _loading = false);
   }
 
   @override

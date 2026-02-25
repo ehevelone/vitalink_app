@@ -176,21 +176,26 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Request password reset
+  // 🔹 Request password reset (FIXED)
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> requestPasswordReset(
-      String emailOrPhone) {
-    return _postJson("request_reset", {"emailOrPhone": emailOrPhone});
+  static Future<Map<String, dynamic>> requestPasswordReset({
+    required String emailOrPhone,
+    required String role, // "users" or "agents"
+  }) {
+    return _postJson("request_reset", {
+      "emailOrPhone": emailOrPhone,
+      "role": role,
+    });
   }
 
   // -------------------------------------------------------------
-  // 🔹 Complete password reset (FIXED)
+  // 🔹 Complete password reset
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resetPassword({
     required String emailOrPhone,
     required String code,
     required String newPassword,
-    required String role, // "users" or "agents"
+    required String role,
   }) {
     return _postJson("reset_password", {
       "emailOrPhone": emailOrPhone,

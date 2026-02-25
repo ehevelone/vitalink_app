@@ -1,3 +1,4 @@
+// lib/screens/agent_request_reset_screen.dart
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -9,31 +10,31 @@ class AgentRequestResetScreen extends StatefulWidget {
       _AgentRequestResetScreenState();
 }
 
-class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
+class _AgentRequestResetScreenState
+    extends State<AgentRequestResetScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
+
   bool _loading = false;
 
   Future<void> _doRequest() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
+
     try {
       final data = await ApiService.requestPasswordReset(
-        _emailCtrl.text.trim(),
+        emailOrPhone: _emailCtrl.text.trim(),
+        role: "agents", // 🔥 REQUIRED
       );
 
       if (data['success'] == true) {
         if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Reset code sent to ${data['sentTo'] ?? _emailCtrl.text} (expires in 20 min) ✅",
-            ),
-          ),
+          const SnackBar(content: Text("Reset code sent ✅")),
         );
 
-        // 👉 Proceed to agent reset page
         Navigator.pushNamed(
           context,
           '/agent_reset_password',
@@ -42,13 +43,14 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['error'] ?? "Failed to send reset code ❌"),
+            content:
+                Text(data['error'] ?? "Request failed ❌"),
           ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Server error: $e")),
+        SnackBar(content: Text("Error: $e")),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -56,57 +58,41 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
   }
 
   @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Agent Password Reset"),
-        backgroundColor: Colors.blue.shade700,
-      ),
+      appBar:
+          AppBar(title: const Text("Agent Request Reset")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
-          child: ListView(
+          child: Column(
             children: [
-              const SizedBox(height: 12),
-              const Center(
-                child: Text(
-                  "VitaLink Agent Portal",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                "Enter your registered agent email below to receive a 6-digit reset code.",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-              const SizedBox(height: 24),
               TextFormField(
                 controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: "Agent Email Address",
-                  border: OutlineInputBorder(),
-                ),
+                    labelText: "Agent Email"),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email address" : null,
+                    v == null || v.isEmpty
+                        ? "Enter your email"
+                        : null,
               ),
               const SizedBox(height: 24),
               _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator())
                   : ElevatedButton.icon(
-                      icon: const Icon(Icons.mark_email_read),
-                      label: const Text("Send Reset Code"),
+                      icon: const Icon(Icons.send),
+                      label:
+                          const Text("Send Reset Code"),
                       onPressed: _doRequest,
                     ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/agent_login');
-                },
-                child: const Text("Back to Agent Login"),
-              ),
             ],
           ),
         ),

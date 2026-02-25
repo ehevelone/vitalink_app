@@ -70,7 +70,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
         await store.setString("savedAgentEmail", email);
-        await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
+        await store.setString(
+            "savedAgentPassword", _passwordCtrl.text.trim());
       } else {
         await store.setBool("rememberMeAgent", false);
         await store.remove("savedAgentEmail");
@@ -99,8 +100,16 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  /// 🔥 FIXED ROUTE
   void _goToReset() {
-    Navigator.pushNamed(context, "/reset-password");
+    Navigator.pushNamed(context, "/agent_request_reset");
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -115,11 +124,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Agent Email"),
+                decoration:
+                    const InputDecoration(labelText: "Agent Email"),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email" : null,
+                    v == null || v.isEmpty
+                        ? "Enter your email"
+                        : null,
               ),
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -136,7 +149,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter password" : null,
+                    v == null || v.isEmpty
+                        ? "Enter password"
+                        : null,
               ),
 
               Align(
@@ -152,11 +167,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 onChanged: (v) =>
                     setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
-                controlAffinity: ListTileControlAffinity.leading,
+                controlAffinity:
+                    ListTileControlAffinity.leading,
               ),
+
               const SizedBox(height: 24),
+
               _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: _login,
                       child: const Text("Login as Agent"),

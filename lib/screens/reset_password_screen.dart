@@ -1,4 +1,3 @@
-// lib/screens/reset_password_screen.dart
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -58,28 +57,24 @@ class _ResetPasswordScreenState
 
     final data = await ApiService.requestPasswordReset(
       emailOrPhone: _emailCtrl.text.trim(),
-      role: "users", // 🔥 REQUIRED
+      role: "users",
     );
+
+    if (mounted) setState(() => _loading = false);
 
     if (data['success'] == true) {
       setState(() => _codeSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Reset code sent to ${data['sentTo'] ?? _emailCtrl.text} (expires in 20 minutes)",
-          ),
+              "Reset code sent to ${data['sentTo'] ?? _emailCtrl.text}"),
         ),
       );
     } else {
-      setState(() => _codeSent = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(data['error'] ?? "Failed to send reset code"),
-        ),
+        SnackBar(content: Text(data['error'] ?? "Failed to send reset code")),
       );
     }
-
-    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _submitNewPassword() async {
@@ -94,19 +89,33 @@ class _ResetPasswordScreenState
       role: "users",
     );
 
+    if (mounted) setState(() => _loading = false);
+
     if (data['success'] == true) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password reset successful")),
+
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Success"),
+          content: const Text(
+            "Your password has been reset successfully.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
       );
+
       Navigator.pushReplacementNamed(context, '/login');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(data['error'] ?? "Reset failed")),
       );
     }
-
-    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -133,7 +142,8 @@ class _ResetPasswordScreenState
                   padding: EdgeInsets.only(bottom: 12),
                   child: Text(
                     "Step 1: We'll email you a 6-digit reset code.",
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    style:
+                        TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ),
 
@@ -171,11 +181,9 @@ class _ResetPasswordScreenState
                     labelText: "New Password",
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _showPass
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
+                      icon: Icon(_showPass
+                          ? Icons.visibility_off
+                          : Icons.visibility),
                       onPressed: () =>
                           setState(() => _showPass = !_showPass),
                     ),
@@ -191,13 +199,12 @@ class _ResetPasswordScreenState
                     labelText: "Confirm Password",
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _showConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () => setState(
-                          () => _showConfirm = !_showConfirm),
+                      icon: Icon(_showConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() =>
+                              _showConfirm = !_showConfirm),
                     ),
                   ),
                   validator: (v) =>
@@ -212,20 +219,15 @@ class _ResetPasswordScreenState
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
-                      icon: Icon(
-                        _codeSent
-                            ? Icons.lock_reset
-                            : Icons.mark_email_read,
-                      ),
-                      label: Text(
-                        _codeSent
-                            ? "Reset Password"
-                            : "Send Reset Code",
-                      ),
-                      onPressed:
-                          _codeSent
-                              ? _submitNewPassword
-                              : _sendResetCode,
+                      icon: Icon(_codeSent
+                          ? Icons.lock_reset
+                          : Icons.mark_email_read),
+                      label: Text(_codeSent
+                          ? "Reset Password"
+                          : "Send Reset Code"),
+                      onPressed: _codeSent
+                          ? _submitNewPassword
+                          : _sendResetCode,
                     ),
             ],
           ),

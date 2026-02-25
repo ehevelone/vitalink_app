@@ -6,10 +6,12 @@ class RequestResetScreen extends StatefulWidget {
   const RequestResetScreen({super.key});
 
   @override
-  State<RequestResetScreen> createState() => _RequestResetScreenState();
+  State<RequestResetScreen> createState() =>
+      _RequestResetScreenState();
 }
 
-class _RequestResetScreenState extends State<RequestResetScreen> {
+class _RequestResetScreenState
+    extends State<RequestResetScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
 
@@ -19,18 +21,20 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
+
     try {
       final data = await ApiService.requestPasswordReset(
-        _emailCtrl.text.trim(), // ✅ matches ApiService signature
+        emailOrPhone: _emailCtrl.text.trim(),
+        role: "users", // 🔥 REQUIRED
       );
 
       if (data['success'] == true) {
         if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Reset code sent ✅")),
         );
 
-        // Go to reset screen with prefilled emailOrPhone
         Navigator.pushNamed(
           context,
           '/reset_password',
@@ -38,7 +42,10 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['error'] ?? "Request failed ❌")),
+          SnackBar(
+            content:
+                Text(data['error'] ?? "Request failed ❌"),
+          ),
         );
       }
     } catch (e) {
@@ -51,9 +58,16 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
   }
 
   @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Request Password Reset")),
+      appBar:
+          AppBar(title: const Text("Request Password Reset")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -62,17 +76,21 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Email or Phone"),
+                decoration: const InputDecoration(
+                    labelText: "Email or Phone"),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter email or phone" : null,
+                    v == null || v.isEmpty
+                        ? "Enter email or phone"
+                        : null,
               ),
               const SizedBox(height: 24),
               _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.send),
-                      label: const Text("Send Reset Code"),
+                      label:
+                          const Text("Send Reset Code"),
                       onPressed: _doRequest,
                     ),
             ],
