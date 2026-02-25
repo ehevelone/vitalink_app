@@ -20,7 +20,6 @@ function reply(statusCode, body) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ CORS Preflight
     if (event.httpMethod === "OPTIONS") {
       return {
         statusCode: 200,
@@ -36,7 +35,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ Safe body parsing
     let body = {};
     try {
       if (event.isBase64Encoded) {
@@ -64,7 +62,6 @@ exports.handler = async (event) => {
 
     const email = emailOrPhone.trim().toLowerCase();
 
-    // 🔎 Lookup account (agents first)
     let user = null;
     let table = null;
 
@@ -105,7 +102,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ Validate reset code (force string comparison)
     if (String(user.reset_code) !== String(code)) {
       return reply(400, {
         success: false,
@@ -113,7 +109,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ Validate expiration
     if (!user.reset_expires || new Date(user.reset_expires) < new Date()) {
       return reply(400, {
         success: false,
@@ -121,19 +116,30 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔐 Hash new password (stronger cost factor)
     const hashed = await bcrypt.hash(newPassword, 12);
 
-    await db.query(
+    const result = await db.query(
       `
       UPDATE ${table}
       SET password_hash = $1,
           reset_code = NULL,
           reset_expires = NULL
       WHERE id = $2
+      RETURNING id
       `,
       [hashed, user.id]
     );
+
+    console.log("Updating table:", table);
+    console.log("User ID:", user.id);
+    console.log("Rows updated:", result.rowCount);
+
+    if (result.rowCount === 0) {
+      return reply(500, {
+        success: false,
+        error: "Password update failed ❌",
+      });
+    }
 
     console.log(`✅ Password reset for ${user.email} (${table})`);
 
