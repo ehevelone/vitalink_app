@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  /// ✅ Netlify Functions base URL
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
 
@@ -41,20 +40,16 @@ class ApiService {
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getUserAgent(String email) {
-    return _postJson("get_user_agent", {
-      "email": email,
-    });
+    return _postJson("get_user_agent", {"email": email});
   }
 
   // -------------------------------------------------------------
-  // 🔎 Get full agent profile  ✅ ADDED
+  // 🔎 Get full agent profile
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentProfile({
     required String email,
   }) {
-    return _postJson("get_agent_profile", {
-      "email": email,
-    });
+    return _postJson("get_agent_profile", {"email": email});
   }
 
   // -------------------------------------------------------------
@@ -189,17 +184,19 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Complete password reset
+  // 🔹 Complete password reset (FIXED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resetPassword({
     required String emailOrPhone,
     required String code,
     required String newPassword,
+    required String role, // "users" or "agents"
   }) {
     return _postJson("reset_password", {
       "emailOrPhone": emailOrPhone,
       "code": code,
       "newPassword": newPassword,
+      "role": role,
     });
   }
 
