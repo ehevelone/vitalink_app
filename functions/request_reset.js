@@ -20,13 +20,8 @@ function reply(statusCode, body) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ CORS preflight
     if (event.httpMethod === "OPTIONS") {
-      return {
-        statusCode: 200,
-        headers: CORS_HEADERS,
-        body: "",
-      };
+      return { statusCode: 200, headers: CORS_HEADERS, body: "" };
     }
 
     if (event.httpMethod !== "POST") {
@@ -36,16 +31,11 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ Safe body parsing
     let body = {};
     try {
-      if (event.isBase64Encoded) {
-        body = JSON.parse(
-          Buffer.from(event.body, "base64").toString("utf8")
-        );
-      } else {
-        body = JSON.parse(event.body || "{}");
-      }
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
     } catch {
       return reply(400, {
         success: false,
@@ -53,57 +43,50 @@ exports.handler = async (event) => {
       });
     }
 
-    const { emailOrPhone } = body;
+    const { emailOrPhone, role } = body;
 
-    if (!emailOrPhone) {
+    if (!emailOrPhone || !role) {
       return reply(400, {
         success: false,
-        error: "Email is required ❌",
+        error: "Missing required fields",
+      });
+    }
+
+    if (role !== "users" && role !== "agents") {
+      return reply(400, {
+        success: false,
+        error: "Invalid role",
       });
     }
 
     const email = emailOrPhone.trim().toLowerCase();
 
-    // 🔎 Locate account
-    let user = null;
-    let table = null;
-
-    const agentRes = await db.query(
-      `SELECT id, email FROM agents WHERE LOWER(email) = $1 LIMIT 1`,
+    const result = await db.query(
+      `
+      SELECT id, email
+      FROM ${role}
+      WHERE LOWER(email) = $1
+      LIMIT 1
+      `,
       [email]
     );
 
-    if (agentRes.rows.length) {
-      user = agentRes.rows[0];
-      table = "agents";
-    } else {
-      const userRes = await db.query(
-        `SELECT id, email FROM users WHERE LOWER(email) = $1 LIMIT 1`,
-        [email]
-      );
-
-      if (userRes.rows.length) {
-        user = userRes.rows[0];
-        table = "users";
-      }
-    }
-
-    if (!user) {
+    if (!result.rows.length) {
       return reply(404, {
         success: false,
-        error: "No account found ❌",
+        error: "No account found",
       });
     }
 
-    // 🔢 Generate 6-digit code
+    const user = result.rows[0];
+
     const resetCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
 
-    // 🕒 Store reset code (20 min expiration)
     await db.query(
       `
-      UPDATE ${table}
+      UPDATE ${role}
       SET reset_code = $2,
           reset_expires = NOW() + INTERVAL '20 minutes'
       WHERE id = $1
@@ -111,7 +94,6 @@ exports.handler = async (event) => {
       [user.id, resetCode]
     );
 
-    // 📧 Mail transport
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT),
@@ -123,7 +105,7 @@ exports.handler = async (event) => {
     });
 
     const subject =
-      table === "agents"
+      role === "agents"
         ? "VitaLink Agent Password Reset Code"
         : "VitaLink Password Reset Code";
 
@@ -148,11 +130,10 @@ If you did not request this, you can ignore this email.
       text: message,
     });
 
-    console.log(`✅ Reset code sent to ${user.email} (${table})`);
+    console.log(`✅ Reset code sent to ${user.email} (${role})`);
 
     return reply(200, {
       success: true,
-      message: "Reset code sent successfully ✅",
       expiresIn: 20,
       sentTo: user.email,
     });
@@ -161,7 +142,7 @@ If you did not request this, you can ignore this email.
     console.error("❌ request_reset error:", err);
     return reply(500, {
       success: false,
-      error: "Server error while sending reset code ❌",
+      error: "Server error",
     });
   }
 };
