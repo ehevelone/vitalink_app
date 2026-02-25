@@ -56,7 +56,6 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -71,9 +70,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
-
               const SizedBox(height: 15),
-
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: vitalinkBlue,
@@ -120,7 +117,6 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -136,9 +132,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
-
               const SizedBox(height: 15),
-
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: vitalinkBlue,
@@ -186,7 +180,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-                      const SizedBox(height: 20),
+
+                      const SizedBox(height: 60), // ⬅️ More top breathing room
 
                       const Text(
                         "Welcome To",
@@ -197,14 +192,14 @@ class _LandingScreenState extends State<LandingScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 30),
 
                       Image.asset(
                         'assets/images/vitalink-logo-2.png',
                         width: 240,
                       ),
 
-                      const SizedBox(height: 50),
+                      const SizedBox(height: 70), // ⬅️ More space before buttons
 
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -218,7 +213,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
 
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -232,7 +227,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 60),
                     ],
                   ),
                 ),
@@ -241,7 +236,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
             // Bottom Branding Image
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 20),
               child: Image.asset(
                 'assets/images/landing-bottom.png',
                 width: double.infinity,
