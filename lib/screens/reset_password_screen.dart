@@ -12,7 +12,8 @@ class ResetPasswordScreen extends StatefulWidget {
       _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState
+    extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
@@ -56,7 +57,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     setState(() => _loading = true);
 
     final data = await ApiService.requestPasswordReset(
-      _emailCtrl.text.trim(),
+      emailOrPhone: _emailCtrl.text.trim(),
+      role: "users", // 🔥 REQUIRED
     );
 
     if (data['success'] == true) {
@@ -89,7 +91,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       emailOrPhone: _emailCtrl.text.trim(),
       code: _codeCtrl.text.trim(),
       newPassword: _newPassCtrl.text.trim(),
-      role: "users", // 🔥 REQUIRED
+      role: "users",
     );
 
     if (data['success'] == true) {
