@@ -43,11 +43,11 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Missing required fields" });
     }
 
-    const email = emailOrPhone.trim().toLowerCase();
-
     if (role !== "users" && role !== "agents") {
       return reply(400, { success: false, error: "Invalid role" });
     }
+
+    const email = emailOrPhone.trim().toLowerCase();
 
     const result = await db.query(
       `
@@ -65,7 +65,15 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
-    if (String(user.reset_code) !== String(code)) {
+    // 🔐 Hardened reset code comparison
+    const storedCode = String(user.reset_code ?? "").trim();
+    const enteredCode = String(code ?? "").trim();
+
+    if (storedCode.length === 0) {
+      return reply(400, { success: false, error: "No reset code found" });
+    }
+
+    if (storedCode !== enteredCode) {
       return reply(400, { success: false, error: "Invalid reset code" });
     }
 
