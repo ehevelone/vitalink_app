@@ -84,8 +84,7 @@ Future<void> main() async {
           padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
             child: DefaultTextStyle(
-              style: const TextStyle(
-                  color: Colors.black, fontSize: 14),
+              style: const TextStyle(color: Colors.black, fontSize: 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -194,13 +193,11 @@ void _handleNotificationNavigation(RemoteMessage message) {
   final type = message.data['type'];
 
   if (type == 'hipaa') {
-    navigatorKey.currentState
-        ?.pushNamed('/authorization_form');
+    navigatorKey.currentState?.pushNamed('/authorization_form');
   }
 
   if (type == 'emergency') {
-    navigatorKey.currentState
-        ?.pushNamed('/emergency');
+    navigatorKey.currentState?.pushNamed('/emergency');
   }
 }
 
@@ -274,10 +271,10 @@ class VitaLinkApp extends StatelessWidget {
         '/insurance_policies': (context) =>
             InsurancePoliciesScreen(),
 
-        // ✅ PLATFORM SPLIT HERE
+        // ✅ PLATFORM SPLIT FIXED
         '/insurance_cards_menu': (context) =>
             Platform.isIOS
-                ? const InsuranceCardsMenuIOS()
+                ? InsuranceCardsMenuIOS()
                 : InsuranceCardsMenuScreen(),
 
         '/authorization_form': (context) =>
