@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
-import '../utils/phone_formatter.dart'; // ✅ ADDED
+import '../services/data_repository.dart';
+import '../models.dart';
+import '../utils/phone_formatter.dart';
 
 class AccountSetupScreen extends StatefulWidget {
   const AccountSetupScreen({super.key});
@@ -24,6 +26,9 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
     setState(() => _loading = true);
 
     final store = SecureStore();
+    final repo = DataRepository();
+
+    // Save identity info
     await store.setBool('setupDone', true);
     await store.setString('role', 'user');
     await store.setString('username', _usernameCtrl.text.trim());
@@ -31,9 +36,21 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
     await store.setString('profileName', _nameCtrl.text.trim());
     await store.setString('profilePhone', _phoneCtrl.text.trim());
 
+    // 🔥 CREATE LOCAL MEDICAL PROFILE
+    final newProfile = Profile(
+      fullName: _nameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      meds: [],
+      doctors: [],
+      insurances: [],
+    );
+
+    await repo.addProfile(newProfile);
+
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/menu');
+
     setState(() => _loading = false);
+    Navigator.pushReplacementNamed(context, '/menu');
   }
 
   @override
@@ -81,7 +98,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
