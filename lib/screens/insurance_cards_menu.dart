@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
-import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
@@ -26,6 +24,8 @@ class _InsuranceCardsMenuScreenState
   bool _loading = true;
   bool _error = false;
 
+  final ImagePicker _picker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
@@ -43,8 +43,7 @@ class _InsuranceCardsMenuScreenState
         _loading = false;
         _error = false;
       });
-    } catch (e) {
-      print("LOAD ERROR: $e");
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -60,22 +59,19 @@ class _InsuranceCardsMenuScreenState
   }
 
   Future<void> _scanCard() async {
-    print("---- SCAN BUTTON PRESSED ----");
-    print("Platform detected: $defaultTargetPlatform");
+    debugPrint("---- SCAN BUTTON PRESSED ----");
 
     final status = await Permission.camera.request();
-    print("Camera permission status: $status");
+    debugPrint("Camera permission: $status");
 
-    if (!status.isGranted) {
-      print("Permission NOT granted.");
-      return;
-    }
+    if (!status.isGranted) return;
+
+    String? imagePath;
 
     try {
-      String? imagePath;
-
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        print("Android branch running");
+      // ✅ ANDROID → MLKIT
+      if (Platform.isAndroid) {
+        debugPrint("Running Android MLKit scanner");
 
         final scanner = DocumentScanner(
           options: DocumentScannerOptions(
@@ -84,57 +80,36 @@ class _InsuranceCardsMenuScreenState
           ),
         );
 
-        print("Launching MLKit scanner...");
         final result = await scanner.scanDocument();
-        print("MLKit returned: $result");
 
         if (result == null ||
             result.images == null ||
             result.images!.isEmpty) {
-          print("No images returned from MLKit");
+          debugPrint("No images returned from MLKit");
           return;
         }
 
         imagePath = result.images!.first;
-      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-        print("iOS branch running");
+      }
 
-        final isTablet =
-            MediaQuery.of(context).size.shortestSide >= 600;
+      // ✅ iOS / iPad → Native Camera (same as Meds)
+      else if (Platform.isIOS) {
+        debugPrint("Running iOS native camera");
 
-        print("Is tablet: $isTablet");
+        final file =
+            await _picker.pickImage(source: ImageSource.camera);
 
-        if (isTablet) {
-          print("Using ImagePicker camera for iPad...");
-          final picker = ImagePicker();
-          final file =
-              await picker.pickImage(source: ImageSource.camera);
-
-          print("ImagePicker returned: $file");
-
-          if (file == null) return;
-          imagePath = file.path;
-        } else {
-          print("Using CunningDocumentScanner for iPhone...");
-          final images =
-              await CunningDocumentScanner.getPictures();
-
-          print("Cunning returned: $images");
-
-          if (images == null || images.isEmpty) return;
-          imagePath = images.first;
+        if (file == null) {
+          debugPrint("User cancelled camera");
+          return;
         }
-      } else {
-        print("Unknown platform.");
-        return;
+
+        imagePath = file.path;
       }
 
-      if (imagePath == null) {
-        print("Image path is null.");
-        return;
-      }
+      if (imagePath == null) return;
 
-      print("Image path saved: $imagePath");
+      debugPrint("Image captured: $imagePath");
 
       setState(() {
         _p!.orphanCards.add(
@@ -147,10 +122,9 @@ class _InsuranceCardsMenuScreenState
       });
 
       await _save();
-      print("Profile saved successfully.");
-
+      debugPrint("Profile saved successfully");
     } catch (e) {
-      print("SCANNER ERROR: $e");
+      debugPrint("SCAN ERROR: $e");
     }
   }
 
