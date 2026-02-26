@@ -46,7 +46,6 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     setState(() {});
   }
 
-  /// 🔧 Normalize AI response
   Map<String, dynamic> _normalizeParsed(dynamic parsed) {
     if (parsed == null) return {};
     if (parsed is Map<String, dynamic>) {
@@ -69,10 +68,12 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     return {};
   }
 
-  /// 📸 Scan insurance policy → Netlify → prefill form
   Future<void> _scanPolicy() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+      if (_p == null) return;
+
+      final XFile? image =
+          await _picker.pickImage(source: ImageSource.camera);
       if (image == null) return;
 
       final bytes = await File(image.path).readAsBytes();
@@ -80,7 +81,6 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
 
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_insurance";
-      debugPrint("Calling: $url");
 
       final resp = await http.post(
         Uri.parse(url),
@@ -90,25 +90,26 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
 
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body);
-        debugPrint("AI Parsed: $parsed");
-
-        final normalized = _normalizeParsed(parsed['data'] ?? parsed);
+        final normalized =
+            _normalizeParsed(parsed['data'] ?? parsed);
 
         final newPolicy = Insurance(
           carrier: (normalized['carrier'] ?? '').trim(),
           policy: (normalized['policy'] ?? '').trim(),
           memberId: (normalized['memberId'] ?? '').trim(),
           policyType:
-              (normalized['policyType'] ?? normalized['group'] ?? '').trim(),
+              (normalized['policyType'] ?? normalized['group'] ?? '')
+                  .trim(),
           cards: [],
         );
 
         final policies = _p!.insurances;
 
-        // 🔎 Duplicate check
         final matchIndex = policies.indexWhere((i) =>
-            i.carrier.toLowerCase() == newPolicy.carrier.toLowerCase() &&
-            i.policy.toLowerCase() == newPolicy.policy.toLowerCase());
+            i.carrier.toLowerCase() ==
+                newPolicy.carrier.toLowerCase() &&
+            i.policy.toLowerCase() ==
+                newPolicy.policy.toLowerCase());
 
         if (matchIndex != -1) {
           final choice = await showDialog<String>(
@@ -116,18 +117,21 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
             builder: (_) => AlertDialog(
               title: const Text("Duplicate Detected"),
               content: Text(
-                  "Policy '${newPolicy.carrier} – ${newPolicy.policy}' already exists. What do you want to do?"),
+                  "Policy '${newPolicy.carrier} – ${newPolicy.policy}' already exists."),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context, "cancel"),
+                  onPressed: () =>
+                      Navigator.pop(context, "cancel"),
                   child: const Text("Cancel"),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.pop(context, "add"),
+                  onPressed: () =>
+                      Navigator.pop(context, "add"),
                   child: const Text("Add New"),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.pop(context, "update"),
+                  onPressed: () =>
+                      Navigator.pop(context, "update"),
                   child: const Text("Update Existing"),
                 ),
               ],
@@ -135,19 +139,20 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           );
 
           if (choice == "update") {
-            setState(() => policies[matchIndex] = newPolicy);
+            setState(() =>
+                policies[matchIndex] = newPolicy);
             await _save();
             return;
           } else if (choice == "add") {
-            setState(() => policies.add(newPolicy));
+            setState(() =>
+                policies.add(newPolicy));
             await _save();
             return;
           } else {
-            return; // cancel
+            return;
           }
         }
 
-        // New policy flow
         final updated = await Navigator.push(
           context,
           MaterialPageRoute(
@@ -159,19 +164,17 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
         );
 
         if (updated != null) {
-          setState(() => policies.add(updated));
+          setState(() =>
+              policies.add(updated));
           await _save();
         }
-      } else {
-        debugPrint("Scan failed: ${resp.statusCode} - ${resp.body}");
       }
-    } catch (e) {
-      debugPrint("Scan error: $e");
-    }
+    } catch (_) {}
   }
 
-  /// Add new policy (manual entry)
   Future<void> _addPolicy() async {
+    if (_p == null) return;
+
     final newPolicy = Insurance();
     final updated = await Navigator.push(
       context,
@@ -182,13 +185,17 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
         ),
       ),
     );
+
     if (updated != null) {
-      setState(() => _p!.insurances.add(updated));
+      setState(() =>
+          _p!.insurances.add(updated));
       await _save();
     }
   }
 
   Future<void> _delete(int i) async {
+    if (_p == null) return;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -196,11 +203,13 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
         content: Text(_p!.insurances[i].carrier),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () =>
+                Navigator.pop(context, false),
             child: const Text("Cancel"),
           ),
           FilledButton.tonal(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () =>
+                Navigator.pop(context, true),
             child: const Text("Remove"),
           ),
         ],
@@ -208,54 +217,70 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     );
 
     if (ok == true) {
-      setState(() => _p!.insurances.removeAt(i));
+      setState(() =>
+          _p!.insurances.removeAt(i));
       await _save();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading || _p == null) {
+      return const Scaffold(
+        body: Center(
+            child: CircularProgressIndicator()),
+      );
     }
 
     final insurances = _p!.insurances;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Insurance Policies")),
+      appBar:
+          AppBar(title: const Text("Insurance Policies")),
       body: Column(
         children: [
           ElevatedButton.icon(
             onPressed: _scanPolicy,
-            icon: const Icon(Icons.camera_alt_outlined),
-            label: const Text("Scan Insurance Policy"),
+            icon:
+                const Icon(Icons.camera_alt_outlined),
+            label: const Text(
+                "Scan Insurance Policy"),
           ),
           Expanded(
             child: insurances.isEmpty
                 ? const Center(
-                    child: Text("No insurance policies yet. Tap + to add."),
+                    child: Text(
+                        "No insurance policies yet. Tap + to add."),
                   )
                 : ListView.builder(
                     itemCount: insurances.length,
                     itemBuilder: (_, i) {
                       final ins = insurances[i];
                       return ListTile(
-                        title: Text(ins.carrier.isNotEmpty
-                            ? ins.carrier
-                            : "Unnamed Policy"),
+                        title: Text(
+                          ins.carrier.isNotEmpty
+                              ? ins.carrier
+                              : "Unnamed Policy",
+                        ),
                         subtitle: Text(
-                            "Policy #: ${ins.policy.isNotEmpty ? ins.policy : 'N/A'}"),
+                          "Policy #: ${ins.policy.isNotEmpty ? ins.policy : 'N/A'}",
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => InsurancePolicyView(index: i),
+                              builder: (_) =>
+                                  InsurancePolicyView(
+                                      index: i),
                             ),
-                          ).then((_) => _load());
+                          ).then((_) =>
+                              _load());
                         },
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(i),
+                          icon: const Icon(
+                              Icons.delete_outline),
+                          onPressed: () =>
+                              _delete(i),
                         ),
                       );
                     },
@@ -263,7 +288,8 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton:
+          FloatingActionButton(
         onPressed: _addPolicy,
         child: const Icon(Icons.add),
       ),
