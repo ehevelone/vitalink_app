@@ -82,9 +82,17 @@ class DataRepository {
   // ==========================================================
   // PUBLIC API
   // ==========================================================
-  Future<Profile?> loadProfile() async {
+
+  // 🔥 FIXED — NEVER RETURNS NULL
+  Future<Profile> loadProfile() async {
     final list = await _loadProfilesInternal();
-    if (list.isEmpty) return null;
+
+    // If no profile exists → create fresh one
+    if (list.isEmpty) {
+      final newProfile = Profile();
+      await addProfile(newProfile);
+      return newProfile;
+    }
 
     final idx = await _getActiveIndex(list);
     return list[idx];
