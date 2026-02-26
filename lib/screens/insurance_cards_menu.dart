@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -55,35 +56,41 @@ class _InsuranceCardsMenuScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // ✅ FIXED SCANNER (iOS Safe)
   Future<void> _scanCard() async {
-    // 🔥 Explicit camera permission request
     final status = await Permission.camera.request();
     if (!status.isGranted) return;
 
     try {
-      final scanner = DocumentScanner(
-        options: DocumentScannerOptions(
-          mode: ScannerMode.full,
-          pageLimit: 1,
-        ),
-      );
+      String? imagePath;
 
-      final result = await scanner.scanDocument();
+      if (Platform.isAndroid) {
+        final scanner = DocumentScanner(
+          options: DocumentScannerOptions(
+            mode: ScannerMode.full,
+            pageLimit: 1,
+          ),
+        );
 
-      if (result == null ||
-          result.images == null ||
-          result.images!.isEmpty) return;
+        final result = await scanner.scanDocument();
 
-      final imagePath = result.images!.first;
+        if (result == null ||
+            result.images == null ||
+            result.images!.isEmpty) return;
 
-      debugPrint("Scanned card path: $imagePath");
+        imagePath = result.images!.first;
+      } else {
+        final images = await CunningDocumentScanner.getPictures();
+        if (images == null || images.isEmpty) return;
 
-      // Example: attach to orphanCards automatically
+        imagePath = images.first;
+      }
+
+      if (imagePath == null) return;
+
       setState(() {
         _p!.orphanCards.add(
           InsuranceCard(
-            frontImagePath: imagePath,
+            frontImagePath: imagePath!,
             carrier: "",
             policy: "",
           ),
@@ -129,8 +136,7 @@ class _InsuranceCardsMenuScreenState
           ),
           Expanded(
             child: allCards.isEmpty
-                ? const Center(
-                    child: Text("No insurance cards found"))
+                ? const Center(child: Text("No insurance cards found"))
                 : ListView.builder(
                     itemCount: allCards.length,
                     itemBuilder: (context, index) {
@@ -139,10 +145,12 @@ class _InsuranceCardsMenuScreenState
 
                       return ListTile(
                         leading: file.existsSync()
-                            ? Image.file(file,
+                            ? Image.file(
+                                file,
                                 width: 70,
                                 height: 50,
-                                fit: BoxFit.cover)
+                                fit: BoxFit.cover,
+                              )
                             : const Icon(Icons.broken_image),
                         title: Text(
                           card.carrier.isNotEmpty
@@ -150,6 +158,15 @@ class _InsuranceCardsMenuScreenState
                               : "Insurance Card",
                         ),
                         subtitle: Text(card.policy ?? ''),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  InsuranceCardDetail(card: card),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

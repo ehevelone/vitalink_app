@@ -2,7 +2,7 @@ name: vitalink
 description: A health records and insurance policy manager app
 publish_to: 'none'
 
-version: 1.0.0+26
+version: 1.0.0+29
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -11,53 +11,43 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ---- Core UI / State ----
   cupertino_icons: 1.0.8
   provider: 6.1.2
 
-  # ---- Permissions ----
   permission_handler: 11.3.1
 
-  # ---- Storage / Data ----
   shared_preferences: 2.3.2
   flutter_secure_storage: 9.2.2
   path_provider: 2.1.3
 
-  # ---- Network ----
   http: 1.2.2
-
-  # ---- Device Link / Deep Linking ----
   app_links: 6.3.2
 
-  # ---- UI / Features ----
   qr_flutter: 4.1.0
   signature: 5.5.0
   local_auth: 2.3.0
   in_app_purchase: 3.1.11
   url_launcher: 6.2.6
 
-  # ---- Camera + ML Scanning ----
+  # ---- Camera + Scanning ----
   camera: 0.10.5+9
   google_mlkit_barcode_scanning: 0.12.0
-  google_mlkit_document_scanner: 0.4.1
   google_mlkit_object_detection: 0.13.0
+  google_mlkit_document_scanner: 0.4.1
+  cunning_document_scanner: ^1.1.3
 
-  # ---- Image Tools ----
   image_picker: 1.0.7
   image_cropper: 10.0.0+1
   image: 4.2.0
 
-  # ---- PDF + Printing ----
   pdf: 3.10.8
   printing: ^5.14.2
   flutter_pdfview: 1.3.2
 
-  # ---- Firebase (Fully Aligned) ----
   firebase_core: 2.32.0
   firebase_messaging: 14.7.10
   firebase_analytics: 10.10.7
 
-  # ---- Notifications ----
   flutter_local_notifications: 17.2.4
 
 dev_dependencies:
