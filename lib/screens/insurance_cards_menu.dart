@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
@@ -56,6 +57,7 @@ class _InsuranceCardsMenuScreenState
     await _repo.saveProfile(_p!);
   }
 
+  // ✅ PLATFORM SAFE SCANNER
   Future<void> _scanCard() async {
     final status = await Permission.camera.request();
     if (!status.isGranted) return;
@@ -63,7 +65,13 @@ class _InsuranceCardsMenuScreenState
     try {
       String? imagePath;
 
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        // iOS → Apple native document scanner
+        final images = await CunningDocumentScanner.getPictures();
+        if (images == null || images.isEmpty) return;
+        imagePath = images.first;
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
+        // Android → MLKit scanner
         final scanner = DocumentScanner(
           options: DocumentScannerOptions(
             mode: ScannerMode.full,
@@ -72,17 +80,13 @@ class _InsuranceCardsMenuScreenState
         );
 
         final result = await scanner.scanDocument();
-
         if (result == null ||
             result.images == null ||
             result.images!.isEmpty) return;
 
         imagePath = result.images!.first;
       } else {
-        final images = await CunningDocumentScanner.getPictures();
-        if (images == null || images.isEmpty) return;
-
-        imagePath = images.first;
+        return;
       }
 
       if (imagePath == null) return;
