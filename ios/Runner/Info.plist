@@ -2,6 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 
@@ -62,8 +63,17 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
+	<!-- ✅ Camera Permission -->
 	<key>NSCameraUsageDescription</key>
-	<string>VitaLink uses the camera to scan QR codes for emergency access and agent onboarding.</string>
+	<string>VitaLink uses the camera to scan medication labels, insurance cards, and QR codes.</string>
+
+	<!-- ✅ Photo Library Permission -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>VitaLink needs access to your photo library to select and store scanned images.</string>
+
+	<!-- ✅ Photo Library Add Permission -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>VitaLink may save scanned images to your photo library when needed.</string>
 
 </dict>
 </plist>
