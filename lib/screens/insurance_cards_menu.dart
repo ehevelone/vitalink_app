@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -24,8 +22,6 @@ class _InsuranceCardsMenuScreenState
   bool _loading = true;
   bool _error = false;
 
-  final ImagePicker _picker = ImagePicker();
-
   @override
   void initState() {
     super.initState();
@@ -36,6 +32,7 @@ class _InsuranceCardsMenuScreenState
   Future<void> _load() async {
     try {
       final p = await _repo.loadProfile();
+
       if (!mounted) return;
 
       setState(() {
@@ -43,8 +40,9 @@ class _InsuranceCardsMenuScreenState
         _loading = false;
         _error = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+
       setState(() {
         _loading = false;
         _error = true;
@@ -54,77 +52,38 @@ class _InsuranceCardsMenuScreenState
 
   Future<void> _save() async {
     if (_p == null) return;
-    _p!.updatedAt = DateTime.now();
-    await _repo.saveProfile(_p!);
+    try {
+      _p!.updatedAt = DateTime.now();
+      await _repo.saveProfile(_p!);
+    } catch (_) {}
   }
 
+  // ✅ Google MLKit Scanner (0.4.1 compatible)
   Future<void> _scanCard() async {
-    debugPrint("---- SCAN BUTTON PRESSED ----");
-
-    final status = await Permission.camera.request();
-    debugPrint("Camera permission: $status");
-
-    if (!status.isGranted) return;
-
-    String? imagePath;
-
     try {
-      // ✅ ANDROID → MLKIT
-      if (Platform.isAndroid) {
-        debugPrint("Running Android MLKit scanner");
+      final scanner = DocumentScanner(
+        options: DocumentScannerOptions(
+          mode: ScannerMode.full,
+          pageLimit: 1,
+        ),
+      );
 
-        final scanner = DocumentScanner(
-          options: DocumentScannerOptions(
-            mode: ScannerMode.full,
-            pageLimit: 1,
-          ),
-        );
+      final result = await scanner.scanDocument();
 
-        final result = await scanner.scanDocument();
+      if (result == null) return;
+      if (result.images == null) return;
+      if (result.images!.isEmpty) return;
 
-        if (result == null ||
-            result.images == null ||
-            result.images!.isEmpty) {
-          debugPrint("No images returned from MLKit");
-          return;
-        }
+      final imagePath = result.images!.first;
 
-        imagePath = result.images!.first;
-      }
+      debugPrint("Scanned card path: $imagePath");
 
-      // ✅ iOS / iPad → Native Camera (same as Meds)
-      else if (Platform.isIOS) {
-        debugPrint("Running iOS native camera");
+      // If you want to automatically attach scanned image,
+      // you would create a new InsuranceCard model here.
 
-        final file =
-            await _picker.pickImage(source: ImageSource.camera);
-
-        if (file == null) {
-          debugPrint("User cancelled camera");
-          return;
-        }
-
-        imagePath = file.path;
-      }
-
-      if (imagePath == null) return;
-
-      debugPrint("Image captured: $imagePath");
-
-      setState(() {
-        _p!.orphanCards.add(
-          InsuranceCard(
-            frontImagePath: imagePath!,
-            carrier: "",
-            policy: "",
-          ),
-        );
-      });
-
-      await _save();
-      debugPrint("Profile saved successfully");
+      await _load();
     } catch (e) {
-      debugPrint("SCAN ERROR: $e");
+      debugPrint("Scanner error: $e");
     }
   }
 
@@ -137,8 +96,33 @@ class _InsuranceCardsMenuScreenState
     }
 
     if (_error || _p == null) {
-      return const Scaffold(
-        body: Center(child: Text("Unable to load insurance cards")),
+      return Scaffold(
+        appBar: AppBar(title: const Text("Insurance Cards")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off,
+                  size: 60, color: Colors.grey),
+              const SizedBox(height: 20),
+              const Text(
+                "Unable to load insurance cards.",
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _loading = true;
+                    _error = false;
+                  });
+                  _load();
+                },
+                child: const Text("Retry"),
+              )
+            ],
+          ),
+        ),
       );
     }
 
@@ -151,6 +135,7 @@ class _InsuranceCardsMenuScreenState
       appBar: AppBar(title: const Text("Insurance Cards")),
       body: Column(
         children: [
+          // ✅ Scanner Button (like Meds screen)
           Padding(
             padding: const EdgeInsets.all(12),
             child: ElevatedButton.icon(
@@ -159,14 +144,18 @@ class _InsuranceCardsMenuScreenState
               label: const Text("Scan Insurance Card"),
             ),
           ),
+
           Expanded(
             child: allCards.isEmpty
-                ? const Center(child: Text("No insurance cards found"))
+                ? const Center(
+                    child: Text("No insurance cards found"))
                 : ListView.builder(
+                    padding: const EdgeInsets.all(16),
                     itemCount: allCards.length,
                     itemBuilder: (context, index) {
                       final card = allCards[index];
-                      final file = File(card.frontImagePath);
+                      final file =
+                          File(card.frontImagePath);
 
                       return ListTile(
                         leading: file.existsSync()
@@ -188,7 +177,8 @@ class _InsuranceCardsMenuScreenState
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  InsuranceCardDetail(card: card),
+                                  InsuranceCardDetail(
+                                      card: card),
                             ),
                           );
                         },
