@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -57,7 +58,6 @@ class _InsuranceCardsMenuScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // ✅ PLATFORM SAFE SCANNER
   Future<void> _scanCard() async {
     final status = await Permission.camera.request();
     if (!status.isGranted) return;
@@ -65,13 +65,8 @@ class _InsuranceCardsMenuScreenState
     try {
       String? imagePath;
 
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
-        // iOS → Apple native document scanner
-        final images = await CunningDocumentScanner.getPictures();
-        if (images == null || images.isEmpty) return;
-        imagePath = images.first;
-      } else if (defaultTargetPlatform == TargetPlatform.android) {
-        // Android → MLKit scanner
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // Android → MLKit
         final scanner = DocumentScanner(
           options: DocumentScannerOptions(
             mode: ScannerMode.full,
@@ -85,8 +80,27 @@ class _InsuranceCardsMenuScreenState
             result.images!.isEmpty) return;
 
         imagePath = result.images!.first;
-      } else {
-        return;
+
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+
+        // iPad detection
+        final isTablet =
+            MediaQuery.of(context).size.shortestSide >= 600;
+
+        if (isTablet) {
+          // iPad → fallback to camera
+          final picker = ImagePicker();
+          final file =
+              await picker.pickImage(source: ImageSource.camera);
+          if (file == null) return;
+          imagePath = file.path;
+        } else {
+          // iPhone → Apple document scanner
+          final images =
+              await CunningDocumentScanner.getPictures();
+          if (images == null || images.isEmpty) return;
+          imagePath = images.first;
+        }
       }
 
       if (imagePath == null) return;
@@ -102,6 +116,7 @@ class _InsuranceCardsMenuScreenState
       });
 
       await _save();
+
     } catch (e) {
       debugPrint("Scanner error: $e");
     }
