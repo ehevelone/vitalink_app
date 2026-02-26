@@ -43,7 +43,8 @@ class _InsuranceCardsMenuScreenState
         _loading = false;
         _error = false;
       });
-    } catch (_) {
+    } catch (e) {
+      print("LOAD ERROR: $e");
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -59,14 +60,23 @@ class _InsuranceCardsMenuScreenState
   }
 
   Future<void> _scanCard() async {
+    print("---- SCAN BUTTON PRESSED ----");
+    print("Platform detected: $defaultTargetPlatform");
+
     final status = await Permission.camera.request();
-    if (!status.isGranted) return;
+    print("Camera permission status: $status");
+
+    if (!status.isGranted) {
+      print("Permission NOT granted.");
+      return;
+    }
 
     try {
       String? imagePath;
 
       if (defaultTargetPlatform == TargetPlatform.android) {
-        // Android → MLKit
+        print("Android branch running");
+
         final scanner = DocumentScanner(
           options: DocumentScannerOptions(
             mode: ScannerMode.full,
@@ -74,36 +84,57 @@ class _InsuranceCardsMenuScreenState
           ),
         );
 
+        print("Launching MLKit scanner...");
         final result = await scanner.scanDocument();
+        print("MLKit returned: $result");
+
         if (result == null ||
             result.images == null ||
-            result.images!.isEmpty) return;
+            result.images!.isEmpty) {
+          print("No images returned from MLKit");
+          return;
+        }
 
         imagePath = result.images!.first;
-
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        print("iOS branch running");
 
-        // iPad detection
         final isTablet =
             MediaQuery.of(context).size.shortestSide >= 600;
 
+        print("Is tablet: $isTablet");
+
         if (isTablet) {
-          // iPad → fallback to camera
+          print("Using ImagePicker camera for iPad...");
           final picker = ImagePicker();
           final file =
               await picker.pickImage(source: ImageSource.camera);
+
+          print("ImagePicker returned: $file");
+
           if (file == null) return;
           imagePath = file.path;
         } else {
-          // iPhone → Apple document scanner
+          print("Using CunningDocumentScanner for iPhone...");
           final images =
               await CunningDocumentScanner.getPictures();
+
+          print("Cunning returned: $images");
+
           if (images == null || images.isEmpty) return;
           imagePath = images.first;
         }
+      } else {
+        print("Unknown platform.");
+        return;
       }
 
-      if (imagePath == null) return;
+      if (imagePath == null) {
+        print("Image path is null.");
+        return;
+      }
+
+      print("Image path saved: $imagePath");
 
       setState(() {
         _p!.orphanCards.add(
@@ -116,9 +147,10 @@ class _InsuranceCardsMenuScreenState
       });
 
       await _save();
+      print("Profile saved successfully.");
 
     } catch (e) {
-      debugPrint("Scanner error: $e");
+      print("SCANNER ERROR: $e");
     }
   }
 
