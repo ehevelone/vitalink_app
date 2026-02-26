@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -32,8 +34,8 @@ import 'screens/emergency_view.dart';
 import 'screens/profile_agent_screen.dart';
 import 'screens/profile_user_screen.dart';
 import 'screens/edit_profile.dart';
-import 'screens/profile_picker.dart';        // ✅ FIXED
-import 'screens/new_profile_screen.dart';   // ✅ FIXED
+import 'screens/profile_picker.dart'; // ✅ FIXED
+import 'screens/new_profile_screen.dart'; // ✅ FIXED
 
 // Medical / insurance data
 import 'screens/meds_screen.dart';
@@ -60,31 +62,105 @@ import 'screens/agent_reset_password_screen.dart';
 
 import 'models.dart';
 
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  // ✅ If anything crashes at startup (common on iOS/TestFlight),
+  // this prevents the "white screen" and lets us surface errors.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    // keep logs (Codemagic/TestFlight device logs)
+    debugPrint("❌ FlutterError: ${details.exception}");
+    debugPrint("${details.stack}");
+  };
 
-  await Firebase.initializeApp();
+  // Catch non-Flutter (platform) async errors too
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint("❌ PlatformDispatcher error: $error");
+    debugPrint("$stack");
+    return true; // handled
+  };
 
-  FirebaseMessaging.onBackgroundMessage(
-    _firebaseMessagingBackgroundHandler,
-  );
+  // Show a real visible error widget instead of blank white
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.white,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: DefaultTextStyle(
+              style: const TextStyle(color: Colors.black, fontSize: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "VitaLink crashed while starting",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(details.exceptionAsString()),
+                  const SizedBox(height: 12),
+                  if (details.stack != null) Text(details.stack.toString()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  };
 
-  await _setupFirebaseTokenListener();
+  await runZonedGuarded(() async {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
 
-  runApp(const VitaLinkApp());
+    // ✅ Firebase can fail on iOS if config/signing is off.
+    // We still want the app to launch and show a real error if needed.
+    try {
+      await Firebase.initializeApp();
+    } catch (e, st) {
+      debugPrint("❌ Firebase.initializeApp failed: $e");
+      debugPrint("$st");
+      // keep going so we don't white-screen
+    }
+
+    // Background handler registration is safe even if Firebase init failed
+    try {
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+    } catch (e, st) {
+      debugPrint("❌ onBackgroundMessage setup failed: $e");
+      debugPrint("$st");
+    }
+
+    // Token listener should not prevent app launch
+    try {
+      await _setupFirebaseTokenListener();
+    } catch (e, st) {
+      debugPrint("❌ _setupFirebaseTokenListener failed: $e");
+      debugPrint("$st");
+    }
+
+    runApp(const VitaLinkApp());
+  }, (error, stack) {
+    debugPrint("❌ Zoned error: $error");
+    debugPrint("$stack");
+  });
 }
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(
-    RemoteMessage message) async {
-  await Firebase.initializeApp();
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e, st) {
+    debugPrint("❌ BG Firebase.initializeApp failed: $e");
+    debugPrint("$st");
+  }
 }
 
 Future<void> _setupFirebaseTokenListener() async {
@@ -135,13 +211,11 @@ void _handleNotificationNavigation(RemoteMessage message) {
   final type = message.data['type'];
 
   if (type == 'hipaa') {
-    navigatorKey.currentState
-        ?.pushNamed('/authorization_form');
+    navigatorKey.currentState?.pushNamed('/authorization_form');
   }
 
   if (type == 'emergency') {
-    navigatorKey.currentState
-        ?.pushNamed('/emergency');
+    navigatorKey.currentState?.pushNamed('/emergency');
   }
 }
 
@@ -182,14 +256,12 @@ class VitaLinkApp extends StatelessWidget {
 
         // AGENT
         '/terms_agent': (context) => const TermsAgentScreen(),
-        '/agent_registration': (context) =>
-            const AgentRegistrationScreen(),
+        '/agent_registration': (context) => const AgentRegistrationScreen(),
         '/agent_login': (context) => const AgentLoginScreen(),
         '/agent_setup': (context) => const AgentSetupScreen(),
         '/agent_menu': (context) => AgentMenuScreen(),
         '/my_agent_agent': (context) => MyAgentAgent(),
-        '/my_profile_agent': (context) =>
-            const ProfileAgentScreen(),
+        '/my_profile_agent': (context) => const ProfileAgentScreen(),
 
         // SHARED
         '/logo': (context) => const LogoScreen(),
@@ -200,25 +272,18 @@ class VitaLinkApp extends StatelessWidget {
         '/meds': (context) => MedsScreen(),
         '/doctors': (context) => DoctorsScreen(),
         '/doctors_view': (context) => DoctorsView(),
-        '/insurance_policies': (context) =>
-            InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (context) =>
-            InsuranceCardsMenuScreen(),
+        '/insurance_policies': (context) => InsurancePoliciesScreen(),
+        '/insurance_cards_menu': (context) => InsuranceCardsMenuScreen(),
 
-        '/authorization_form': (context) =>
-            const HipaaFormScreen(),
+        '/authorization_form': (context) => const HipaaFormScreen(),
 
         '/scan_card': (context) => ScanCard(),
 
-        '/request_reset': (context) =>
-            const RequestResetScreen(),
-        '/reset_password': (context) =>
-            const ResetPasswordScreen(),
+        '/request_reset': (context) => const RequestResetScreen(),
+        '/reset_password': (context) => const ResetPasswordScreen(),
 
-        '/agent_request_reset': (context) =>
-            const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) =>
-            const AgentResetPasswordScreen(),
+        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
       },
     );
   }
