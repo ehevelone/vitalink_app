@@ -39,7 +39,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
     // 🔥 CREATE LOCAL MEDICAL PROFILE
     final newProfile = Profile(
       fullName: _nameCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim(),
+      userPhone: _phoneCtrl.text.trim(), // ✅ FIXED
       meds: [],
       doctors: [],
       insurances: [],
@@ -84,7 +84,8 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: "Confirm Password"),
+                  decoration:
+                      const InputDecoration(labelText: "Confirm Password"),
                   validator: (v) =>
                       v != _passwordCtrl.text ? "Passwords don’t match" : null,
                 ),
