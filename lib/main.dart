@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -46,6 +47,7 @@ import 'screens/insurance_policy_view.dart';
 import 'screens/insurance_policy_form.dart';
 import 'screens/insurance_cards.dart';
 import 'screens/insurance_cards_menu.dart';
+import 'screens/insurance_cards_menu_ios.dart';
 import 'screens/insurance_card_detail.dart';
 
 // HIPAA
@@ -68,14 +70,12 @@ final GlobalKey<NavigatorState> navigatorKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Catch Flutter framework errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint("❌ FlutterError: ${details.exception}");
     debugPrint("${details.stack}");
   };
 
-  // Show visible error instead of white screen
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Material(
       color: Colors.white,
@@ -273,8 +273,12 @@ class VitaLinkApp extends StatelessWidget {
             DoctorsView(),
         '/insurance_policies': (context) =>
             InsurancePoliciesScreen(),
+
+        // ✅ PLATFORM SPLIT HERE
         '/insurance_cards_menu': (context) =>
-            InsuranceCardsMenuScreen(),
+            Platform.isIOS
+                ? const InsuranceCardsMenuIOS()
+                : InsuranceCardsMenuScreen(),
 
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
