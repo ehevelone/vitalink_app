@@ -47,7 +47,7 @@ import 'screens/insurance_policy_view.dart';
 import 'screens/insurance_policy_form.dart';
 import 'screens/insurance_cards.dart';
 import 'screens/insurance_card_detail.dart';
-import 'screens/insurance_cards_menu_ios.dart'; // iOS version
+import 'screens/insurance_cards_menu_ios.dart';
 
 // HIPAA
 import 'screens/hipaa_form_screen.dart';
@@ -82,7 +82,7 @@ Future<void> main() async {
       _firebaseMessagingBackgroundHandler,
     );
 
-    await _setupFirebaseTokenListener();
+    // 🚨 IMPORTANT: DO NOT call FCM permission/token setup here
 
     runApp(const VitaLinkApp());
   }, (error, stack) {
@@ -120,8 +120,21 @@ Future<void> _setupFirebaseTokenListener() async {
   }
 }
 
-class VitaLinkApp extends StatelessWidget {
+class VitaLinkApp extends StatefulWidget {
   const VitaLinkApp({super.key});
+
+  @override
+  State<VitaLinkApp> createState() => _VitaLinkAppState();
+}
+
+class _VitaLinkAppState extends State<VitaLinkApp> {
+  @override
+  void initState() {
+    super.initState();
+
+    // 🔥 SAFE to run after first frame
+    _setupFirebaseTokenListener();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,17 +144,10 @@ class VitaLinkApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
       routes: {
-        '/landing': (context) =>
-            const LandingScreen(),
-        '/splash': (context) =>
-            const SplashScreen(),
-
-        '/insurance_cards_menu': (context) =>
-            IOSCardScanScreen(), // ✅ FIXED HERE
-
-        '/scan_card': (context) =>
-            const ScanCard(),
-
+        '/landing': (context) => const LandingScreen(),
+        '/splash': (context) => const SplashScreen(),
+        '/insurance_cards_menu': (context) => IOSCardScanScreen(),
+        '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
       },
