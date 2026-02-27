@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../services/app_state.dart';
 
 class LandingScreen extends StatefulWidget {
@@ -15,20 +16,29 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    _checkStoredSession();
+
+    // 🔥 Delay SharedPreferences access until after first frame
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _checkStoredSession();
+    });
   }
 
   Future<void> _checkStoredSession() async {
-    final loggedIn = await AppState.isLoggedIn();
+    try {
+      final loggedIn = await AppState.isLoggedIn();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (loggedIn) {
-      Navigator.pushReplacementNamed(context, '/logo');
-      return;
+      if (loggedIn) {
+        Navigator.pushReplacementNamed(context, '/logo');
+        return;
+      }
+
+      setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
-
-    setState(() => _loading = false);
   }
 
   // ------------------------
@@ -180,9 +190,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
-
-                      const SizedBox(height: 60), // ⬅️ More top breathing room
-
+                      const SizedBox(height: 60),
                       const Text(
                         "Welcome To",
                         style: TextStyle(
@@ -191,16 +199,12 @@ class _LandingScreenState extends State<LandingScreen> {
                           color: vitalinkBlue,
                         ),
                       ),
-
                       const SizedBox(height: 30),
-
                       Image.asset(
                         'assets/images/vitalink-logo-2.png',
                         width: 240,
                       ),
-
-                      const SizedBox(height: 70), // ⬅️ More space before buttons
-
+                      const SizedBox(height: 70),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
@@ -212,9 +216,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: vitalinkBlue,
@@ -226,15 +228,12 @@ class _LandingScreenState extends State<LandingScreen> {
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),
                       ),
-
                       const SizedBox(height: 60),
                     ],
                   ),
                 ),
               ),
             ),
-
-            // Bottom Branding Image
             Padding(
               padding: const EdgeInsets.only(bottom: 20),
               child: Image.asset(
