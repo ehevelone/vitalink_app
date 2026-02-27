@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../services/app_state.dart';
 import '../services/data_repository.dart';
 import '../models.dart';
 
@@ -26,7 +25,9 @@ class _SplashScreenState extends State<SplashScreen> {
     _routed = true;
 
     try {
-      final loggedIn = await AppState.isLoggedIn();
+      // 🔥 TEMP TEST — bypass AppState
+      final loggedIn = false;
+
       if (!mounted) return;
 
       // 🔹 Not logged in → Landing
@@ -46,13 +47,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (!mounted) return;
 
-      // 🔹 Logged in but no local profile → Landing
       if (profile == null) {
         Navigator.pushReplacementNamed(context, '/landing');
         return;
       }
 
-      // 🔹 Logged in + profile exists → Logo
       Navigator.pushReplacementNamed(context, '/logo');
 
     } catch (e, st) {
