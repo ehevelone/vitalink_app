@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -55,17 +56,34 @@ class _IOSCardScanScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // ✅ iOS VisionKit Scanner
+  // 🔥 Permission-safe scanner
   Future<void> _scanCard() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Opening scanner...")),
-    );
+    // Check permission first
+    var status = await Permission.camera.status;
+
+    if (!status.isGranted) {
+      final result = await Permission.camera.request();
+
+      if (!result.isGranted) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Camera permission required"),
+          ),
+        );
+
+        await openAppSettings();
+        return;
+      }
+    }
 
     try {
       final images =
           await CunningDocumentScanner.getPictures();
 
       if (images == null || images.isEmpty) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Scan cancelled")),
         );
@@ -150,7 +168,6 @@ class _IOSCardScanScreenState
               label: const Text("Scan Insurance Card"),
             ),
           ),
-
           Expanded(
             child: allCards.isEmpty
                 ? const Center(
