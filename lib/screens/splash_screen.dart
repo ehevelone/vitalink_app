@@ -17,30 +17,13 @@ class _SplashScreenState extends State<SplashScreen> {
     SchedulerBinding.instance.addPostFrameCallback((_) => _route());
   }
 
-  Future<void> _route() async {
+  void _route() {
     if (_routed) return;
     _routed = true;
 
     if (!mounted) return;
 
-    // 🔥 HARD TEST — bypass EVERYTHING
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const Scaffold(
-          backgroundColor: Colors.red,
-          body: Center(
-            child: Text(
-              "NAV WORKS",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    Navigator.pushReplacementNamed(context, '/landing');
   }
 
   @override
@@ -48,13 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
     return const Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(height: 120),
-            CircularProgressIndicator(color: Colors.white70),
-          ],
-        ),
+        child: CircularProgressIndicator(color: Colors.white70),
       ),
     );
   }
