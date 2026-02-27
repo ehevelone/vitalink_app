@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../services/data_repository.dart';
-import '../models.dart';
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -24,43 +21,26 @@ class _SplashScreenState extends State<SplashScreen> {
     if (_routed) return;
     _routed = true;
 
-    try {
-      // 🔥 TEMP TEST — bypass AppState
-      final loggedIn = false;
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      // 🔹 Not logged in → Landing
-      if (!loggedIn) {
-        Navigator.pushReplacementNamed(context, '/landing');
-        return;
-      }
-
-      // 🔹 Try loading local profile
-      Profile? profile;
-      try {
-        final repo = DataRepository();
-        profile = await repo.loadProfile();
-      } catch (_) {
-        profile = null;
-      }
-
-      if (!mounted) return;
-
-      if (profile == null) {
-        Navigator.pushReplacementNamed(context, '/landing');
-        return;
-      }
-
-      Navigator.pushReplacementNamed(context, '/logo');
-
-    } catch (e, st) {
-      debugPrint("Splash crash: $e");
-      debugPrint("$st");
-
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/landing');
-    }
+    // 🔥 HARD TEST — bypass EVERYTHING
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const Scaffold(
+          backgroundColor: Colors.red,
+          body: Center(
+            child: Text(
+              "NAV WORKS",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -71,11 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image(
-              image: AssetImage('assets/images/vitalink-logo-1.png'),
-              height: 120,
-            ),
-            SizedBox(height: 16),
+            SizedBox(height: 120),
             CircularProgressIndicator(color: Colors.white70),
           ],
         ),
