@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -56,29 +55,12 @@ class _IOSCardScanScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // 🔥 Permission-safe scanner
+  // ✅ iOS Native Document Scanner
   Future<void> _scanCard() async {
-    // Check permission first
-    var status = await Permission.camera.status;
-
-    if (!status.isGranted) {
-      final result = await Permission.camera.request();
-
-      if (!result.isGranted) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Camera permission required"),
-          ),
-        );
-
-        await openAppSettings();
-        return;
-      }
-    }
-
     try {
+      // Small delay helps iOS present controller cleanly
+      await Future.delayed(const Duration(milliseconds: 200));
+
       final images =
           await CunningDocumentScanner.getPictures();
 
@@ -108,7 +90,10 @@ class _IOSCardScanScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Card added")),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      print("SCAN ERROR: $e");
+      print(stack);
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
