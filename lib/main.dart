@@ -46,9 +46,8 @@ import 'screens/insurance_policies.dart';
 import 'screens/insurance_policy_view.dart';
 import 'screens/insurance_policy_form.dart';
 import 'screens/insurance_cards.dart';
-import 'screens/insurance_cards_menu.dart';
 import 'screens/insurance_card_detail.dart';
-import 'screens/insurance_cards_menu_ios.dart'; // 👈 iOS screen
+import 'screens/insurance_cards_menu_ios.dart'; // ✅ Only menu version now
 
 // HIPAA
 import 'screens/hipaa_form_screen.dart';
@@ -84,8 +83,8 @@ Future<void> main() async {
           padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
             child: DefaultTextStyle(
-              style: const TextStyle(
-                  color: Colors.black, fontSize: 14),
+              style:
+                  const TextStyle(color: Colors.black, fontSize: 14),
               child: Column(
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
@@ -223,8 +222,7 @@ class VitaLinkApp extends StatelessWidget {
       initialRoute: '/splash',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor:
-            Colors.white,
+        scaffoldBackgroundColor: Colors.white,
       ),
       routes: {
         '/landing': (context) =>
@@ -288,17 +286,15 @@ class VitaLinkApp extends StatelessWidget {
         '/insurance_policies': (context) =>
             InsurancePoliciesScreen(),
 
-        // 👇 ONLY CHANGE
+        // ✅ Single insurance menu (Cunning)
         '/insurance_cards_menu': (context) =>
-            Platform.isIOS
-                ? IOSCardScanScreen()
-                : InsuranceCardsMenuScreen(),
+            InsuranceCardsMenuScreen(),
 
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
 
         '/scan_card': (context) =>
-            ScanCard(),
+            const ScanCard(),
 
         '/request_reset': (context) =>
             const RequestResetScreen(),
