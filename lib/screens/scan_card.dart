@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
 class ScanCard extends StatefulWidget {
   const ScanCard({super.key});
@@ -14,18 +14,11 @@ class _ScanCardState extends State<ScanCard> {
   Future<void> _startScan() async {
     setState(() => _scanning = true);
 
-    DocumentScanner? scanner;
     try {
-      final options = DocumentScannerOptions(
-        mode: ScannerMode.full,
-        pageLimit: 1,
-        isGalleryImport: true,
-      );
+      // Small delay helps iOS present cleanly
+      await Future.delayed(const Duration(milliseconds: 200));
 
-      scanner = DocumentScanner(options: options);
-
-      final result = await scanner.scanDocument();
-      final images = result?.images;
+      final images = await CunningDocumentScanner.getPictures();
 
       if (!mounted) return;
 
@@ -35,26 +28,28 @@ class _ScanCardState extends State<ScanCard> {
         Navigator.pop(context, null);
       }
     } catch (e) {
-      debugPrint("❌ Document scan failed: $e");
+      debugPrint("Scan failed: $e");
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Scan failed: $e")),
         );
       }
+
       Navigator.pop(context, null);
     } finally {
-      try {
-        await scanner?.close();
-      } catch (_) {}
-
-      if (mounted) setState(() => _scanning = false);
+      if (mounted) {
+        setState(() => _scanning = false);
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startScan());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startScan();
+    });
   }
 
   @override
