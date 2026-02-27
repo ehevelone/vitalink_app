@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../services/app_state.dart';
 import '../services/data_repository.dart';
+import '../models.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -26,27 +27,38 @@ class _SplashScreenState extends State<SplashScreen> {
 
     try {
       final loggedIn = await AppState.isLoggedIn();
-
       if (!mounted) return;
 
-      if (loggedIn) {
-        final repo = DataRepository();
-        final profile = await repo.loadProfile();
-
-        if (!mounted) return;
-
-        if (profile == null) {
-          await AppState.clearAuth();
-          Navigator.pushReplacementNamed(context, '/landing');
-          return;
-        }
-
-        Navigator.pushReplacementNamed(context, '/logo');
+      // 🔹 Not logged in → Landing
+      if (!loggedIn) {
+        Navigator.pushReplacementNamed(context, '/landing');
         return;
       }
 
-      Navigator.pushReplacementNamed(context, '/landing');
-    } catch (_) {
+      // 🔹 Try loading local profile
+      Profile? profile;
+      try {
+        final repo = DataRepository();
+        profile = await repo.loadProfile();
+      } catch (_) {
+        profile = null;
+      }
+
+      if (!mounted) return;
+
+      // 🔹 Logged in but no local profile → Landing
+      if (profile == null) {
+        Navigator.pushReplacementNamed(context, '/landing');
+        return;
+      }
+
+      // 🔹 Logged in + profile exists → Logo
+      Navigator.pushReplacementNamed(context, '/logo');
+
+    } catch (e, st) {
+      debugPrint("Splash crash: $e");
+      debugPrint("$st");
+
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');
     }
