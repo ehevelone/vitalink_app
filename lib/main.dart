@@ -47,8 +47,8 @@ import 'screens/insurance_policy_view.dart';
 import 'screens/insurance_policy_form.dart';
 import 'screens/insurance_cards.dart';
 import 'screens/insurance_cards_menu.dart';
-import 'screens/insurance_cards_menu_ios.dart';
 import 'screens/insurance_card_detail.dart';
+import 'screens/insurance_cards_menu_ios.dart'; // 👈 iOS screen
 
 // HIPAA
 import 'screens/hipaa_form_screen.dart';
@@ -84,9 +84,11 @@ Future<void> main() async {
           padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
             child: DefaultTextStyle(
-              style: const TextStyle(color: Colors.black, fontSize: 14),
+              style: const TextStyle(
+                  color: Colors.black, fontSize: 14),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "VitaLink crashed while starting",
@@ -116,7 +118,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp();
     } catch (e, st) {
-      debugPrint("❌ Firebase.initializeApp failed: $e");
+      debugPrint(
+          "❌ Firebase.initializeApp failed: $e");
       debugPrint("$st");
     }
 
@@ -166,7 +169,8 @@ Future<void> _setupFirebaseTokenListener() async {
     }
   }
 
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+  FirebaseMessaging.instance.onTokenRefresh
+      .listen((newToken) async {
     final email = await store.get('lastEmail');
     final role = await store.get('lastRole');
 
@@ -179,25 +183,31 @@ Future<void> _setupFirebaseTokenListener() async {
     }
   });
 
-  FirebaseMessaging.onMessageOpenedApp.listen((message) {
+  FirebaseMessaging.onMessageOpenedApp
+      .listen((message) {
     _handleNotificationNavigation(message);
   });
 
-  final initialMessage = await fcm.getInitialMessage();
+  final initialMessage =
+      await fcm.getInitialMessage();
   if (initialMessage != null) {
-    _handleNotificationNavigation(initialMessage);
+    _handleNotificationNavigation(
+        initialMessage);
   }
 }
 
-void _handleNotificationNavigation(RemoteMessage message) {
+void _handleNotificationNavigation(
+    RemoteMessage message) {
   final type = message.data['type'];
 
   if (type == 'hipaa') {
-    navigatorKey.currentState?.pushNamed('/authorization_form');
+    navigatorKey.currentState
+        ?.pushNamed('/authorization_form');
   }
 
   if (type == 'emergency') {
-    navigatorKey.currentState?.pushNamed('/emergency');
+    navigatorKey.currentState
+        ?.pushNamed('/emergency');
   }
 }
 
@@ -213,11 +223,14 @@ class VitaLinkApp extends StatelessWidget {
       initialRoute: '/splash',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.white,
+        scaffoldBackgroundColor:
+            Colors.white,
       ),
       routes: {
-        '/landing': (context) => const LandingScreen(),
-        '/splash': (context) => const SplashScreen(),
+        '/landing': (context) =>
+            const LandingScreen(),
+        '/splash': (context) =>
+            const SplashScreen(),
 
         '/my_profile': (context) =>
             const EditProfileScreen(),
@@ -226,12 +239,14 @@ class VitaLinkApp extends StatelessWidget {
             const TermsUserScreen(),
         '/registration': (context) =>
             const RegistrationScreen(),
-        '/login': (context) => const LoginScreen(),
+        '/login': (context) =>
+            const LoginScreen(),
         '/account_setup': (context) =>
             const AccountSetupScreen(),
         '/welcome': (context) =>
             const WelcomeScreen(),
-        '/menu': (context) => MenuScreen(),
+        '/menu': (context) =>
+            MenuScreen(),
         '/my_agent_user': (context) =>
             MyAgentUser(),
         '/my_profile_user': (context) =>
@@ -257,13 +272,15 @@ class VitaLinkApp extends StatelessWidget {
         '/my_profile_agent': (context) =>
             const ProfileAgentScreen(),
 
-        '/logo': (context) => const LogoScreen(),
+        '/logo': (context) =>
+            const LogoScreen(),
         '/emergency': (context) =>
             EmergencyScreen(),
         '/emergency_view': (context) =>
             EmergencyView(),
 
-        '/meds': (context) => MedsScreen(),
+        '/meds': (context) =>
+            MedsScreen(),
         '/doctors': (context) =>
             DoctorsScreen(),
         '/doctors_view': (context) =>
@@ -271,16 +288,17 @@ class VitaLinkApp extends StatelessWidget {
         '/insurance_policies': (context) =>
             InsurancePoliciesScreen(),
 
-        // ✅ PLATFORM SPLIT FIXED
+        // 👇 ONLY CHANGE
         '/insurance_cards_menu': (context) =>
             Platform.isIOS
-                ? InsuranceCardsMenuIOS()
+                ? IOSCardScanScreen()
                 : InsuranceCardsMenuScreen(),
 
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
 
-        '/scan_card': (context) => ScanCard(),
+        '/scan_card': (context) =>
+            ScanCard(),
 
         '/request_reset': (context) =>
             const RequestResetScreen(),
