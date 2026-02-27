@@ -33,7 +33,6 @@ class _IOSCardScanScreenState
   Future<void> _load() async {
     try {
       final p = await _repo.loadProfile();
-
       if (!mounted) return;
 
       setState(() {
@@ -43,7 +42,6 @@ class _IOSCardScanScreenState
       });
     } catch (_) {
       if (!mounted) return;
-
       setState(() {
         _loading = false;
         _error = true;
@@ -53,23 +51,28 @@ class _IOSCardScanScreenState
 
   Future<void> _save() async {
     if (_p == null) return;
-    try {
-      _p!.updatedAt = DateTime.now();
-      await _repo.saveProfile(_p!);
-    } catch (_) {}
+    _p!.updatedAt = DateTime.now();
+    await _repo.saveProfile(_p!);
   }
 
-  // ✅ VisionKit Scanner (cunning_document_scanner)
+  // ✅ iOS VisionKit Scanner
   Future<void> _scanCard() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Opening scanner...")),
+    );
+
     try {
       final images =
           await CunningDocumentScanner.getPictures();
 
-      if (images == null || images.isEmpty) return;
+      if (images == null || images.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Scan cancelled")),
+        );
+        return;
+      }
 
       final imagePath = images.first;
-
-      debugPrint("iOS scanned card path: $imagePath");
 
       _p?.orphanCards.add(
         InsuranceCard(
@@ -81,9 +84,36 @@ class _IOSCardScanScreenState
 
       await _save();
       await _load();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Card added")),
+      );
     } catch (e) {
-      debugPrint("iOS scanner error: $e");
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Scanner error: $e")),
+      );
     }
+  }
+
+  void _deleteCard(InsuranceCard card) async {
+    _p?.orphanCards.remove(card);
+
+    for (var ins in _p?.insurances ?? []) {
+      ins.cards.remove(card);
+    }
+
+    await _save();
+    await _load();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Card deleted")),
+    );
   }
 
   @override
@@ -96,107 +126,76 @@ class _IOSCardScanScreenState
 
     if (_error || _p == null) {
       return Scaffold(
-        appBar:
-            AppBar(title: const Text("Insurance Cards")),
-        body: Center(
-          child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.wifi_off,
-                  size: 60, color: Colors.grey),
-              const SizedBox(height: 20),
-              const Text(
-                "Unable to load insurance cards.",
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _loading = true;
-                    _error = false;
-                  });
-                  _load();
-                },
-                child: const Text("Retry"),
-              )
-            ],
-          ),
+        appBar: AppBar(title: const Text("Insurance Cards")),
+        body: const Center(
+          child: Text("Unable to load insurance cards."),
         ),
       );
     }
 
     final allCards = [
       ..._p?.orphanCards ?? [],
-      for (var ins in _p?.insurances ?? [])
-        ...ins.cards,
+      for (var ins in _p?.insurances ?? []) ...ins.cards,
     ];
 
     return Scaffold(
-      appBar:
-          AppBar(title: const Text("Insurance Cards")),
+      appBar: AppBar(title: const Text("Insurance Cards")),
       body: Column(
         children: [
-          // ✅ SAME BUTTON AS ANDROID
           Padding(
             padding: const EdgeInsets.all(12),
             child: ElevatedButton.icon(
               onPressed: _scanCard,
-              icon: const Icon(
-                  Icons.camera_alt_outlined),
-              label:
-                  const Text("Scan Insurance Card"),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text("Scan Insurance Card"),
             ),
           ),
 
           Expanded(
             child: allCards.isEmpty
                 ? const Center(
-                    child:
-                        Text("No insurance cards found"))
+                    child: Text("No insurance cards found"),
+                  )
                 : ListView.builder(
-                    padding:
-                        const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     itemCount: allCards.length,
-                    itemBuilder:
-                        (context, index) {
-                      final card =
-                          allCards[index];
-                      final file = File(
-                          card.frontImagePath);
+                    itemBuilder: (context, index) {
+                      final card = allCards[index];
+                      final file = File(card.frontImagePath);
 
-                      return ListTile(
-                        leading:
-                            file.existsSync()
-                                ? Image.file(
-                                    file,
-                                    width: 70,
-                                    height: 50,
-                                    fit: BoxFit.cover,
-                                  )
-                                : const Icon(
-                                    Icons
-                                        .broken_image),
-                        title: Text(
-                          card.carrier
-                                  .isNotEmpty
-                              ? card.carrier
-                              : "Insurance Card",
+                      return Card(
+                        child: ListTile(
+                          leading: file.existsSync()
+                              ? Image.file(
+                                  file,
+                                  width: 70,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                )
+                              : const Icon(Icons.broken_image),
+                          title: Text(
+                            card.carrier.isNotEmpty
+                                ? card.carrier
+                                : "Insurance Card",
+                          ),
+                          subtitle: Text(card.policy ?? ''),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    InsuranceCardDetail(
+                                        card: card),
+                              ),
+                            );
+                          },
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete,
+                                color: Colors.red),
+                            onPressed: () =>
+                                _deleteCard(card),
+                          ),
                         ),
-                        subtitle:
-                            Text(card.policy ?? ''),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  InsuranceCardDetail(
-                                      card:
-                                          card),
-                            ),
-                          );
-                        },
                       );
                     },
                   ),
