@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/app_state.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -10,29 +9,12 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen> {
   static const Color vitalinkBlue = Color(0xFF79CAE3);
-  bool _loading = true;
+  bool _loading = false; // 🔥 Start false — no session check
 
   @override
   void initState() {
     super.initState();
-
-    // 🔥 Surgical fix: delay SharedPreferences until after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkStoredSession();
-    });
-  }
-
-  Future<void> _checkStoredSession() async {
-    final loggedIn = await AppState.isLoggedIn();
-
-    if (!mounted) return;
-
-    if (loggedIn) {
-      Navigator.pushReplacementNamed(context, '/logo');
-      return;
-    }
-
-    setState(() => _loading = false);
+    // 🔥 No SharedPreferences call at all
   }
 
   // ------------------------
@@ -126,9 +108,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   backgroundColor: Colors.green,
                   minimumSize: const Size(double.infinity, 55),
                 ),
-                onPressed: () async {
+                onPressed: () {
                   Navigator.pop(ctx);
-                  await AppState.setRole('user');
                   Navigator.pushReplacementNamed(context, '/terms_user');
                 },
                 child: const Text(
@@ -142,9 +123,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   backgroundColor: vitalinkBlue,
                   minimumSize: const Size(double.infinity, 55),
                 ),
-                onPressed: () async {
+                onPressed: () {
                   Navigator.pop(ctx);
-                  await AppState.setRole('agent');
                   Navigator.pushReplacementNamed(context, '/terms_agent');
                 },
                 child: const Text(
@@ -164,15 +144,6 @@ class _LandingScreenState extends State<LandingScreen> {
   // ------------------------
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.white70),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
