@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -18,7 +18,6 @@ class IOSCardScanScreen extends StatefulWidget {
 class _IOSCardScanScreenState
     extends State<IOSCardScanScreen> {
   late final DataRepository _repo;
-  final ImagePicker _picker = ImagePicker();
 
   Profile? _p;
   bool _loading = true;
@@ -60,19 +59,18 @@ class _IOSCardScanScreenState
     } catch (_) {}
   }
 
-  // ✅ iOS Camera Scan (ImagePicker instead of MLKit)
+  // ✅ VisionKit Scanner (cunning_document_scanner)
   Future<void> _scanCard() async {
     try {
-      final file =
-          await _picker.pickImage(source: ImageSource.camera);
+      final images =
+          await CunningDocumentScanner.getPictures();
 
-      if (file == null) return;
+      if (images == null || images.isEmpty) return;
 
-      final imagePath = file.path;
+      final imagePath = images.first;
 
       debugPrint("iOS scanned card path: $imagePath");
 
-      // Attach scanned image as orphan card
       _p?.orphanCards.add(
         InsuranceCard(
           frontImagePath: imagePath,
@@ -155,8 +153,8 @@ class _IOSCardScanScreenState
           Expanded(
             child: allCards.isEmpty
                 ? const Center(
-                    child: Text(
-                        "No insurance cards found"))
+                    child:
+                        Text("No insurance cards found"))
                 : ListView.builder(
                     padding:
                         const EdgeInsets.all(16),
