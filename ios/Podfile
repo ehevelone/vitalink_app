@@ -34,9 +34,10 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
 
-    # 🔥 REMOVE MLKit Document Scanner from iOS build ONLY
-    if target.name == 'google_mlkit_document_scanner'
-      puts "Removing google_mlkit_document_scanner from iOS build"
+    # 🔥 REMOVE ALL Google MLKit Flutter pods from iOS build
+    # (Android keeps them. iOS will use CunningDocumentScanner instead.)
+    if target.name.start_with?('google_mlkit')
+      puts "Removing #{target.name} from iOS build"
       target.remove_from_project
       next
     end
