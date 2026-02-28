@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
@@ -30,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await ApiService.loginUser(
       email: email,
       password: password,
+      platform: Platform.isIOS ? "ios" : "android",
     );
 
     if (!mounted) return;
@@ -47,6 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // 🔎 Check local profile
       final profile = await repo.loadProfile();
+
+      if (!mounted) return;
 
       if (profile == null) {
         Navigator.pushReplacementNamed(context, '/account_setup');
