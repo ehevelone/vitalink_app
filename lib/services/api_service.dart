@@ -8,7 +8,7 @@ class ApiService {
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔧 Internal POST helper (HARDENED FOR iOS)
+  // 🔧 Internal POST helper (FULLY SAFE)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
@@ -45,14 +45,14 @@ class ApiService {
 
       final decoded = jsonDecode(res.body);
 
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
+      if (decoded == null || decoded is! Map<String, dynamic>) {
+        return {
+          "success": false,
+          "error": "Invalid server response"
+        };
       }
 
-      return {
-        "success": false,
-        "error": "Invalid server response"
-      };
+      return decoded;
     } catch (e, st) {
       debugPrint("❌ API ERROR ($path): $e\n$st");
       return {"success": false, "error": e.toString()};
@@ -106,7 +106,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Agent login
+  // 🔹 Agent login (SAFE)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
@@ -117,15 +117,25 @@ class ApiService {
       "password": password,
     });
 
-    if (res["success"] != true || res["agent"] == null) {
-      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
+    if (res["success"] != true) {
+      return {
+        "success": false,
+        "error": res["error"] ?? "Invalid credentials"
+      };
+    }
+
+    if (res["agent"] == null) {
+      return {
+        "success": false,
+        "error": "Agent data missing"
+      };
     }
 
     return {"success": true, "agent": res["agent"]};
   }
 
   // -------------------------------------------------------------
-  // 🔹 User login
+  // 🔹 User login (FULLY SAFE)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -138,8 +148,18 @@ class ApiService {
       "platform": platform,
     });
 
-    if (res["success"] != true || res["user"] == null) {
-      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
+    if (res["success"] != true) {
+      return {
+        "success": false,
+        "error": res["error"] ?? "Invalid credentials"
+      };
+    }
+
+    if (res["user"] == null) {
+      return {
+        "success": false,
+        "error": "User data missing"
+      };
     }
 
     return {"success": true, "user": res["user"]};
@@ -247,7 +267,7 @@ class ApiService {
       "email": email,
       "role": role,
       "deviceToken": fcmToken,
-      "platform": "android",
+      "platform": Platform.isIOS ? "ios" : "android",
     });
   }
 
@@ -314,10 +334,17 @@ class ApiService {
       "code": code,
     });
 
-    if (res["success"] != true || res["agent"] == null) {
+    if (res["success"] != true) {
       return {
         "success": false,
         "error": res["error"] ?? "Invalid agent code",
+      };
+    }
+
+    if (res["agent"] == null) {
+      return {
+        "success": false,
+        "error": "Agent data missing",
       };
     }
 
