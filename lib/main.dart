@@ -82,8 +82,6 @@ Future<void> main() async {
       _firebaseMessagingBackgroundHandler,
     );
 
-    // 🚨 IMPORTANT: DO NOT call FCM permission/token setup here
-
     runApp(const VitaLinkApp());
   }, (error, stack) {
     debugPrint("Zoned error: $error");
@@ -132,8 +130,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   void initState() {
     super.initState();
 
-    // 🔥 SAFE to run after first frame
-    _setupFirebaseTokenListener();
+    // 🔥 DISABLED — this was freezing startup
+    // _setupFirebaseTokenListener();
   }
 
   @override
