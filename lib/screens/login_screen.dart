@@ -25,44 +25,57 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = true);
 
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
+    try {
+      final email = _emailCtrl.text.trim();
+      final password = _passwordCtrl.text.trim();
 
-    final result = await ApiService.loginUser(
-      email: email,
-      password: password,
-      platform: Platform.isIOS ? "ios" : "android",
-    );
+      final result = await ApiService.loginUser(
+        email: email,
+        password: password,
+        platform: Platform.isIOS ? "ios" : "android",
+      );
 
-    if (!mounted) return;
-
-    setState(() => _loading = false);
-
-    if (result['success'] == true) {
-      final store = SecureStore();
-      final repo = DataRepository();
-
-      // 🔐 Save identity
-      await store.setBool('userLoggedIn', true);
-      await store.setString('lastEmail', email);
-      await store.setString('lastRole', 'user');
-
-      // 🔎 Check local profile
-      final profile = await repo.loadProfile();
+      debugPrint("LOGIN RESULT: $result");
 
       if (!mounted) return;
 
-      if (profile == null) {
-        Navigator.pushReplacementNamed(context, '/account_setup');
+      if (result['success'] == true) {
+        final store = SecureStore();
+        final repo = DataRepository();
+
+        await store.setBool('userLoggedIn', true);
+        await store.setString('lastEmail', email);
+        await store.setString('lastRole', 'user');
+
+        final profile = await repo.loadProfile();
+
+        if (!mounted) return;
+
+        if (profile == null) {
+          Navigator.pushReplacementNamed(context, '/account_setup');
+        } else {
+          Navigator.pushReplacementNamed(context, '/menu');
+        }
       } else {
-        Navigator.pushReplacementNamed(context, '/menu');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? "Login failed"),
+          ),
+        );
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['error'] ?? "Login failed"),
-        ),
-      );
+    } catch (e, st) {
+      debugPrint("LOGIN CRASH: $e");
+      debugPrint("$st");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Login error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
