@@ -19,9 +19,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _loading = false;
   bool _showPassword = false;
+  bool _rememberMe = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedLogin();
+  }
+
+  Future<void> _loadSavedLogin() async {
+    final store = SecureStore();
+    final savedEmail = await store.getString('lastEmail');
+    final loggedIn = await store.getBool('userLoggedIn');
+
+    if (savedEmail != null && loggedIn == true) {
+      _emailCtrl.text = savedEmail;
+      setState(() {
+        _rememberMe = true;
+      });
+    }
+  }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
 
     setState(() => _loading = true);
 
@@ -35,17 +56,20 @@ class _LoginScreenState extends State<LoginScreen> {
         platform: Platform.isIOS ? "ios" : "android",
       );
 
-      debugPrint("LOGIN RESULT: $result");
-
       if (!mounted) return;
 
       if (result['success'] == true) {
         final store = SecureStore();
         final repo = DataRepository();
 
-        await store.setBool('userLoggedIn', true);
-        await store.setString('lastEmail', email);
-        await store.setString('lastRole', 'user');
+        if (_rememberMe) {
+          await store.setBool('userLoggedIn', true);
+          await store.setString('lastEmail', email);
+          await store.setString('lastRole', 'user');
+        } else {
+          await store.setBool('userLoggedIn', false);
+          await store.delete('lastEmail');
+        }
 
         final profile = await repo.loadProfile();
 
@@ -63,10 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e, st) {
-      debugPrint("LOGIN CRASH: $e");
-      debugPrint("$st");
-
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Login error: $e")),
@@ -98,9 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                ),
+                decoration: const InputDecoration(labelText: "Email"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your email" : null,
               ),
@@ -117,16 +136,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _showPassword = !_showPassword;
-                      });
-                    },
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your password" : null,
               ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Checkbox(
+                    value: _rememberMe,
+                    onChanged: (v) {
+                      setState(() => _rememberMe = v ?? false);
+                    },
+                  ),
+                  const Text("Remember Me"),
+                ],
+              ),
+
               const SizedBox(height: 24),
 
               _loading
