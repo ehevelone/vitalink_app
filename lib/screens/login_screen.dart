@@ -47,7 +47,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final messaging = FirebaseMessaging.instance;
       final token = await messaging.getToken();
-
       if (token == null) return;
 
       await ApiService.registerDeviceToken(
@@ -68,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final res = await ApiService.loginUser(
       email: email,
       password: password,
-      platform: "android",
+      platform: "ios", // ✅ FIXED
     );
 
     if (res["success"] == true) {
@@ -83,8 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await store.setString("userId", user["id"].toString());
       await store.setString("userEmail", user["email"]);
-      await store.setString(
-          "agent_id", user["agent_id"]?.toString() ?? "");
+      await store.setString("agent_id", user["agent_id"]?.toString() ?? "");
       await store.setString("agentName", user["agent_name"] ?? "");
       await store.setString("agentEmail", user["agent_email"] ?? "");
       await store.setString("agentPhone", user["agent_phone"] ?? "");
@@ -147,7 +145,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -166,7 +163,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter password" : null,
               ),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -174,18 +170,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text("Forgot Password?"),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>
                     setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
-
               const SizedBox(height: 24),
-
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(

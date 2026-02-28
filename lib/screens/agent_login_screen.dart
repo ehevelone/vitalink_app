@@ -100,7 +100,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  /// 🔥 FIXED ROUTE
   void _goToReset() {
     Navigator.pushNamed(context, "/agent_request_reset");
   }
@@ -132,7 +131,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                         : null,
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -153,7 +151,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                         ? "Enter password"
                         : null,
               ),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -161,7 +158,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                   child: const Text("Forgot Password?"),
                 ),
               ),
-
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>
@@ -170,9 +166,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 controlAffinity:
                     ListTileControlAffinity.leading,
               ),
-
               const SizedBox(height: 24),
-
               _loading
                   ? const Center(
                       child: CircularProgressIndicator())
