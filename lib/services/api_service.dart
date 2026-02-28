@@ -8,7 +8,7 @@ class ApiService {
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔧 Internal POST helper
+  // 🔧 Internal POST helper (HARDENED FOR iOS)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
@@ -29,7 +29,30 @@ class ApiService {
       debugPrint("📥 STATUS ($path): ${res.statusCode}");
       debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode != 200) {
+        return {
+          "success": false,
+          "error": "Server returned ${res.statusCode}"
+        };
+      }
+
+      if (res.body.isEmpty) {
+        return {
+          "success": false,
+          "error": "Empty server response"
+        };
+      }
+
+      final decoded = jsonDecode(res.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {
+        "success": false,
+        "error": "Invalid server response"
+      };
     } catch (e, st) {
       debugPrint("❌ API ERROR ($path): $e\n$st");
       return {"success": false, "error": e.toString()};
@@ -176,11 +199,11 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Request password reset (FIXED)
+  // 🔹 Request password reset
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> requestPasswordReset({
     required String emailOrPhone,
-    required String role, // "users" or "agents"
+    required String role,
   }) {
     return _postJson("request_reset", {
       "emailOrPhone": emailOrPhone,
