@@ -35,7 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
-    if (remember == true && savedEmail != null && savedPassword != null) {
+    if (remember == true &&
+        savedEmail != null &&
+        savedPassword != null) {
       setState(() {
         _emailCtrl.text = savedEmail;
         _passwordCtrl.text = savedPassword;
@@ -45,7 +47,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    // ✅ SAFE form validation (no crash)
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
 
     setState(() => _loading = true);
 
@@ -61,15 +65,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // 🔐 FULL NULL SAFETY GUARD
-      if (result == null || result['success'] != true) {
+      // ✅ Safe error handling
+      if (result['success'] != true) {
         final errorMessage =
-            result?['error']?.toString() ?? "Login failed";
+            result['error']?.toString() ?? "Login failed";
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage)),
         );
 
+        setState(() => _loading = false);
         return;
       }
 
@@ -136,7 +141,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     v == null || v.isEmpty ? "Enter your email" : null,
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -158,9 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your password" : null,
               ),
-
               const SizedBox(height: 8),
-
               Row(
                 children: [
                   Checkbox(
@@ -174,18 +176,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text("Remember Me"),
                 ],
               ),
-
               const SizedBox(height: 24),
-
               _loading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
                       onPressed: _login,
                       child: const Text("Login"),
                     ),
-
               const SizedBox(height: 16),
-
               TextButton(
                 onPressed: () {
                   Navigator.push(
