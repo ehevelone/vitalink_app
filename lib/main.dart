@@ -130,7 +130,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   void initState() {
     super.initState();
 
-    // 🔥 DISABLED — this was freezing startup
+    // 🔥 FCM disabled for now (was freezing startup)
     // _setupFirebaseTokenListener();
   }
 
@@ -144,6 +144,17 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
+
+        // ✅ RESTORED ROUTES
+        '/login': (context) => const LoginScreen(),
+        '/agent_login': (context) => const AgentLoginScreen(),
+        '/terms_user': (context) => const TermsUserScreen(),
+        '/terms_agent': (context) => const TermsAgentScreen(),
+        '/registration': (context) => const RegistrationScreen(),
+        '/account_setup': (context) => const AccountSetupScreen(),
+        '/agent_registration': (context) => const AgentRegistrationScreen(),
+        '/agent_setup': (context) => const AgentSetupScreen(),
+
         '/insurance_cards_menu': (context) => IOSCardScanScreen(),
         '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) =>
