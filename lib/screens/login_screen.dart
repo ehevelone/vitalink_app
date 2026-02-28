@@ -19,7 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _loading = false;
   bool _showPassword = false;
-  bool _rememberMe = true;
+  bool _rememberMe = false;
 
   @override
   void initState() {
@@ -30,19 +30,22 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedLogin() async {
     final store = SecureStore();
     final savedEmail = await store.getString('lastEmail');
-    final loggedIn = await store.getBool('userLoggedIn');
+    final savedPassword = await store.getString('lastPassword');
+    final remember = await store.getBool('rememberMe');
 
-    if (savedEmail != null && loggedIn == true) {
-      _emailCtrl.text = savedEmail;
+    if (!mounted) return;
+
+    if (remember == true && savedEmail != null && savedPassword != null) {
       setState(() {
+        _emailCtrl.text = savedEmail;
+        _passwordCtrl.text = savedPassword;
         _rememberMe = true;
       });
     }
   }
 
   Future<void> _login() async {
-    final form = _formKey.currentState;
-    if (form == null || !form.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
 
@@ -56,19 +59,25 @@ class _LoginScreenState extends State<LoginScreen> {
         platform: Platform.isIOS ? "ios" : "android",
       );
 
+      debugPrint("LOGIN RESULT: $result");
+
       if (!mounted) return;
 
       if (result['success'] == true) {
         final store = SecureStore();
         final repo = DataRepository();
 
+        // 🔐 Save login state
+        await store.setBool('userLoggedIn', true);
+        await store.setString('lastEmail', email);
+        await store.setString('lastRole', 'user');
+
         if (_rememberMe) {
-          await store.setBool('userLoggedIn', true);
-          await store.setString('lastEmail', email);
-          await store.setString('lastRole', 'user');
+          await store.setBool('rememberMe', true);
+          await store.setString('lastPassword', password);
         } else {
-          await store.setBool('userLoggedIn', false);
-          await store.delete('lastEmail');
+          await store.setBool('rememberMe', false);
+          await store.remove('lastPassword'); // ✅ FIXED
         }
 
         final profile = await repo.loadProfile();
@@ -87,7 +96,10 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint("LOGIN CRASH: $e");
+      debugPrint("$st");
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Login error: $e")),
@@ -119,7 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Email"),
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                ),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your email" : null,
               ),
@@ -136,22 +150,27 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
+                    onPressed: () {
+                      setState(() {
+                        _showPassword = !_showPassword;
+                      });
+                    },
                   ),
                 ),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your password" : null,
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
               Row(
                 children: [
                   Checkbox(
                     value: _rememberMe,
-                    onChanged: (v) {
-                      setState(() => _rememberMe = v ?? false);
+                    onChanged: (val) {
+                      setState(() {
+                        _rememberMe = val ?? false;
+                      });
                     },
                   ),
                   const Text("Remember Me"),
