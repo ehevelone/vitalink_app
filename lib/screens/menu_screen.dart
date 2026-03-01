@@ -62,18 +62,15 @@ class _MenuScreenState extends State<MenuScreen> {
     } catch (_) {}
   }
 
-  /// 🔥 REAL logout fix
   Future<void> _logout(BuildContext context) async {
     final store = SecureStore();
 
-    // Clear SecureStore
     await store.remove('userLoggedIn');
     await store.remove('rememberMe');
     await store.remove('role');
     await store.remove('authToken');
     await store.remove('userEmail');
 
-    // 🔥 Clear SharedPreferences (THIS is what Splash checks)
     await AppState.clearAuth();
 
     if (!mounted) return;
@@ -87,8 +84,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 FIXED: no forced null access
     final displayName =
-        _p?.fullName?.isNotEmpty == true ? _p!.fullName : "User";
+        (_p != null && _p!.fullName.isNotEmpty) ? _p!.fullName : "User";
 
     return Scaffold(
       appBar: AppBar(
@@ -100,7 +98,10 @@ class _MenuScreenState extends State<MenuScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: Image.asset("assets/images/app_icon_big.png", height: 32),
+            child: Image.asset(
+              "assets/images/app_icon_big.png",
+              height: 32,
+            ),
           ),
         ],
       ),
@@ -133,7 +134,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                 '/insurance_cards_menu'),
                             _item(Icons.policy, "Insurance Policies",
                                 '/insurance_policies'),
-                            _item(Icons.person, "My Profile", '/my_profile_user'),
+                            _item(Icons.person, "My Profile",
+                                '/my_profile_user'),
                           ],
                         ),
                       ),

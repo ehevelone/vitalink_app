@@ -34,18 +34,22 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
     setState(() {
       _p = p;
-      agentName = storedName?.isNotEmpty == true ? storedName! : "Agent";
+
+      // 🔥 FIXED — no null assertion
+      if (storedName != null && storedName.isNotEmpty) {
+        agentName = storedName;
+      } else {
+        agentName = "Agent";
+      }
+
       _loading = false;
     });
   }
 
-  // 🔥 FINAL LOGOUT
   Future<void> _logout(BuildContext context) async {
-    // Clear SharedPreferences (what Splash reads)
     await AppState.setLoggedIn(false);
     await AppState.clearAuth();
 
-    // Optional: manually clear secure store keys if needed
     final store = SecureStore();
     await store.remove('loggedIn');
     await store.remove('userLoggedIn');

@@ -69,6 +69,13 @@ final GlobalKey<NavigatorState> navigatorKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 🔥 FORCE FLUTTER TO SURFACE ERRORS (even in profile/release)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint("🔥 FLUTTER ERROR: ${details.exceptionAsString()}");
+    debugPrint(details.stack.toString());
+  };
+
   await runZonedGuarded(() async {
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -84,8 +91,8 @@ Future<void> main() async {
 
     runApp(const VitaLinkApp());
   }, (error, stack) {
-    debugPrint("Zoned error: $error");
-    debugPrint("$stack");
+    debugPrint("🔥 ZONED ERROR: $error");
+    debugPrint(stack.toString());
   });
 }
 
@@ -145,7 +152,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
 
-        // ✅ RESTORED ROUTES
         '/login': (context) => const LoginScreen(),
         '/agent_login': (context) => const AgentLoginScreen(),
         '/terms_user': (context) => const TermsUserScreen(),

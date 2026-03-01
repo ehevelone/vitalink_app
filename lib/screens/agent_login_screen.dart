@@ -33,6 +33,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     final email = await store.getString("savedAgentEmail") ?? "";
     final pass = await store.getString("savedAgentPassword") ?? "";
 
+    if (!mounted) return;
+
     if (remember) {
       setState(() {
         _rememberMe = true;
@@ -43,29 +45,59 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
+
     setState(() => _loading = true);
 
-    final email = _emailCtrl.text.trim();
+    try {
+      final email = _emailCtrl.text.trim();
 
-    final res = await ApiService.loginAgent(
-      email: email,
-      password: _passwordCtrl.text.trim(),
-    );
+      final res = await ApiService.loginAgent(
+        email: email,
+        password: _passwordCtrl.text.trim(),
+      );
 
-    if (res["success"] == true) {
+      if (!mounted) return;
+
+      if (res["success"] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(res["error"]?.toString() ?? "Invalid credentials")),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
       final agent = res["agent"];
+
+      if (agent == null ||
+          agent["email"] == null ||
+          agent["id"] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Invalid agent response from server")),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
       final store = SecureStore();
 
       await AppState.clearAuth();
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
-      await AppState.setEmail(agent["email"]);
+      await AppState.setEmail(agent["email"].toString());
 
-      await store.setString("agentId", agent["id"].toString());
-      await store.setString("agentEmail", agent["email"] ?? "");
-      await store.setString("agentName", agent["name"] ?? "");
-      await store.setString("agentPhone", agent["phone"] ?? "");
+      await store.setString(
+          "agentId", agent["id"].toString());
+      await store.setString(
+          "agentEmail", agent["email"]?.toString() ?? "");
+      await store.setString(
+          "agentName", agent["name"]?.toString() ?? "");
+      await store.setString(
+          "agentPhone", agent["phone"]?.toString() ?? "");
 
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
@@ -79,10 +111,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       }
 
       try {
-        final fcm = await FirebaseMessaging.instance.getToken();
+        final fcm =
+            await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
           await ApiService.registerDeviceToken(
-            email: agent["email"],
+            email: agent["email"].toString(),
             fcmToken: fcm,
             role: "agent",
           );
@@ -90,14 +123,17 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       } catch (_) {}
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, "/logo");
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res["error"] ?? "Invalid credentials")),
-      );
-    }
 
-    if (mounted) setState(() => _loading = false);
+      Navigator.pushReplacementNamed(context, "/logo");
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login error: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _goToReset() {
@@ -143,7 +179,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                           : Icons.visibility,
                     ),
                     onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
+                        setState(() =>
+                            _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
