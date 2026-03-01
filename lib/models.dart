@@ -356,6 +356,33 @@ class Profile {
     );
   }
 
+  // 🔥 THIS IS THE ONLY ADDITION
+  Map<String, dynamic> toJson() => {
+        'fullName': fullName,
+        'dob': dob,
+        'updatedAt': updatedAt.toIso8601String(),
+        'userPhone': userPhone,
+        'meds': meds.map((m) => m.toJson()).toList(),
+        'doctors': doctors.map((d) => d.toJson()).toList(),
+        'insurances': insurances.map((i) => i.toJson()).toList(),
+        'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
+        'emergency': emergency.toJson(),
+        'username': username,
+        'password': password,
+        'useBiometrics': useBiometrics,
+        'acceptedTerms': acceptedTerms,
+        'registered': registered,
+        'agentTerms': agentTerms,
+        'agentRegistered': agentRegistered,
+        'agentLoggedIn': agentLoggedIn,
+        'agentSetupDone': agentSetupDone,
+        'agentId': agentId,
+        'agentName': agentName,
+        'agentEmail': agentEmail,
+        'agentPhone': agentPhone,
+        'agentNpn': agentNpn,
+      };
+
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
