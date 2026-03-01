@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
-import '../services/api_service.dart';
 import '../services/app_state.dart';
 
 class LogoScreen extends StatefulWidget {
@@ -20,7 +18,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
   Profile? _p;
   bool _loading = true;
-  bool _deviceRegistered = false;
 
   @override
   void initState() {
@@ -28,42 +25,16 @@ class _LogoScreenState extends State<LogoScreen> {
 
     _loadProfile();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initPushAndRegister();
-    });
+    // 🔥 PUSH DISABLED FOR iOS TESTING
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _initPushAndRegister();
+    // });
 
     _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
 
-  Future<void> _initPushAndRegister() async {
-    if (_deviceRegistered) return;
-
-    try {
-      final messaging = FirebaseMessaging.instance;
-
-      await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      final token = await messaging.getToken();
-      if (token == null) return;
-
-      final email = await AppState.getEmail();
-      final role = await AppState.getRole();
-
-      if (email == null || role == null) return;
-
-      await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: token,
-        role: role,
-      );
-
-      _deviceRegistered = true;
-    } catch (_) {}
-  }
+  // 🔥 PUSH COMPLETELY REMOVED FOR NOW
+  // Future<void> _initPushAndRegister() async {}
 
   Future<void> _loadProfile() async {
     try {
