@@ -82,10 +82,8 @@ class VitaLinkApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
 
-      // ✅ Use onGenerateRoute for any screen that needs arguments
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
-          // InsuranceCardsScreen requires: index
           int index = 0;
 
           final args = settings.arguments;
@@ -102,7 +100,7 @@ class VitaLinkApp extends StatelessWidget {
           );
         }
 
-        return null; // fall back to routes below
+        return null;
       },
 
       routes: {
@@ -133,10 +131,7 @@ class VitaLinkApp extends StatelessWidget {
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
 
-        // ✅ FIXED: correct class name
         '/edit_profile': (context) => const EditProfileScreen(),
-
-        // ✅ FIXED: correct class name
         '/profile_picker': (context) => const ProfilePickerScreen(),
         '/new_profile': (context) => const NewProfileScreen(),
 
@@ -144,20 +139,25 @@ class VitaLinkApp extends StatelessWidget {
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
 
-        '/insurance_policies': (context) => InsurancePolicies(),
+        // ✅ FIXED HERE
+        '/insurance_policies': (context) =>
+            const InsurancePoliciesScreen(),
 
-        // ❌ DO NOT put /insurance_cards here (needs index)
-        // '/insurance_cards': handled by onGenerateRoute
-
-        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
+        '/insurance_cards_menu': (context) =>
+            const IOSCardScanScreen(),
 
         '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) => const HipaaFormScreen(),
+        '/authorization_form': (context) =>
+            const HipaaFormScreen(),
 
-        '/request_reset': (context) => const RequestResetScreen(),
-        '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
+        '/request_reset': (context) =>
+            const RequestResetScreen(),
+        '/reset_password': (context) =>
+            const ResetPasswordScreen(),
+        '/agent_request_reset': (context) =>
+            const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) =>
+            const AgentResetPasswordScreen(),
       },
     );
   }
