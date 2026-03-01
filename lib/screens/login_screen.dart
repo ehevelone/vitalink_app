@@ -27,6 +27,16 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadSavedLogin();
   }
 
+  void _toast(String msg) {
+    // ✅ Never crash if there's no ScaffoldMessenger in the tree yet
+    final sm = ScaffoldMessenger.maybeOf(context);
+    if (sm == null) {
+      debugPrint("⚠️ SnackBar skipped (no ScaffoldMessenger): $msg");
+      return;
+    }
+    sm.showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _loadSavedLogin() async {
     final store = SecureStore();
     final savedEmail = await store.getString('lastEmail');
@@ -35,9 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
-    if (remember == true &&
-        savedEmail != null &&
-        savedPassword != null) {
+    if (remember == true && savedEmail != null && savedPassword != null) {
       setState(() {
         _emailCtrl.text = savedEmail;
         _passwordCtrl.text = savedPassword;
@@ -56,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text.trim();
 
-      // ✅ iOS only
+      // ✅ iOS-only build for now
       final result = await ApiService.loginUser(
         email: email,
         password: password,
@@ -66,24 +74,21 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] != true) {
-        final errorMessage =
-            result['error']?.toString() ?? "Login failed";
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-
+        final errorMessage = (result['error']?.toString().trim().isNotEmpty == true)
+            ? result['error'].toString()
+            : "Login failed";
+        _toast(errorMessage);
         setState(() => _loading = false);
         return;
       }
 
-      // 🔥 Auth state
+      // ✅ Auth state
       await AppState.setLoggedIn(true);
       await AppState.setEmail(email);
       await AppState.setRole('user');
 
+      // ✅ Remember me
       final store = SecureStore();
-
       await store.setString('lastEmail', email);
 
       if (_rememberMe) {
@@ -94,23 +99,23 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove('lastPassword');
       }
 
-      // ✅ load profile (never null now)
+      // ✅ Profile load (never null in your DataRepository)
       final repo = DataRepository();
       await repo.loadProfile();
 
       if (!mounted) return;
 
+      // ✅ For now just route forward (account setup flow can be reinserted later)
       Navigator.pushReplacementNamed(context, '/logo');
-    } catch (e) {
-      if (!mounted) return;
+    } catch (e, st) {
+      // 🔥 This is what we need to pinpoint the REAL line of the null-bang
+      debugPrint("❌ LOGIN EXCEPTION: $e");
+      debugPrint("🧱 STACK TRACE:\n$st");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login error: $e")),
-      );
+      if (!mounted) return;
+      _toast("Login error: $e");
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -133,11 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email" : null,
+                decoration: const InputDecoration(labelText: "Email"),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? "Enter your email"
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -147,30 +151,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _showPassword = !_showPassword;
-                      });
-                    },
+                    onPressed: () => setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your password" : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? "Enter your password"
+                    : null,
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Checkbox(
                     value: _rememberMe,
-                    onChanged: (val) {
-                      setState(() {
-                        _rememberMe = val ?? false;
-                      });
-                    },
+                    onChanged: (val) => setState(() => _rememberMe = val ?? false),
                   ),
                   const Text("Remember Me"),
                 ],
@@ -187,10 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const ResetPasswordScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
                   );
                 },
                 child: const Text("Forgot Password?"),
