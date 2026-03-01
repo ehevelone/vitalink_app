@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/app_state.dart';
 import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -47,7 +47,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    // ✅ SAFE form validation (no crash)
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
 
@@ -57,15 +56,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text.trim();
 
+      // ✅ iOS only
       final result = await ApiService.loginUser(
         email: email,
         password: password,
-        platform: Platform.isIOS ? "ios" : "android",
+        platform: "ios",
       );
 
       if (!mounted) return;
 
-      // ✅ Safe error handling
       if (result['success'] != true) {
         final errorMessage =
             result['error']?.toString() ?? "Login failed";
@@ -78,12 +77,14 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final store = SecureStore();
-      final repo = DataRepository();
+      // 🔥 Auth state
+      await AppState.setLoggedIn(true);
+      await AppState.setEmail(email);
+      await AppState.setRole('user');
 
-      await store.setBool('userLoggedIn', true);
+      final store = SecureStore();
+
       await store.setString('lastEmail', email);
-      await store.setString('lastRole', 'user');
 
       if (_rememberMe) {
         await store.setBool('rememberMe', true);
@@ -93,15 +94,13 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove('lastPassword');
       }
 
-      final profile = await repo.loadProfile();
+      // ✅ load profile (never null now)
+      final repo = DataRepository();
+      await repo.loadProfile();
 
       if (!mounted) return;
 
-      if (profile == null) {
-        Navigator.pushReplacementNamed(context, '/account_setup');
-      } else {
-        Navigator.pushReplacementNamed(context, '/menu');
-      }
+      Navigator.pushReplacementNamed(context, '/logo');
     } catch (e) {
       if (!mounted) return;
 
