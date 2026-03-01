@@ -4,7 +4,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
-import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 
@@ -18,6 +17,7 @@ class LogoScreen extends StatefulWidget {
 class _LogoScreenState extends State<LogoScreen> {
   Timer? _timer;
   late final DataRepository _repo = DataRepository();
+
   Profile? _p;
   bool _loading = true;
   bool _deviceRegistered = false;
@@ -32,7 +32,7 @@ class _LogoScreenState extends State<LogoScreen> {
       _initPushAndRegister();
     });
 
-    _timer = Timer(const Duration(seconds: 15), _openMenu);
+    _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
 
   Future<void> _initPushAndRegister() async {
@@ -69,13 +69,18 @@ class _LogoScreenState extends State<LogoScreen> {
     try {
       final p = await _repo.loadProfile();
       if (!mounted) return;
+
       setState(() {
         _p = p;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+
+      setState(() {
+        _p = null;
+        _loading = false;
+      });
     }
   }
 
@@ -113,8 +118,8 @@ class _LogoScreenState extends State<LogoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasName = !_loading && _p?.fullName.isNotEmpty == true;
-    final name = hasName ? _p!.fullName : null;
+    final String name = (_p?.fullName ?? '').trim();
+    final bool hasName = !_loading && name.isNotEmpty;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -130,8 +135,11 @@ class _LogoScreenState extends State<LogoScreen> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 28),
+
               if (_loading)
-                const CircularProgressIndicator(color: Colors.white70)
+                const CircularProgressIndicator(
+                  color: Colors.white70,
+                )
               else if (hasName) ...[
                 Text(
                   "Welcome, $name",
@@ -142,6 +150,7 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
+
               const Text(
                 'TAP ANYWHERE TO OPEN',
                 style: TextStyle(
@@ -151,7 +160,9 @@ class _LogoScreenState extends State<LogoScreen> {
                   letterSpacing: 1.1,
                 ),
               ),
+
               const SizedBox(height: 48),
+
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(
