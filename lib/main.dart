@@ -1,15 +1,11 @@
 // lib/main.dart
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-
-import 'services/api_service.dart';
-import 'services/secure_store.dart';
 
 // Core screens
 import 'screens/landing_screen.dart';
@@ -25,7 +21,6 @@ import 'screens/agent_setup_screen.dart';
 import 'screens/terms_user_screen.dart';
 import 'screens/terms_agent_screen.dart';
 import 'screens/logo_screen.dart';
-import 'screens/welcome_screen.dart';
 import 'screens/my_agent_user.dart';
 import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
@@ -61,8 +56,16 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// ✅ Required for FCM background messages
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+  // If you want: log message.messageId / data here
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,6 +77,11 @@ Future<void> main() async {
 
     try {
       await Firebase.initializeApp();
+    } catch (_) {}
+
+    // ✅ Register background handler (safe even if you’re not using it yet)
+    try {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     } catch (_) {}
 
     runApp(const VitaLinkApp());
@@ -133,21 +141,16 @@ class VitaLinkApp extends StatelessWidget {
         '/insurance_policy_form': (context) => const InsurancePolicyForm(),
 
         '/insurance_cards': (context) => const InsuranceCards(),
-        '/insurance_card_detail': (context) =>
-            const InsuranceCardDetail(),
-        '/insurance_cards_menu': (context) =>
-            const IOSCardScanScreen(),
+        '/insurance_card_detail': (context) => const InsuranceCardDetail(),
+        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
 
         '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) =>
-            const HipaaFormScreen(),
+        '/authorization_form': (context) => const HipaaFormScreen(),
 
         '/request_reset': (context) => const RequestResetScreen(),
         '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) =>
-            const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) =>
-            const AgentResetPasswordScreen(),
+        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
       },
     );
   }
