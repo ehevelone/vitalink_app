@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -55,10 +54,14 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+import 'models.dart';
+
+final GlobalKey<NavigatorState> navigatorKey =
+    GlobalKey<NavigatorState>();
 
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
   } catch (_) {}
@@ -125,7 +128,6 @@ class VitaLinkApp extends StatelessWidget {
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
 
-        // ❌ Removed const from these (not const constructors)
         '/edit_profile': (context) => EditProfile(),
         '/profile_picker': (context) => ProfilePicker(),
         '/new_profile': (context) => const NewProfileScreen(),
@@ -136,36 +138,45 @@ class VitaLinkApp extends StatelessWidget {
 
         '/insurance_policies': (context) => InsurancePolicies(),
         '/insurance_cards': (context) => InsuranceCards(),
-        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
+        '/insurance_cards_menu': (context) =>
+            const IOSCardScanScreen(),
 
         '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) => const HipaaFormScreen(),
+        '/authorization_form': (context) =>
+            const HipaaFormScreen(),
 
         '/request_reset': (context) => const RequestResetScreen(),
         '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
+        '/agent_request_reset': (context) =>
+            const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) =>
+            const AgentResetPasswordScreen(),
       },
 
-      // ✅ Handle routes that require arguments
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/insurance_policy_view':
             final index = settings.arguments as int;
             return MaterialPageRoute(
-              builder: (_) => InsurancePolicyView(index: index),
+              builder: (_) =>
+                  InsurancePolicyView(index: index),
             );
 
           case '/insurance_policy_form':
-            final policy = settings.arguments;
+            final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
-              builder: (_) => InsurancePolicyForm(policy: policy),
+              builder: (_) => InsurancePolicyForm(
+                policy: args['policy'],
+                allPolicies: args['allPolicies'],
+              ),
             );
 
           case '/insurance_card_detail':
-            final card = settings.arguments;
+            final card =
+                settings.arguments as InsuranceCard;
             return MaterialPageRoute(
-              builder: (_) => InsuranceCardDetail(card: card),
+              builder: (_) =>
+                  InsuranceCardDetail(card: card),
             );
         }
         return null;
