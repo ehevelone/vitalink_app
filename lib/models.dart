@@ -248,8 +248,6 @@ class Profile {
   String fullName;
   String? dob;
   DateTime updatedAt;
-
-  // ✅ NEW — USER’S OWN PHONE (separate from emergency phone)
   String userPhone;
 
   List<Medication> meds;
@@ -279,10 +277,7 @@ class Profile {
     this.fullName = '',
     this.dob,
     DateTime? updatedAt,
-
-    // ✅ NEW
     this.userPhone = '',
-
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -313,7 +308,7 @@ class Profile {
     String? fullName,
     String? dob,
     DateTime? updatedAt,
-    String? userPhone, // ✅ NEW
+    String? userPhone,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -338,7 +333,7 @@ class Profile {
       fullName: fullName ?? this.fullName,
       dob: dob ?? this.dob,
       updatedAt: updatedAt ?? this.updatedAt,
-      userPhone: userPhone ?? this.userPhone, // ✅ NEW
+      userPhone: userPhone ?? this.userPhone,
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
       insurances: insurances ?? this.insurances,
@@ -361,38 +356,12 @@ class Profile {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'fullName': fullName,
-        'dob': dob,
-        'updatedAt': updatedAt.toIso8601String(),
-        'userPhone': userPhone, // ✅ NEW
-        'meds': meds.map((m) => m.toJson()).toList(),
-        'doctors': doctors.map((d) => d.toJson()).toList(),
-        'insurances': insurances.map((i) => i.toJson()).toList(),
-        'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
-        'emergency': emergency.toJson(),
-        'username': username,
-        'password': password,
-        'useBiometrics': useBiometrics,
-        'acceptedTerms': acceptedTerms,
-        'registered': registered,
-        'agentTerms': agentTerms,
-        'agentRegistered': agentRegistered,
-        'agentLoggedIn': agentLoggedIn,
-        'agentSetupDone': agentSetupDone,
-        'agentId': agentId,
-        'agentName': agentName,
-        'agentEmail': agentEmail,
-        'agentPhone': agentPhone,
-        'agentNpn': agentNpn,
-      };
-
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
         updatedAt:
             DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
-        userPhone: json['userPhone'] ?? '', // ✅ NEW
+        userPhone: json['userPhone'] ?? '',
         meds: (json['meds'] as List<dynamic>? ?? [])
             .map((m) => Medication.fromJson(m))
             .toList(),
@@ -431,7 +400,10 @@ class Profile {
 extension ProfileHelpers on Profile {
   String get displayName {
     if (fullName.isNotEmpty) return fullName;
-    if (agentName != null && agentName!.isNotEmpty) return agentName!;
+
+    final safeAgentName = agentName ?? '';
+    if (safeAgentName.isNotEmpty) return safeAgentName;
+
     return "User";
   }
 }
