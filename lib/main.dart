@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -111,15 +110,23 @@ class VitaLinkApp extends StatelessWidget {
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
         '/edit_profile': (context) => EditProfile(),
-        '/profile_picker': (context) => ProfilePicker(),
+
+        // 🔥 FIXED CLASS NAME
+        '/profile_picker': (context) => const ProfilePickerScreen(),
+
         '/new_profile': (context) => const NewProfileScreen(),
 
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
 
-        '/insurance_policies': (context) => InsurancePolicies(),
-        '/insurance_cards': (context) => InsuranceCards(),
+        // 🔥 Adjust if class names differ
+        '/insurance_policies': (context) =>
+            const InsurancePoliciesScreen(),
+
+        '/insurance_cards': (context) =>
+            const InsuranceCardsScreen(),
+
         '/insurance_cards_menu': (context) =>
             const IOSCardScanScreen(),
 
