@@ -50,8 +50,7 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,6 +81,30 @@ class VitaLinkApp extends StatelessWidget {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
+
+      // ✅ Use onGenerateRoute for any screen that needs arguments
+      onGenerateRoute: (settings) {
+        if (settings.name == '/insurance_cards') {
+          // InsuranceCardsScreen requires: index
+          int index = 0;
+
+          final args = settings.arguments;
+          if (args is int) {
+            index = args;
+          } else if (args is Map) {
+            final v = args['index'];
+            if (v is int) index = v;
+          }
+
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => InsuranceCardsScreen(index: index),
+          );
+        }
+
+        return null; // fall back to routes below
+      },
+
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
@@ -109,37 +132,32 @@ class VitaLinkApp extends StatelessWidget {
 
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
-        '/edit_profile': (context) => EditProfile(),
 
-        // 🔥 FIXED CLASS NAME
+        // ✅ FIXED: correct class name
+        '/edit_profile': (context) => const EditProfileScreen(),
+
+        // ✅ FIXED: correct class name
         '/profile_picker': (context) => const ProfilePickerScreen(),
-
         '/new_profile': (context) => const NewProfileScreen(),
 
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
 
-        // 🔥 Adjust if class names differ
-        '/insurance_policies': (context) =>
-            const InsurancePoliciesScreen(),
+        '/insurance_policies': (context) => InsurancePolicies(),
 
-        '/insurance_cards': (context) =>
-            const InsuranceCardsScreen(),
+        // ❌ DO NOT put /insurance_cards here (needs index)
+        // '/insurance_cards': handled by onGenerateRoute
 
-        '/insurance_cards_menu': (context) =>
-            const IOSCardScanScreen(),
+        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
 
         '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) =>
-            const HipaaFormScreen(),
+        '/authorization_form': (context) => const HipaaFormScreen(),
 
         '/request_reset': (context) => const RequestResetScreen(),
         '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) =>
-            const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) =>
-            const AgentResetPasswordScreen(),
+        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
       },
     );
   }
