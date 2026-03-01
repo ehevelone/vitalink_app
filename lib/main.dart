@@ -3,7 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -58,13 +57,11 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// ✅ Required for FCM background messages
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
   } catch (_) {}
-  // If you want: log message.messageId / data here
 }
 
 Future<void> main() async {
@@ -77,11 +74,9 @@ Future<void> main() async {
 
     try {
       await Firebase.initializeApp();
-    } catch (_) {}
-
-    // ✅ Register background handler (safe even if you’re not using it yet)
-    try {
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        firebaseMessagingBackgroundHandler,
+      );
     } catch (_) {}
 
     runApp(const VitaLinkApp());
@@ -101,6 +96,7 @@ class VitaLinkApp extends StatelessWidget {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
+
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
@@ -128,20 +124,18 @@ class VitaLinkApp extends StatelessWidget {
 
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
-        '/edit_profile': (context) => const EditProfile(),
-        '/profile_picker': (context) => const ProfilePicker(),
+
+        // ❌ Removed const from these (not const constructors)
+        '/edit_profile': (context) => EditProfile(),
+        '/profile_picker': (context) => ProfilePicker(),
         '/new_profile': (context) => const NewProfileScreen(),
 
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
 
-        '/insurance_policies': (context) => const InsurancePolicies(),
-        '/insurance_policy_view': (context) => const InsurancePolicyView(),
-        '/insurance_policy_form': (context) => const InsurancePolicyForm(),
-
-        '/insurance_cards': (context) => const InsuranceCards(),
-        '/insurance_card_detail': (context) => const InsuranceCardDetail(),
+        '/insurance_policies': (context) => InsurancePolicies(),
+        '/insurance_cards': (context) => InsuranceCards(),
         '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
 
         '/scan_card': (context) => const ScanCard(),
@@ -151,6 +145,30 @@ class VitaLinkApp extends StatelessWidget {
         '/reset_password': (context) => const ResetPasswordScreen(),
         '/agent_request_reset': (context) => const AgentRequestResetScreen(),
         '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
+      },
+
+      // ✅ Handle routes that require arguments
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/insurance_policy_view':
+            final index = settings.arguments as int;
+            return MaterialPageRoute(
+              builder: (_) => InsurancePolicyView(index: index),
+            );
+
+          case '/insurance_policy_form':
+            final policy = settings.arguments;
+            return MaterialPageRoute(
+              builder: (_) => InsurancePolicyForm(policy: policy),
+            );
+
+          case '/insurance_card_detail':
+            final card = settings.arguments;
+            return MaterialPageRoute(
+              builder: (_) => InsuranceCardDetail(card: card),
+            );
+        }
+        return null;
       },
     );
   }
