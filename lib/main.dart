@@ -61,20 +61,11 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
-import 'models.dart';
-
 final GlobalKey<NavigatorState> navigatorKey =
     GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔥 FORCE FLUTTER TO SURFACE ERRORS (even in profile/release)
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint("🔥 FLUTTER ERROR: ${details.exceptionAsString()}");
-    debugPrint(details.stack.toString());
-  };
 
   await runZonedGuarded(() async {
     await SystemChrome.setPreferredOrientations([
@@ -85,10 +76,6 @@ Future<void> main() async {
       await Firebase.initializeApp();
     } catch (_) {}
 
-    FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler,
-    );
-
     runApp(const VitaLinkApp());
   }, (error, stack) {
     debugPrint("🔥 ZONED ERROR: $error");
@@ -96,50 +83,8 @@ Future<void> main() async {
   });
 }
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(
-    RemoteMessage message) async {
-  try {
-    await Firebase.initializeApp();
-  } catch (_) {}
-}
-
-Future<void> _setupFirebaseTokenListener() async {
-  final fcm = FirebaseMessaging.instance;
-  final store = SecureStore();
-
-  await fcm.requestPermission();
-  final token = await fcm.getToken();
-
-  if (token != null) {
-    final email = await store.get('lastEmail');
-    final role = await store.get('lastRole');
-
-    if (email != null && role != null) {
-      await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: token,
-        role: role,
-      );
-    }
-  }
-}
-
-class VitaLinkApp extends StatefulWidget {
+class VitaLinkApp extends StatelessWidget {
   const VitaLinkApp({super.key});
-
-  @override
-  State<VitaLinkApp> createState() => _VitaLinkAppState();
-}
-
-class _VitaLinkAppState extends State<VitaLinkApp> {
-  @override
-  void initState() {
-    super.initState();
-
-    // 🔥 FCM disabled for now (was freezing startup)
-    // _setupFirebaseTokenListener();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -154,17 +99,55 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         '/login': (context) => const LoginScreen(),
         '/agent_login': (context) => const AgentLoginScreen(),
+
         '/terms_user': (context) => const TermsUserScreen(),
         '/terms_agent': (context) => const TermsAgentScreen(),
+
         '/registration': (context) => const RegistrationScreen(),
         '/account_setup': (context) => const AccountSetupScreen(),
         '/agent_registration': (context) => const AgentRegistrationScreen(),
         '/agent_setup': (context) => const AgentSetupScreen(),
 
-        '/insurance_cards_menu': (context) => IOSCardScanScreen(),
+        '/logo': (context) => const LogoScreen(),
+        '/menu': (context) => const MenuScreen(),
+        '/agent_menu': (context) => const AgentMenuScreen(),
+
+        '/my_agent_user': (context) => const MyAgentUser(),
+        '/my_agent_agent': (context) => const MyAgentAgent(),
+
+        '/emergency': (context) => const EmergencyScreen(),
+        '/emergency_view': (context) => const EmergencyView(),
+
+        '/my_profile_user': (context) => const ProfileUserScreen(),
+        '/my_profile_agent': (context) => const ProfileAgentScreen(),
+        '/edit_profile': (context) => const EditProfile(),
+        '/profile_picker': (context) => const ProfilePicker(),
+        '/new_profile': (context) => const NewProfileScreen(),
+
+        '/meds': (context) => const MedsScreen(),
+        '/doctors': (context) => const DoctorsScreen(),
+        '/doctors_view': (context) => const DoctorsView(),
+
+        '/insurance_policies': (context) => const InsurancePolicies(),
+        '/insurance_policy_view': (context) => const InsurancePolicyView(),
+        '/insurance_policy_form': (context) => const InsurancePolicyForm(),
+
+        '/insurance_cards': (context) => const InsuranceCards(),
+        '/insurance_card_detail': (context) =>
+            const InsuranceCardDetail(),
+        '/insurance_cards_menu': (context) =>
+            const IOSCardScanScreen(),
+
         '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
+
+        '/request_reset': (context) => const RequestResetScreen(),
+        '/reset_password': (context) => const ResetPasswordScreen(),
+        '/agent_request_reset': (context) =>
+            const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) =>
+            const AgentResetPasswordScreen(),
       },
     );
   }
