@@ -66,31 +66,52 @@ class _LogoScreenState extends State<LogoScreen> {
       final email = await store.getString('userEmail');
       final role = await store.getString('role');
 
-      if (email == null || email.isEmpty) return;
-      if (role == null) return;
-      if (role != 'user') return;
+      if (email == null || email.isEmpty) {
+        _showDebug("Missing email");
+        return;
+      }
+
+      if (role != 'user') {
+        _showDebug("Role not user");
+        return;
+      }
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null || fcmToken.isEmpty) return;
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        _showDebug("No FCM token");
+        return;
+      }
 
       final lastToken = await store.getString('lastDeviceToken');
-      if (lastToken != null && lastToken == fcmToken) return;
+
+      if (lastToken != null && lastToken == fcmToken) {
+        _showDebug("Token unchanged");
+        return;
+      }
 
       final result = await ApiService.registerDeviceToken(
         email: email,
         fcmToken: fcmToken,
-        role: role, // now safe (non-null)
+        role: role,
       );
 
       if (result['success'] == true) {
         await store.setString('lastDeviceToken', fcmToken);
-        debugPrint("✅ Device registered");
+        _showDebug("Device registered OK");
       } else {
-        debugPrint("⚠️ Device registration failed: ${result['error']}");
+        _showDebug("Backend error");
       }
-    } catch (e) {
-      debugPrint("❌ Device registration exception: $e");
+    } catch (_) {
+      _showDebug("Registration exception");
     }
+  }
+
+  void _showDebug(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("REG DEV: $msg")),
+    );
   }
 
   @override
