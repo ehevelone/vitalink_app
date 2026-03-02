@@ -64,17 +64,20 @@ class _LogoScreenState extends State<LogoScreen> {
       final store = SecureStore();
 
       final email = await store.getString('userEmail');
-      final role = await store.getString('role');
+      final roleNullable = await store.getString('role');
 
       if (email == null || email.isEmpty) {
         _showDebug("Missing email");
         return;
       }
 
-      if (role != 'user') {
+      if (roleNullable == null || roleNullable != 'user') {
         _showDebug("Role not user");
         return;
       }
+
+      // 🔥 Now make it NON-nullable
+      final String role = roleNullable;
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
 
@@ -102,7 +105,7 @@ class _LogoScreenState extends State<LogoScreen> {
       } else {
         _showDebug("Backend error");
       }
-    } catch (_) {
+    } catch (e) {
       _showDebug("Registration exception");
     }
   }
