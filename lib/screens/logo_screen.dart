@@ -22,8 +22,6 @@ class _LogoScreenState extends State<LogoScreen> {
   Profile? _p;
   bool _loading = true;
 
-  bool _deviceRegisterAttempted = false;
-
   @override
   void initState() {
     super.initState();
@@ -57,9 +55,6 @@ class _LogoScreenState extends State<LogoScreen> {
   }
 
   Future<void> _registerDeviceOnAppLoad() async {
-    if (_deviceRegisterAttempted) return;
-    _deviceRegisterAttempted = true;
-
     try {
       final store = SecureStore();
 
@@ -67,37 +62,23 @@ class _LogoScreenState extends State<LogoScreen> {
       final roleNullable = await store.getString('role');
 
       if (email == null || email.isEmpty) {
-        _showDebug("Missing email");
+        _debug("Missing email — abort");
         return;
       }
 
-      if (roleNullable == null || roleNullable != 'user') {
-        _showDebug("Role not user");
-        return;
-      }
+      final role = roleNullable ?? 'user';
 
-      final String role = roleNullable;
-
-      // 🔥 iOS REQUIRES permission request
+      // 🔥 Force permission request
       await FirebaseMessaging.instance.requestPermission();
 
-      final fcmToken = await FirebaseMessaging.instance.getToken();
+      final fcmToken =
+          await FirebaseMessaging.instance.getToken() ?? "NO_TOKEN";
 
-      if (fcmToken == null || fcmToken.isEmpty) {
-        _showDebug("No FCM token");
-        return;
-      }
+      _debug("EMAIL: $email");
+      _debug("ROLE: $role");
+      _debug("TOKEN: $fcmToken");
 
-      _showDebug("Token OK");
-
-      final lastToken = await store.getString('lastDeviceToken');
-
-      if (lastToken != null && lastToken == fcmToken) {
-        _showDebug("Token unchanged");
-        return;
-      }
-
-      _showDebug("Calling backend");
+      _debug("FORCING BACKEND CALL");
 
       final result = await ApiService.registerDeviceToken(
         email: email,
@@ -105,18 +86,17 @@ class _LogoScreenState extends State<LogoScreen> {
         role: role,
       );
 
+      _debug("BACKEND RESPONSE: ${result['success']}");
+
       if (result['success'] == true) {
         await store.setString('lastDeviceToken', fcmToken);
-        _showDebug("Device registered OK");
-      } else {
-        _showDebug("Backend error");
       }
     } catch (e) {
-      _showDebug("Registration exception");
+      _debug("EXCEPTION: $e");
     }
   }
 
-  void _showDebug(String msg) {
+  void _debug(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("REG DEV: $msg")),
@@ -131,8 +111,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
   Future<void> _openMenu() async {
     _timer?.cancel();
-
-    await _registerDeviceOnAppLoad();
 
     try {
       final loggedIn = await AppState.isLoggedIn();
@@ -200,59 +178,6 @@ class _LogoScreenState extends State<LogoScreen> {
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 48),
-              GestureDetector(
-                onTap: _openEmergencyScreen,
-                child: Container(
-                  width: 240,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade700,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.redAccent,
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent.withOpacity(0.4),
-                        blurRadius: 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.white,
-                        size: 42,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "EMERGENCY",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        "TAP FOR INFO",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],
