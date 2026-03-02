@@ -30,7 +30,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
     _loadProfile();
 
-    // ✅ iOS-safe: try once after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _registerDeviceOnAppLoad();
     });
@@ -58,37 +57,39 @@ class _LogoScreenState extends State<LogoScreen> {
   }
 
   Future<void> _registerDeviceOnAppLoad() async {
-    // ✅ Allow multiple calls, but do nothing if already tried
     if (_deviceRegisterAttempted) return;
     _deviceRegisterAttempted = true;
 
     try {
       final store = SecureStore();
+
       final email = await store.getString('userEmail');
       final role = await store.getString('role');
 
-      // Must exist
-      if (email == null || email.isEmpty || role == null || role.isEmpty) return;
-
-      // ✅ Users only
+      if (email == null || email.isEmpty) return;
       if (role != 'user') return;
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken == null || fcmToken.isEmpty) return;
 
-      // ✅ Only call backend if token changed
       final lastToken = await store.getString('lastDeviceToken');
+
       if (lastToken != null && lastToken == fcmToken) return;
 
-      await ApiService.registerDeviceToken(
+      final result = await ApiService.registerDeviceToken(
         email: email,
         fcmToken: fcmToken,
         role: role,
       );
 
-      await store.setString('lastDeviceToken', fcmToken);
-    } catch (_) {
-      // silent
+      if (result['success'] == true) {
+        await store.setString('lastDeviceToken', fcmToken);
+        debugPrint("✅ Device registered");
+      } else {
+        debugPrint("⚠️ Device registration failed: ${result['error']}");
+      }
+    } catch (e) {
+      debugPrint("❌ Device registration exception: $e");
     }
   }
 
@@ -101,7 +102,6 @@ class _LogoScreenState extends State<LogoScreen> {
   Future<void> _openMenu() async {
     _timer?.cancel();
 
-    // ✅ CRITICAL: try device registration again right before routing
     await _registerDeviceOnAppLoad();
 
     try {
@@ -158,7 +158,10 @@ class _LogoScreenState extends State<LogoScreen> {
               else if (hasName) ...[
                 Text(
                   "Welcome, $name",
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -180,7 +183,10 @@ class _LogoScreenState extends State<LogoScreen> {
                   decoration: BoxDecoration(
                     color: Colors.red.shade700,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.redAccent, width: 3),
+                    border: Border.all(
+                      color: Colors.redAccent,
+                      width: 3,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.redAccent.withOpacity(0.4),
@@ -192,8 +198,11 @@ class _LogoScreenState extends State<LogoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(Icons.warning_amber_rounded,
-                          color: Colors.white, size: 42),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
                       SizedBox(height: 12),
                       Text(
                         "EMERGENCY",

@@ -27,41 +27,32 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadSavedLogin();
   }
 
-  void _toast(String msg) {
-    // ✅ Never crash if there's no ScaffoldMessenger in the tree yet
-    final sm = ScaffoldMessenger.maybeOf(context);
-    if (sm == null) {
-      debugPrint("⚠️ SnackBar skipped (no ScaffoldMessenger): $msg");
-      return;
-    }
-    sm.showSnackBar(SnackBar(content: Text(msg)));
-  }
-
   Future<void> _loadSavedLogin() async {
     final store = SecureStore();
+    final remember = await store.getBool('rememberMe');
     final savedEmail = await store.getString('lastEmail');
     final savedPassword = await store.getString('lastPassword');
-    final remember = await store.getBool('rememberMe');
 
     if (!mounted) return;
 
-    // ✅ Restore email even if password is missing
     if (remember == true) {
       setState(() {
         _rememberMe = true;
-        if (savedEmail != null && savedEmail.isNotEmpty) {
-          _emailCtrl.text = savedEmail;
-        }
-        if (savedPassword != null && savedPassword.isNotEmpty) {
-          _passwordCtrl.text = savedPassword;
-        }
+        if (savedEmail != null) _emailCtrl.text = savedEmail;
+        if (savedPassword != null) _passwordCtrl.text = savedPassword;
       });
     }
   }
 
+  void _toast(String msg) {
+    final sm = ScaffoldMessenger.maybeOf(context);
+    if (sm != null) {
+      sm.showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
   Future<void> _login() async {
-    final form = _formKey.currentState;
-    if (form == null || !form.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
 
@@ -69,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text.trim();
 
-      // ✅ iOS-only build for now
       final result = await ApiService.loginUser(
         email: email,
         password: password,
@@ -79,27 +69,23 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] != true) {
-        final errorMessage =
-            (result['error']?.toString().trim().isNotEmpty == true)
-                ? result['error'].toString()
-                : "Login failed";
-        _toast(errorMessage);
+        _toast(result['error'] ?? "Login failed");
         setState(() => _loading = false);
         return;
       }
 
-      // ✅ Auth state
+      // ✅ AppState
       await AppState.setLoggedIn(true);
       await AppState.setEmail(email);
       await AppState.setRole('user');
 
-      // ✅ SecureStore keys used by device registration + menus
+      // ✅ SecureStore (for device registration + auto login)
       final store = SecureStore();
       await store.setString('userEmail', email);
       await store.setString('role', 'user');
       await store.setBool('userLoggedIn', true);
 
-      // ✅ Remember me
+      // ✅ Remember Me
       await store.setString('lastEmail', email);
 
       if (_rememberMe) {
@@ -110,20 +96,13 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove('lastPassword');
       }
 
-      // ✅ Profile load (never null in your DataRepository)
-      final repo = DataRepository();
-      await repo.loadProfile();
+      await DataRepository().loadProfile();
 
       if (!mounted) return;
-
-      // ✅ Route forward
       Navigator.pushReplacementNamed(context, '/logo');
-    } catch (e, st) {
-      debugPrint("❌ LOGIN EXCEPTION: $e");
-      debugPrint("🧱 STACK TRACE:\n$st");
-
+    } catch (e) {
       if (!mounted) return;
-      _toast("Login error: $e");
+      _toast("Login error");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -150,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? "Enter your email" : null,
+                    v == null || v.trim().isEmpty ? "Enter your email" : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -160,17 +139,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                      _showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? "Enter your password"
-                    : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty
+                        ? "Enter your password"
+                        : null,
               ),
-              const SizedBox(height: 8),
               Row(
                 children: [
                   Checkbox(
