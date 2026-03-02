@@ -27,21 +27,28 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadSavedLogin();
   }
 
+  // 🔥 Always restore email. Restore password only if rememberMe true.
   Future<void> _loadSavedLogin() async {
     final store = SecureStore();
-    final remember = await store.getBool('rememberMe');
+
     final savedEmail = await store.getString('lastEmail');
     final savedPassword = await store.getString('lastPassword');
+    final remember = await store.getBool('rememberMe');
 
     if (!mounted) return;
 
-    if (remember == true) {
-      setState(() {
+    setState(() {
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        _emailCtrl.text = savedEmail;
+      }
+
+      if (remember == true && savedPassword != null) {
+        _passwordCtrl.text = savedPassword;
         _rememberMe = true;
-        if (savedEmail != null) _emailCtrl.text = savedEmail;
-        if (savedPassword != null) _passwordCtrl.text = savedPassword;
-      });
-    }
+      } else {
+        _rememberMe = false;
+      }
+    });
   }
 
   void _toast(String msg) {
@@ -79,20 +86,21 @@ class _LoginScreenState extends State<LoginScreen> {
       await AppState.setEmail(email);
       await AppState.setRole('user');
 
-      // ✅ SecureStore (for device registration + auto login)
+      // ✅ SecureStore (used by logo + device reg)
       final store = SecureStore();
       await store.setString('userEmail', email);
       await store.setString('role', 'user');
       await store.setBool('userLoggedIn', true);
 
-      // ✅ Remember Me
+      // 🔥 Always store last email
       await store.setString('lastEmail', email);
 
+      // 🔥 Proper remember logic
+      await store.setBool('rememberMe', _rememberMe);
+
       if (_rememberMe) {
-        await store.setBool('rememberMe', true);
         await store.setString('lastPassword', password);
       } else {
-        await store.setBool('rememberMe', false);
         await store.remove('lastPassword');
       }
 
@@ -100,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/logo');
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       _toast("Login error");
     } finally {
