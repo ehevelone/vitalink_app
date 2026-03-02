@@ -71,6 +71,9 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
+      // ✅ Users only — never register agents
+      if (role != 'user') return;
+
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken == null || fcmToken.isEmpty) return;
 
