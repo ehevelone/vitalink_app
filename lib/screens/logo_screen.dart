@@ -30,7 +30,7 @@ class _LogoScreenState extends State<LogoScreen> {
 
     _loadProfile();
 
-    // ✅ Run after first frame so iOS is fully settled
+    // ✅ iOS-safe: try once after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _registerDeviceOnAppLoad();
     });
@@ -58,26 +58,25 @@ class _LogoScreenState extends State<LogoScreen> {
   }
 
   Future<void> _registerDeviceOnAppLoad() async {
+    // ✅ Allow multiple calls, but do nothing if already tried
     if (_deviceRegisterAttempted) return;
     _deviceRegisterAttempted = true;
 
     try {
-      // Prefer SecureStore (Menu uses these keys)
       final store = SecureStore();
       final email = await store.getString('userEmail');
       final role = await store.getString('role');
 
-      if (email == null || email.isEmpty || role == null || role.isEmpty) {
-        return;
-      }
+      // Must exist
+      if (email == null || email.isEmpty || role == null || role.isEmpty) return;
 
-      // ✅ Users only — never register agents
+      // ✅ Users only
       if (role != 'user') return;
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken == null || fcmToken.isEmpty) return;
 
-      // ✅ Only call backend if token changed (register/update/no-op)
+      // ✅ Only call backend if token changed
       final lastToken = await store.getString('lastDeviceToken');
       if (lastToken != null && lastToken == fcmToken) return;
 
@@ -89,7 +88,7 @@ class _LogoScreenState extends State<LogoScreen> {
 
       await store.setString('lastDeviceToken', fcmToken);
     } catch (_) {
-      // No crash. Just skip silently.
+      // silent
     }
   }
 
@@ -101,6 +100,9 @@ class _LogoScreenState extends State<LogoScreen> {
 
   Future<void> _openMenu() async {
     _timer?.cancel();
+
+    // ✅ CRITICAL: try device registration again right before routing
+    await _registerDeviceOnAppLoad();
 
     try {
       final loggedIn = await AppState.isLoggedIn();
@@ -152,16 +154,11 @@ class _LogoScreenState extends State<LogoScreen> {
               ),
               const SizedBox(height: 28),
               if (_loading)
-                const CircularProgressIndicator(
-                  color: Colors.white70,
-                )
+                const CircularProgressIndicator(color: Colors.white70)
               else if (hasName) ...[
                 Text(
                   "Welcome, $name",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -183,10 +180,7 @@ class _LogoScreenState extends State<LogoScreen> {
                   decoration: BoxDecoration(
                     color: Colors.red.shade700,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.redAccent,
-                      width: 3,
-                    ),
+                    border: Border.all(color: Colors.redAccent, width: 3),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.redAccent.withOpacity(0.4),
@@ -198,11 +192,8 @@ class _LogoScreenState extends State<LogoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.white,
-                        size: 42,
-                      ),
+                      Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 42),
                       SizedBox(height: 12),
                       Text(
                         "EMERGENCY",
