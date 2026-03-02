@@ -45,11 +45,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
-    if (remember == true && savedEmail != null && savedPassword != null) {
+    // ✅ Restore email even if password is missing
+    if (remember == true) {
       setState(() {
-        _emailCtrl.text = savedEmail;
-        _passwordCtrl.text = savedPassword;
         _rememberMe = true;
+        if (savedEmail != null && savedEmail.isNotEmpty) {
+          _emailCtrl.text = savedEmail;
+        }
+        if (savedPassword != null && savedPassword.isNotEmpty) {
+          _passwordCtrl.text = savedPassword;
+        }
       });
     }
   }
@@ -74,9 +79,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] != true) {
-        final errorMessage = (result['error']?.toString().trim().isNotEmpty == true)
-            ? result['error'].toString()
-            : "Login failed";
+        final errorMessage =
+            (result['error']?.toString().trim().isNotEmpty == true)
+                ? result['error'].toString()
+                : "Login failed";
         _toast(errorMessage);
         setState(() => _loading = false);
         return;
@@ -87,8 +93,13 @@ class _LoginScreenState extends State<LoginScreen> {
       await AppState.setEmail(email);
       await AppState.setRole('user');
 
-      // ✅ Remember me
+      // ✅ SecureStore keys used by device registration + menus
       final store = SecureStore();
+      await store.setString('userEmail', email);
+      await store.setString('role', 'user');
+      await store.setBool('userLoggedIn', true);
+
+      // ✅ Remember me
       await store.setString('lastEmail', email);
 
       if (_rememberMe) {
@@ -105,10 +116,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // ✅ For now just route forward (account setup flow can be reinserted later)
+      // ✅ Route forward
       Navigator.pushReplacementNamed(context, '/logo');
     } catch (e, st) {
-      // 🔥 This is what we need to pinpoint the REAL line of the null-bang
       debugPrint("❌ LOGIN EXCEPTION: $e");
       debugPrint("🧱 STACK TRACE:\n$st");
 
@@ -139,9 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? "Enter your email"
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? "Enter your email" : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -153,7 +162,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: Icon(
                       _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
@@ -165,7 +175,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Checkbox(
                     value: _rememberMe,
-                    onChanged: (val) => setState(() => _rememberMe = val ?? false),
+                    onChanged: (val) =>
+                        setState(() => _rememberMe = val ?? false),
                   ),
                   const Text("Remember Me"),
                 ],
@@ -182,7 +193,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const ResetPasswordScreen(),
+                    ),
                   );
                 },
                 child: const Text("Forgot Password?"),
