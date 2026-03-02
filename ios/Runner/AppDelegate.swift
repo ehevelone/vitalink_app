@@ -1,6 +1,6 @@
 import UIKit
 import Flutter
-import Firebase
+import FirebaseCore
 import FirebaseMessaging
 
 @main
@@ -11,20 +11,23 @@ import FirebaseMessaging
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    FirebaseApp.configure()
-
-    Messaging.messaging().delegate = self
-
-    application.registerForRemoteNotifications()
+    // 🔥 SAFE INIT (prevents crash if plist missing or mislinked)
+    if FirebaseApp.app() == nil {
+      FirebaseApp.configure()
+    }
 
     GeneratedPluginRegistrant.register(with: self)
+
+    Messaging.messaging().delegate = self
+    application.registerForRemoteNotifications()
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  override func application(_ application: UIApplication,
-    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
