@@ -46,7 +46,6 @@ class _LogoScreenState extends State<LogoScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-
       setState(() {
         _p = null;
         _loading = false;
@@ -55,30 +54,41 @@ class _LogoScreenState extends State<LogoScreen> {
   }
 
   Future<void> _registerDeviceOnAppLoad() async {
-    try {
-      final store = SecureStore();
+    final store = SecureStore();
 
+    try {
       final email = await store.getString('userEmail');
       final roleNullable = await store.getString('role');
 
       if (email == null || email.isEmpty) {
-        _debug("Missing email — abort");
+        _debug("Missing email");
         return;
       }
 
-      final role = roleNullable ?? 'user';
+      final role = roleNullable ?? "user";
 
-      // 🔥 Force permission request
-      await FirebaseMessaging.instance.requestPermission();
+      // 🔹 Request permission safely (will NOT throw)
+      try {
+        await FirebaseMessaging.instance.requestPermission();
+      } catch (e) {
+        _debug("Permission error: $e");
+      }
 
-      final fcmToken =
-          await FirebaseMessaging.instance.getToken() ?? "NO_TOKEN";
+      String fcmToken = "NO_TOKEN";
+
+      // 🔹 Get token safely (this is where iOS usually fails)
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token != null && token.isNotEmpty) {
+          fcmToken = token;
+        }
+      } catch (e) {
+        _debug("getToken error: $e");
+      }
 
       _debug("EMAIL: $email");
       _debug("ROLE: $role");
       _debug("TOKEN: $fcmToken");
-
-      _debug("FORCING BACKEND CALL");
 
       final result = await ApiService.registerDeviceToken(
         email: email,
@@ -86,13 +96,13 @@ class _LogoScreenState extends State<LogoScreen> {
         role: role,
       );
 
-      _debug("BACKEND RESPONSE: ${result['success']}");
+      _debug("BACKEND: ${result['success']}");
 
       if (result['success'] == true) {
         await store.setString('lastDeviceToken', fcmToken);
       }
     } catch (e) {
-      _debug("EXCEPTION: $e");
+      _debug("FINAL EX: $e");
     }
   }
 
