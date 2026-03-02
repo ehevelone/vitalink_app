@@ -24,10 +24,13 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedLogin();
+
+    // 🔥 iOS-safe delayed load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedLogin();
+    });
   }
 
-  // 🔥 Always restore email. Restore password only if rememberMe true.
   Future<void> _loadSavedLogin() async {
     final store = SecureStore();
 
@@ -42,7 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailCtrl.text = savedEmail;
       }
 
-      if (remember == true && savedPassword != null) {
+      if (remember == true &&
+          savedPassword != null &&
+          savedPassword.isNotEmpty) {
         _passwordCtrl.text = savedPassword;
         _rememberMe = true;
       } else {
@@ -81,21 +86,20 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // ✅ AppState
       await AppState.setLoggedIn(true);
       await AppState.setEmail(email);
       await AppState.setRole('user');
 
-      // ✅ SecureStore (used by logo + device reg)
       final store = SecureStore();
+
       await store.setString('userEmail', email);
       await store.setString('role', 'user');
       await store.setBool('userLoggedIn', true);
 
-      // 🔥 Always store last email
+      // 🔥 Always store email
       await store.setString('lastEmail', email);
 
-      // 🔥 Proper remember logic
+      // 🔥 Proper remember handling
       await store.setBool('rememberMe', _rememberMe);
 
       if (_rememberMe) {
