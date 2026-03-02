@@ -76,8 +76,10 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
-      // 🔥 Now make it NON-nullable
       final String role = roleNullable;
+
+      // 🔥 iOS REQUIRES permission request
+      await FirebaseMessaging.instance.requestPermission();
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
 
@@ -86,12 +88,16 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
+      _showDebug("Token OK");
+
       final lastToken = await store.getString('lastDeviceToken');
 
       if (lastToken != null && lastToken == fcmToken) {
         _showDebug("Token unchanged");
         return;
       }
+
+      _showDebug("Calling backend");
 
       final result = await ApiService.registerDeviceToken(
         email: email,
