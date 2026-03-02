@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
+import '../services/secure_store.dart';
+import '../services/api_service.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -19,10 +22,19 @@ class _LogoScreenState extends State<LogoScreen> {
   Profile? _p;
   bool _loading = true;
 
+  bool _deviceRegisterAttempted = false;
+
   @override
   void initState() {
     super.initState();
+
     _loadProfile();
+
+    // ✅ Run after first frame so iOS is fully settled
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _registerDeviceOnAppLoad();
+    });
+
     _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
 
@@ -42,6 +54,39 @@ class _LogoScreenState extends State<LogoScreen> {
         _p = null;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _registerDeviceOnAppLoad() async {
+    if (_deviceRegisterAttempted) return;
+    _deviceRegisterAttempted = true;
+
+    try {
+      // Prefer SecureStore (Menu uses these keys)
+      final store = SecureStore();
+      final email = await store.getString('userEmail');
+      final role = await store.getString('role');
+
+      if (email == null || email.isEmpty || role == null || role.isEmpty) {
+        return;
+      }
+
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null || fcmToken.isEmpty) return;
+
+      // ✅ Only call backend if token changed (register/update/no-op)
+      final lastToken = await store.getString('lastDeviceToken');
+      if (lastToken != null && lastToken == fcmToken) return;
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: fcmToken,
+        role: role,
+      );
+
+      await store.setString('lastDeviceToken', fcmToken);
+    } catch (_) {
+      // No crash. Just skip silently.
     }
   }
 
@@ -65,7 +110,6 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
-      // 🔒 HARD SAFE DEFAULTS
       final safeRole = role ?? "user";
 
       if (safeRole == 'agent') {
@@ -74,7 +118,7 @@ class _LogoScreenState extends State<LogoScreen> {
       }
 
       Navigator.pushReplacementNamed(context, '/menu');
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');
     }
@@ -134,18 +178,49 @@ class _LogoScreenState extends State<LogoScreen> {
                   width: 240,
                   height: 160,
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    color: Colors.red.shade700,
                     borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      "EMERGENCY",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    border: Border.all(
+                      color: Colors.redAccent,
+                      width: 3,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withOpacity(0.4),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "EMERGENCY",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        "TAP FOR INFO",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
