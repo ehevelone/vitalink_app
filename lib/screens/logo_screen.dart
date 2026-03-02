@@ -67,19 +67,19 @@ class _LogoScreenState extends State<LogoScreen> {
       final role = await store.getString('role');
 
       if (email == null || email.isEmpty) return;
+      if (role == null) return;
       if (role != 'user') return;
 
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken == null || fcmToken.isEmpty) return;
 
       final lastToken = await store.getString('lastDeviceToken');
-
       if (lastToken != null && lastToken == fcmToken) return;
 
       final result = await ApiService.registerDeviceToken(
         email: email,
         fcmToken: fcmToken,
-        role: role,
+        role: role, // now safe (non-null)
       );
 
       if (result['success'] == true) {
@@ -115,9 +115,7 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
-      final safeRole = role ?? "user";
-
-      if (safeRole == 'agent') {
+      if (role == 'agent') {
         Navigator.pushReplacementNamed(context, '/agent_menu');
         return;
       }
