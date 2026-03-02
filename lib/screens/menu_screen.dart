@@ -84,9 +84,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 FIXED: no forced null access
-    final displayName =
-        (_p != null && _p!.fullName.isNotEmpty) ? _p!.fullName : "User";
+    final displayName = (_p?.fullName.isNotEmpty == true)
+        ? _p!.fullName
+        : "User";
 
     return Scaffold(
       appBar: AppBar(

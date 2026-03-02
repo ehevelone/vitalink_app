@@ -22,19 +22,9 @@ class _LogoScreenState extends State<LogoScreen> {
   @override
   void initState() {
     super.initState();
-
     _loadProfile();
-
-    // 🔥 PUSH DISABLED FOR iOS TESTING
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   _initPushAndRegister();
-    // });
-
     _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
-
-  // 🔥 PUSH COMPLETELY REMOVED FOR NOW
-  // Future<void> _initPushAndRegister() async {}
 
   Future<void> _loadProfile() async {
     try {
@@ -64,22 +54,30 @@ class _LogoScreenState extends State<LogoScreen> {
   Future<void> _openMenu() async {
     _timer?.cancel();
 
-    final loggedIn = await AppState.isLoggedIn();
-    final role = await AppState.getRole();
+    try {
+      final loggedIn = await AppState.isLoggedIn();
+      final role = await AppState.getRole();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (!loggedIn) {
+      if (!loggedIn) {
+        Navigator.pushReplacementNamed(context, '/landing');
+        return;
+      }
+
+      // 🔒 HARD SAFE DEFAULTS
+      final safeRole = role ?? "user";
+
+      if (safeRole == 'agent') {
+        Navigator.pushReplacementNamed(context, '/agent_menu');
+        return;
+      }
+
+      Navigator.pushReplacementNamed(context, '/menu');
+    } catch (e) {
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');
-      return;
     }
-
-    if (role == 'agent') {
-      Navigator.pushReplacementNamed(context, '/agent_menu');
-      return;
-    }
-
-    Navigator.pushReplacementNamed(context, '/menu');
   }
 
   void _openEmergencyScreen() {
@@ -106,7 +104,6 @@ class _LogoScreenState extends State<LogoScreen> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 28),
-
               if (_loading)
                 const CircularProgressIndicator(
                   color: Colors.white70,
@@ -121,7 +118,6 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
-
               const Text(
                 'TAP ANYWHERE TO OPEN',
                 style: TextStyle(
@@ -131,58 +127,25 @@ class _LogoScreenState extends State<LogoScreen> {
                   letterSpacing: 1.1,
                 ),
               ),
-
               const SizedBox(height: 48),
-
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(
                   width: 240,
                   height: 160,
                   decoration: BoxDecoration(
-                    color: Colors.red.shade700,
+                    color: Colors.red,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.redAccent,
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent.withOpacity(0.4),
-                        blurRadius: 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(
-                        Icons.warning_amber_rounded,
+                  child: const Center(
+                    child: Text(
+                      "EMERGENCY",
+                      style: TextStyle(
                         color: Colors.white,
-                        size: 42,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
                       ),
-                      SizedBox(height: 12),
-                      Text(
-                        "EMERGENCY",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        "TAP FOR INFO",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
