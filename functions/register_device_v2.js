@@ -44,6 +44,7 @@ exports.handler = async (event) => {
     console.log("📲 Device registration attempt:", {
       email,
       token: deviceToken.slice(0, 10) + "...",
+      platform,
     });
 
     const userRes = await db.query(
@@ -62,29 +63,31 @@ exports.handler = async (event) => {
       return reply(200, { success: true, message: "No agent attached" });
     }
 
+    // 🔥 Check by device_token (NOT user_id)
     const existing = await db.query(
-      `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
-      [userId]
+      `SELECT id FROM user_devices WHERE device_token = $1 LIMIT 1`,
+      [deviceToken]
     );
 
     if (existing.rows.length) {
       const updated = await db.query(
         `
         UPDATE user_devices
-        SET device_token=$1,
+        SET user_id=$1,
             agent_id=$2,
             platform=$3,
             updated_at=NOW()
-        WHERE user_id=$4
+        WHERE device_token=$4
         RETURNING *;
         `,
-        [deviceToken, agentId, platform || "android", userId]
+        [userId, agentId, platform || "unknown", deviceToken]
       );
 
       console.log("♻️ Device updated:", updated.rows[0]);
       return reply(200, { success: true, device: updated.rows[0] });
     }
 
+    // 🔥 Insert NEW device row
     const inserted = await db.query(
       `
       INSERT INTO user_devices
@@ -92,7 +95,7 @@ exports.handler = async (event) => {
       VALUES ($1,$2,$3,$4,NOW(),NOW())
       RETURNING *;
       `,
-      [userId, agentId, deviceToken, platform || "android"]
+      [userId, agentId, deviceToken, platform || "unknown"]
     );
 
     console.log("✅ Device registered:", inserted.rows[0]);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -44,27 +45,29 @@ class _MenuScreenState extends State<MenuScreen> {
         return;
       }
 
-      // 2️⃣ Wait for APNs token (iOS only requirement)
-      String? apnsToken;
-      for (int i = 0; i < 10; i++) {
-        apnsToken =
-            await FirebaseMessaging.instance.getAPNSToken();
-        if (apnsToken != null) break;
-        await Future.delayed(const Duration(milliseconds: 500));
+      // 2️⃣ iOS only: wait for APNs token
+      if (Platform.isIOS) {
+        String? apnsToken;
+        for (int i = 0; i < 10; i++) {
+          apnsToken =
+              await FirebaseMessaging.instance.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+
+        if (apnsToken == null) {
+          print("APNS token never arrived");
+          return;
+        }
+
+        print("APNS TOKEN: $apnsToken");
       }
 
-      if (apnsToken == null) {
-        print("APNS token never arrived");
-        return;
-      }
-
-      print("APNS TOKEN: $apnsToken");
-
-      // 3️⃣ Now get FCM token
+      // 3️⃣ Get FCM token
       final fcmToken =
           await FirebaseMessaging.instance.getToken();
 
-      if (fcmToken == null) {
+      if (fcmToken == null || fcmToken.isEmpty) {
         print("FCM token null");
         return;
       }
@@ -80,17 +83,26 @@ class _MenuScreenState extends State<MenuScreen> {
         email: email,
         fcmToken: fcmToken,
         role: role,
+        platform: Platform.isIOS ? "ios" : "android",
       );
 
       // 4️⃣ Listen for refresh
       _tokenSub = FirebaseMessaging.instance.onTokenRefresh
           .listen((newToken) async {
+
+        final refreshedEmail = await store.getString('userEmail');
+        final refreshedRole = await store.getString('role');
+
+        if (refreshedEmail == null || refreshedRole == null) return;
+
         await ApiService.registerDeviceToken(
-          email: email,
+          email: refreshedEmail,
           fcmToken: newToken,
-          role: role,
+          role: refreshedRole,
+          platform: Platform.isIOS ? "ios" : "android",
         );
       });
+
     } catch (e) {
       print("FCM setup error: $e");
     }
