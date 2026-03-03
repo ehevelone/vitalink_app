@@ -63,31 +63,31 @@ exports.handler = async (event) => {
       return reply(200, { success: true, message: "No agent attached" });
     }
 
-    // 🔥 Check by device_token (NOT user_id)
+    // 🔥 ALWAYS update by user_id (single row per user)
     const existing = await db.query(
-      `SELECT id FROM user_devices WHERE device_token = $1 LIMIT 1`,
-      [deviceToken]
+      `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
+      [userId]
     );
 
     if (existing.rows.length) {
       const updated = await db.query(
         `
         UPDATE user_devices
-        SET user_id=$1,
-            agent_id=$2,
-            platform=$3,
+        SET device_token=$1,
+            platform=$2,
+            agent_id=$3,
             updated_at=NOW()
-        WHERE device_token=$4
+        WHERE user_id=$4
         RETURNING *;
         `,
-        [userId, agentId, platform || "unknown", deviceToken]
+        [deviceToken, platform || "unknown", agentId, userId]
       );
 
       console.log("♻️ Device updated:", updated.rows[0]);
       return reply(200, { success: true, device: updated.rows[0] });
     }
 
-    // 🔥 Insert NEW device row
+    // Safety fallback — insert if somehow missing
     const inserted = await db.query(
       `
       INSERT INTO user_devices
@@ -98,7 +98,7 @@ exports.handler = async (event) => {
       [userId, agentId, deviceToken, platform || "unknown"]
     );
 
-    console.log("✅ Device registered:", inserted.rows[0]);
+    console.log("✅ Device inserted:", inserted.rows[0]);
     return reply(200, { success: true, device: inserted.rows[0] });
 
   } catch (err) {
