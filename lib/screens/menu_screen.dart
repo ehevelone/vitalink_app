@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -19,14 +20,50 @@ class _MenuScreenState extends State<MenuScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
-  bool _deviceRegistered = false;
+  StreamSubscription<String>? _tokenSub;
 
   @override
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
     _loadProfile();
-    _registerDevice();
+    _setupFCM();
+  }
+
+  Future<void> _setupFCM() async {
+    final store = SecureStore();
+
+    await FirebaseMessaging.instance.requestPermission();
+
+    // Listen for token refresh (correct iOS pattern)
+    _tokenSub =
+        FirebaseMessaging.instance.onTokenRefresh.listen((fcmToken) async {
+      final email = await store.getString('userEmail');
+      final role = await store.getString('role');
+
+      if (email == null || role == null) return;
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: fcmToken,
+        role: role,
+      );
+    });
+
+    // Try initial fetch (Android works immediately)
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      final email = await store.getString('userEmail');
+      final role = await store.getString('role');
+
+      if (email != null && role != null) {
+        await ApiService.registerDeviceToken(
+          email: email,
+          fcmToken: token,
+          role: role,
+        );
+      }
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -36,30 +73,6 @@ class _MenuScreenState extends State<MenuScreen> {
       _p = p;
       _loading = false;
     });
-  }
-
-  Future<void> _registerDevice() async {
-    if (_deviceRegistered) return;
-
-    try {
-      final store = SecureStore();
-
-      final email = await store.getString('userEmail');
-      final role = await store.getString('role');
-
-      if (email == null || email.isEmpty || role == null) return;
-
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null || fcmToken.isEmpty) return;
-
-      await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: fcmToken,
-        role: role,
-      );
-
-      _deviceRegistered = true;
-    } catch (_) {}
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -83,10 +96,15 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   @override
+  void dispose() {
+    _tokenSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final displayName = (_p?.fullName.isNotEmpty == true)
-        ? _p!.fullName
-        : "User";
+    final displayName =
+        (_p?.fullName.isNotEmpty == true) ? _p!.fullName : "User";
 
     return Scaffold(
       appBar: AppBar(

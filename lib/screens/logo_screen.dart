@@ -1,13 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
-import '../services/secure_store.dart';
-import '../services/api_service.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -26,13 +22,7 @@ class _LogoScreenState extends State<LogoScreen> {
   @override
   void initState() {
     super.initState();
-
     _loadProfile();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _registerDeviceOnAppLoad();
-    });
-
     _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
 
@@ -52,74 +42,6 @@ class _LogoScreenState extends State<LogoScreen> {
         _loading = false;
       });
     }
-  }
-
-  Future<void> _registerDeviceOnAppLoad() async {
-    final store = SecureStore();
-
-    try {
-      final email = await store.getString('userEmail');
-      final roleNullable = await store.getString('role');
-
-      if (email == null || email.isEmpty) {
-        _debug("Missing email");
-        return;
-      }
-
-      final role = roleNullable ?? "user";
-
-      await FirebaseMessaging.instance.requestPermission();
-
-      // 🔥 iOS requires APNs token first
-      if (Platform.isIOS) {
-        String? apnsToken;
-
-        for (int i = 0; i < 10; i++) {
-          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-          if (apnsToken != null) break;
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
-
-        if (apnsToken == null) {
-          _debug("APNS token not ready");
-          return;
-        }
-
-        _debug("APNS ready");
-      }
-
-      String fcmToken = "NO_TOKEN";
-
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null && token.isNotEmpty) {
-        fcmToken = token;
-      }
-
-      _debug("EMAIL: $email");
-      _debug("ROLE: $role");
-      _debug("TOKEN: $fcmToken");
-
-      final result = await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: fcmToken,
-        role: role,
-      );
-
-      _debug("BACKEND: ${result['success']}");
-
-      if (result['success'] == true) {
-        await store.setString('lastDeviceToken', fcmToken);
-      }
-    } catch (e) {
-      _debug("FINAL EX: $e");
-    }
-  }
-
-  void _debug(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("REG DEV: $msg")),
-    );
   }
 
   @override
