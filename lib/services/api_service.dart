@@ -106,20 +106,25 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Agent login (Device enforced)
+  // 🔹 Agent login (NO device enforcement)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
     required String password,
-    required String deviceId,
+    String? deviceId,
     bool replace = false,
   }) async {
-    final res = await _postJson("check_agent", {
+    final body = {
       "email": email,
       "password": password,
-      "device_id": deviceId,
       "replace": replace,
-    });
+    };
+
+    if (deviceId != null) {
+      body["device_id"] = deviceId;
+    }
+
+    final res = await _postJson("check_agent", body);
 
     if (res["success"] != true) {
       return {
