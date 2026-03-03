@@ -34,7 +34,6 @@ exports.handler = async (event) => {
       return reply(false, { error: "Email and password required" }, 400);
     }
 
-    // 🔎 Get user
     const result = await db.query(
       `SELECT id, email, password_hash, first_name, last_name, agent_id
        FROM users
@@ -54,14 +53,15 @@ exports.handler = async (event) => {
       return reply(false, { error: "Invalid password" }, 401);
     }
 
-    // 🔥 DEVICE ENFORCEMENT (using user_devices table)
     if (device_id) {
       const deviceResult = await db.query(
-        `SELECT device_id FROM user_devices WHERE user_id = $1 LIMIT 1`,
+        `SELECT id, device_id
+         FROM user_devices
+         WHERE user_id = $1
+         LIMIT 1`,
         [user.id]
       );
 
-      // No device registered yet → insert
       if (!deviceResult.rows.length) {
         await db.query(
           `INSERT INTO user_devices (user_id, device_id)
@@ -71,7 +71,15 @@ exports.handler = async (event) => {
       } else {
         const existingDevice = deviceResult.rows[0].device_id;
 
-        if (existingDevice !== device_id) {
+        // 🔥 NULL means not registered yet
+        if (!existingDevice) {
+          await db.query(
+            `UPDATE user_devices
+             SET device_id = $1, updated_at = NOW()
+             WHERE user_id = $2`,
+            [device_id, user.id]
+          );
+        } else if (existingDevice !== device_id) {
           if (replace === true) {
             await db.query(
               `UPDATE user_devices
