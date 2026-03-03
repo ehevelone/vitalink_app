@@ -25,7 +25,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSavedLogin();
     });
@@ -72,8 +71,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text.trim();
 
-      // 🔥 NEW — Get persistent device ID
-      final deviceId = await DeviceIdService.getDeviceId();
+      // ✅ Correct device id call
+      final deviceId = await DeviceId.getOrCreate();
 
       final result = await ApiService.loginUser(
         email: email,
