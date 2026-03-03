@@ -30,8 +30,8 @@ exports.handler = async (event) => {
     const { email, password, device_id, replace } =
       JSON.parse(event.body || "{}");
 
-    if (!email || !password || !device_id) {
-      return reply(false, { error: "Missing required fields" }, 400);
+    if (!email || !password) {
+      return reply(false, { error: "Email and password required" }, 400);
     }
 
     const result = await db.query(
@@ -53,26 +53,24 @@ exports.handler = async (event) => {
       return reply(false, { error: "Invalid password" }, 401);
     }
 
-    // 🔥 DEVICE ENFORCEMENT LOGIC
-
-    // If no device yet → assign it
-    if (!user.device_id) {
-      await db.query(
-        `UPDATE users SET device_id = $1 WHERE id = $2`,
-        [device_id, user.id]
-      );
-    }
-
-    // If device mismatch
-    if (user.device_id && user.device_id !== device_id) {
-      if (replace === true) {
-        // Overwrite with new device
+    // 🔥 DEVICE ENFORCEMENT (only if device_id is provided)
+    if (device_id) {
+      if (!user.device_id) {
         await db.query(
           `UPDATE users SET device_id = $1 WHERE id = $2`,
           [device_id, user.id]
         );
-      } else {
-        return reply(false, { error: "DEVICE_ACTIVE" }, 403);
+      }
+
+      if (user.device_id && user.device_id !== device_id) {
+        if (replace === true) {
+          await db.query(
+            `UPDATE users SET device_id = $1 WHERE id = $2`,
+            [device_id, user.id]
+          );
+        } else {
+          return reply(false, { error: "DEVICE_ACTIVE" }, 403);
+        }
       }
     }
 
