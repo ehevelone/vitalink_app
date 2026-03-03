@@ -253,12 +253,13 @@ class ApiService {
     required String email,
     required String fcmToken,
     required String role,
+    String? platform,
   }) {
     return _postJson("register_device_v2", {
       "email": email,
       "role": role,
       "deviceToken": fcmToken,
-      "platform": Platform.isIOS ? "ios" : "android",
+      "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
     });
   }
 
