@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -67,23 +68,31 @@ class _LogoScreenState extends State<LogoScreen> {
 
       final role = roleNullable ?? "user";
 
-      // 🔹 Request permission safely (will NOT throw)
-      try {
-        await FirebaseMessaging.instance.requestPermission();
-      } catch (e) {
-        _debug("Permission error: $e");
+      await FirebaseMessaging.instance.requestPermission();
+
+      // 🔥 iOS requires APNs token first
+      if (Platform.isIOS) {
+        String? apnsToken;
+
+        for (int i = 0; i < 10; i++) {
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+
+        if (apnsToken == null) {
+          _debug("APNS token not ready");
+          return;
+        }
+
+        _debug("APNS ready");
       }
 
       String fcmToken = "NO_TOKEN";
 
-      // 🔹 Get token safely (this is where iOS usually fails)
-      try {
-        final token = await FirebaseMessaging.instance.getToken();
-        if (token != null && token.isNotEmpty) {
-          fcmToken = token;
-        }
-      } catch (e) {
-        _debug("getToken error: $e");
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        fcmToken = token;
       }
 
       _debug("EMAIL: $email");
