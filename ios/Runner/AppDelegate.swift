@@ -14,9 +14,18 @@ import UserNotifications
 
     FirebaseApp.configure()
 
-    // 🔥 Set delegates properly
     UNUserNotificationCenter.current().delegate = self
     Messaging.messaging().delegate = self
+
+    // 🔥 Request system notification permission at native level
+    UNUserNotificationCenter.current().requestAuthorization(
+      options: [.alert, .badge, .sound]
+    ) { granted, error in
+      print("🔔 Permission granted: \(granted)")
+      if let error = error {
+        print("❌ Permission error: \(error)")
+      }
+    }
 
     application.registerForRemoteNotifications()
 
@@ -30,13 +39,21 @@ import UserNotifications
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
 
-    // 🔥 Forward APNs token to Firebase
+    print("🔥 APNs DEVICE TOKEN RECEIVED")
+
     Messaging.messaging().setAPNSToken(deviceToken, type: .unknown)
 
     super.application(
       application,
       didRegisterForRemoteNotificationsWithDeviceToken: deviceToken
     )
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    print("❌ FAILED TO REGISTER FOR APNs: \(error)")
   }
 
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
