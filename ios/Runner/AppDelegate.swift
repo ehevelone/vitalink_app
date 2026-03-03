@@ -2,9 +2,10 @@ import UIKit
 import Flutter
 import Firebase
 import FirebaseMessaging
+import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate {
+@objc class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
 
   override func application(
     _ application: UIApplication,
@@ -13,6 +14,8 @@ import FirebaseMessaging
 
     FirebaseApp.configure()
 
+    // 🔥 REQUIRED FOR iOS PUSH
+    UNUserNotificationCenter.current().delegate = self
     Messaging.messaging().delegate = self
 
     application.registerForRemoteNotifications()
@@ -27,7 +30,7 @@ import FirebaseMessaging
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
 
-    // 🔥 REQUIRED FOR FIREBASE iOS 17+
+    // 🔥 REQUIRED
     Messaging.messaging().setAPNSToken(deviceToken, type: .unknown)
 
     super.application(application,
