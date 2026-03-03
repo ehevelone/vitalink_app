@@ -31,7 +31,6 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ SINGLE, CLEAN CORS PREFLIGHT
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
@@ -43,7 +42,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ Safe body parsing
     let body = {};
     try {
       body = event.isBase64Encoded
@@ -58,7 +56,6 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Missing agentEmail" });
     }
 
-    // ✅ Get agent
     const agentRes = await db.query(
       `SELECT id, name FROM agents WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [agentEmail.trim()]
@@ -70,7 +67,6 @@ exports.handler = async (event) => {
 
     const agent = agentRes.rows[0];
 
-    // ✅ Get users linked to agent
     const usersRes = await db.query(
       `SELECT id FROM users WHERE agent_id = $1`,
       [agent.id]
@@ -85,7 +81,6 @@ exports.handler = async (event) => {
 
     const userIds = usersRes.rows.map((u) => u.id);
 
-    // ✅ Get device tokens
     const devicesRes = await db.query(
       `
       SELECT device_token
@@ -105,15 +100,12 @@ exports.handler = async (event) => {
 
     const tokens = devicesRes.rows.map((d) => d.device_token);
 
-    // 🔔 REAL NOTIFICATION (NOT DATA-ONLY)
     const message = {
       tokens,
-
       notification: {
         title: `Message from ${agent.name || "Your Agent"}`,
         body: "⏰ Time to send your Medicare information!",
       },
-
       android: {
         priority: "high",
         notification: {
@@ -121,7 +113,6 @@ exports.handler = async (event) => {
           sound: "default",
         },
       },
-
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/authorization_form",
@@ -129,6 +120,19 @@ exports.handler = async (event) => {
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
+
+    // 🔥 DEBUG OUTPUT
+    console.log("=== PUSH DEBUG ===");
+    console.log("SuccessCount:", response.successCount);
+    console.log("FailureCount:", response.failureCount);
+
+    response.responses.forEach((r, i) => {
+      console.log("Token:", tokens[i]);
+      console.log("Success:", r.success);
+      if (!r.success) {
+        console.log("Error:", r.error?.message);
+      }
+    });
 
     return reply(200, {
       success: true,
