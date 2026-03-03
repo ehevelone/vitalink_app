@@ -8,7 +8,7 @@ class ApiService {
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔧 Internal POST helper (FULLY SAFE)
+  // 🔧 Internal POST helper (SAFE)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
@@ -60,61 +60,19 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔎 Get User's Assigned Agent
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getUserAgent(String email) {
-    return _postJson("get_user_agent", {"email": email});
-  }
-
-  // -------------------------------------------------------------
-  // 🔎 Get full agent profile
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentProfile({
-    required String email,
-  }) {
-    return _postJson("get_agent_profile", {"email": email});
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Insurance card parsing
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> parseInsurance(File image) async {
-    final bytes = await image.readAsBytes();
-    final base64 = base64Encode(bytes);
-    return _postJson("parse_insurance", {"imageBase64": base64});
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Agent unlock claim
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> claimAgentUnlock({
-    required String unlockCode,
-    required String email,
-    required String password,
-    required String npn,
-    String? phone,
-    String? name,
-  }) {
-    return _postJson("claim_agent_unlock", {
-      "unlockCode": unlockCode,
-      "email": email,
-      "password": password,
-      "npn": npn,
-      "phone": phone,
-      "name": name,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Agent login (SAFE)
+  // 🔹 Agent login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
     required String password,
+    required String deviceId,
+    bool replace = false,
   }) async {
     final res = await _postJson("check_agent", {
       "email": email,
       "password": password,
+      "device_id": deviceId,
+      "replace": replace,
     });
 
     if (res["success"] != true) {
@@ -135,17 +93,21 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 User login (FULLY SAFE)
+  // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
     required String email,
     required String password,
     required String platform,
+    required String deviceId,
+    bool replace = false,
   }) async {
     final res = await _postJson("check_user", {
       "email": email,
       "password": password,
       "platform": platform,
+      "device_id": deviceId,
+      "replace": replace,
     });
 
     if (res["success"] != true) {
@@ -166,96 +128,6 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Register user
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> registerUser({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required String phone,
-    required String password,
-    required String promoCode,
-    required String platform,
-  }) {
-    return _postJson("register_user", {
-      "firstName": firstName,
-      "lastName": lastName,
-      "email": email,
-      "phone": phone,
-      "password": password,
-      "promoCode": promoCode,
-      "platform": platform,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Promo lookup
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> verifyPromo({
-    required String username,
-    required String promoCode,
-  }) {
-    return _postJson("vpc", {
-      "username": username,
-      "promoCode": promoCode,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Generate agent unlock code
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> issueAgentCode({
-    required String masterKey,
-    String? requestedEmail,
-    String? requestedName,
-    String? requestedNpn,
-  }) {
-    return _postJson("generate_agent_unlock", {
-      "masterKey": masterKey,
-      "email": requestedEmail,
-      "name": requestedName,
-      "npn": requestedNpn,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Request password reset
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> requestPasswordReset({
-    required String emailOrPhone,
-    required String role,
-  }) {
-    return _postJson("request_reset", {
-      "emailOrPhone": emailOrPhone,
-      "role": role,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔹 Complete password reset
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> resetPassword({
-    required String emailOrPhone,
-    required String code,
-    required String newPassword,
-    required String role,
-  }) {
-    return _postJson("reset_password", {
-      "emailOrPhone": emailOrPhone,
-      "code": code,
-      "newPassword": newPassword,
-      "role": role,
-    });
-  }
-
-  // -------------------------------------------------------------
-  // 🔥 Get agent promo code
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentPromoCode(String email) {
-    return _postJson("get_agent_promo", {"email": email});
-  }
-
-  // -------------------------------------------------------------
   // 🔹 Register device token
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerDeviceToken({
@@ -269,88 +141,5 @@ class ApiService {
       "deviceToken": fcmToken,
       "platform": Platform.isIOS ? "ios" : "android",
     });
-  }
-
-  // -------------------------------------------------------------
-  // 🔔 Send notification
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> sendNotification({
-    required String agentEmail,
-  }) {
-    return _postJson("send_notification", {"agentEmail": agentEmail});
-  }
-
-  // -------------------------------------------------------------
-  // 🧑‍💼 Update agent profile
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> updateAgentProfile({
-    required String email,
-    String? name,
-    String? phone,
-    String? npn,
-    String? agencyName,
-    String? agencyAddress,
-    String? password,
-  }) {
-    final body = {
-      "email": email,
-      "name": name,
-      "phone": phone,
-      "npn": npn,
-      "agencyName": agencyName,
-      "agencyAddress": agencyAddress,
-      "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
-
-    return _postJson("update_agent_profile", body);
-  }
-
-  // -------------------------------------------------------------
-  // 👤 Update user profile
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> updateUserProfile({
-    required String currentEmail,
-    required String email,
-    String? name,
-    String? phone,
-    String? password,
-  }) {
-    final body = {
-      "currentEmail": currentEmail,
-      "email": email,
-      "name": name,
-      "phone": phone,
-      "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
-
-    return _postJson("update_user_profile", body);
-  }
-
-  // -------------------------------------------------------------
-  // 🔎 Resolve agent by QR / agent code
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
-    final res = await _postJson("resolve_agent_code", {
-      "code": code,
-    });
-
-    if (res["success"] != true) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid agent code",
-      };
-    }
-
-    if (res["agent"] == null) {
-      return {
-        "success": false,
-        "error": "Agent data missing",
-      };
-    }
-
-    return {
-      "success": true,
-      "agent": res["agent"],
-    };
   }
 }

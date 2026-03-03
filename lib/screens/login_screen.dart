@@ -3,6 +3,7 @@ import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
+import '../services/device_id.dart';
 import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
 
-    // 🔥 iOS-safe delayed load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSavedLogin();
     });
@@ -72,10 +72,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text.trim();
 
+      // 🔥 NEW — Get persistent device ID
+      final deviceId = await DeviceIdService.getDeviceId();
+
       final result = await ApiService.loginUser(
         email: email,
         password: password,
         platform: "ios",
+        deviceId: deviceId,
+        replace: false,
       );
 
       if (!mounted) return;
@@ -96,10 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await store.setString('role', 'user');
       await store.setBool('userLoggedIn', true);
 
-      // 🔥 Always store email
       await store.setString('lastEmail', email);
-
-      // 🔥 Proper remember handling
       await store.setBool('rememberMe', _rememberMe);
 
       if (_rememberMe) {

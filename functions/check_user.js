@@ -19,7 +19,6 @@ function reply(success, obj = {}, code = 200) {
 
 exports.handler = async (event) => {
   try {
-    // ✅ CORS preflight
     if (event.httpMethod === "OPTIONS") {
       return { statusCode: 200, headers, body: "" };
     }
@@ -28,14 +27,15 @@ exports.handler = async (event) => {
       return reply(false, { error: "Method Not Allowed" }, 405);
     }
 
-    const { email, password } = JSON.parse(event.body || "{}");
+    const { email, password, device_id, replace } =
+      JSON.parse(event.body || "{}");
 
-    if (!email || !password) {
-      return reply(false, { error: "Email and password required" }, 400);
+    if (!email || !password || !device_id) {
+      return reply(false, { error: "Missing required fields" }, 400);
     }
 
     const result = await db.query(
-      `SELECT id, email, password_hash, first_name, last_name, agent_id
+      `SELECT id, email, password_hash, first_name, last_name, agent_id, device_id
        FROM users
        WHERE LOWER(email) = LOWER($1)
        LIMIT 1`,
@@ -51,6 +51,29 @@ exports.handler = async (event) => {
 
     if (!valid) {
       return reply(false, { error: "Invalid password" }, 401);
+    }
+
+    // 🔥 DEVICE ENFORCEMENT LOGIC
+
+    // If no device yet → assign it
+    if (!user.device_id) {
+      await db.query(
+        `UPDATE users SET device_id = $1 WHERE id = $2`,
+        [device_id, user.id]
+      );
+    }
+
+    // If device mismatch
+    if (user.device_id && user.device_id !== device_id) {
+      if (replace === true) {
+        // Overwrite with new device
+        await db.query(
+          `UPDATE users SET device_id = $1 WHERE id = $2`,
+          [device_id, user.id]
+        );
+      } else {
+        return reply(false, { error: "DEVICE_ACTIVE" }, 403);
+      }
     }
 
     return reply(true, {
