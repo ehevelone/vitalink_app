@@ -30,6 +30,8 @@ exports.handler = async (event) => {
     const { email, password, device_id, replace } =
       JSON.parse(event.body || "{}");
 
+    console.log("DEVICE RECEIVED:", device_id);
+
     if (!email || !password) {
       return reply(false, { error: "Email and password required" }, 400);
     }
@@ -71,7 +73,6 @@ exports.handler = async (event) => {
       } else {
         const existingDevice = deviceResult.rows[0].device_id;
 
-        // 🔥 NULL means not registered yet
         if (!existingDevice) {
           await db.query(
             `UPDATE user_devices
