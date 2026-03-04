@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
+import '../services/api_service.dart';
 import '../services/app_state.dart';
 
 class LogoScreen extends StatefulWidget {
@@ -18,12 +20,49 @@ class _LogoScreenState extends State<LogoScreen> {
 
   Profile? _p;
   bool _loading = true;
+  bool _deviceRegistered = false;
 
   @override
   void initState() {
     super.initState();
+
     _loadProfile();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initPushAndRegister();
+    });
+
     _timer = Timer(const Duration(seconds: 3), _openMenu);
+  }
+
+  Future<void> _initPushAndRegister() async {
+    if (_deviceRegistered) return;
+
+    try {
+      final messaging = FirebaseMessaging.instance;
+
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      final token = await messaging.getToken();
+      if (token == null) return;
+
+      final email = await AppState.getEmail();
+      final role = await AppState.getRole();
+
+      if (email == null || role == null) return;
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: token,
+        role: role,
+      );
+
+      _deviceRegistered = true;
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
@@ -37,10 +76,7 @@ class _LogoScreenState extends State<LogoScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _p = null;
-        _loading = false;
-      });
+      setState(() => _loading = false);
     }
   }
 
@@ -83,8 +119,8 @@ class _LogoScreenState extends State<LogoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String name = (_p?.fullName ?? '').trim();
-    final bool hasName = !_loading && name.isNotEmpty;
+    final hasName = !_loading && _p?.fullName.isNotEmpty == true;
+    final name = hasName ? _p!.fullName : null;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -100,6 +136,7 @@ class _LogoScreenState extends State<LogoScreen> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 28),
+
               if (_loading)
                 const CircularProgressIndicator(color: Colors.white70)
               else if (hasName) ...[
@@ -112,6 +149,7 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
+
               const Text(
                 'TAP ANYWHERE TO OPEN',
                 style: TextStyle(
@@ -119,6 +157,62 @@ class _LogoScreenState extends State<LogoScreen> {
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.1,
+                ),
+              ),
+
+              const SizedBox(height: 48),
+
+              // 🔴 EMERGENCY BUTTON RESTORED
+              GestureDetector(
+                onTap: _openEmergencyScreen,
+                child: Container(
+                  width: 240,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade700,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.redAccent,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withOpacity(0.4),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "EMERGENCY",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        "TAP FOR INFO",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
