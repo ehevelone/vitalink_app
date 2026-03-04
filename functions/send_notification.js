@@ -81,6 +81,14 @@ function campaignText(campaign, agentName) {
   };
 }
 
+// ✅ NEW: cycle start is Apr 1. If today is before Apr 1, cycle started Apr 1 last year.
+function getCycleStartApr1(now = new Date()) {
+  const y = now.getFullYear();
+  const apr1ThisYear = new Date(y, 3, 1, 0, 0, 0, 0); // month 3 = April
+  if (now >= apr1ThisYear) return apr1ThisYear;
+  return new Date(y - 1, 3, 1, 0, 0, 0, 0);
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") return reply(200, {});
@@ -124,11 +132,16 @@ exports.handler = async (event) => {
 
     const year = now.getFullYear();
 
+    // ✅ NEW: Responded suppression window start (Apr 1)
+    // If last_reviewed >= cycleStart -> user already responded this cycle -> DO NOT notify
+    const cycleStart = getCycleStartApr1(now);
+
     // -----------------------------
     // Get eligible devices
     // - Join users + user_devices so we can FILTER and UPDATE users
     // - Cooldown check
     // - Campaign check
+    // - ✅ NEW: exclude users who already responded this cycle (last_reviewed)
     // -----------------------------
     const eligibleSql = `
       SELECT
@@ -146,6 +159,10 @@ exports.handler = async (event) => {
           OR u.last_notified_at < NOW() - ($2::text || ' days')::interval
         )
         AND (
+          u.last_reviewed IS NULL
+          OR u.last_reviewed < $5::timestamptz
+        )
+        AND (
           CASE
             WHEN $3 = 'PREP' THEN
               (COALESCE(u.profile_complete, FALSE) = FALSE)
@@ -159,7 +176,13 @@ exports.handler = async (event) => {
         )
     `;
 
-    const devicesRes = await db.query(eligibleSql, [agent.id, String(cooldownDays), campaign, year]);
+    const devicesRes = await db.query(eligibleSql, [
+      agent.id,
+      String(cooldownDays),
+      campaign,
+      year,
+      cycleStart.toISOString(), // $5
+    ]);
 
     if (!devicesRes.rows.length) {
       return reply(200, {

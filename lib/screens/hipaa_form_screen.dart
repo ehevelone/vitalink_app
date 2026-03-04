@@ -11,6 +11,7 @@ import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../models.dart';
+import '../services/app_state.dart';
 
 class HipaaFormScreen extends StatefulWidget {
   const HipaaFormScreen({super.key});
@@ -319,6 +320,14 @@ I understand:
       if (resp.statusCode != 200) {
         throw Exception(resp.body);
       }
+
+// ✅ Mark reviewed so user stops getting notifications this cycle
+try {
+  final email = userEmail.trim();
+  if (email.isNotEmpty) {
+    await ApiService.markReviewed(email: email);
+  }
+} catch (_) {}
 
       if (mounted) {
         showDialog(
