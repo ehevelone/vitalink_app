@@ -9,6 +9,7 @@ try {
   console.error("❌ Invalid FCM_SERVICE_ACCOUNT JSON");
 }
 
+// ✅ Initialize Firebase once
 if (!admin.apps.length && serviceAccount.project_id) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -41,94 +42,161 @@ function isInvalidTokenError(err) {
   );
 }
 
+// -----------------------------
+// Campaign selection
+// -----------------------------
+function pickCampaign(now = new Date()) {
+  const m = now.getMonth() + 1; // 1-12
+  const d = now.getDate();
+
+  // PREP: Sep 1 - Oct 14
+  const inPrep = (m === 9) || (m === 10 && d <= 14);
+
+  // AEP: Oct 15 - Dec 7
+  const inAep = (m === 10 && d >= 15) || (m === 11) || (m === 12 && d <= 7);
+
+  // OEP: Jan 1 - Mar 31
+  const inOep = (m === 1) || (m === 2) || (m === 3);
+
+  if (inAep) return "AEP";
+  if (inOep) return "OEP";
+  if (inPrep) return "PREP";
+  return "OFF";
+}
+
+function campaignText(campaign, agentName) {
+  const name = agentName || "Your Agent";
+
+  if (campaign === "PREP") {
+    return {
+      title: `Message from ${name}`,
+      body: "📋 Please complete your profile & send your Medicare info so we can check plans before your appointment.",
+    };
+  }
+
+  // AEP/OEP
+  return {
+    title: `Message from ${name}`,
+    body: "⏰ Time to send your Medicare information!",
+  };
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") return reply(200, {});
-    if (event.httpMethod !== "POST")
+    if (event.httpMethod !== "POST") {
       return reply(405, { success: false, error: "Method Not Allowed" });
+    }
 
-    const body = JSON.parse(event.body || "{}");
+    // ✅ Safe body parsing
+    let body = {};
+    try {
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
+    } catch {
+      return reply(400, { success: false, error: "Invalid request body" });
+    }
+
     const { agentEmail } = body;
+    if (!agentEmail) return reply(400, { success: false, error: "Missing agentEmail" });
 
-    if (!agentEmail)
-      return reply(400, { success: false, error: "Missing agentEmail" });
+    // Optional overrides (handy for testing)
+    const cooldownDays = Number.isFinite(Number(body.cooldownDays)) ? Number(body.cooldownDays) : 14;
+    const forcedCampaign = typeof body.campaign === "string" ? body.campaign.trim().toUpperCase() : null;
 
+    // ✅ Get agent
     const agentRes = await db.query(
-      `SELECT id, name FROM agents WHERE LOWER(email)=LOWER($1) LIMIT 1`,
+      `SELECT id, name FROM agents WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [agentEmail.trim()]
     );
-
-    if (!agentRes.rows.length)
-      return reply(404, { success: false, error: "Agent not found" });
+    if (!agentRes.rows.length) return reply(404, { success: false, error: "Agent not found" });
 
     const agent = agentRes.rows[0];
-    const currentYear = new Date().getFullYear();
 
-    // 🔑 Only users NOT reviewed this year
-    const usersRes = await db.query(
-      `
-      SELECT id
-      FROM users
-      WHERE agent_id = $1
-      AND (
-            last_review_year IS NULL
-            OR last_review_year < $2
-          )
-      `,
-      [agent.id, currentYear]
-    );
+    // Decide campaign
+    const now = new Date();
+    const campaign = forcedCampaign || pickCampaign(now);
 
-    if (!usersRes.rows.length) {
+    if (campaign === "OFF") {
+      return reply(200, { success: true, message: "Outside PREP/AEP/OEP window" });
+    }
+
+    const year = now.getFullYear();
+
+    // -----------------------------
+    // Get eligible devices
+    // - Join users + user_devices so we can FILTER and UPDATE users
+    // - Cooldown check
+    // - Campaign check
+    // -----------------------------
+    const eligibleSql = `
+      SELECT
+        ud.id              AS device_row_id,
+        ud.device_token    AS device_token,
+        ud.user_id         AS user_id
+      FROM user_devices ud
+      JOIN users u ON u.id = ud.user_id
+      WHERE u.agent_id = $1
+        AND ud.device_token IS NOT NULL
+        AND TRIM(ud.device_token) <> ''
+        AND TRIM(ud.device_token) <> 'NO_TOKEN'
+        AND (
+          u.last_notified_at IS NULL
+          OR u.last_notified_at < NOW() - ($2::text || ' days')::interval
+        )
+        AND (
+          CASE
+            WHEN $3 = 'PREP' THEN
+              (COALESCE(u.profile_complete, FALSE) = FALSE)
+              OR (COALESCE(u.last_plan_check_year, 0) < $4)
+            WHEN $3 = 'AEP' THEN
+              (COALESCE(u.last_review_year, 0) < $4)
+            WHEN $3 = 'OEP' THEN
+              (COALESCE(u.last_review_year, 0) < $4)
+            ELSE FALSE
+          END
+        )
+    `;
+
+    const devicesRes = await db.query(eligibleSql, [agent.id, String(cooldownDays), campaign, year]);
+
+    if (!devicesRes.rows.length) {
       return reply(200, {
         success: true,
-        message: "All users already reviewed this year",
+        message: `No eligible devices to notify (campaign=${campaign})`,
+        campaign,
       });
     }
 
-    const userIds = usersRes.rows.map((u) => u.id);
-
-    const devicesRes = await db.query(
-      `
-      SELECT id, device_token
-      FROM user_devices
-      WHERE user_id = ANY($1::int[])
-      AND device_token IS NOT NULL
-      `,
-      [userIds]
-    );
-
-    if (!devicesRes.rows.length)
-      return reply(404, { success: false, error: "No registered devices" });
-
-    const cleaned = devicesRes.rows
-      .map((d) => ({
-        id: d.id,
-        token: String(d.device_token || "").trim(),
-      }))
-      .filter((d) => d.token && d.token !== "NO_TOKEN");
-
-    if (!cleaned.length)
-      return reply(404, {
-        success: false,
-        error: "No valid device tokens",
-      });
-
+    // Deduplicate tokens (keep first occurrence)
     const seen = new Set();
     const devices = [];
-    for (const d of cleaned) {
-      if (seen.has(d.token)) continue;
-      seen.add(d.token);
-      devices.push(d);
+    for (const row of devicesRes.rows) {
+      const token = String(row.device_token || "").trim();
+      if (!token || seen.has(token)) continue;
+      seen.add(token);
+      devices.push({
+        deviceRowId: row.device_row_id,
+        userId: row.user_id,
+        token,
+      });
+    }
+
+    if (!devices.length) {
+      return reply(200, {
+        success: true,
+        message: `No valid tokens after dedupe (campaign=${campaign})`,
+        campaign,
+      });
     }
 
     const tokens = devices.map((d) => d.token);
+    const notif = campaignText(campaign, agent.name);
 
     const message = {
       tokens,
-      notification: {
-        title: `Message from ${agent.name || "Your Agent"}`,
-        body: "⏰ Time to send your Medicare information!",
-      },
+      notification: notif,
       android: {
         priority: "high",
         notification: {
@@ -142,37 +210,76 @@ exports.handler = async (event) => {
       },
     };
 
-    const response =
-      await admin.messaging().sendEachForMulticast(message);
+    const response = await admin.messaging().sendEachForMulticast(message);
 
-    const invalidTokenIds = [];
+    console.log("=== PUSH DEBUG ===");
+    console.log("Campaign:", campaign);
+    console.log("SuccessCount:", response.successCount);
+    console.log("FailureCount:", response.failureCount);
+
+    const invalidDeviceRowIds = [];
+    const invalidTokens = [];
+    const successUserIds = new Set();
 
     for (let i = 0; i < response.responses.length; i++) {
       const r = response.responses[i];
       const device = devices[i];
 
-      if (!r.success && isInvalidTokenError(r.error)) {
-        invalidTokenIds.push(device.id);
+      if (r.success) {
+        successUserIds.add(device.userId);
+      } else {
+        if (isInvalidTokenError(r.error)) {
+          invalidDeviceRowIds.push(device.deviceRowId);
+          invalidTokens.push(device.token);
+        }
       }
     }
 
-    if (invalidTokenIds.length) {
-      await db.query(
-        `DELETE FROM user_devices WHERE id = ANY($1::int[])`,
-        [invalidTokenIds]
-      );
+    // ✅ Update throttle markers ONLY for users that actually received push
+    if (successUserIds.size) {
+      try {
+        await db.query(
+          `
+          UPDATE users
+          SET last_notified_at = NOW(),
+              last_notified_campaign = $1
+          WHERE id = ANY($2::int[])
+          `,
+          [campaign, Array.from(successUserIds)]
+        );
+      } catch (e) {
+        console.error("❌ Failed updating users last_notified:", e);
+      }
+    }
+
+    // ✅ Delete invalid tokens (self-heal)
+    if (invalidDeviceRowIds.length) {
+      try {
+        await db.query(
+          `DELETE FROM user_devices WHERE id = ANY($1::int[])`,
+          [invalidDeviceRowIds]
+        );
+        console.log("🧹 Removed invalid tokens count:", invalidDeviceRowIds.length);
+      } catch (e) {
+        console.error("❌ Failed deleting invalid tokens:", e);
+      }
     }
 
     return reply(200, {
       success: true,
-      successCount: response.successCount,
+      campaign,
+      cooldownDays,
       totalDevices: tokens.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      notifiedUsers: successUserIds.size,
+      removedInvalidTokens: invalidTokens.length,
     });
   } catch (err) {
     console.error("❌ send_notification error:", err);
     return reply(500, {
       success: false,
-      error: "Server error",
+      error: "Server error while sending notifications ❌",
     });
   }
 };
