@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+// 🔁 Rebuild trigger: markReviewed API added and verified (force fresh CI build)
+
 class ApiService {
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔧 Internal POST helper (FIXED)
+  // 🔧 Internal POST helper (SAFE)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
@@ -29,17 +31,7 @@ class ApiService {
       debugPrint("📥 STATUS ($path): ${res.statusCode}");
       debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-      // 🔥 FIXED: preserve backend error body (403 etc.)
       if (res.statusCode != 200) {
-        if (res.body.isNotEmpty) {
-          try {
-            final decoded = jsonDecode(res.body);
-            if (decoded is Map<String, dynamic>) {
-              return decoded;
-            }
-          } catch (_) {}
-        }
-
         return {
           "success": false,
           "error": "Server returned ${res.statusCode}"
@@ -116,7 +108,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Agent login
+  // 🔹 Agent login (NO device enforcement)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
@@ -211,6 +203,9 @@ class ApiService {
     });
   }
 
+  // -------------------------------------------------------------
+  // 🔹 Promo lookup
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> verifyPromo({
     required String username,
     required String promoCode,
@@ -221,6 +216,9 @@ class ApiService {
     });
   }
 
+  // -------------------------------------------------------------
+  // 🔹 Request password reset
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> requestPasswordReset({
     required String emailOrPhone,
     required String role,
@@ -231,6 +229,9 @@ class ApiService {
     });
   }
 
+  // -------------------------------------------------------------
+  // 🔹 Complete password reset
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resetPassword({
     required String emailOrPhone,
     required String code,
@@ -245,10 +246,16 @@ class ApiService {
     });
   }
 
+  // -------------------------------------------------------------
+  // 🔥 Get agent promo code
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentPromoCode(String email) {
     return _postJson("get_agent_promo", {"email": email});
   }
 
+  // -------------------------------------------------------------
+  // 🔹 Register device token (push)
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerDeviceToken({
     required String email,
     required String fcmToken,
@@ -263,12 +270,18 @@ class ApiService {
     });
   }
 
+  // -------------------------------------------------------------
+  // 🔔 Send notification
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> sendNotification({
     required String agentEmail,
   }) {
     return _postJson("send_notification", {"agentEmail": agentEmail});
   }
 
+  // -------------------------------------------------------------
+  // 🧑‍💼 Update agent profile
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> updateAgentProfile({
     required String email,
     String? name,
@@ -291,6 +304,9 @@ class ApiService {
     return _postJson("update_agent_profile", body);
   }
 
+  // -------------------------------------------------------------
+  // 👤 Update user profile
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> updateUserProfile({
     required String currentEmail,
     required String email,
@@ -308,7 +324,18 @@ class ApiService {
 
     return _postJson("update_user_profile", body);
   }
+// 👇 PASTE THE NEW METHOD RIGHT HERE
 
+static Future<Map<String, dynamic>> markReviewed({
+  required String email,
+}) {
+  return _postJson("mark_reviewed", {
+    "email": email.trim(),
+  });
+}
+  // -------------------------------------------------------------
+  // 🔎 Resolve agent by QR / agent code
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
     final res = await _postJson("resolve_agent_code", {
       "code": code,
