@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:permission_handler/permission_handler.dart'; // ✅ ADDED
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -55,9 +56,25 @@ class _IOSCardScanScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // ✅ iOS Native Document Scanner
+  // ✅ iOS Native Document Scanner WITH explicit permission request
   Future<void> _scanCard() async {
     try {
+      // 🔥 Explicitly request camera permission first
+      final status = await Permission.camera.request();
+
+      if (!status.isGranted) {
+        if (status.isPermanentlyDenied) {
+          await openAppSettings();
+        }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Camera permission not granted")),
+        );
+        return;
+      }
+
       // Small delay helps iOS present controller cleanly
       await Future.delayed(const Duration(milliseconds: 200));
 
