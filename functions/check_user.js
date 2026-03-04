@@ -55,7 +55,8 @@ exports.handler = async (event) => {
       return reply(false, { error: "Invalid password" }, 401);
     }
 
-    if (device_id) {
+    // 🔒 DEVICE ENFORCEMENT ONLY IF NO AGENT
+    if (!user.agent_id && device_id) {
       const deviceResult = await db.query(
         `SELECT id, device_id
          FROM user_devices
@@ -66,8 +67,8 @@ exports.handler = async (event) => {
 
       if (!deviceResult.rows.length) {
         await db.query(
-          `INSERT INTO user_devices (user_id, device_id)
-           VALUES ($1, $2)`,
+          `INSERT INTO user_devices (user_id, device_id, created_at, updated_at)
+           VALUES ($1, $2, NOW(), NOW())`,
           [user.id, device_id]
         );
       } else {
@@ -95,6 +96,8 @@ exports.handler = async (event) => {
       }
     }
 
+    // ✅ Agent users skip device enforcement completely
+
     return reply(true, {
       user: {
         id: user.id,
@@ -104,6 +107,7 @@ exports.handler = async (event) => {
         agent_id: user.agent_id,
       },
     });
+
   } catch (err) {
     console.error("❌ check_user error:", err);
     return reply(false, { error: "Server error" }, 500);
