@@ -17,7 +17,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
   String? _agentName;
   String? _agentEmail;
   String? _agentPhone;
-  String? _agentNpn; // kept, not displayed
+  String? _agentNpn;
   String? _agencyName;
   String? _agencyAddress;
   String? _promoCode;
@@ -31,14 +31,11 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
 
   Future<void> _loadAgentInfo() async {
     final store = SecureStore();
-
     setState(() => _loading = true);
 
     try {
-      // ✅ Load stored email FIRST (required for API call)
       _agentEmail = await store.getString("agentEmail");
 
-      // 🔹 Pull fresh profile from Supabase
       final profileRes = await ApiService.getAgentProfile(
         email: _agentEmail ?? "",
       );
@@ -53,7 +50,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         _agencyName = data['agency_name'];
         _agencyAddress = data['agency_address'];
 
-        // Save fresh copy locally
         await store.setString("agentName", _agentName ?? "");
         await store.setString("agentEmail", _agentEmail ?? "");
         await store.setString("agentPhone", _agentPhone ?? "");
@@ -61,7 +57,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         await store.setString("agencyName", _agencyName ?? "");
         await store.setString("agencyAddress", _agencyAddress ?? "");
       } else {
-        // Fallback to local
         _agentName = await store.getString("agentName");
         _agentEmail ??= await store.getString("agentEmail");
         _agentPhone = await store.getString("agentPhone");
@@ -70,7 +65,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         _agencyAddress = await store.getString("agencyAddress");
       }
 
-      // 🔹 Promo Code
       final res =
           await ApiService.getAgentPromoCode(_agentEmail ?? "");
 
@@ -89,7 +83,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
             "https://vitalink-app.netlify.app/onboard?code=$stored";
       }
     } catch (_) {
-      // Silent fallback
       _agentName = await store.getString("agentName");
       _agentEmail ??= await store.getString("agentEmail");
       _agentPhone = await store.getString("agentPhone");
@@ -109,20 +102,53 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     );
   }
 
+  // 🔔 UPDATED: Now shows dialog with full results
   Future<void> _sendNotification() async {
     if (_agentEmail == null || _agentEmail!.isEmpty) return;
+
     setState(() => _loading = true);
+
     final res =
         await ApiService.sendNotification(agentEmail: _agentEmail!);
+
     setState(() => _loading = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          res['success'] == true
-              ? "📨 Sent to ${res['successCount']}/${res['totalDevices']} devices"
-              : (res['error'] ?? "Notification failed ❌"),
+    if (!mounted) return;
+
+    final success = res["success"] == true;
+    final campaign = res["campaign"] ?? "";
+    final total = res["totalDevices"] ?? 0;
+    final notified = res["notifiedUsers"] ?? 0;
+    final failures = res["failureCount"] ?? 0;
+    final message = res["message"];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(success ? "Notification Results" : "Error"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!success)
+              Text(res["error"] ?? "Unknown error")
+            else ...[
+              if (message != null) Text(message),
+              if (campaign.isNotEmpty)
+                Text("Campaign: $campaign"),
+              const SizedBox(height: 8),
+              Text("Devices targeted: $total"),
+              Text("Users notified: $notified"),
+              Text("Failures: $failures"),
+            ],
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("OK"),
+          ),
+        ],
       ),
     );
   }
@@ -187,25 +213,14 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                               ),
                             ),
                             const SizedBox(height: 6),
-
                             if (_agencyName?.isNotEmpty == true)
-                              Text("🏢 $_agencyName",
-                                  style: const TextStyle(fontSize: 16)),
-
+                              Text("🏢 $_agencyName"),
                             if (_agencyAddress?.isNotEmpty == true)
-                              Text(
-                                "📍 $_agencyAddress",
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-
+                              Text("📍 $_agencyAddress"),
                             if (_agentPhone?.isNotEmpty == true)
-                              Text("📞 $_agentPhone",
-                                  style: const TextStyle(fontSize: 16)),
-
+                              Text("📞 $_agentPhone"),
                             if (_agentEmail?.isNotEmpty == true)
-                              Text("📧 $_agentEmail",
-                                  style: const TextStyle(fontSize: 16)),
+                              Text("📧 $_agentEmail"),
                           ],
                         ),
                       ),
@@ -229,7 +244,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -246,16 +260,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                   icon: const Icon(Icons.copy),
                                   label: const Text("Copy Invite Link"),
                                   onPressed: _copyInviteLink,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey.shade800,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(40),
-                                    ),
-                                  ),
                                 ),
                               ),
                             ],
@@ -271,15 +275,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                         icon: const Icon(Icons.assignment),
                         label: const Text("Send My Information"),
                         onPressed: _goToAuthorizationForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(40),
-                          ),
-                        ),
                       ),
                     ),
 
@@ -291,15 +286,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                         icon: const Icon(Icons.notifications_active),
                         label: const Text("Send Notification"),
                         onPressed: _sendNotification,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(40),
-                          ),
-                        ),
                       ),
                     ),
                   ],
