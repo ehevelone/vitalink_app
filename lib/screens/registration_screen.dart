@@ -7,7 +7,7 @@ import '../services/app_state.dart';
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
-import '../utils/phone_formatter.dart'; // ✅ USE GLOBAL FORMATTER
+import '../utils/phone_formatter.dart';
 import 'qr_scanner_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
@@ -25,9 +25,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  final _agentCodeCtrl = TextEditingController();
+  final _activationCodeCtrl = TextEditingController();
 
   bool _loading = false;
+
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   Future<void> _scanQr() async {
     Navigator.push(
@@ -35,9 +38,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       MaterialPageRoute(
         builder: (_) => QrScannerScreen(
           onScanned: (value) {
-            setState(() => _agentCodeCtrl.text = value.trim());
+            setState(() => _activationCodeCtrl.text = value.trim());
           },
         ),
+      ),
+    );
+  }
+
+  void _recoverCode() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Recover Activation Code"),
+        content: const Text(
+            "If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text("Close"),
+          ),
+        ],
       ),
     );
   }
@@ -49,12 +71,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     try {
       final repo = DataRepository();
 
-      final code = _agentCodeCtrl.text.trim();
+      final code = _activationCodeCtrl.text.trim();
       final email = _emailCtrl.text.trim().toLowerCase();
 
       final agentRes = await ApiService.resolveAgentByCode(code);
       if (agentRes['success'] != true || agentRes['agent'] == null) {
-        throw Exception("Invalid or inactive agent code");
+        throw Exception("Invalid or inactive activation code");
       }
 
       final nameParts = _nameCtrl.text.trim().split(" ");
@@ -134,7 +156,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ✅ STANDARDIZED PHONE FIELD
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
@@ -147,11 +168,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _passwordCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Password"),
+                obscureText: !_showPassword,
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showPassword = !_showPassword;
+                      });
+                    },
+                  ),
+                ),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Required" : null,
               ),
+
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
 
@@ -159,9 +195,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _confirmCtrl,
-                obscureText: true,
-                decoration:
-                    const InputDecoration(labelText: "Confirm Password"),
+                obscureText: !_showConfirmPassword,
+                decoration: InputDecoration(
+                  labelText: "Confirm Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showConfirmPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _showConfirmPassword = !_showConfirmPassword;
+                      });
+                    },
+                  ),
+                ),
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
@@ -169,16 +218,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               const SizedBox(height: 16),
 
               TextFormField(
-                controller: _agentCodeCtrl,
+                controller: _activationCodeCtrl,
                 decoration: InputDecoration(
-                  labelText: "Agent Code",
+                  labelText: "Activation Code",
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.qr_code),
                     onPressed: _scanQr,
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Agent code required" : null,
+                    v == null || v.isEmpty ? "Activation code required" : null,
+              ),
+
+              const SizedBox(height: 8),
+
+              Center(
+                child: TextButton(
+                  onPressed: _recoverCode,
+                  child: const Text(
+                    "Lost your activation code?",
+                    style: TextStyle(color: Colors.blueAccent),
+                  ),
+                ),
               ),
             ],
           ),
