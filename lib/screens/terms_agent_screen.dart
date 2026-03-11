@@ -99,7 +99,7 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
           Positioned.fill(
             child: Image.asset(
               'assets/images/logo_icon.png',
-              fit: BoxFit.cover, // ✅ blue heart background
+              fit: BoxFit.cover,
             ),
           ),
           SafeArea(
@@ -111,11 +111,18 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
                     child: SingleChildScrollView(
                       child: Text(
                         "Welcome to VitaLink (Agent).\n\n"
+
                         "By using this app as an Agent, you agree:\n"
                         "• You must maintain a valid license to offer Medicare services.\n"
                         "• You are solely responsible for compliance with CMS and AHIP guidelines.\n"
                         "• You must safeguard client data and never share login credentials.\n"
                         "• You agree that misuse may result in immediate access termination.\n\n"
+
+                        "Activation & Client Access\n\n"
+                        "Agents may provide activation codes to their clients for access to the VitaLink service.\n\n"
+                        "Clients of participating agents will receive an activation code from their agent.\n\n"
+                        "Agents are responsible for ensuring that any client information entered into the app is accurate and handled in accordance with applicable privacy and regulatory requirements.\n\n"
+
                         "If you do not agree to these terms, you cannot use the app as an Agent.",
                         style: TextStyle(fontSize: 16, color: Colors.black),
                       ),

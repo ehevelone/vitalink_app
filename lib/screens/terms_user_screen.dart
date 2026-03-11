@@ -99,7 +99,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
           Positioned.fill(
             child: Image.asset(
               'assets/images/logo_icon.png',
-              fit: BoxFit.cover, // ✅ blue heart background
+              fit: BoxFit.cover,
             ),
           ),
           SafeArea(
@@ -111,11 +111,21 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
                     child: SingleChildScrollView(
                       child: Text(
                         "Welcome to VitaLink (User).\n\n"
+
                         "By using this app, you agree:\n"
                         "• This app is provided as-is, without warranties.\n"
                         "• You are responsible for the accuracy of your data.\n"
                         "• This app does not replace professional medical advice.\n"
                         "• Always consult licensed healthcare providers for medical decisions.\n\n"
+
+                        "Activation Requirement\n\n"
+                        "A VitaLink account requires an activation code.\n\n"
+
+                        "Clients of participating insurance agents will receive an activation code from their agent.\n\n"
+
+                        "Personal users can obtain an activation code at:\n"
+                        "myvitalink.app\n\n"
+
                         "If you do not agree to these terms, you cannot use the app.",
                         style: TextStyle(fontSize: 16, color: Colors.black),
                       ),
