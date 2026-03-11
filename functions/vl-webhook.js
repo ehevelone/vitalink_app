@@ -1,6 +1,12 @@
 const Stripe = require("stripe");
+const { Pool } = require("pg");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 exports.handler = async (event) => {
 
@@ -27,22 +33,24 @@ exports.handler = async (event) => {
 
     const email = session.customer_details.email;
 
-    console.log("Payment success for:", email);
+    const code =
+      "VL-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    // Activation code generation placeholder
-    const code = "VL-" + Math.random().toString(36).substring(2,8).toUpperCase();
+    const client = await pool.connect();
 
-    console.log("Generated code:", code);
+    await client.query(
+      `INSERT INTO activation_codes (code, email, created_at)
+       VALUES ($1,$2,NOW())`,
+      [code, email]
+    );
 
-    // Later we will:
-    // store in Supabase
-    // send email to user
+    client.release();
 
+    console.log("Activation created:", code, email);
   }
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ received: true }),
+    body: JSON.stringify({ received: true })
   };
-
 };
