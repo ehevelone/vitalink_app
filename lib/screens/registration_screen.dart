@@ -18,6 +18,7 @@ class RegistrationScreen extends StatefulWidget {
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
+
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
@@ -32,20 +33,96 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
 
+  bool _activationLoaded = false;
+
+  bool _argsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _activationCodeCtrl.addListener(_lookupActivation);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_argsLoaded) return;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map && args['code'] != null) {
+
+      final code = args['code'].toString();
+
+      _activationCodeCtrl.text = code.toUpperCase();
+
+      _lookupActivation();
+    }
+
+    _argsLoaded = true;
+  }
+
+  Future<void> _lookupActivation() async {
+
+    if (_activationLoaded) return;
+
+    final code = _activationCodeCtrl.text.trim();
+
+    if (code.length < 8) return;
+
+    try {
+
+      final res = await ApiService.lookupActivation(code);
+
+      if (res['success'] == true) {
+
+        setState(() {
+          _nameCtrl.text = res['name'] ?? "";
+          _emailCtrl.text = res['email'] ?? "";
+          _activationLoaded = true;
+        });
+
+      }
+
+    } catch (_) {}
+
+  }
+
   Future<void> _scanQr() async {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => QrScannerScreen(
           onScanned: (value) {
-            setState(() => _activationCodeCtrl.text = value.trim());
+            setState(() {
+              _activationCodeCtrl.text = value.trim().toUpperCase();
+              _activationLoaded = false;
+            });
+            _lookupActivation();
           },
         ),
       ),
     );
   }
 
+  Future<void> _pasteCode() async {
+
+    final data = await Clipboard.getData('text/plain');
+
+    if (data != null && data.text != null) {
+
+      setState(() {
+        _activationCodeCtrl.text = data.text!.trim().toUpperCase();
+        _activationLoaded = false;
+      });
+
+      _lookupActivation();
+    }
+  }
+
   void _recoverCode() {
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -65,22 +142,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _register() async {
+
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _loading = true);
 
     try {
+
       final repo = DataRepository();
 
       final code = _activationCodeCtrl.text.trim();
       final email = _emailCtrl.text.trim().toLowerCase();
 
       final agentRes = await ApiService.resolveAgentByCode(code);
+
       if (agentRes['success'] != true || agentRes['agent'] == null) {
         throw Exception("Invalid or inactive activation code");
       }
 
       final nameParts = _nameCtrl.text.trim().split(" ");
+
       final firstName = nameParts.first;
+
       final lastName =
           nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "";
 
@@ -101,32 +184,44 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final profile = await repo.loadProfile() ?? Profile();
 
       profile.fullName = _nameCtrl.text.trim();
+
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
 
       profile.registered = true;
+
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
 
       await AppState.setLoggedIn(true);
+
       await AppState.setRole('user');
+
       await AppState.setEmail(email);
 
       if (!mounted) return;
+
       Navigator.pushReplacementNamed(context, '/menu');
+
     } catch (e) {
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Registration failed: $e")),
       );
+
     } finally {
+
       if (mounted) setState(() => _loading = false);
+
     }
   }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(title: const Text("User Registration")),
       body: Padding(
@@ -135,25 +230,59 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           key: _formKey,
           child: ListView(
             children: [
+
+              const Text(
+                "ENTER YOUR ACTIVATION CODE",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              TextFormField(
+                controller: _activationCodeCtrl,
+                decoration: InputDecoration(
+                  labelText: "Activation Code",
+                  border: const OutlineInputBorder(),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      IconButton(
+                        icon: const Icon(Icons.paste),
+                        onPressed: _pasteCode,
+                      ),
+
+                      IconButton(
+                        icon: const Icon(Icons.qr_code),
+                        onPressed: _scanQr,
+                      ),
+
+                    ],
+                  ),
+                ),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Activation code required" : null,
+              ),
+
+              const SizedBox(height: 20),
+
               TextFormField(
                 controller: _nameCtrl,
+                readOnly: true,
                 decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _emailCtrl,
+                readOnly: true,
                 decoration: const InputDecoration(labelText: "Email"),
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return "Email required";
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
-                    return "Invalid email";
-                  }
-                  return null;
-                },
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -164,6 +293,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   PhoneNumberFormatter(),
                 ],
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -189,6 +319,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
 
               const SizedBox(height: 8),
+
               PasswordRules(controller: _passwordCtrl),
 
               const SizedBox(height: 12),
@@ -206,28 +337,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     onPressed: () {
                       setState(() {
-                        _showConfirmPassword = !_showConfirmPassword;
+                        _showConfirmPassword =
+                            !_showConfirmPassword;
                       });
                     },
                   ),
                 ),
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: _activationCodeCtrl,
-                decoration: InputDecoration(
-                  labelText: "Activation Code",
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code),
-                    onPressed: _scanQr,
-                  ),
-                ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Activation code required" : null,
               ),
 
               const SizedBox(height: 8),

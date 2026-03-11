@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:uni_links/uni_links.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -71,8 +72,90 @@ Future<void> main() async {
   });
 }
 
-class VitaLinkApp extends StatelessWidget {
+class VitaLinkApp extends StatefulWidget {
   const VitaLinkApp({super.key});
+
+  @override
+  State<VitaLinkApp> createState() => _VitaLinkAppState();
+}
+
+class _VitaLinkAppState extends State<VitaLinkApp> {
+
+  StreamSubscription? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+
+    try {
+
+      final uri = await getInitialUri();
+
+      if (uri != null) {
+        _handleDeepLink(uri);
+      }
+
+      _sub = uriLinkStream.listen((Uri? uri) {
+        if (uri != null) {
+          _handleDeepLink(uri);
+        }
+      });
+
+    } catch (e) {
+      debugPrint("Deep link error: $e");
+    }
+
+  }
+
+  void _handleDeepLink(Uri uri) {
+
+    debugPrint("Deep link received: $uri");
+
+    if (uri.host == "activate") {
+
+      final code = uri.queryParameters["code"];
+
+      if (code != null) {
+
+        // SAFE navigation (prevents crash on cold start)
+        Future.microtask(() {
+          navigatorKey.currentState?.pushNamed(
+            "/registration",
+            arguments: {"code": code},
+          );
+        });
+
+      }
+
+    }
+
+    if (uri.host == "recover") {
+
+      Future.microtask(() {
+        navigatorKey.currentState?.pushNamed("/request_reset");
+      });
+
+    }
+
+    if (uri.host == "emergency") {
+
+      Future.microtask(() {
+        navigatorKey.currentState?.pushNamed("/emergency_view");
+      });
+
+    }
+
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +222,6 @@ class VitaLinkApp extends StatelessWidget {
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
 
-        // ✅ FIXED HERE
         '/insurance_policies': (context) =>
             const InsurancePoliciesScreen(),
 
