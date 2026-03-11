@@ -9,12 +9,20 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen> {
   static const Color vitalinkBlue = Color(0xFF79CAE3);
-  bool _loading = false; // 🔥 Start false — no session check
+
+  bool _loading = false;
+
+  String? activationCode;
 
   @override
-  void initState() {
-    super.initState();
-    // 🔥 No SharedPreferences call at all
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map && args["code"] != null) {
+      activationCode = args["code"];
+    }
   }
 
   // ------------------------
@@ -110,7 +118,12 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  Navigator.pushReplacementNamed(context, '/terms_user');
+
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/terms_user',
+                    arguments: {"code": activationCode},
+                  );
                 },
                 child: const Text(
                   "Create User Account",
@@ -125,7 +138,12 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  Navigator.pushReplacementNamed(context, '/terms_agent');
+
+                  Navigator.pushReplacementNamed(
+                    context,
+                    '/terms_agent',
+                    arguments: {"code": activationCode},
+                  );
                 },
                 child: const Text(
                   "Create Agent Account",

@@ -16,11 +16,24 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
   late final DataRepository _repo;
   Profile? _p;
 
+  Map? _args;
+
   @override
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map) {
+      _args = args;
+    }
   }
 
   Future<void> _load() async {
@@ -42,7 +55,12 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
     await SecureStore().setBool('userTerms', true);
 
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/registration');
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/registration',
+      arguments: _args, // 🔥 forward activation code
+    );
   }
 
   void _handleDecline(BuildContext context) async {

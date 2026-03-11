@@ -204,6 +204,15 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // 🔎 Activation lookup (autofill registration)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> lookupActivation(String code) {
+    return _postJson("lookup_activation", {
+      "code": code,
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔹 Promo lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> verifyPromo({
@@ -324,15 +333,18 @@ class ApiService {
 
     return _postJson("update_user_profile", body);
   }
-// 👇 PASTE THE NEW METHOD RIGHT HERE
 
-static Future<Map<String, dynamic>> markReviewed({
-  required String email,
-}) {
-  return _postJson("mark_reviewed", {
-    "email": email.trim(),
-  });
-}
+  // -------------------------------------------------------------
+  // 🔎 Mark agent as reviewed
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> markReviewed({
+    required String email,
+  }) {
+    return _postJson("mark_reviewed", {
+      "email": email.trim(),
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔎 Resolve agent by QR / agent code
   // -------------------------------------------------------------

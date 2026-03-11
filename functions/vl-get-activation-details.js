@@ -10,7 +10,7 @@ const SITE = "https://myvitalink.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS"
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
 exports.handler = async function (event) {
@@ -23,17 +23,18 @@ exports.handler = async function (event) {
     };
   }
 
-  if (event.httpMethod !== "GET") {
+  if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
       headers: corsHeaders,
-      body: "Method Not Allowed"
+      body: JSON.stringify({ success:false })
     };
   }
 
   try {
 
-    const code = event.queryStringParameters?.code;
+    const body = JSON.parse(event.body || "{}");
+    const code = body.code?.toUpperCase().trim();
 
     if (!code) {
       return {
@@ -71,7 +72,7 @@ exports.handler = async function (event) {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        success:true,
+        success: true,
         name: row.full_name,
         email: row.email
       })
@@ -79,7 +80,7 @@ exports.handler = async function (event) {
 
   } catch (err) {
 
-    console.error(err);
+    console.error("lookup_activation error:", err);
 
     return {
       statusCode: 500,

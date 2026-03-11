@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -81,7 +81,8 @@ class VitaLinkApp extends StatefulWidget {
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
 
-  StreamSubscription? _sub;
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _sub;
 
   @override
   void initState() {
@@ -91,23 +92,21 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
   Future<void> _initDeepLinks() async {
 
+    _appLinks = AppLinks();
+
     try {
 
-      final uri = await getInitialUri();
+      final uri = await _appLinks.getInitialLink();
 
       if (uri != null) {
         _handleDeepLink(uri);
       }
 
-      _sub = uriLinkStream.listen((Uri? uri) {
-        if (uri != null) {
-          _handleDeepLink(uri);
-        }
-      });
+    } catch (_) {}
 
-    } catch (e) {
-      debugPrint("Deep link error: $e");
-    }
+    _sub = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
 
   }
 
@@ -121,10 +120,9 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
       if (code != null) {
 
-        // SAFE navigation (prevents crash on cold start)
-        Future.microtask(() {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           navigatorKey.currentState?.pushNamed(
-            "/registration",
+            "/landing",
             arguments: {"code": code},
           );
         });
@@ -135,7 +133,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     if (uri.host == "recover") {
 
-      Future.microtask(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         navigatorKey.currentState?.pushNamed("/request_reset");
       });
 
@@ -143,7 +141,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     if (uri.host == "emergency") {
 
-      Future.microtask(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         navigatorKey.currentState?.pushNamed("/emergency_view");
       });
 

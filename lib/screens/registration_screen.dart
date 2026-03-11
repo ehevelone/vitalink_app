@@ -8,7 +8,6 @@ import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../utils/phone_formatter.dart';
-import 'qr_scanner_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -34,6 +33,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _showConfirmPassword = false;
 
   bool _activationLoaded = false;
+  bool _lookupRunning = false;
 
   bool _argsLoaded = false;
 
@@ -41,6 +41,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void initState() {
     super.initState();
     _activationCodeCtrl.addListener(_lookupActivation);
+  }
+
+  @override
+  void dispose() {
+    _activationCodeCtrl.removeListener(_lookupActivation);
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    _activationCodeCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,11 +65,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (args is Map && args['code'] != null) {
 
-      final code = args['code'].toString();
+      final code = args['code'].toString().toUpperCase();
 
-      _activationCodeCtrl.text = code.toUpperCase();
+      _activationCodeCtrl.text = code;
 
-      _lookupActivation();
+      Future.microtask(() {
+        _lookupActivation();
+      });
     }
 
     _argsLoaded = true;
@@ -66,14 +80,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _lookupActivation() async {
 
     if (_activationLoaded) return;
+    if (_lookupRunning) return;
 
     final code = _activationCodeCtrl.text.trim();
 
     if (code.length < 8) return;
 
+    _lookupRunning = true;
+
     try {
 
       final res = await ApiService.lookupActivation(code);
+
+      if (!mounted) return;
 
       if (res['success'] == true) {
 
@@ -83,27 +102,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           _activationLoaded = true;
         });
 
+        _activationCodeCtrl.removeListener(_lookupActivation);
+
       }
 
     } catch (_) {}
 
-  }
-
-  Future<void> _scanQr() async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => QrScannerScreen(
-          onScanned: (value) {
-            setState(() {
-              _activationCodeCtrl.text = value.trim().toUpperCase();
-              _activationLoaded = false;
-            });
-            _lookupActivation();
-          },
-        ),
-      ),
-    );
+    _lookupRunning = false;
   }
 
   Future<void> _pasteCode() async {
@@ -174,7 +179,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         phone: _phoneCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
         promoCode: code,
-        platform: "android",
+        platform: "mobile",
       );
 
       if (registerRes['success'] != true) {
@@ -195,9 +200,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       await repo.saveProfile(profile);
 
       await AppState.setLoggedIn(true);
-
       await AppState.setRole('user');
-
       await AppState.setEmail(email);
 
       if (!mounted) return;
@@ -246,21 +249,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 decoration: InputDecoration(
                   labelText: "Activation Code",
                   border: const OutlineInputBorder(),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-
-                      IconButton(
-                        icon: const Icon(Icons.paste),
-                        onPressed: _pasteCode,
-                      ),
-
-                      IconButton(
-                        icon: const Icon(Icons.qr_code),
-                        onPressed: _scanQr,
-                      ),
-
-                    ],
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.paste),
+                    onPressed: _pasteCode,
                   ),
                 ),
                 validator: (v) =>
