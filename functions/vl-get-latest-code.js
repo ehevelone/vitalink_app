@@ -23,25 +23,20 @@ exports.handler = async function (event) {
     };
   }
 
-  if (event.httpMethod !== "GET") {
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: "Method Not Allowed"
-    };
-  }
-
-  const sessionId = event.queryStringParameters?.session_id;
-
-  if (!sessionId) {
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: "Missing session id" })
-    };
-  }
-
   try {
+
+    const params = event.queryStringParameters || {};
+    const sessionId = params.session_id;
+
+    console.log("Session requested:", sessionId);
+
+    if (!sessionId) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Missing session id" })
+      };
+    }
 
     const client = await pool.connect();
 
@@ -55,11 +50,13 @@ exports.handler = async function (event) {
 
     client.release();
 
+    console.log("DB result:", result.rows);
+
     if (result.rows.length === 0) {
       return {
         statusCode: 404,
         headers: corsHeaders,
-        body: JSON.stringify({ code: null })
+        body: JSON.stringify({ error: "Activation code not found" })
       };
     }
 
@@ -71,12 +68,12 @@ exports.handler = async function (event) {
 
   } catch (err) {
 
-    console.error("Fetch activation code error:", err);
+    console.error("Activation lookup error:", err);
 
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: "Server error"
+      body: JSON.stringify({ error: "Server error" })
     };
 
   }
