@@ -33,7 +33,11 @@ exports.handler = async (event) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
 
+    console.log("Stripe event type:", stripeEvent.type);
+
   } catch (err) {
+
+    console.error("Webhook verification failed:", err);
 
     return {
       statusCode: 400,
@@ -42,13 +46,24 @@ exports.handler = async (event) => {
 
   }
 
-  if (stripeEvent.type === "checkout.session.completed") {
+  if (
+    stripeEvent.type === "checkout.session.completed" ||
+    stripeEvent.type === "checkout.session.async_payment_succeeded"
+  ) {
+
+    console.log("Payment event detected");
 
     const session = stripeEvent.data.object;
 
+    console.log("Session ID:", session.id);
+
     const email = session.customer_details?.email || null;
 
+    console.log("Customer email:", email);
+
     const code = generateCode();
+
+    console.log("Generated code:", code);
 
     const client = await pool.connect();
 
@@ -62,6 +77,8 @@ exports.handler = async (event) => {
       );
 
       if (existing.rows.length === 0) {
+
+        console.log("Creating activation code row");
 
         await client.query(
           `INSERT INTO activation_codes
@@ -87,6 +104,10 @@ exports.handler = async (event) => {
       client.release();
 
     }
+
+  } else {
+
+    console.log("Unhandled Stripe event:", stripeEvent.type);
 
   }
 
