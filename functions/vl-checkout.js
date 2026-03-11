@@ -21,7 +21,9 @@ exports.handler = async (event) => {
   try {
 
     const session = await stripe.checkout.sessions.create({
+
       payment_method_types: ["card", "us_bank_account"],
+
       mode: "payment",
 
       line_items: [
@@ -31,8 +33,12 @@ exports.handler = async (event) => {
         }
       ],
 
-      success_url: "https://myvitalink.app/activate-success.html",
-      cancel_url: "https://myvitalink.app/activate.html"
+      success_url:
+        "https://myvitalink.app/activate-success.html?session_id={CHECKOUT_SESSION_ID}",
+
+      cancel_url:
+        "https://myvitalink.app/activate.html"
+
     });
 
     return {
@@ -43,6 +49,8 @@ exports.handler = async (event) => {
 
   } catch (err) {
 
+    console.error("Stripe checkout error:", err);
+
     return {
       statusCode: 500,
       headers: corsHeaders,
@@ -50,4 +58,5 @@ exports.handler = async (event) => {
     };
 
   }
+
 };
