@@ -31,6 +31,16 @@ exports.handler = async function (event) {
     };
   }
 
+  const sessionId = event.queryStringParameters?.session_id;
+
+  if (!sessionId) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Missing session id" })
+    };
+  }
+
   try {
 
     const client = await pool.connect();
@@ -38,8 +48,9 @@ exports.handler = async function (event) {
     const result = await client.query(
       `SELECT code
        FROM activation_codes
-       ORDER BY created_at DESC
-       LIMIT 1`
+       WHERE stripe_session = $1
+       LIMIT 1`,
+      [sessionId]
     );
 
     client.release();
