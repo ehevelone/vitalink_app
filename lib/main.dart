@@ -83,6 +83,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _sub;
 
+  bool _deepLinkHandled = false;
+
   @override
   void initState() {
     super.initState();
@@ -92,8 +94,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   Future<void> _initDeepLinks() async {
     _appLinks = AppLinks();
 
-    // 🔧 Allow navigator + splash screen to initialize first
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Give navigator time to initialize
+    await Future.delayed(const Duration(seconds: 1));
 
     try {
       final uri = await _appLinks.getInitialLink();
@@ -111,16 +113,17 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   void _handleDeepLink(Uri uri) {
     debugPrint("Deep link received: $uri");
 
-    // 🔧 Navigator guard
+    if (_deepLinkHandled) return;
+    _deepLinkHandled = true;
+
     if (navigatorKey.currentState == null) return;
 
     if (uri.host == "register") {
       final code = uri.queryParameters["code"];
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        navigatorKey.currentState?.pushReplacementNamed(
           "/landing",
-          (route) => false,
           arguments: {"code": code},
         );
       });
@@ -131,24 +134,20 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
     if (uri.host == "activate") {
       final code = uri.queryParameters["code"];
 
-      if (code != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamedAndRemoveUntil(
-            "/landing",
-            (route) => false,
-            arguments: {"code": code},
-          );
-        });
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushReplacementNamed(
+          "/landing",
+          arguments: {"code": code},
+        );
+      });
 
       return;
     }
 
     if (uri.host == "recover") {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        navigatorKey.currentState?.pushReplacementNamed(
           "/request_reset",
-          (route) => false,
         );
       });
 
@@ -157,9 +156,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     if (uri.host == "emergency") {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        navigatorKey.currentState?.pushReplacementNamed(
           "/emergency_view",
-          (route) => false,
         );
       });
 
@@ -180,11 +178,13 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
+
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
           int index = 0;
 
           final args = settings.arguments;
+
           if (args is int) {
             index = args;
           } else if (args is Map) {
@@ -200,6 +200,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         return null;
       },
+
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
@@ -226,17 +227,12 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
-        '/insurance_policies': (context) =>
-            const InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (context) =>
-            const IOSCardScanScreen(),
+        '/insurance_policies': (context) => const InsurancePoliciesScreen(),
+        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
         '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) =>
-            const HipaaFormScreen(),
-        '/request_reset': (context) =>
-            const RequestResetScreen(),
-        '/reset_password': (context) =>
-            const ResetPasswordScreen(),
+        '/authorization_form': (context) => const HipaaFormScreen(),
+        '/request_reset': (context) => const RequestResetScreen(),
+        '/reset_password': (context) => const ResetPasswordScreen(),
         '/agent_request_reset': (context) =>
             const AgentRequestResetScreen(),
         '/agent_reset_password': (context) =>
