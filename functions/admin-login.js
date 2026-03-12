@@ -1,7 +1,6 @@
 // @ts-nocheck
 
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -69,67 +68,28 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // ADMIN FLOW (2FA)
+    // FORCE 2FA FOR BOTH ROLES
     // ==========================
-    if (user.role === "admin") {
 
-      if (!user.phone) {
-        client.release();
-        return {
-          statusCode: 400,
-          headers: corsHeaders(),
-          body: "Admin phone not configured"
-        };
-      }
-
+    if (!user.phone) {
       client.release();
-
       return {
-        statusCode: 200,
+        statusCode: 400,
         headers: corsHeaders(),
-        body: JSON.stringify({
-          step: "firebase_2fa",
-          phone: user.phone,
-          role: "admin"
-        })
-      };
-    }
-
-    // ==========================
-    // RSM FLOW (ISSUE SESSION)
-    // ==========================
-    if (user.role === "rsm") {
-
-      const sessionToken = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
-
-      await client.query(
-        `UPDATE rsms
-         SET admin_session_token = $1,
-             admin_session_expires = $2
-         WHERE id = $3`,
-        [sessionToken, expires, user.id]
-      );
-
-      client.release();
-
-      return {
-        statusCode: 200,
-        headers: corsHeaders(),
-        body: JSON.stringify({
-          step: "login_success",
-          role: "rsm",
-          token: sessionToken
-        })
+        body: "Phone not configured for 2FA"
       };
     }
 
     client.release();
 
     return {
-      statusCode: 403,
+      statusCode: 200,
       headers: corsHeaders(),
-      body: "Unauthorized"
+      body: JSON.stringify({
+        step: "firebase_2fa",
+        phone: user.phone,
+        role: user.role
+      })
     };
 
   } catch (err) {
