@@ -80,7 +80,6 @@ class VitaLinkApp extends StatefulWidget {
 }
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
-
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _sub;
 
@@ -91,68 +90,81 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   }
 
   Future<void> _initDeepLinks() async {
-
     _appLinks = AppLinks();
 
     // 🔧 Allow navigator + splash screen to initialize first
     await Future.delayed(const Duration(milliseconds: 500));
 
     try {
-
       final uri = await _appLinks.getInitialLink();
 
       if (uri != null) {
         _handleDeepLink(uri);
       }
-
     } catch (_) {}
 
     _sub = _appLinks.uriLinkStream.listen((uri) {
       _handleDeepLink(uri);
     });
-
   }
 
   void _handleDeepLink(Uri uri) {
-
     debugPrint("Deep link received: $uri");
 
     // 🔧 Navigator guard
     if (navigatorKey.currentState == null) return;
 
-    if (uri.host == "activate") {
+    if (uri.host == "register") {
+      final code = uri.queryParameters["code"];
 
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          "/landing",
+          (route) => false,
+          arguments: {"code": code},
+        );
+      });
+
+      return;
+    }
+
+    if (uri.host == "activate") {
       final code = uri.queryParameters["code"];
 
       if (code != null) {
-
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamed(
+          navigatorKey.currentState?.pushNamedAndRemoveUntil(
             "/landing",
+            (route) => false,
             arguments: {"code": code},
           );
         });
-
       }
 
+      return;
     }
 
     if (uri.host == "recover") {
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed("/request_reset");
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          "/request_reset",
+          (route) => false,
+        );
       });
 
+      return;
     }
 
     if (uri.host == "emergency") {
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed("/emergency_view");
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          "/emergency_view",
+          (route) => false,
+        );
       });
 
+      return;
     }
-
   }
 
   @override
@@ -168,7 +180,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       initialRoute: '/splash',
-
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
           int index = 0;
@@ -189,53 +200,39 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         return null;
       },
-
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
-
         '/login': (context) => const LoginScreen(),
         '/agent_login': (context) => const AgentLoginScreen(),
-
         '/registration': (context) => const RegistrationScreen(),
         '/account_setup': (context) => const AccountSetupScreen(),
         '/agent_registration': (context) => const AgentRegistrationScreen(),
         '/agent_setup': (context) => const AgentSetupScreen(),
-
         '/terms_user': (context) => const TermsUserScreen(),
         '/terms_agent': (context) => const TermsAgentScreen(),
-
         '/logo': (context) => const LogoScreen(),
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),
-
         '/my_agent_user': (context) => const MyAgentUser(),
         '/my_agent_agent': (context) => const MyAgentAgent(),
-
         '/emergency': (context) => const EmergencyScreen(),
         '/emergency_view': (context) => const EmergencyView(),
-
         '/my_profile_user': (context) => const ProfileUserScreen(),
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
-
         '/edit_profile': (context) => const EditProfileScreen(),
         '/profile_picker': (context) => const ProfilePickerScreen(),
         '/new_profile': (context) => const NewProfileScreen(),
-
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
-
         '/insurance_policies': (context) =>
             const InsurancePoliciesScreen(),
-
         '/insurance_cards_menu': (context) =>
             const IOSCardScanScreen(),
-
         '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) =>
             const HipaaFormScreen(),
-
         '/request_reset': (context) =>
             const RequestResetScreen(),
         '/reset_password': (context) =>
