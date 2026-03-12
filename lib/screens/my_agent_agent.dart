@@ -65,22 +65,24 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         _agencyAddress = await store.getString("agencyAddress");
       }
 
-      final res =
-          await ApiService.getAgentPromoCode(_agentEmail ?? "");
+      final res = await ApiService.getAgentPromoCode(_agentEmail ?? "");
 
       if (res['success'] == true) {
         final code = res['promoCode'];
         await store.setString("agentPromoCode", code);
         _promoCode = code;
-        _deepLink =
-            "https://vitalink-app.netlify.app/onboard?code=$code";
+
+        // ✅ NEW AGENT QR LANDING PAGE
+        _deepLink = "https://myvitalink.app/agent-success.html?code=$code";
       }
 
       final stored = await store.getString("agentPromoCode");
       if (_promoCode == null && stored != null) {
         _promoCode = stored;
+
+        // ✅ fallback
         _deepLink =
-            "https://vitalink-app.netlify.app/onboard?code=$stored";
+            "https://myvitalink.app/agent-success.html?code=$stored";
       }
     } catch (_) {
       _agentName = await store.getString("agentName");
@@ -91,18 +93,19 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
       _agencyAddress = await store.getString("agencyAddress");
     }
 
+    if (!mounted) return;
     setState(() => _loading = false);
   }
 
   Future<void> _copyInviteLink() async {
     if (_deepLink == null) return;
     await Clipboard.setData(ClipboardData(text: _deepLink!));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Invite link copied 📋")),
     );
   }
 
-  // 🔔 UPDATED: Now shows dialog with full results
   Future<void> _sendNotification() async {
     if (_agentEmail == null || _agentEmail!.isEmpty) return;
 
@@ -111,9 +114,8 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     final res =
         await ApiService.sendNotification(agentEmail: _agentEmail!);
 
-    setState(() => _loading = false);
-
     if (!mounted) return;
+    setState(() => _loading = false);
 
     final success = res["success"] == true;
     final campaign = res["campaign"] ?? "";
@@ -252,6 +254,12 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 size: 210,
                                 version: QrVersions.auto,
                                 backgroundColor: Colors.white,
+                              ),
+                              const SizedBox(height: 12),
+                              SelectableText(
+                                _deepLink!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12),
                               ),
                               const SizedBox(height: 20),
                               SizedBox(

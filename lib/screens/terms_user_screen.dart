@@ -31,8 +31,10 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
 
     final args = ModalRoute.of(context)?.settings.arguments;
 
-    if (args is Map) {
-      _args = args;
+    if (args is Map && _args == null) {
+      setState(() {
+        _args = args;
+      });
     }
   }
 

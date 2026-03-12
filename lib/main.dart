@@ -94,6 +94,9 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     _appLinks = AppLinks();
 
+    // 🔧 Allow navigator + splash screen to initialize first
+    await Future.delayed(const Duration(milliseconds: 500));
+
     try {
 
       final uri = await _appLinks.getInitialLink();
@@ -113,6 +116,9 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   void _handleDeepLink(Uri uri) {
 
     debugPrint("Deep link received: $uri");
+
+    // 🔧 Navigator guard
+    if (navigatorKey.currentState == null) return;
 
     if (uri.host == "activate") {
 

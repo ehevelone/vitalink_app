@@ -20,8 +20,10 @@ class _LandingScreenState extends State<LandingScreen> {
 
     final args = ModalRoute.of(context)?.settings.arguments;
 
-    if (args is Map && args["code"] != null) {
-      activationCode = args["code"];
+    if (args is Map && args["code"] != null && activationCode == null) {
+      setState(() {
+        activationCode = args["code"];
+      });
     }
   }
 

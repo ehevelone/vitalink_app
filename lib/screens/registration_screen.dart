@@ -40,12 +40,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    _activationCodeCtrl.addListener(_lookupActivation);
   }
 
   @override
   void dispose() {
-    _activationCodeCtrl.removeListener(_lookupActivation);
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
@@ -69,9 +67,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       _activationCodeCtrl.text = code;
 
-      Future.microtask(() {
+      if (!_lookupRunning && !_activationLoaded) {
         _lookupActivation();
-      });
+      }
     }
 
     _argsLoaded = true;
@@ -101,8 +99,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           _emailCtrl.text = res['email'] ?? "";
           _activationLoaded = true;
         });
-
-        _activationCodeCtrl.removeListener(_lookupActivation);
 
       }
 
@@ -262,16 +258,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _nameCtrl,
-                readOnly: true,
                 decoration: const InputDecoration(labelText: "Full Name"),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? "Name required" : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _emailCtrl,
-                readOnly: true,
                 decoration: const InputDecoration(labelText: "Email"),
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return "Email required";
+                  }
+                  if (!v.contains("@")) {
+                    return "Enter a valid email";
+                  }
+                  return null;
+                },
               ),
 
               const SizedBox(height: 12),
