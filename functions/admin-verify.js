@@ -34,6 +34,7 @@ exports.handler = async function (event) {
   }
 
   try {
+
     const { idToken, email } = JSON.parse(event.body || "{}");
 
     if (!idToken || !email) {
@@ -48,7 +49,6 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // 🔥 Allow BOTH admin and rsm
     const result = await client.query(
       "SELECT id, phone, role FROM rsms WHERE email=$1 AND active=true LIMIT 1",
       [email]
@@ -61,13 +61,29 @@ exports.handler = async function (event) {
 
     const user = result.rows[0];
 
-    const dbPhone = String(user.phone).replace(/\D/g, "");
-    const firebasePhone = String(decoded.phone_number).replace(/\D/g, "");
+    // ==========================
+    // PHONE NORMALIZATION FIX
+    // ==========================
+
+    function normalizePhone(p) {
+      let digits = String(p || "").replace(/\D/g, "");
+      if (digits.length === 11 && digits.startsWith("1")) {
+        digits = digits.slice(1);
+      }
+      return digits;
+    }
+
+    const dbPhone = normalizePhone(user.phone);
+    const firebasePhone = normalizePhone(decoded.phone_number);
 
     if (dbPhone !== firebasePhone) {
       client.release();
       return { statusCode: 403, headers: corsHeaders, body: "Phone mismatch" };
     }
+
+    // ==========================
+    // CREATE SESSION
+    // ==========================
 
     const sessionToken = crypto.randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
@@ -85,7 +101,7 @@ exports.handler = async function (event) {
       body: JSON.stringify({
         success: true,
         token: sessionToken,
-        role: user.role   // 🔥 CRITICAL FIX
+        role: user.role
       })
     };
 
@@ -93,4 +109,5 @@ exports.handler = async function (event) {
     console.error("admin-verify error:", err);
     return { statusCode: 500, headers: corsHeaders, body: "Verification failed" };
   }
+
 };
