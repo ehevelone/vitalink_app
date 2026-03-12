@@ -26,6 +26,7 @@ exports.handler = async function (event) {
   try {
 
     const sessionToken = event.headers["x-admin-session"];
+    const ip = event.headers["x-forwarded-for"] || "unknown";
 
     if (!sessionToken) {
       return { statusCode: 401, headers: corsHeaders, body: "Unauthorized" };
@@ -41,7 +42,7 @@ exports.handler = async function (event) {
 
     // Verify RSM session
     const rsmCheck = await client.query(
-      `SELECT id
+      `SELECT id, email
        FROM rsms
        WHERE admin_session_token = $1
        AND admin_session_expires > NOW()
@@ -54,6 +55,8 @@ exports.handler = async function (event) {
       return { statusCode: 401, headers: corsHeaders, body: "Invalid session" };
     }
 
+    const rsm = rsmCheck.rows[0];
+
     // Toggle agent active status
     const update = await client.query(
       `UPDATE agents
@@ -63,11 +66,26 @@ exports.handler = async function (event) {
       [agentId]
     );
 
-    client.release();
-
     if (update.rows.length === 0) {
+      client.release();
       return { statusCode: 404, headers: corsHeaders, body: "Agent not found" };
     }
+
+    const newStatus = update.rows[0].active ? "activated" : "deactivated";
+
+    // 🔒 LOG ACTION
+    await client.query(
+      `INSERT INTO admin_logs (admin_id, action, target, ip)
+       VALUES ($1,$2,$3,$4)`,
+      [
+        rsm.id,
+        "toggle_agent",
+        `agent:${agentId}:${newStatus}`,
+        ip
+      ]
+    );
+
+    client.release();
 
     return {
       statusCode: 200,
