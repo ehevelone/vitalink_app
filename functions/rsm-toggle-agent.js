@@ -1,6 +1,9 @@
 // @ts-nocheck
 
 const { Pool } = require("pg");
+const Stripe = require("stripe");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -42,7 +45,7 @@ exports.handler = async function (event) {
 
     // Verify RSM session
     const rsmCheck = await client.query(
-      `SELECT id, email
+      `SELECT id, email, stripe_subscription_id, stripe_subscription_item_id
        FROM rsms
        WHERE admin_session_token = $1
        AND admin_session_expires > NOW()
@@ -73,7 +76,34 @@ exports.handler = async function (event) {
 
     const newStatus = update.rows[0].active ? "activated" : "deactivated";
 
-    // 🔒 LOG ACTION
+    // Count active agents
+    const countResult = await client.query(
+      `SELECT COUNT(*)
+       FROM agents
+       WHERE rsm_id = $1
+       AND active = true`,
+      [rsm.id]
+    );
+
+    const activeCount = parseInt(countResult.rows[0].count);
+
+    console.log("Active agents:", activeCount);
+
+    // Update Stripe quantity
+    if (rsm.stripe_subscription_item_id) {
+
+      await stripe.subscriptionItems.update(
+        rsm.stripe_subscription_item_id,
+        {
+          quantity: activeCount
+        }
+      );
+
+      console.log("Stripe quantity updated:", activeCount);
+
+    }
+
+    // Log action
     await client.query(
       `INSERT INTO admin_logs (admin_id, action, target, ip)
        VALUES ($1,$2,$3,$4)`,
@@ -92,7 +122,8 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
-        agent: update.rows[0]
+        agent: update.rows[0],
+        active_agents: activeCount
       })
     };
 

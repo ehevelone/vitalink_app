@@ -39,6 +39,8 @@ exports.handler = async (event) => {
 
   try {
 
+    /* CHECKOUT COMPLETED */
+
     if (
       stripeEvent.type === "checkout.session.completed" ||
       stripeEvent.type === "checkout.session.async_payment_succeeded"
@@ -50,20 +52,40 @@ exports.handler = async (event) => {
 
       console.log("RSM signup payment:", email);
 
-      if (email) {
+      if (email && session.subscription) {
+
+        const subscription = await stripe.subscriptions.retrieve(
+          session.subscription
+        );
+
+        const itemId = subscription.items.data[0].id;
 
         await client.query(
           `UPDATE rsms
-           SET billing_active = true
-           WHERE email = $1`,
-          [email]
+           SET billing_active = true,
+               stripe_customer_id = $1,
+               stripe_subscription_id = $2,
+               stripe_subscription_item_id = $3,
+               subscription_status = $4,
+               current_period_end = to_timestamp($5)
+           WHERE email = $6`,
+          [
+            session.customer,
+            subscription.id,
+            itemId,
+            subscription.status,
+            subscription.current_period_end,
+            email
+          ]
         );
 
-        console.log("Billing activated for:", email);
+        console.log("RSM billing activated:", email);
 
       }
 
     }
+
+    /* INVOICE PAID (SUBSCRIPTION RENEWAL) */
 
     if (stripeEvent.type === "invoice.paid") {
 
@@ -71,18 +93,21 @@ exports.handler = async (event) => {
 
       const email = invoice.customer_email || null;
 
-      console.log("Subscription payment received:", email);
+      console.log("Subscription renewal:", email);
 
       if (email) {
 
         await client.query(
           `UPDATE rsms
-           SET billing_active = true
-           WHERE email = $1`,
-          [email]
+           SET billing_active = true,
+               subscription_status = 'active',
+               current_period_end = to_timestamp($1)
+           WHERE email = $2`,
+          [
+            invoice.lines.data[0].period.end,
+            email
+          ]
         );
-
-        console.log("Billing confirmed for:", email);
 
       }
 
