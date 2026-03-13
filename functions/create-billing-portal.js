@@ -71,7 +71,9 @@ exports.handler = async (event) => {
 
       const portalSession = await stripe.billingPortal.sessions.create({
         customer: rsmData.stripe_customer_id,
-        return_url: "https://myvitalink.app/rsm_report.html"
+
+        /* FIXED PATH */
+        return_url: "https://myvitalink.app/core-node/rsm_report.html"
       });
 
       return {
@@ -96,11 +98,13 @@ exports.handler = async (event) => {
         }
       ],
 
+      /* FIXED PATH */
       success_url:
-        "https://myvitalink.app/rsm_report.html?billing=success",
+        "https://myvitalink.app/core-node/rsm_report.html?billing=success",
 
+      /* FIXED PATH */
       cancel_url:
-        "https://myvitalink.app/rsm_report.html?billing=cancel",
+        "https://myvitalink.app/core-node/rsm_report.html?billing=cancel",
 
       metadata: {
         rsm_id: rsmData.id
