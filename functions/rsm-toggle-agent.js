@@ -67,8 +67,9 @@ exports.handler = async function (event) {
       `UPDATE agents
        SET active = NOT active
        WHERE id = $1
+       AND rsm_id = $2
        RETURNING id, active`,
-      [agentId]
+      [agentId, rsm.id]
     );
 
     if (update.rows.length === 0) {
@@ -98,14 +99,40 @@ exports.handler = async function (event) {
 
       try {
 
-        await stripe.subscriptionItems.update(
-          rsm.stripe_subscription_item_id,
-          {
-            quantity: activeCount
-          }
-        );
+        if (activeCount === 0) {
 
-        console.log("Stripe quantity updated:", activeCount);
+          /* CANCEL STRIPE SUBSCRIPTION */
+
+          const subItem = await stripe.subscriptionItems.retrieve(
+            rsm.stripe_subscription_item_id
+          );
+
+          await stripe.subscriptions.cancel(subItem.subscription);
+
+          await client.query(
+            `UPDATE rsms
+             SET billing_active = false,
+                 stripe_subscription_item_id = NULL
+             WHERE id = $1`,
+            [rsm.id]
+          );
+
+          console.log("Stripe subscription cancelled");
+
+        } else {
+
+          /* UPDATE SEAT COUNT */
+
+          await stripe.subscriptionItems.update(
+            rsm.stripe_subscription_item_id,
+            {
+              quantity: activeCount
+            }
+          );
+
+          console.log("Stripe quantity updated:", activeCount);
+
+        }
 
       } catch (stripeErr) {
 
