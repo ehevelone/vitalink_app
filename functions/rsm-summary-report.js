@@ -9,7 +9,7 @@ const pool = new Pool({
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://myvitalink.app",
-  "Access-Control-Allow-Headers": "Content-Type, x-rsm-token",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-session",
   "Access-Control-Allow-Methods": "GET, OPTIONS"
 };
 
@@ -25,7 +25,8 @@ exports.handler = async function (event) {
 
   try {
 
-    const token = event.headers["x-rsm-token"];
+    const token = event.headers["x-admin-session"];
+
     if (!token) {
       return { statusCode: 401, headers: corsHeaders, body: "Missing token" };
     }
