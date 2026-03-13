@@ -113,6 +113,8 @@ exports.handler = async (event) => {
           ]
         );
 
+        console.log("Billing renewed:", email);
+
       }
 
     }
@@ -131,6 +133,8 @@ exports.handler = async (event) => {
 
       if (email) {
 
+        /* Disable RSM billing */
+
         await client.query(
           `UPDATE rsms
            SET billing_active = false,
@@ -139,7 +143,18 @@ exports.handler = async (event) => {
           [email]
         );
 
-        console.log("Billing disabled due to failed payment:", email);
+        console.log("Billing disabled:", email);
+
+        /* Disable ALL agents under this RSM */
+
+        await client.query(
+          `UPDATE agents
+           SET active = false
+           WHERE rsm_email = $1`,
+          [email]
+        );
+
+        console.log("All agents disabled for RSM:", email);
 
       }
 
