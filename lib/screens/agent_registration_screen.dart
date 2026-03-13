@@ -60,27 +60,40 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     _initDeepLinks();
   }
 
-  // vitalink://agent/onboard?unlockCode=XXXXX
   Future<void> _initDeepLinks() async {
     _appLinks = AppLinks();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final Uri? initial = await _appLinks.getInitialLink();
+
         if (initial != null) {
-          final code = initial.queryParameters['unlockCode'] ??
-              initial.queryParameters['code'];
-          if (code != null && code.isNotEmpty) _codeCtrl.text = code;
+          _applyCode(initial);
         }
       } catch (_) {}
 
       _linkSub = _appLinks.uriLinkStream.listen((Uri uri) {
-        final code = uri.queryParameters['unlockCode'] ??
-            uri.queryParameters['code'];
-        if (code != null && code.isNotEmpty) {
-          setState(() => _codeCtrl.text = code);
-        }
+        _applyCode(uri);
       });
     });
+  }
+
+  void _applyCode(Uri uri) {
+
+    String? code;
+
+    // OLD QR FORMAT
+    code = uri.queryParameters['unlockCode'] ??
+        uri.queryParameters['code'];
+
+    // NEW INVITE FORMAT
+    if (code == null && uri.pathSegments.isNotEmpty) {
+      code = uri.pathSegments.last;
+    }
+
+    if (code != null && code.isNotEmpty) {
+      setState(() => _codeCtrl.text = code);
+    }
   }
 
   @override
@@ -133,7 +146,6 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
           await store.setString("agentPromoCode", data['promoCode']);
         }
 
-        // Auto-login memory
         await store.setBool("rememberMeAgent", true);
         await store.setString("savedAgentEmail", _emailCtrl.text.trim());
         await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
@@ -184,11 +196,13 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
           key: _formKey,
           child: ListView(
             children: [
+
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
                 validator: (v) => v == null || v.isEmpty ? "Enter your name" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -198,6 +212,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || !v.contains('@') ? "Enter a valid email" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -206,6 +221,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 keyboardType: TextInputType.number,
                 validator: (v) => v == null || v.isEmpty ? "Enter your NPN" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -216,6 +232,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your phone number" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -224,6 +241,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency name" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -232,6 +250,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency address" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -250,8 +269,10 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: _validatePassword,
                 onChanged: (_) => setState(() {}),
               ),
+
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
+
               const SizedBox(height: 16),
 
               TextFormField(
@@ -269,6 +290,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
+
               const SizedBox(height: 12),
 
               TextFormField(
@@ -277,7 +299,9 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter unlock code" : null,
               ),
+
               const SizedBox(height: 24),
+
             ],
           ),
         ),

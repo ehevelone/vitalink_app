@@ -21,9 +21,15 @@ class _LandingScreenState extends State<LandingScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
 
     if (args is Map && args["code"] != null && activationCode == null) {
-      setState(() {
-        activationCode = args["code"];
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        setState(() {
+          activationCode = args["code"];
+        });
       });
+
     }
   }
 

@@ -16,11 +16,24 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
   late final DataRepository _repo;
   Profile? _p;
 
+  String? activationCode;
+
   @override
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map && args["code"] != null && activationCode == null) {
+      activationCode = args["code"];
+    }
   }
 
   Future<void> _load() async {
@@ -42,7 +55,12 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
     await SecureStore().setBool('agentTerms', true);
 
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/agent_registration');
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/agent_registration',
+      arguments: {"code": activationCode},
+    );
   }
 
   void _handleDecline(BuildContext context) async {

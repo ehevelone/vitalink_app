@@ -96,7 +96,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     _appLinks = AppLinks();
 
-    // Allow splash + navigator to mount
     await Future.delayed(const Duration(seconds: 1));
 
     try {
@@ -123,24 +122,21 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     Future.delayed(const Duration(milliseconds: 300), () {
 
-      if (uri.host == "register") {
+      String? code;
 
-        final code = uri.queryParameters["code"];
-
-        navigatorKey.currentState?.pushReplacementNamed(
-          "/landing",
-          arguments: {"code": code},
-        );
-
-        return;
+      // SUPPORT BOTH LINK FORMATS
+      if (uri.queryParameters.containsKey("code")) {
+        code = uri.queryParameters["code"];
+      } 
+      else if (uri.pathSegments.isNotEmpty) {
+        code = uri.pathSegments.last;
       }
 
-      if (uri.host == "activate") {
+      if (uri.host == "register" || uri.host == "activate") {
 
-        final code = uri.queryParameters["code"];
-
-        navigatorKey.currentState?.pushReplacementNamed(
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
           "/landing",
+          (route) => false,
           arguments: {"code": code},
         );
 
