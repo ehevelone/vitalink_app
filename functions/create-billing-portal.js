@@ -4,7 +4,7 @@ const { Pool } = require("pg");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const pool = new Pool({
-  connectionString: process.env.SUPABASE_DB_URL,
+  connectionString: process.env.SUPABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
@@ -48,7 +48,7 @@ exports.handler = async (event) => {
 
     const rsmResult = await client.query(
       `
-      SELECT id, email, stripe_customer_id
+      SELECT id,email,stripe_customer_id
       FROM rsms
       WHERE admin_session_token = $1
       AND admin_session_expires > NOW()
@@ -67,9 +67,7 @@ exports.handler = async (event) => {
 
     const rsm = rsmResult.rows[0];
 
-    /* -----------------------------
-       IF CUSTOMER EXISTS → PORTAL
-    ----------------------------- */
+    /* EXISTING CUSTOMER → BILLING PORTAL */
 
     if (rsm.stripe_customer_id) {
 
@@ -88,9 +86,7 @@ exports.handler = async (event) => {
 
     }
 
-    /* -----------------------------
-       NO CUSTOMER → CREATE CHECKOUT
-    ----------------------------- */
+    /* NO CUSTOMER → CREATE CHECKOUT */
 
     const checkoutSession = await stripe.checkout.sessions.create({
 
@@ -100,7 +96,7 @@ exports.handler = async (event) => {
 
       line_items: [
         {
-          price: process.env.STRIPE_RSM_PRICE_ID,
+          price: process.env.STRIPE_ACTIVATION_PRICE_ID,
           quantity: 1
         }
       ],
