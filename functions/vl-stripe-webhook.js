@@ -133,28 +133,43 @@ exports.handler = async (event) => {
 
       if (email) {
 
-        /* Disable RSM billing */
+        /* Get RSM ID */
 
-        await client.query(
-          `UPDATE rsms
-           SET billing_active = false,
-               subscription_status = 'past_due'
-           WHERE email = $1`,
+        const rsmLookup = await client.query(
+          `SELECT id FROM rsms WHERE email = $1`,
           [email]
         );
 
-        console.log("Billing disabled:", email);
+        if (rsmLookup.rows.length === 0) {
 
-        /* Disable ALL agents under this RSM */
+          console.log("No RSM found for email:", email);
 
-        await client.query(
-          `UPDATE agents
-           SET active = false
-           WHERE rsm_email = $1`,
-          [email]
-        );
+        } else {
 
-        console.log("All agents disabled for RSM:", email);
+          const rsmId = rsmLookup.rows[0].id;
+
+          /* Disable RSM billing */
+
+          await client.query(
+            `UPDATE rsms
+             SET billing_active = false,
+                 subscription_status = 'past_due'
+             WHERE id = $1`,
+            [rsmId]
+          );
+
+          /* Disable ALL agents under this RSM */
+
+          await client.query(
+            `UPDATE agents
+             SET active = false
+             WHERE rsm_id = $1`,
+            [rsmId]
+          );
+
+          console.log("All agents disabled for RSM:", rsmId);
+
+        }
 
       }
 
