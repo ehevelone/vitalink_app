@@ -80,6 +80,7 @@ class VitaLinkApp extends StatefulWidget {
 }
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
+
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _sub;
 
@@ -92,14 +93,14 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   }
 
   Future<void> _initDeepLinks() async {
+
     _appLinks = AppLinks();
 
-    // Give navigator time to initialize
+    // Allow splash + navigator to mount
     await Future.delayed(const Duration(seconds: 1));
 
     try {
       final uri = await _appLinks.getInitialLink();
-
       if (uri != null) {
         _handleDeepLink(uri);
       }
@@ -108,9 +109,11 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
     _sub = _appLinks.uriLinkStream.listen((uri) {
       _handleDeepLink(uri);
     });
+
   }
 
   void _handleDeepLink(Uri uri) {
+
     debugPrint("Deep link received: $uri");
 
     if (_deepLinkHandled) return;
@@ -118,51 +121,52 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
     if (navigatorKey.currentState == null) return;
 
-    if (uri.host == "register") {
-      final code = uri.queryParameters["code"];
+    Future.delayed(const Duration(milliseconds: 300), () {
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (uri.host == "register") {
+
+        final code = uri.queryParameters["code"];
+
         navigatorKey.currentState?.pushReplacementNamed(
           "/landing",
           arguments: {"code": code},
         );
-      });
 
-      return;
-    }
+        return;
+      }
 
-    if (uri.host == "activate") {
-      final code = uri.queryParameters["code"];
+      if (uri.host == "activate") {
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final code = uri.queryParameters["code"];
+
         navigatorKey.currentState?.pushReplacementNamed(
           "/landing",
           arguments: {"code": code},
         );
-      });
 
-      return;
-    }
+        return;
+      }
 
-    if (uri.host == "recover") {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (uri.host == "recover") {
+
         navigatorKey.currentState?.pushReplacementNamed(
           "/request_reset",
         );
-      });
 
-      return;
-    }
+        return;
+      }
 
-    if (uri.host == "emergency") {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (uri.host == "emergency") {
+
         navigatorKey.currentState?.pushReplacementNamed(
           "/emergency_view",
         );
-      });
 
-      return;
-    }
+        return;
+      }
+
+    });
+
   }
 
   @override
@@ -173,6 +177,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'VitaLink',
@@ -180,14 +185,17 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       initialRoute: '/splash',
 
       onGenerateRoute: (settings) {
+
         if (settings.name == '/insurance_cards') {
+
           int index = 0;
 
           final args = settings.arguments;
 
           if (args is int) {
             index = args;
-          } else if (args is Map) {
+          }
+          else if (args is Map) {
             final v = args['index'];
             if (v is int) index = v;
           }
@@ -202,6 +210,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       },
 
       routes: {
+
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
@@ -233,11 +242,12 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/authorization_form': (context) => const HipaaFormScreen(),
         '/request_reset': (context) => const RequestResetScreen(),
         '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) =>
-            const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) =>
-            const AgentResetPasswordScreen(),
+        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
+        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
+
       },
+
     );
+
   }
 }
