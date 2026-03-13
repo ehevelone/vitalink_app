@@ -32,9 +32,9 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // 🔐 Validate session
+    // 🔐 Validate session + get billing status
     const rsmResult = await client.query(`
-      SELECT id
+      SELECT id, billing_active
       FROM rsms
       WHERE admin_session_token = $1
       AND role = 'rsm'
@@ -48,6 +48,8 @@ exports.handler = async function (event) {
     }
 
     const rsmId = rsmResult.rows[0].id;
+    const billingActive = rsmResult.rows[0].billing_active;
+
     const { search, download, id } = event.queryStringParameters || {};
 
     // =========================================================
@@ -175,6 +177,7 @@ exports.handler = async function (event) {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
+        billing_active: billingActive,
         active_agents: Number(count.rows[0].count),
         agents: agents.rows
       })
