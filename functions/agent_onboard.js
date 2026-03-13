@@ -13,7 +13,9 @@ function generateUnlockCode(prefix = "AG", length = 10) {
 }
 
 exports.handler = async (event) => {
+
   try {
+
     // ✅ Allow CORS preflight
     if (event.httpMethod === "OPTIONS") {
       return {
@@ -45,10 +47,10 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔎 1️⃣ Find RSM by agent_enroll_code
+    // 🔎 1️⃣ Find RSM by enrollment code
     const rsmResult = await db.query(
       `
-      SELECT id
+      SELECT id, billing_active
       FROM rsms
       WHERE agent_enroll_code = $1
       LIMIT 1
@@ -63,7 +65,19 @@ exports.handler = async (event) => {
       };
     }
 
-    const rsmId = rsmResult.rows[0].id;
+    const rsm = rsmResult.rows[0];
+
+    // 🚫 BLOCK if office billing inactive
+    if (!rsm.billing_active) {
+      console.log("Enrollment blocked — billing inactive");
+
+      return {
+        statusCode: 403,
+        body: "Office billing inactive. Contact your RSM.",
+      };
+    }
+
+    const rsmId = rsm.id;
 
     // 🔑 2️⃣ Generate agent unlock code
     const unlockCode = generateUnlockCode();
@@ -92,7 +106,7 @@ exports.handler = async (event) => {
 
     const agentId = result.rows[0].id;
 
-    // 🔁 4️⃣ Redirect to claim page (UPDATED PATH)
+    // 🔁 4️⃣ Redirect to claim page
     const redirectUrl =
       `https://myvitalink.app/core-node/agent_claim.html?code=${encodeURIComponent(unlockCode)}`;
 
@@ -111,6 +125,7 @@ exports.handler = async (event) => {
     };
 
   } catch (err) {
+
     console.error("❌ agent_onboard error:", err);
 
     return {
@@ -120,5 +135,7 @@ exports.handler = async (event) => {
         error: err.message,
       }),
     };
+
   }
+
 };

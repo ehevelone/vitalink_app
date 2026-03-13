@@ -39,7 +39,9 @@ exports.handler = async (event) => {
 
   try {
 
-    /* CHECKOUT COMPLETED */
+    /* =========================================
+       CHECKOUT COMPLETED (FIRST PAYMENT)
+       ========================================= */
 
     if (
       stripeEvent.type === "checkout.session.completed" ||
@@ -58,7 +60,7 @@ exports.handler = async (event) => {
           session.subscription
         );
 
-        const itemId = subscription.items.data[0].id;
+        const itemId = subscription.items?.data?.[0]?.id || null;
 
         await client.query(
           `UPDATE rsms
@@ -85,7 +87,9 @@ exports.handler = async (event) => {
 
     }
 
-    /* INVOICE PAID (SUBSCRIPTION RENEWAL) */
+    /* =========================================
+       SUBSCRIPTION RENEWAL
+       ========================================= */
 
     if (stripeEvent.type === "invoice.paid") {
 
@@ -104,10 +108,38 @@ exports.handler = async (event) => {
                current_period_end = to_timestamp($1)
            WHERE email = $2`,
           [
-            invoice.lines.data[0].period.end,
+            invoice.lines?.data?.[0]?.period?.end || null,
             email
           ]
         );
+
+      }
+
+    }
+
+    /* =========================================
+       PAYMENT FAILURE
+       ========================================= */
+
+    if (stripeEvent.type === "invoice.payment_failed") {
+
+      const invoice = stripeEvent.data.object;
+
+      const email = invoice.customer_email || null;
+
+      console.log("Payment failed:", email);
+
+      if (email) {
+
+        await client.query(
+          `UPDATE rsms
+           SET billing_active = false,
+               subscription_status = 'past_due'
+           WHERE email = $1`,
+          [email]
+        );
+
+        console.log("Billing disabled due to failed payment:", email);
 
       }
 

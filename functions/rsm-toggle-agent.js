@@ -43,9 +43,10 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // Verify RSM session
+    /* VERIFY RSM SESSION */
+
     const rsmCheck = await client.query(
-      `SELECT id, email, stripe_subscription_id, stripe_subscription_item_id
+      `SELECT id, email, billing_active, stripe_subscription_item_id
        FROM rsms
        WHERE admin_session_token = $1
        AND admin_session_expires > NOW()
@@ -60,7 +61,8 @@ exports.handler = async function (event) {
 
     const rsm = rsmCheck.rows[0];
 
-    // Toggle agent active status
+    /* TOGGLE AGENT STATUS */
+
     const update = await client.query(
       `UPDATE agents
        SET active = NOT active
@@ -76,7 +78,8 @@ exports.handler = async function (event) {
 
     const newStatus = update.rows[0].active ? "activated" : "deactivated";
 
-    // Count active agents
+    /* COUNT ACTIVE AGENTS */
+
     const countResult = await client.query(
       `SELECT COUNT(*)
        FROM agents
@@ -89,21 +92,31 @@ exports.handler = async function (event) {
 
     console.log("Active agents:", activeCount);
 
-    // Update Stripe quantity
-    if (rsm.stripe_subscription_item_id) {
+    /* UPDATE STRIPE BILLING */
 
-      await stripe.subscriptionItems.update(
-        rsm.stripe_subscription_item_id,
-        {
-          quantity: activeCount
-        }
-      );
+    if (rsm.billing_active && rsm.stripe_subscription_item_id) {
 
-      console.log("Stripe quantity updated:", activeCount);
+      try {
+
+        await stripe.subscriptionItems.update(
+          rsm.stripe_subscription_item_id,
+          {
+            quantity: activeCount
+          }
+        );
+
+        console.log("Stripe quantity updated:", activeCount);
+
+      } catch (stripeErr) {
+
+        console.error("Stripe billing update failed:", stripeErr.message);
+
+      }
 
     }
 
-    // Log action
+    /* LOG ACTION */
+
     await client.query(
       `INSERT INTO admin_logs (admin_id, action, target, ip)
        VALUES ($1,$2,$3,$4)`,
@@ -128,12 +141,15 @@ exports.handler = async function (event) {
     };
 
   } catch (err) {
+
     console.error("toggle-agent error:", err);
+
     return {
       statusCode: 500,
       headers: corsHeaders,
       body: "Server error"
     };
+
   }
 
 };
