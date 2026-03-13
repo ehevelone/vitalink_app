@@ -91,7 +91,7 @@ exports.handler = async (event) => {
 
       line_items: [
         {
-          price: process.env.STRIPE_ACTIVATION_PRICE_ID,
+          price: process.env.STRIPE_RSM_PRICE_ID,
           quantity: 1
         }
       ],
