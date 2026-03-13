@@ -68,9 +68,9 @@ exports.handler = async function (event) {
 
       await client.query(
         `INSERT INTO agents
-          (agent_code, active, created_at, rsm_id)
+          (unlock_code, active, role, rsm_id, created_at)
          VALUES
-          ($1, false, NOW(), $2)`,
+          ($1, false, 'agent', $2, NOW())`,
         [
           agentCode,
           rsmId
