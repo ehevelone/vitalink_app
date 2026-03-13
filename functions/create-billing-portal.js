@@ -17,11 +17,7 @@ const corsHeaders = {
 exports.handler = async (event) => {
 
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: ""
-    };
+    return { statusCode: 200, headers: corsHeaders, body: "" };
   }
 
   if (event.httpMethod !== "POST") {
@@ -46,7 +42,9 @@ exports.handler = async (event) => {
       };
     }
 
-    const rsmResult = await client.query(
+    /* VERIFY RSM SESSION */
+
+    const rsm = await client.query(
       `
       SELECT id,email,stripe_customer_id
       FROM rsms
@@ -57,7 +55,7 @@ exports.handler = async (event) => {
       [sessionToken]
     );
 
-    if (rsmResult.rows.length === 0) {
+    if (rsm.rows.length === 0) {
       return {
         statusCode: 401,
         headers: corsHeaders,
@@ -65,34 +63,31 @@ exports.handler = async (event) => {
       };
     }
 
-    const rsm = rsmResult.rows[0];
+    const rsmData = rsm.rows[0];
 
     /* EXISTING CUSTOMER → BILLING PORTAL */
 
-    if (rsm.stripe_customer_id) {
+    if (rsmData.stripe_customer_id) {
 
       const portalSession = await stripe.billingPortal.sessions.create({
-        customer: rsm.stripe_customer_id,
+        customer: rsmData.stripe_customer_id,
         return_url: "https://myvitalink.app/rsm_report.html"
       });
 
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({
-          url: portalSession.url
-        })
+        body: JSON.stringify({ url: portalSession.url })
       };
-
     }
 
-    /* NO CUSTOMER → CREATE CHECKOUT */
+    /* FIRST TIME → CREATE CHECKOUT */
 
     const checkoutSession = await stripe.checkout.sessions.create({
 
       mode: "subscription",
 
-      customer_email: rsm.email,
+      customer_email: rsmData.email,
 
       line_items: [
         {
@@ -107,14 +102,16 @@ exports.handler = async (event) => {
       cancel_url:
         "https://myvitalink.app/rsm_report.html?billing=cancel",
 
+      metadata: {
+        rsm_id: rsmData.id
+      }
+
     });
 
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({
-        url: checkoutSession.url
-      })
+      body: JSON.stringify({ url: checkoutSession.url })
     };
 
   } catch (err) {
@@ -124,9 +121,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({
-        error: err.message
-      })
+      body: JSON.stringify({ error: err.message })
     };
 
   } finally {
