@@ -1,12 +1,10 @@
-// functions/create-billing-portal.js
-
 const Stripe = require("stripe");
 const { Pool } = require("pg");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const pool = new Pool({
-  connectionString: process.env.SUPABASE_URL,
+  connectionString: process.env.SUPABASE_DB_URL,
   ssl: { rejectUnauthorized: false }
 });
 
@@ -48,7 +46,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Verify RSM session
     const rsmResult = await client.query(
       `
       SELECT stripe_customer_id
@@ -78,7 +75,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Create Stripe customer portal session
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: "https://myvitalink.app/rsm_report.html"
@@ -99,13 +95,13 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: "Server error"
+      body: JSON.stringify({
+        error: err.message
+      })
     };
 
   } finally {
-
     client.release();
-
   }
 
 };
