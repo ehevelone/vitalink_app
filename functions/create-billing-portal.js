@@ -48,7 +48,7 @@ exports.handler = async (event) => {
 
     const rsmResult = await client.query(
       `
-      SELECT stripe_customer_id
+      SELECT id, email, stripe_customer_id
       FROM rsms
       WHERE admin_session_token = $1
       AND admin_session_expires > NOW()
@@ -65,32 +65,65 @@ exports.handler = async (event) => {
       };
     }
 
-    const customerId = rsmResult.rows[0].stripe_customer_id;
+    const rsm = rsmResult.rows[0];
 
-    if (!customerId) {
+    /* -----------------------------
+       IF CUSTOMER EXISTS → PORTAL
+    ----------------------------- */
+
+    if (rsm.stripe_customer_id) {
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: rsm.stripe_customer_id,
+        return_url: "https://myvitalink.app/rsm_report.html"
+      });
+
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers: corsHeaders,
-        body: "No billing customer found"
+        body: JSON.stringify({
+          url: portalSession.url
+        })
       };
+
     }
 
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: "https://myvitalink.app/rsm_report.html"
+    /* -----------------------------
+       NO CUSTOMER → CREATE CHECKOUT
+    ----------------------------- */
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+
+      mode: "subscription",
+
+      customer_email: rsm.email,
+
+      line_items: [
+        {
+          price: process.env.STRIPE_RSM_PRICE_ID,
+          quantity: 1
+        }
+      ],
+
+      success_url:
+        "https://myvitalink.app/rsm_report.html?billing=success",
+
+      cancel_url:
+        "https://myvitalink.app/rsm_report.html?billing=cancel",
+
     });
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        url: portalSession.url
+        url: checkoutSession.url
       })
     };
 
   } catch (err) {
 
-    console.error("Billing portal error:", err);
+    console.error("Billing error:", err);
 
     return {
       statusCode: 500,
