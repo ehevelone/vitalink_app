@@ -11,7 +11,7 @@ const pool = new Pool({
 const SITE = "https://myvitalink.app";
 const FUNCTION_URL = "https://vitalink-app.netlify.app/.netlify/functions/rsm-onboard";
 
-// ✅ NEW: Generate permanent RSM agent enrollment code
+// Generate permanent RSM agent enrollment code
 function generateRsmEnrollCode(prefix = "RSM", length = 8) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -75,12 +75,12 @@ exports.handler = async function (event) {
     // Required because password_hash is NOT NULL
     const tempPasswordHash = "PENDING_SETUP";
 
-    // ✅ NEW: generate permanent agent enrollment code
-    const enrollCode = generateRsmEnrollCode();
+    // Generate permanent agent enrollment code
+    const inviteCode = generateRsmEnrollCode();
 
     await client.query(
       `INSERT INTO rsms 
-        (role, email, password_hash, name, region, phone, active, created_at, onboard_token, onboard_token_expires, agent_enroll_code) 
+        (role, email, password_hash, name, region, phone, active, created_at, onboard_token, onboard_token_expires, invite_code) 
        VALUES ('rsm', $1, $2, $3, $4, $5, false, NOW(), $6, $7, $8)`,
       [
         email,
@@ -90,7 +90,7 @@ exports.handler = async function (event) {
         phone,
         token,
         expires,
-        enrollCode
+        inviteCode
       ]
     );
 
@@ -105,7 +105,7 @@ exports.handler = async function (event) {
         success: true,
         onboard_url: onboardingUrl,
         onboard_token: token,
-        agent_enroll_code: enrollCode   // ✅ returned for admin visibility if needed
+        invite_code: inviteCode
       })
     };
 
