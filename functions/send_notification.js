@@ -1,11 +1,12 @@
-// functions/send_notification.js
-
 const db = require("./services/db");
 const admin = require("firebase-admin");
+const fs = require("fs");
+const path = require("path");
 
-const serviceAccount = require("./firebase-service-account.json");
+const serviceAccount = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "firebase-service-account.json"), "utf8")
+);
 
-// ✅ Initialize Firebase once
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -38,16 +39,13 @@ function isInvalidTokenError(err) {
   );
 }
 
-// -----------------------------
-// Campaign selection
-// -----------------------------
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
   const d = now.getDate();
 
-  const inPrep = (m === 9) || (m === 10 && d <= 14);
-  const inAep = (m === 10 && d >= 15) || (m === 11) || (m === 12 && d <= 7);
-  const inOep = (m === 1) || (m === 2) || (m === 3);
+  const inPrep = m === 9 || (m === 10 && d <= 14);
+  const inAep = (m === 10 && d >= 15) || m === 11 || (m === 12 && d <= 7);
+  const inOep = m === 1 || m === 2 || m === 3;
 
   if (inAep) return "AEP";
   if (inOep) return "OEP";
@@ -57,7 +55,6 @@ function pickCampaign(now = new Date()) {
 }
 
 function campaignText(campaign, agentName) {
-
   const name = agentName || "Your Agent";
 
   if (campaign === "PREP") {
@@ -74,19 +71,15 @@ function campaignText(campaign, agentName) {
 }
 
 function getCycleStartApr1(now = new Date()) {
-
   const y = now.getFullYear();
   const apr1 = new Date(y, 3, 1, 0, 0, 0, 0);
 
   if (now >= apr1) return apr1;
-
   return new Date(y - 1, 3, 1, 0, 0, 0, 0);
 }
 
 exports.handler = async (event) => {
-
   try {
-
     if (event.httpMethod === "OPTIONS") return reply(200, {});
 
     if (event.httpMethod !== "POST") {
@@ -96,15 +89,11 @@ exports.handler = async (event) => {
     let body = {};
 
     try {
-
       body = event.isBase64Encoded
         ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
         : JSON.parse(event.body || "{}");
-
     } catch {
-
       return reply(400, { success: false, error: "Invalid request body" });
-
     }
 
     const { agentEmail } = body;
@@ -135,7 +124,6 @@ exports.handler = async (event) => {
     const agent = agentRes.rows[0];
 
     const now = new Date();
-
     const campaign = forcedCampaign || pickCampaign(now);
 
     if (campaign === "OFF") {
@@ -146,7 +134,6 @@ exports.handler = async (event) => {
     }
 
     const year = now.getFullYear();
-
     const cycleStart = getCycleStartApr1(now);
 
     const eligibleSql = `
@@ -193,7 +180,7 @@ exports.handler = async (event) => {
     if (!devicesRes.rows.length) {
       return reply(200, {
         success: true,
-        message: `No eligible devices to notify`,
+        message: "No eligible devices to notify",
         campaign,
       });
     }
@@ -202,9 +189,7 @@ exports.handler = async (event) => {
     const devices = [];
 
     for (const row of devicesRes.rows) {
-
       const token = String(row.device_token || "").trim();
-
       if (!token || seen.has(token)) continue;
 
       seen.add(token);
@@ -217,15 +202,11 @@ exports.handler = async (event) => {
     }
 
     const tokens = devices.map(d => d.token);
-
     const notif = campaignText(campaign, agent.name);
 
     const message = {
-
       tokens,
-
       notification: notif,
-
       android: {
         priority: "high",
         notification: {
@@ -233,7 +214,6 @@ exports.handler = async (event) => {
           sound: "default",
         },
       },
-
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/authorization_form",
@@ -247,7 +227,6 @@ exports.handler = async (event) => {
     const successUserIds = new Set();
 
     for (let i = 0; i < response.responses.length; i++) {
-
       const r = response.responses[i];
       const device = devices[i];
 
@@ -257,11 +236,9 @@ exports.handler = async (event) => {
         invalidDeviceRowIds.push(device.deviceRowId);
         invalidTokens.push(device.token);
       }
-
     }
 
     if (successUserIds.size) {
-
       await db.query(
         `
         UPDATE users
@@ -271,20 +248,16 @@ exports.handler = async (event) => {
         `,
         [campaign, Array.from(successUserIds)]
       );
-
     }
 
     if (invalidDeviceRowIds.length) {
-
       await db.query(
         `DELETE FROM user_devices WHERE id = ANY($1::int[])`,
         [invalidDeviceRowIds]
       );
-
     }
 
     return reply(200, {
-
       success: true,
       campaign,
       cooldownDays,
@@ -293,18 +266,14 @@ exports.handler = async (event) => {
       failureCount: response.failureCount,
       notifiedUsers: successUserIds.size,
       removedInvalidTokens: invalidTokens.length,
-
     });
 
   } catch (err) {
-
     console.error("send_notification error:", err);
 
     return reply(500, {
       success: false,
       error: "Server error while sending notifications",
     });
-
   }
-
 };
