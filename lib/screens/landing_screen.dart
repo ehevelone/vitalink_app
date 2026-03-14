@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -8,9 +9,8 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
-  static const Color vitalinkBlue = Color(0xFF79CAE3);
 
-  bool _loading = false;
+  static const Color vitalinkBlue = Color(0xFF79CAE3);
 
   String? activationCode;
 
@@ -18,25 +18,21 @@ class _LandingScreenState extends State<LandingScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final args = ModalRoute.of(context)?.settings.arguments;
+    final route = ModalRoute.of(context);
 
-    if (args is Map && args["code"] != null && activationCode == null) {
+    if (route != null) {
+      final args = route.settings.arguments;
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        setState(() {
-          activationCode = args["code"];
-        });
-      });
-
+      if (args is Map && args["code"] != null) {
+        activationCode = args["code"];
+      }
     }
+
+    activationCode ??= VitaLinkDeepLink.code;
   }
 
-  // ------------------------
-  // LOGIN POPUP
-  // ------------------------
   void _showLoginPopup() {
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -49,6 +45,7 @@ class _LandingScreenState extends State<LandingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+
               const Text(
                 "Log In",
                 style: TextStyle(
@@ -57,7 +54,9 @@ class _LandingScreenState extends State<LandingScreen> {
                   color: Colors.white,
                 ),
               ),
+
               const SizedBox(height: 24),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -72,7 +71,9 @@ class _LandingScreenState extends State<LandingScreen> {
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
+
               const SizedBox(height: 15),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: vitalinkBlue,
@@ -87,6 +88,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
+
             ],
           ),
         ),
@@ -94,10 +96,8 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  // ------------------------
-  // REGISTER POPUP
-  // ------------------------
   void _showRegisterPopup() {
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -110,6 +110,7 @@ class _LandingScreenState extends State<LandingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+
               const Text(
                 "Create Account",
                 style: TextStyle(
@@ -118,13 +119,16 @@ class _LandingScreenState extends State<LandingScreen> {
                   color: Colors.white,
                 ),
               ),
+
               const SizedBox(height: 24),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   minimumSize: const Size(double.infinity, 55),
                 ),
                 onPressed: () {
+
                   Navigator.pop(ctx);
 
                   Navigator.pushReplacementNamed(
@@ -132,19 +136,23 @@ class _LandingScreenState extends State<LandingScreen> {
                     '/terms_user',
                     arguments: {"code": activationCode},
                   );
+
                 },
                 child: const Text(
                   "Create User Account",
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
+
               const SizedBox(height: 15),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: vitalinkBlue,
                   minimumSize: const Size(double.infinity, 55),
                 ),
                 onPressed: () {
+
                   Navigator.pop(ctx);
 
                   Navigator.pushReplacementNamed(
@@ -152,12 +160,14 @@ class _LandingScreenState extends State<LandingScreen> {
                     '/terms_agent',
                     arguments: {"code": activationCode},
                   );
+
                 },
                 child: const Text(
                   "Create Agent Account",
                   style: TextStyle(fontSize: 18, color: Colors.black),
                 ),
               ),
+
             ],
           ),
         ),
@@ -165,23 +175,24 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  // ------------------------
-  // UI
-  // ------------------------
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
+
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
                     children: [
+
                       const SizedBox(height: 60),
+
                       const Text(
                         "Welcome To",
                         style: TextStyle(
@@ -190,12 +201,16 @@ class _LandingScreenState extends State<LandingScreen> {
                           color: vitalinkBlue,
                         ),
                       ),
+
                       const SizedBox(height: 30),
+
                       Image.asset(
                         'assets/images/vitalink-logo-2.png',
                         width: 240,
                       ),
+
                       const SizedBox(height: 70),
+
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
@@ -207,7 +222,9 @@ class _LandingScreenState extends State<LandingScreen> {
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),
                       ),
+
                       const SizedBox(height: 24),
+
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: vitalinkBlue,
@@ -219,12 +236,15 @@ class _LandingScreenState extends State<LandingScreen> {
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),
                       ),
+
                       const SizedBox(height: 60),
+
                     ],
                   ),
                 ),
               ),
             ),
+
             Padding(
               padding: const EdgeInsets.only(bottom: 20),
               child: Image.asset(
@@ -233,9 +253,11 @@ class _LandingScreenState extends State<LandingScreen> {
                 fit: BoxFit.contain,
               ),
             ),
+
           ],
         ),
       ),
     );
+
   }
 }

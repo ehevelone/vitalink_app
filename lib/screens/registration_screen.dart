@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../main.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
@@ -17,7 +18,6 @@ class RegistrationScreen extends StatefulWidget {
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
-
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
@@ -28,18 +28,40 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _activationCodeCtrl = TextEditingController();
 
   bool _loading = false;
-
   bool _showPassword = false;
   bool _showConfirmPassword = false;
 
   bool _activationLoaded = false;
   bool _lookupRunning = false;
-
   bool _argsLoaded = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_argsLoaded) return;
+    _argsLoaded = true;
+
+    String? code;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map && args['code'] != null) {
+      code = args['code'].toString().trim().toUpperCase();
+    }
+
+    code ??= VitaLinkDeepLink.code?.trim().toUpperCase();
+
+    if (code != null && code.isNotEmpty) {
+      _activationCodeCtrl.text = code;
+
+      // Clear any leftover deep link once we've consumed it here.
+      if (VitaLinkDeepLink.code == code) {
+        VitaLinkDeepLink.clear();
+      }
+
+      _lookupActivation();
+    }
   }
 
   @override
@@ -53,88 +75,60 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     super.dispose();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_argsLoaded) return;
-
-    final args = ModalRoute.of(context)?.settings.arguments;
-
-    if (args is Map && args['code'] != null) {
-
-      final code = args['code'].toString().toUpperCase();
-
-      _activationCodeCtrl.text = code;
-
-      if (!_lookupRunning && !_activationLoaded) {
-        _lookupActivation();
-      }
-    }
-
-    _argsLoaded = true;
-  }
-
   Future<void> _lookupActivation() async {
-
     if (_activationLoaded) return;
     if (_lookupRunning) return;
 
-    final code = _activationCodeCtrl.text.trim();
-
+    final code = _activationCodeCtrl.text.trim().toUpperCase();
     if (code.length < 8) return;
 
     _lookupRunning = true;
 
     try {
-
       final res = await ApiService.lookupActivation(code);
 
       if (!mounted) return;
 
       if (res['success'] == true) {
-
         setState(() {
-          _nameCtrl.text = res['name'] ?? "";
-          _emailCtrl.text = res['email'] ?? "";
+          _nameCtrl.text = (res['name'] ?? "").toString();
+          _emailCtrl.text = (res['email'] ?? "").toString();
           _activationLoaded = true;
         });
-
       }
-
-    } catch (_) {}
-
-    _lookupRunning = false;
-  }
-
-  Future<void> _pasteCode() async {
-
-    final data = await Clipboard.getData('text/plain');
-
-    if (data != null && data.text != null) {
-
-      setState(() {
-        _activationCodeCtrl.text = data.text!.trim().toUpperCase();
-        _activationLoaded = false;
-      });
-
-      _lookupActivation();
+    } catch (_) {
+      // intentionally quiet here
+    } finally {
+      _lookupRunning = false;
     }
   }
 
-  void _recoverCode() {
+  Future<void> _pasteCode() async {
+    final data = await Clipboard.getData('text/plain');
 
+    if (data?.text == null) return;
+
+    final pasted = data!.text!.trim().toUpperCase();
+
+    setState(() {
+      _activationCodeCtrl.text = pasted;
+      _activationLoaded = false;
+    });
+
+    await _lookupActivation();
+  }
+
+  void _recoverCode() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Recover Activation Code"),
         content: const Text(
-            "If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover"),
+          "If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover",
+        ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
             child: const Text("Close"),
           ),
         ],
@@ -143,16 +137,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _register() async {
-
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
 
     try {
-
       final repo = DataRepository();
 
-      final code = _activationCodeCtrl.text.trim();
+      final code = _activationCodeCtrl.text.trim().toUpperCase();
       final email = _emailCtrl.text.trim().toLowerCase();
 
       final agentRes = await ApiService.resolveAgentByCode(code);
@@ -162,9 +154,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
 
       final nameParts = _nameCtrl.text.trim().split(" ");
-
       final firstName = nameParts.first;
-
       final lastName =
           nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "";
 
@@ -185,12 +175,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final profile = await repo.loadProfile() ?? Profile();
 
       profile.fullName = _nameCtrl.text.trim();
-
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
-
       profile.registered = true;
-
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
@@ -202,25 +189,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       Navigator.pushReplacementNamed(context, '/menu');
-
     } catch (e) {
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Registration failed: $e")),
       );
-
     } finally {
-
-      if (mounted) setState(() => _loading = false);
-
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(title: const Text("User Registration")),
       body: Padding(
@@ -229,7 +212,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           key: _formKey,
           child: ListView(
             children: [
-
               const Text(
                 "ENTER YOUR ACTIVATION CODE",
                 style: TextStyle(
@@ -237,11 +219,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 10),
-
               TextFormField(
                 controller: _activationCodeCtrl,
+                textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: "Activation Code",
                   border: const OutlineInputBorder(),
@@ -251,20 +232,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Activation code required" : null,
+                    v == null || v.trim().isEmpty ? "Activation code required" : null,
               ),
-
               const SizedBox(height: 20),
-
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? "Name required" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
@@ -279,9 +256,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
@@ -290,9 +265,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   PhoneNumberFormatter(),
                 ],
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -300,9 +273,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      _showPassword ? Icons.visibility : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -311,16 +282,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Required" : null,
+                validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
-
               const SizedBox(height: 8),
-
               PasswordRules(controller: _passwordCtrl),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _confirmCtrl,
                 obscureText: !_showConfirmPassword,
@@ -334,8 +300,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     onPressed: () {
                       setState(() {
-                        _showConfirmPassword =
-                            !_showConfirmPassword;
+                        _showConfirmPassword = !_showConfirmPassword;
                       });
                     },
                   ),
@@ -343,9 +308,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
-
               const SizedBox(height: 8),
-
               Center(
                 child: TextButton(
                   onPressed: _recoverCode,

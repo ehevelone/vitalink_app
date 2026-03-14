@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../main.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -29,18 +30,27 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final args = ModalRoute.of(context)?.settings.arguments;
+    final route = ModalRoute.of(context);
 
-    if (args is Map && _args == null) {
-      setState(() {
+    // QR flow
+    if (route != null) {
+      final args = route.settings.arguments;
+
+      if (args is Map && _args == null) {
         _args = args;
-      });
+      }
+    }
+
+    // Deep link fallback
+    if (_args == null && VitaLinkDeepLink.code != null) {
+      _args = {"code": VitaLinkDeepLink.code};
     }
   }
 
   Future<void> _load() async {
     final p = await _repo.loadProfile();
     if (!mounted) return;
+
     setState(() {
       _p = p ?? Profile();
     });
@@ -61,7 +71,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
     Navigator.pushReplacementNamed(
       context,
       '/registration',
-      arguments: _args, // 🔥 forward activation code
+      arguments: _args,
     );
   }
 
@@ -97,7 +107,9 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
 
   Future<void> _handleBack() async {
     await SecureStore().remove('role');
+
     if (!mounted) return;
+
     Navigator.pushReplacementNamed(context, '/landing');
   }
 

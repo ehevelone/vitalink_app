@@ -53,6 +53,30 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+class VitaLinkDeepLink {
+  static String? _code;
+  static String? _lastRawUri;
+
+  static String? get code => _code;
+
+  static void setCode(String? value, {String? rawUri}) {
+    _code = value;
+    if (rawUri != null) {
+      _lastRawUri = rawUri;
+    }
+  }
+
+  static bool shouldIgnore(Uri uri) {
+    final raw = uri.toString();
+    return _lastRawUri == raw;
+  }
+
+  static void clear() {
+    _code = null;
+    _lastRawUri = null;
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -67,7 +91,7 @@ Future<void> main() async {
 
     runApp(const VitaLinkApp());
   }, (error, stack) {
-    debugPrint("ZONED ERROR: $error");
+    debugPrint('ZONED ERROR: $error');
     debugPrint(stack.toString());
   });
 }
@@ -80,11 +104,9 @@ class VitaLinkApp extends StatefulWidget {
 }
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
-
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _sub;
-
-  bool _deepLinkHandled = false;
+  bool _linksInitialized = false;
 
   @override
   void initState() {
@@ -93,76 +115,51 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   }
 
   Future<void> _initDeepLinks() async {
+    if (_linksInitialized) return;
+    _linksInitialized = true;
 
     _appLinks = AppLinks();
-
-    await Future.delayed(const Duration(seconds: 1));
 
     try {
       final uri = await _appLinks.getInitialLink();
       if (uri != null) {
-        _handleDeepLink(uri);
+        _storeDeepLink(uri);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Initial link error: $e');
+    }
 
-    _sub = _appLinks.uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
-    });
-
+    _sub = _appLinks.uriLinkStream.listen(
+      (uri) {
+        _storeDeepLink(uri);
+      },
+      onError: (e) {
+        debugPrint('uriLinkStream error: $e');
+      },
+    );
   }
 
-  void _handleDeepLink(Uri uri) {
+  void _storeDeepLink(Uri uri) {
+    if (VitaLinkDeepLink.shouldIgnore(uri)) return;
 
-    debugPrint("Deep link received: $uri");
+    debugPrint('Deep link received: $uri');
 
-    if (_deepLinkHandled) return;
-    _deepLinkHandled = true;
+    String? code;
 
-    if (navigatorKey.currentState == null) return;
-
-    Future.delayed(const Duration(milliseconds: 300), () {
-
-      String? code;
-
-      // SUPPORT BOTH LINK FORMATS
-      if (uri.queryParameters.containsKey("code")) {
-        code = uri.queryParameters["code"];
-      } 
-      else if (uri.pathSegments.isNotEmpty) {
-        code = uri.pathSegments.last;
+    final qpCode = uri.queryParameters['code'];
+    if (qpCode != null && qpCode.trim().isNotEmpty) {
+      code = qpCode.trim().toUpperCase();
+    } else if (uri.pathSegments.isNotEmpty) {
+      final last = uri.pathSegments.last.trim();
+      if (last.isNotEmpty) {
+        code = last.toUpperCase();
       }
+    }
 
-      if (uri.host == "register" || uri.host == "activate") {
+    if (code == null || code.isEmpty) return;
 
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
-          "/landing",
-          (route) => false,
-          arguments: {"code": code},
-        );
-
-        return;
-      }
-
-      if (uri.host == "recover") {
-
-        navigatorKey.currentState?.pushReplacementNamed(
-          "/request_reset",
-        );
-
-        return;
-      }
-
-      if (uri.host == "emergency") {
-
-        navigatorKey.currentState?.pushReplacementNamed(
-          "/emergency_view",
-        );
-
-        return;
-      }
-
-    });
-
+    VitaLinkDeepLink.setCode(code, rawUri: uri.toString());
+    debugPrint('Activation code stored: $code');
   }
 
   @override
@@ -173,25 +170,22 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
   @override
   Widget build(BuildContext context) {
-
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
-      initialRoute: '/splash',
+
+      // START DIRECTLY ON LANDING
+      home: const LandingScreen(),
 
       onGenerateRoute: (settings) {
-
         if (settings.name == '/insurance_cards') {
-
           int index = 0;
-
           final args = settings.arguments;
 
           if (args is int) {
             index = args;
-          }
-          else if (args is Map) {
+          } else if (args is Map) {
             final v = args['index'];
             if (v is int) index = v;
           }
@@ -204,9 +198,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         return null;
       },
-
       routes: {
-
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
@@ -240,10 +232,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/reset_password': (context) => const ResetPasswordScreen(),
         '/agent_request_reset': (context) => const AgentRequestResetScreen(),
         '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
-
       },
-
     );
-
   }
 }

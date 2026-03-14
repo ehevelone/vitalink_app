@@ -1,0 +1,105 @@
+const Stripe = require("stripe");
+const db = require("./services/db");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://myvitalink.app",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS"
+};
+
+exports.handler = async (event) => {
+
+if(event.httpMethod === "OPTIONS"){
+return {
+statusCode:200,
+headers:corsHeaders,
+body:""
+};
+}
+
+try{
+
+const sessionId = event.queryStringParameters.session_id;
+
+if(!sessionId){
+return {
+statusCode:400,
+headers:corsHeaders,
+body:JSON.stringify({error:"Missing session_id"})
+};
+}
+
+/* verify stripe session */
+
+const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+if(session.payment_status !== "paid"){
+return {
+statusCode:400,
+headers:corsHeaders,
+body:JSON.stringify({error:"Payment not completed"})
+};
+}
+
+/* check if agent already created */
+
+const existing = await db.query(
+"SELECT access_code FROM agents WHERE stripe_session_id = $1",
+[sessionId]
+);
+
+if(existing.rows.length){
+
+return {
+statusCode:200,
+headers:corsHeaders,
+body:JSON.stringify({
+code:existing.rows[0].access_code
+})
+};
+
+}
+
+/* generate agent code */
+
+const code =
+Math.random().toString(36).substring(2,8).toUpperCase();
+
+/* create agent */
+
+await db.query(
+`
+INSERT INTO agents
+(access_code, stripe_session_id, stripe_customer_id, created_at)
+VALUES ($1,$2,$3,NOW())
+`,
+[
+code,
+sessionId,
+session.customer
+]
+);
+
+return {
+statusCode:200,
+headers:corsHeaders,
+body:JSON.stringify({
+code:code
+})
+};
+
+}catch(err){
+
+console.error("Agent session error:",err);
+
+return {
+statusCode:500,
+headers:corsHeaders,
+body:JSON.stringify({error:"Server error"})
+};
+
+}
+
+};

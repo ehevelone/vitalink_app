@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../main.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -29,16 +30,25 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final args = ModalRoute.of(context)?.settings.arguments;
+    final route = ModalRoute.of(context);
 
-    if (args is Map && args["code"] != null && activationCode == null) {
-      activationCode = args["code"];
+    // QR flow
+    if (route != null) {
+      final args = route.settings.arguments;
+
+      if (args is Map && args["code"] != null) {
+        activationCode = args["code"];
+      }
     }
+
+    // Deep-link fallback
+    activationCode ??= VitaLinkDeepLink.code;
   }
 
   Future<void> _load() async {
     final p = await _repo.loadProfile();
     if (!mounted) return;
+
     setState(() {
       _p = p ?? Profile();
     });
@@ -95,7 +105,9 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
 
   Future<void> _handleBack() async {
     await SecureStore().remove('role');
+
     if (!mounted) return;
+
     Navigator.pushReplacementNamed(context, '/landing');
   }
 
@@ -138,7 +150,9 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
 
                         "Activation & Client Access\n\n"
                         "Agents may provide activation codes to their clients for access to the VitaLink service.\n\n"
+
                         "Clients of participating agents will receive an activation code from their agent.\n\n"
+
                         "Agents are responsible for ensuring that any client information entered into the app is accurate and handled in accordance with applicable privacy and regulatory requirements.\n\n"
 
                         "If you do not agree to these terms, you cannot use the app as an Agent.",

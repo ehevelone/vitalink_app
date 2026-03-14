@@ -4,11 +4,11 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
 
+const serviceAccount = require("./firebase-service-account.json");
+
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(
-      JSON.parse(process.env.FCM_SERVICE_ACCOUNT)
-    )
+    credential: admin.credential.cert(serviceAccount)
   });
 }
 

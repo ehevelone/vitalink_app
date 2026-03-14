@@ -1,8 +1,7 @@
-// lib/screens/agent_registration_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:app_links/app_links.dart';
-import 'dart:async';
+
+import '../main.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../widgets/password_rules.dart';
@@ -37,6 +36,7 @@ class AgentRegistrationScreen extends StatefulWidget {
 
 class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _npnCtrl = TextEditingController();
@@ -51,54 +51,45 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
   bool _showPassword = false;
   bool _showConfirm = false;
 
-  StreamSubscription<Uri>? _linkSub;
-  late final AppLinks _appLinks;
+  bool _argsLoaded = false;
 
   @override
-  void initState() {
-    super.initState();
-    _initDeepLinks();
-  }
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-  Future<void> _initDeepLinks() async {
-    _appLinks = AppLinks();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        final Uri? initial = await _appLinks.getInitialLink();
-
-        if (initial != null) {
-          _applyCode(initial);
-        }
-      } catch (_) {}
-
-      _linkSub = _appLinks.uriLinkStream.listen((Uri uri) {
-        _applyCode(uri);
-      });
-    });
-  }
-
-  void _applyCode(Uri uri) {
+    if (_argsLoaded) return;
+    _argsLoaded = true;
 
     String? code;
 
-    // OLD QR FORMAT
-    code = uri.queryParameters['unlockCode'] ??
-        uri.queryParameters['code'];
+    final args = ModalRoute.of(context)?.settings.arguments;
 
-    // NEW INVITE FORMAT
-    if (code == null && uri.pathSegments.isNotEmpty) {
-      code = uri.pathSegments.last;
+    if (args is Map && args["code"] != null) {
+      code = args["code"].toString();
     }
 
+    code ??= VitaLinkDeepLink.code;
+
     if (code != null && code.isNotEmpty) {
-      setState(() => _codeCtrl.text = code);
+      _codeCtrl.text = code;
+
+      if (VitaLinkDeepLink.code == code) {
+        VitaLinkDeepLink.clear();
+      }
     }
   }
 
   @override
   void dispose() {
-    _linkSub?.cancel();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _npnCtrl.dispose();
+    _phoneCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    _codeCtrl.dispose();
+    _agencyNameCtrl.dispose();
+    _agencyAddressCtrl.dispose();
     super.dispose();
   }
 
@@ -114,6 +105,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
 
   Future<void> _tryRegister() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _loading = true);
 
     try {
@@ -151,6 +143,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
 
         if (!mounted) return;
+
         Navigator.pushReplacementNamed(context, '/agent_menu');
       } else {
         _showPopup("Registration Failed", data['error'] ?? "Unknown error ❌");
@@ -182,7 +175,9 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     final store = SecureStore();
     await store.remove('authToken');
     await store.remove('device_token');
+
     if (!mounted) return;
+
     Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
   }
 
@@ -200,7 +195,8 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) => v == null || v.isEmpty ? "Enter your name" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter your name" : null,
               ),
 
               const SizedBox(height: 12),
@@ -219,7 +215,8 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 controller: _npnCtrl,
                 decoration: const InputDecoration(labelText: "NPN"),
                 keyboardType: TextInputType.number,
-                validator: (v) => v == null || v.isEmpty ? "Enter your NPN" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter your NPN" : null,
               ),
 
               const SizedBox(height: 12),
@@ -258,10 +255,12 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
                   labelText: "Password",
-                  helperText: "≥ 10 characters • 1 uppercase • 1 special character",
+                  helperText:
+                      "≥ 10 characters • 1 uppercase • 1 special character",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                        _showPassword ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(_showPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
                   ),
@@ -271,6 +270,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
 
               const SizedBox(height: 8),
+
               PasswordRules(controller: _passwordCtrl),
 
               const SizedBox(height: 16),
@@ -281,8 +281,9 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 decoration: InputDecoration(
                   labelText: "Confirm Password",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                        _showConfirm ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(_showConfirm
+                        ? Icons.visibility_off
+                        : Icons.visibility),
                     onPressed: () =>
                         setState(() => _showConfirm = !_showConfirm),
                   ),
