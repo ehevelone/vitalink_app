@@ -3,150 +3,195 @@ const db = require("./services/db");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+function generateCode() {
+  return Math.random()
+    .toString(36)
+    .substring(2, 8)
+    .toUpperCase();
+}
+
 exports.handler = async (event) => {
 
-const sig = event.headers["stripe-signature"];
+  const sig = event.headers["stripe-signature"];
 
-let stripeEvent;
+  let stripeEvent;
 
-try {
+  try {
 
-stripeEvent = stripe.webhooks.constructEvent(
-event.body,
-sig,
-process.env.STRIPE_WEBHOOK_SECRET_AGENT
-);
+    stripeEvent = stripe.webhooks.constructEvent(
+      event.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET_AGENT
+    );
 
-} catch (err) {
+  } catch (err) {
 
-console.error("Webhook signature failed", err);
+    console.error("Webhook signature failed", err);
 
-return {
-statusCode:400,
-body:"Webhook Error"
-};
+    return {
+      statusCode: 400,
+      body: "Webhook Error"
+    };
 
-}
+  }
 
-const data = stripeEvent.data.object;
+  const data = stripeEvent.data.object;
 
-try {
+  try {
 
-switch(stripeEvent.type){
+    switch (stripeEvent.type) {
 
-/* NEW AGENT SUBSCRIPTION */
+      /* AGENT CREATED AFTER CHECKOUT */
 
-case "customer.subscription.created":
+      case "checkout.session.completed":
 
-await db.query(
-`
-UPDATE agents
-SET
-stripe_subscription_id = $1,
-subscription_status = 'active'
-WHERE stripe_customer_id = $2
-`,
-[
-data.id,
-data.customer
-]
-);
+        const email = data.customer_details.email;
+        const customerId = data.customer;
+        const subscriptionId = data.subscription;
 
-break;
+        const code = generateCode();
 
+        await db.query(
+          `
+          INSERT INTO agents
+          (email, role, active, created_at, unlock_code, stripe_customer_id, stripe_subscription_id, subscription_status)
+          VALUES ($1,'agent',true,NOW(),$2,$3,$4,'active')
+          ON CONFLICT (email)
+          DO UPDATE SET
+            stripe_customer_id = EXCLUDED.stripe_customer_id,
+            stripe_subscription_id = EXCLUDED.stripe_subscription_id
+          `,
+          [
+            email,
+            code,
+            customerId,
+            subscriptionId
+          ]
+        );
 
-/* SUBSCRIPTION UPDATED */
+        console.log("Agent created:", email, code);
 
-case "customer.subscription.updated":
-
-await db.query(
-`
-UPDATE agents
-SET
-subscription_status = $1
-WHERE stripe_subscription_id = $2
-`,
-[
-data.status,
-data.id
-]
-);
-
-break;
+      break;
 
 
-/* SUBSCRIPTION CANCELED */
 
-case "customer.subscription.deleted":
+      /* NEW AGENT SUBSCRIPTION */
 
-await db.query(
-`
-UPDATE agents
-SET
-subscription_status = 'canceled'
-WHERE stripe_subscription_id = $1
-`,
-[
-data.id
-]
-);
+      case "customer.subscription.created":
 
-break;
+        await db.query(
+          `
+          UPDATE agents
+          SET
+            stripe_subscription_id = $1,
+            subscription_status = 'active'
+          WHERE stripe_customer_id = $2
+          `,
+          [
+            data.id,
+            data.customer
+          ]
+        );
 
-
-/* PAYMENT FAILED */
-
-case "invoice.payment_failed":
-
-await db.query(
-`
-UPDATE agents
-SET
-subscription_status = 'past_due'
-WHERE stripe_customer_id = $1
-`,
-[
-data.customer
-]
-);
-
-break;
+      break;
 
 
-/* PAYMENT SUCCESS */
 
-case "invoice.paid":
+      /* SUBSCRIPTION UPDATED */
 
-await db.query(
-`
-UPDATE agents
-SET
-subscription_status = 'active'
-WHERE stripe_customer_id = $1
-`,
-[
-data.customer
-]
-);
+      case "customer.subscription.updated":
 
-break;
+        await db.query(
+          `
+          UPDATE agents
+          SET
+            subscription_status = $1
+          WHERE stripe_subscription_id = $2
+          `,
+          [
+            data.status,
+            data.id
+          ]
+        );
 
-}
+      break;
 
-return {
-statusCode:200,
-body:"Webhook received"
-};
 
-}catch(err){
 
-console.error("Agent webhook error:", err);
+      /* SUBSCRIPTION CANCELED */
 
-return {
-statusCode:500,
-body:"Server error"
-};
+      case "customer.subscription.deleted":
 
-}
+        await db.query(
+          `
+          UPDATE agents
+          SET
+            subscription_status = 'canceled'
+          WHERE stripe_subscription_id = $1
+          `,
+          [
+            data.id
+          ]
+        );
+
+      break;
+
+
+
+      /* PAYMENT FAILED */
+
+      case "invoice.payment_failed":
+
+        await db.query(
+          `
+          UPDATE agents
+          SET
+            subscription_status = 'past_due'
+          WHERE stripe_customer_id = $1
+          `,
+          [
+            data.customer
+          ]
+        );
+
+      break;
+
+
+
+      /* PAYMENT SUCCESS */
+
+      case "invoice.paid":
+
+        await db.query(
+          `
+          UPDATE agents
+          SET
+            subscription_status = 'active'
+          WHERE stripe_customer_id = $1
+          `,
+          [
+            data.customer
+          ]
+        );
+
+      break;
+
+    }
+
+    return {
+      statusCode: 200,
+      body: "Webhook received"
+    };
+
+  } catch (err) {
+
+    console.error("Agent webhook error:", err);
+
+    return {
+      statusCode: 500,
+      body: "Server error"
+    };
+
+  }
 
 };
