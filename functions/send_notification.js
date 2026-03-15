@@ -1,18 +1,26 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
-const fs = require("fs");
-const path = require("path");
 
-const serviceAccount = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "firebase-service-account.json"), "utf8")
-);
+/* LOAD FIREBASE SERVICE ACCOUNT */
+let serviceAccount;
 
+try {
+  serviceAccount = require("./firebase-service-account.json");
+  console.log("Firebase service account loaded");
+} catch (err) {
+  console.error("Failed to load firebase-service-account.json", err);
+  throw err;
+}
+
+/* INIT FIREBASE */
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
+  console.log("Firebase initialized");
 }
 
+/* RESPONSE HELPER */
 function reply(statusCode, obj) {
   return {
     statusCode,
@@ -26,6 +34,7 @@ function reply(statusCode, obj) {
   };
 }
 
+/* INVALID TOKEN DETECTION */
 function isInvalidTokenError(err) {
   const msg = (err?.message || "").toLowerCase();
   const code = (err?.code || "").toLowerCase();
@@ -39,13 +48,14 @@ function isInvalidTokenError(err) {
   );
 }
 
+/* CAMPAIGN SELECTION */
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
   const d = now.getDate();
 
-  const inPrep = m === 9 || (m === 10 && d <= 14);
-  const inAep = (m === 10 && d >= 15) || m === 11 || (m === 12 && d <= 7);
-  const inOep = m === 1 || m === 2 || m === 3;
+  const inPrep = (m === 9) || (m === 10 && d <= 14);
+  const inAep = (m === 10 && d >= 15) || (m === 11) || (m === 12 && d <= 7);
+  const inOep = (m === 1) || (m === 2) || (m === 3);
 
   if (inAep) return "AEP";
   if (inOep) return "OEP";
@@ -54,35 +64,48 @@ function pickCampaign(now = new Date()) {
   return "OFF";
 }
 
+/* MESSAGE TEXT */
 function campaignText(campaign, agentName) {
   const name = agentName || "Your Agent";
 
   if (campaign === "PREP") {
     return {
       title: `Message from ${name}`,
-      body: "📋 Please complete your profile & send your Medicare info so we can check plans before your appointment.",
+      body:
+        "Please complete your profile and send your Medicare information so we can check plans before your appointment.",
     };
   }
 
   return {
     title: `Message from ${name}`,
-    body: "⏰ Time to send your Medicare information!",
+    body: "Time to send your Medicare information!",
   };
 }
 
+/* APRIL CYCLE START */
 function getCycleStartApr1(now = new Date()) {
   const y = now.getFullYear();
   const apr1 = new Date(y, 3, 1, 0, 0, 0, 0);
 
   if (now >= apr1) return apr1;
+
   return new Date(y - 1, 3, 1, 0, 0, 0, 0);
 }
 
+/* HANDLER */
 exports.handler = async (event) => {
+
+  console.log("=== SEND NOTIFICATION START ===");
+
   try {
-    if (event.httpMethod === "OPTIONS") return reply(200, {});
+
+    if (event.httpMethod === "OPTIONS") {
+      console.log("OPTIONS request");
+      return reply(200, {});
+    }
 
     if (event.httpMethod !== "POST") {
+      console.log("Invalid method:", event.httpMethod);
       return reply(405, { success: false, error: "Method Not Allowed" });
     }
 
@@ -92,11 +115,14 @@ exports.handler = async (event) => {
       body = event.isBase64Encoded
         ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
         : JSON.parse(event.body || "{}");
-    } catch {
+    } catch (err) {
+      console.error("Body parse error", err);
       return reply(400, { success: false, error: "Invalid request body" });
     }
 
     const { agentEmail } = body;
+
+    console.log("Agent email:", agentEmail);
 
     if (!agentEmail) {
       return reply(400, { success: false, error: "Missing agentEmail" });
@@ -113,27 +139,34 @@ exports.handler = async (event) => {
         : null;
 
     const agentRes = await db.query(
-      `SELECT id, name FROM agents WHERE LOWER(email)=LOWER($1) LIMIT 1`,
+      "SELECT id, name FROM agents WHERE LOWER(email)=LOWER($1) LIMIT 1",
       [agentEmail.trim()]
     );
 
     if (!agentRes.rows.length) {
+      console.log("Agent not found");
       return reply(404, { success: false, error: "Agent not found" });
     }
 
     const agent = agentRes.rows[0];
 
+    console.log("Agent ID:", agent.id);
+
     const now = new Date();
+
     const campaign = forcedCampaign || pickCampaign(now);
+
+    console.log("Campaign:", campaign);
 
     if (campaign === "OFF") {
       return reply(200, {
         success: true,
-        message: "Outside PREP/AEP/OEP window",
+        message: "Outside campaign window",
       });
     }
 
     const year = now.getFullYear();
+
     const cycleStart = getCycleStartApr1(now);
 
     const eligibleSql = `
@@ -177,11 +210,12 @@ exports.handler = async (event) => {
       cycleStart.toISOString(),
     ]);
 
+    console.log("Devices found:", devicesRes.rows.length);
+
     if (!devicesRes.rows.length) {
       return reply(200, {
         success: true,
-        message: "No eligible devices to notify",
-        campaign,
+        message: "No eligible devices",
       });
     }
 
@@ -190,6 +224,7 @@ exports.handler = async (event) => {
 
     for (const row of devicesRes.rows) {
       const token = String(row.device_token || "").trim();
+
       if (!token || seen.has(token)) continue;
 
       seen.add(token);
@@ -202,6 +237,9 @@ exports.handler = async (event) => {
     }
 
     const tokens = devices.map(d => d.token);
+
+    console.log("Tokens to send:", tokens.length);
+
     const notif = campaignText(campaign, agent.name);
 
     const message = {
@@ -222,58 +260,24 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    const invalidDeviceRowIds = [];
-    const invalidTokens = [];
-    const successUserIds = new Set();
-
-    for (let i = 0; i < response.responses.length; i++) {
-      const r = response.responses[i];
-      const device = devices[i];
-
-      if (r.success) {
-        successUserIds.add(device.userId);
-      } else if (isInvalidTokenError(r.error)) {
-        invalidDeviceRowIds.push(device.deviceRowId);
-        invalidTokens.push(device.token);
-      }
-    }
-
-    if (successUserIds.size) {
-      await db.query(
-        `
-        UPDATE users
-        SET last_notified_at = NOW(),
-            last_notified_campaign = $1
-        WHERE id = ANY($2::int[])
-        `,
-        [campaign, Array.from(successUserIds)]
-      );
-    }
-
-    if (invalidDeviceRowIds.length) {
-      await db.query(
-        `DELETE FROM user_devices WHERE id = ANY($1::int[])`,
-        [invalidDeviceRowIds]
-      );
-    }
+    console.log("Success:", response.successCount);
+    console.log("Failures:", response.failureCount);
 
     return reply(200, {
       success: true,
-      campaign,
-      cooldownDays,
-      totalDevices: tokens.length,
       successCount: response.successCount,
       failureCount: response.failureCount,
-      notifiedUsers: successUserIds.size,
-      removedInvalidTokens: invalidTokens.length,
     });
 
   } catch (err) {
-    console.error("send_notification error:", err);
+
+    console.error("SEND NOTIFICATION ERROR", err);
 
     return reply(500, {
       success: false,
       error: "Server error while sending notifications",
     });
+
   }
+
 };
