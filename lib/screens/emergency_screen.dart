@@ -65,6 +65,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       "dob": p.dob ?? "",
       "allergies": e.allergies,
       "conditions": e.conditions,
+      "implants": e.implants,
+      "procedures": e.procedures,
       "bloodType": e.bloodType,
       "organDonor": e.organDonor,
       "emergencyContactName": e.contact,
@@ -136,28 +138,44 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   title: const Text("Date of Birth"),
                   subtitle: Text(Formatters.dob(p.dob!)),
                 ),
+
               ListTile(
                 title: const Text("Emergency Contact"),
                 subtitle: Text(e.contact.isNotEmpty ? e.contact : "N/A"),
               ),
+
               ListTile(
                 title: const Text("Phone"),
                 subtitle: Text(
                   e.phone.isNotEmpty ? Formatters.phone(e.phone) : "N/A",
                 ),
               ),
+
               ListTile(
                 title: const Text("Allergies"),
                 subtitle: Text(e.allergies.isNotEmpty ? e.allergies : "N/A"),
               ),
+
               ListTile(
                 title: const Text("Conditions"),
                 subtitle: Text(e.conditions.isNotEmpty ? e.conditions : "N/A"),
               ),
+
+              ListTile(
+                title: const Text("Implanted Devices"),
+                subtitle: Text(e.implants.isNotEmpty ? e.implants : "N/A"),
+              ),
+
+              ListTile(
+                title: const Text("Major Procedures"),
+                subtitle: Text(e.procedures.isNotEmpty ? e.procedures : "N/A"),
+              ),
+
               ListTile(
                 title: const Text("Blood Type"),
                 subtitle: Text(e.bloodType.isNotEmpty ? e.bloodType : "N/A"),
               ),
+
               ListTile(
                 title: const Text("Organ Donor"),
                 subtitle: Text(

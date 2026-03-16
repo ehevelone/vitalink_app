@@ -23,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _showPassword = false;
 
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -42,11 +44,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailCtrl.text = email;
       _passwordCtrl.text = pass;
     });
-  }
-
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<bool> _showReplacePopup() async {
@@ -80,8 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      minimumSize:
-                          const Size(double.infinity, 50),
+                      minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
                     child: const Text(
@@ -93,8 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey,
-                      minimumSize:
-                          const Size(double.infinity, 50),
+                      minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
                     child: const Text(
@@ -113,7 +108,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login({bool replace = false}) async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
 
     final email = _emailCtrl.text.trim().toLowerCase();
     final password = _passwordCtrl.text.trim();
@@ -150,10 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.remove("savedUserPassword");
       }
 
-      // Register FCM token
       try {
-        final fcm =
-            await FirebaseMessaging.instance.getToken();
+        final fcm = await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
           await ApiService.registerDeviceToken(
             email: user["email"],
@@ -164,17 +160,32 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (_) {}
 
       Navigator.pushReplacementNamed(context, "/logo");
-    } else if (res["error"] == "DEVICE_ACTIVE" &&
-        replace == false) {
+    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
       final confirmed = await _showReplacePopup();
       if (confirmed) {
         await _login(replace: true);
       }
     } else {
-      _toast(res["error"] ?? "Login failed");
+      String msg = "Login failed";
+
+      if (res["status"] == 401) {
+        msg = "Incorrect password";
+      } else if (res["status"] == 404) {
+        msg = "Account not found";
+      } else if (res["error"] != null) {
+        msg = res["error"];
+      }
+
+      setState(() {
+        _errorMessage = msg;
+      });
     }
 
-    if (mounted) setState(() => _loading = false);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
   void _goToReset() {
@@ -195,6 +206,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _clearError() {
+    if (_errorMessage != null) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -207,16 +226,15 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Email"),
+                onChanged: (_) => _clearError(),
+                decoration: const InputDecoration(labelText: "Email"),
                 validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter email"
-                        : null,
+                    v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _passwordCtrl,
+                onChanged: (_) => _clearError(),
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
                   labelText: "Password",
@@ -227,26 +245,45 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Icons.visibility,
                     ),
                     onPressed: () =>
-                        setState(() =>
-                            _showPassword = !_showPassword),
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter password"
-                        : null,
+                    v == null || v.isEmpty ? "Enter password" : null,
               ),
+
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _goToReset,
+                  child: const Text("Forgot Password?"),
+                ),
+              ),
+
               const SizedBox(height: 8),
+
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>
                     setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
+
               const SizedBox(height: 24),
+
               _loading
-                  ? const Center(
-                      child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: () => _login(),
                       child: const Text("Login"),

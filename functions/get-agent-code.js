@@ -21,20 +21,34 @@ exports.handler = async (event) => {
 
   try {
 
-    const sessionId = event.queryStringParameters.session_id;
+    const sessionId = event.queryStringParameters?.session_id;
 
     if (!sessionId) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Missing session_id" })
+        body: JSON.stringify({
+          error: "Missing session_id"
+        })
       };
     }
 
+    // Retrieve Stripe checkout session
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     const customerId = session.customer;
 
+    if (!customerId) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "Missing Stripe customer ID"
+        })
+      };
+    }
+
+    // Lookup agent by Stripe customer
     const result = await db.query(
       `
       SELECT unlock_code
@@ -49,7 +63,21 @@ exports.handler = async (event) => {
       return {
         statusCode: 404,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Agent not found" })
+        body: JSON.stringify({
+          error: "Agent not found"
+        })
+      };
+    }
+
+    const code = result.rows[0].unlock_code;
+
+    if (!code) {
+      return {
+        statusCode: 404,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: "Unlock code not generated yet"
+        })
       };
     }
 
@@ -57,7 +85,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        code: result.rows[0].unlock_code
+        unlock_code: code
       })
     };
 
@@ -68,7 +96,9 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: "Server error" })
+      body: JSON.stringify({
+        error: "Server error"
+      })
     };
 
   }

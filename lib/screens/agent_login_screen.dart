@@ -21,6 +21,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   bool _rememberMe = false;
   bool _showPassword = false;
 
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -44,11 +46,22 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     }
   }
 
+  void _clearError() {
+    if (_errorMessage != null) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
+  }
+
   Future<void> _login() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
 
     try {
       final email = _emailCtrl.text.trim();
@@ -61,25 +74,31 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       if (!mounted) return;
 
       if (res["success"] != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(res["error"]?.toString() ?? "Invalid credentials")),
-        );
-        setState(() => _loading = false);
+        String msg = "Login failed";
+
+        if (res["status"] == 401) {
+          msg = "Incorrect password";
+        } else if (res["status"] == 404) {
+          msg = "Agent account not found";
+        } else if (res["error"] != null) {
+          msg = res["error"].toString();
+        }
+
+        setState(() {
+          _errorMessage = msg;
+          _loading = false;
+        });
+
         return;
       }
 
       final agent = res["agent"];
 
-      if (agent == null ||
-          agent["email"] == null ||
-          agent["id"] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Invalid agent response from server")),
-        );
-        setState(() => _loading = false);
+      if (agent == null || agent["email"] == null || agent["id"] == null) {
+        setState(() {
+          _errorMessage = "Invalid agent response from server";
+          _loading = false;
+        });
         return;
       }
 
@@ -90,14 +109,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       await AppState.setRole("agent");
       await AppState.setEmail(agent["email"].toString());
 
-      await store.setString(
-          "agentId", agent["id"].toString());
-      await store.setString(
-          "agentEmail", agent["email"]?.toString() ?? "");
-      await store.setString(
-          "agentName", agent["name"]?.toString() ?? "");
-      await store.setString(
-          "agentPhone", agent["phone"]?.toString() ?? "");
+      await store.setString("agentId", agent["id"].toString());
+      await store.setString("agentEmail", agent["email"]?.toString() ?? "");
+      await store.setString("agentName", agent["name"]?.toString() ?? "");
+      await store.setString("agentPhone", agent["phone"]?.toString() ?? "");
 
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
@@ -111,8 +126,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       }
 
       try {
-        final fcm =
-            await FirebaseMessaging.instance.getToken();
+        final fcm = await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
           await ApiService.registerDeviceToken(
             email: agent["email"].toString(),
@@ -128,11 +142,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login error: $e")),
-      );
+      setState(() {
+        _errorMessage = "Login error: $e";
+      });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -159,16 +177,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Agent Email"),
+                onChanged: (_) => _clearError(),
+                decoration: const InputDecoration(labelText: "Agent Email"),
                 validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter your email"
-                        : null,
+                    v == null || v.isEmpty ? "Enter your email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _passwordCtrl,
+                onChanged: (_) => _clearError(),
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
                   labelText: "Password",
@@ -179,15 +196,24 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                           : Icons.visibility,
                     ),
                     onPressed: () =>
-                        setState(() =>
-                            _showPassword = !_showPassword),
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter password"
-                        : null,
+                    v == null || v.isEmpty ? "Enter password" : null,
               ),
+
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -195,18 +221,19 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                   child: const Text("Forgot Password?"),
                 ),
               ),
+
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) =>
                     setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
-                controlAffinity:
-                    ListTileControlAffinity.leading,
+                controlAffinity: ListTileControlAffinity.leading,
               ),
+
               const SizedBox(height: 24),
+
               _loading
-                  ? const Center(
-                      child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: _login,
                       child: const Text("Login as Agent"),
