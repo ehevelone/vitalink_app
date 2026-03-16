@@ -3,7 +3,7 @@ const db = require("./services/db");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// VitaLink Agent Webhook – activation code fix
+// VitaLink Agent Webhook
 
 function generateCode() {
   return Math.random()
@@ -49,11 +49,13 @@ exports.handler = async (event) => {
 
       case "checkout.session.completed":
 
-        const email = data.customer_details?.email;
+        const email = data.customer_email || data.customer_details?.email;
         const customerId = data.customer;
         const subscriptionId = data.subscription;
 
         const code = generateCode();
+
+        console.log("Generated activation code:", code);
 
         await db.query(
           `
@@ -74,7 +76,7 @@ exports.handler = async (event) => {
           ]
         );
 
-        console.log("Agent created:", email, code);
+        console.log("Agent stored with activation code:", email, code);
 
       break;
 
