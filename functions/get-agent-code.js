@@ -51,7 +51,7 @@ exports.handler = async (event) => {
     // Lookup agent by Stripe customer
     const result = await db.query(
       `
-      SELECT unlock_code
+      SELECT promo_code, unlock_code
       FROM agents
       WHERE stripe_customer_id = $1
       LIMIT 1
@@ -69,14 +69,15 @@ exports.handler = async (event) => {
       };
     }
 
-    const code = result.rows[0].unlock_code;
+    const promoCode = result.rows[0].promo_code;
+    const unlockCode = result.rows[0].unlock_code;
 
-    if (!code) {
+    if (!promoCode && !unlockCode) {
       return {
         statusCode: 404,
         headers: corsHeaders,
         body: JSON.stringify({
-          error: "Unlock code not generated yet"
+          error: "Codes not generated yet"
         })
       };
     }
@@ -85,7 +86,8 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        unlock_code: code
+        promo_code: promoCode,
+        unlock_code: unlockCode
       })
     };
 
