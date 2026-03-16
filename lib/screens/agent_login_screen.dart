@@ -114,11 +114,19 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       await store.setString("agentName", agent["name"]?.toString() ?? "");
       await store.setString("agentPhone", agent["phone"]?.toString() ?? "");
 
+      // 🔥 THIS FIXES YOUR CLIENT LIST
+      await store.setString(
+        "unlock_code",
+        agent["unlock_code"]?.toString() ?? "",
+      );
+
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
         await store.setString("savedAgentEmail", email);
         await store.setString(
-            "savedAgentPassword", _passwordCtrl.text.trim());
+          "savedAgentPassword",
+          _passwordCtrl.text.trim(),
+        );
       } else {
         await store.setBool("rememberMeAgent", false);
         await store.remove("savedAgentEmail");
