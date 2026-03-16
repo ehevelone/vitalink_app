@@ -24,6 +24,9 @@ import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
 
+// NEW SCREEN
+import 'screens/agent_clients_screen.dart';
+
 // PROFILE
 import 'screens/profile_user_screen.dart';
 import 'screens/profile_agent_screen.dart';
@@ -175,7 +178,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
 
-      // START DIRECTLY ON LANDING
       home: const LandingScreen(),
 
       onGenerateRoute: (settings) {
@@ -198,6 +200,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         return null;
       },
+
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
@@ -212,6 +215,10 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/logo': (context) => const LogoScreen(),
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),
+
+        // NEW ROUTE
+        '/agent_clients': (context) => const AgentClientsScreen(),
+
         '/my_agent_user': (context) => const MyAgentUser(),
         '/my_agent_agent': (context) => const MyAgentAgent(),
         '/emergency': (context) => const EmergencyScreen(),
