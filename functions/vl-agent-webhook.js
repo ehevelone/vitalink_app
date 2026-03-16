@@ -3,6 +3,8 @@ const db = require("./services/db");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// VitaLink Agent Webhook – activation code fix
+
 function generateCode() {
   return Math.random()
     .toString(36)
