@@ -3,13 +3,25 @@ const db = require("./services/db");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// VitaLink Agent Webhook
-
-function generateCode() {
+// short unlock code for the agent app
+function generateUnlockCode() {
   return Math.random()
     .toString(36)
     .substring(2, 8)
     .toUpperCase();
+}
+
+// longer client code agents give to clients
+function generateClientCode() {
+
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "CL-";
+
+  for (let i = 0; i < 10; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return code;
 }
 
 exports.handler = async (event) => {
@@ -45,43 +57,43 @@ exports.handler = async (event) => {
 
     switch (stripeEvent.type) {
 
-      /* AGENT CREATED AFTER CHECKOUT */
-
       case "checkout.session.completed":
 
         const email = data.customer_email || data.customer_details?.email;
         const customerId = data.customer;
         const subscriptionId = data.subscription;
 
-        const code = generateCode();
+        const unlockCode = generateUnlockCode();
+        const clientCode = generateClientCode();
 
-        console.log("Generated activation code:", code);
+        console.log("Generated unlock code:", unlockCode);
+        console.log("Generated client code:", clientCode);
 
         await db.query(
           `
           INSERT INTO agents
-          (email, role, active, created_at, unlock_code, stripe_customer_id, stripe_subscription_id, subscription_status)
-          VALUES ($1,'agent',true,NOW(),$2,$3,$4,'active')
+          (email, role, active, created_at, promo_code, client_code, stripe_customer_id, stripe_subscription_id, subscription_status)
+          VALUES ($1,'agent',true,NOW(),$2,$3,$4,$5,'active')
           ON CONFLICT (email)
           DO UPDATE SET
             stripe_customer_id = EXCLUDED.stripe_customer_id,
             stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-            unlock_code = EXCLUDED.unlock_code
+            promo_code = EXCLUDED.promo_code,
+            client_code = EXCLUDED.client_code
           `,
           [
             email,
-            code,
+            unlockCode,
+            clientCode,
             customerId,
             subscriptionId
           ]
         );
 
-        console.log("Agent stored with activation code:", email, code);
+        console.log("Agent stored:", email, unlockCode, clientCode);
 
       break;
 
-
-      /* NEW AGENT SUBSCRIPTION */
 
       case "customer.subscription.created":
 
@@ -102,8 +114,6 @@ exports.handler = async (event) => {
       break;
 
 
-      /* SUBSCRIPTION UPDATED */
-
       case "customer.subscription.updated":
 
         await db.query(
@@ -122,8 +132,6 @@ exports.handler = async (event) => {
       break;
 
 
-      /* SUBSCRIPTION CANCELED */
-
       case "customer.subscription.deleted":
 
         await db.query(
@@ -141,8 +149,6 @@ exports.handler = async (event) => {
       break;
 
 
-      /* PAYMENT FAILED */
-
       case "invoice.payment_failed":
 
         await db.query(
@@ -159,8 +165,6 @@ exports.handler = async (event) => {
 
       break;
 
-
-      /* PAYMENT SUCCESS */
 
       case "invoice.paid":
 
