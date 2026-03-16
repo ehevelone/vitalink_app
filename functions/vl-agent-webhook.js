@@ -61,7 +61,8 @@ exports.handler = async (event) => {
           ON CONFLICT (email)
           DO UPDATE SET
             stripe_customer_id = EXCLUDED.stripe_customer_id,
-            stripe_subscription_id = EXCLUDED.stripe_subscription_id
+            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+            unlock_code = EXCLUDED.unlock_code
           `,
           [
             email,
