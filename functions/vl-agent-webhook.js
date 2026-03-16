@@ -12,7 +12,9 @@ function generateCode() {
 
 exports.handler = async (event) => {
 
-  const sig = event.headers["stripe-signature"];
+  const sig =
+    event.headers["stripe-signature"] ||
+    event.headers["Stripe-Signature"];
 
   let stripeEvent;
 
@@ -45,7 +47,7 @@ exports.handler = async (event) => {
 
       case "checkout.session.completed":
 
-        const email = data.customer_details.email;
+        const email = data.customer_details?.email;
         const customerId = data.customer;
         const subscriptionId = data.subscription;
 
@@ -74,7 +76,6 @@ exports.handler = async (event) => {
       break;
 
 
-
       /* NEW AGENT SUBSCRIPTION */
 
       case "customer.subscription.created":
@@ -94,7 +95,6 @@ exports.handler = async (event) => {
         );
 
       break;
-
 
 
       /* SUBSCRIPTION UPDATED */
@@ -117,7 +117,6 @@ exports.handler = async (event) => {
       break;
 
 
-
       /* SUBSCRIPTION CANCELED */
 
       case "customer.subscription.deleted":
@@ -137,7 +136,6 @@ exports.handler = async (event) => {
       break;
 
 
-
       /* PAYMENT FAILED */
 
       case "invoice.payment_failed":
@@ -155,7 +153,6 @@ exports.handler = async (event) => {
         );
 
       break;
-
 
 
       /* PAYMENT SUCCESS */
