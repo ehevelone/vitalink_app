@@ -31,7 +31,7 @@ exports.handler = async (event) => {
         active,
         created_at
       FROM users
-      WHERE agent_code = $1
+      WHERE unlock_code = $1
       ORDER BY created_at DESC
       `,
       [unlockCode]
