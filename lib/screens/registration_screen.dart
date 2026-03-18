@@ -1,3 +1,5 @@
+import 'dart:io'; // ✅ ADDED
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -55,7 +57,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (code != null && code.isNotEmpty) {
       _activationCodeCtrl.text = code;
 
-      // Clear any leftover deep link once we've consumed it here.
       if (VitaLinkDeepLink.code == code) {
         VitaLinkDeepLink.clear();
       }
@@ -96,16 +97,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           _activationLoaded = true;
         });
       }
-    } catch (_) {
-      // intentionally quiet here
-    } finally {
+    } catch (_) {} finally {
       _lookupRunning = false;
     }
   }
 
   Future<void> _pasteCode() async {
     final data = await Clipboard.getData('text/plain');
-
     if (data?.text == null) return;
 
     final pasted = data!.text!.trim().toUpperCase();
@@ -136,6 +134,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
+  String _normalizePhone(String input) {
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    return digits.isEmpty ? "" : "+1$digits";
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -156,16 +159,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
       final lastName =
-          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "";
+          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "User"; // ✅ FIX
 
       final registerRes = await ApiService.registerUser(
         firstName: firstName,
         lastName: lastName,
         email: email,
-        phone: _phoneCtrl.text.trim(),
+        phone: _normalizePhone(_phoneCtrl.text),
         password: _passwordCtrl.text.trim(),
         promoCode: code,
-        platform: "mobile",
+        platform: Platform.isIOS ? "ios" : "android", // ✅ FIX
       );
 
       if (registerRes['success'] != true) {

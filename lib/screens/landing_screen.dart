@@ -180,84 +180,94 @@ class _LandingScreenState extends State<LandingScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black, // 🔥 FULL SCREEN BLACK GUARANTEE
+        child: SafeArea(
+          child: Column(
+            children: [
 
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.black,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
 
-                      const SizedBox(height: 60),
+                          const SizedBox(height: 60),
 
-                      const Text(
-                        "Welcome To",
-                        style: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.bold,
-                          color: vitalinkBlue,
-                        ),
+                          const Text(
+                            "Welcome To",
+                            style: TextStyle(
+                              fontSize: 44,
+                              fontWeight: FontWeight.bold,
+                              color: vitalinkBlue,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          Image.asset(
+                            'assets/images/vitalink-logo-2.png',
+                            width: 240,
+                          ),
+
+                          const SizedBox(height: 70),
+
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              minimumSize: const Size(double.infinity, 55),
+                            ),
+                            onPressed: _showLoginPopup,
+                            child: const Text(
+                              "Log In to Your Account",
+                              style: TextStyle(fontSize: 18, color: Colors.black),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: vitalinkBlue,
+                              minimumSize: const Size(double.infinity, 55),
+                            ),
+                            onPressed: _showRegisterPopup,
+                            child: const Text(
+                              "Register for an Account",
+                              style: TextStyle(fontSize: 18, color: Colors.black),
+                            ),
+                          ),
+
+                          const SizedBox(height: 60),
+
+                        ],
                       ),
-
-                      const SizedBox(height: 30),
-
-                      Image.asset(
-                        'assets/images/vitalink-logo-2.png',
-                        width: 240,
-                      ),
-
-                      const SizedBox(height: 70),
-
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          minimumSize: const Size(double.infinity, 55),
-                        ),
-                        onPressed: _showLoginPopup,
-                        child: const Text(
-                          "Log In to Your Account",
-                          style: TextStyle(fontSize: 18, color: Colors.black),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: vitalinkBlue,
-                          minimumSize: const Size(double.infinity, 55),
-                        ),
-                        onPressed: _showRegisterPopup,
-                        child: const Text(
-                          "Register for an Account",
-                          style: TextStyle(fontSize: 18, color: Colors.black),
-                        ),
-                      ),
-
-                      const SizedBox(height: 60),
-
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Image.asset(
-                'assets/images/landing-bottom.png',
+              // 🔥 FIXED BOTTOM IMAGE
+              Container(
                 width: double.infinity,
-                fit: BoxFit.contain,
+                color: Colors.black,
+                child: Image.asset(
+                  'assets/images/landing-bottom.png',
+                  width: double.infinity,
+                  fit: BoxFit.cover, // 🔥 KEY FIX
+                ),
               ),
-            ),
 
-          ],
+            ],
+          ),
         ),
       ),
     );
-
   }
 }
