@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
+import '../services/api_service.dart';
 import '../services/secure_store.dart';
 
 class AgentClientsScreen extends StatefulWidget {
@@ -28,32 +27,38 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
     try {
 
       final store = SecureStore();
-      final unlockCode = await store.getString("unlock_code");
+      final agentIdStr = await store.getString("agentId");
 
-      if (unlockCode == null) {
+      if (agentIdStr == null) {
         setState(() {
-          error = "Missing agent code";
+          error = "Missing agent session";
           loading = false;
         });
         return;
       }
 
-      final res = await http.post(
-        Uri.parse(
-          "https://vitalink-app.netlify.app/.netlify/functions/get-agent-clients",
-        ),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: jsonEncode({
-          "unlock_code": unlockCode
-        }),
-      );
+      final agentId = int.tryParse(agentIdStr);
 
-      final data = jsonDecode(res.body);
+      if (agentId == null) {
+        setState(() {
+          error = "Invalid agent ID";
+          loading = false;
+        });
+        return;
+      }
+
+      final res = await ApiService.getAgentClients(agentId: agentId);
+
+      if (res["success"] != true) {
+        setState(() {
+          error = res["error"] ?? "Failed to load clients";
+          loading = false;
+        });
+        return;
+      }
 
       setState(() {
-        clients = data["clients"] ?? [];
+        clients = res["clients"] ?? [];
         loading = false;
       });
 
@@ -92,7 +97,8 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
 
                         final first = client["first_name"] ?? "";
                         final last = client["last_name"] ?? "";
-                        final active = client["active"] == true;
+                        final email = client["email"] ?? "";
+                        final phone = client["phone"] ?? "";
 
                         return Card(
                           elevation: 0,
@@ -107,16 +113,12 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                               "$first $last",
                               style: const TextStyle(fontSize: 18),
                             ),
-                            subtitle: Text(
-                              active ? "Active" : "Inactive",
-                            ),
-                            trailing: Icon(
-                              active
-                                  ? Icons.check_circle
-                                  : Icons.cancel,
-                              color: active
-                                  ? Colors.green
-                                  : Colors.red,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(email),
+                                Text(phone),
+                              ],
                             ),
                           ),
                         );

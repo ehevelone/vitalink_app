@@ -18,6 +18,7 @@ class ApiService {
   ) async {
     try {
       final url = Uri.parse("$_baseUrl/$path");
+      debugPrint("🌐 FULL URL → $url");
 
       debugPrint("📡 POST → $url");
       debugPrint("📦 BODY → $body");
@@ -364,5 +365,16 @@ class ApiService {
       "success": true,
       "agent": res["agent"],
     };
+  }
+
+  // -------------------------------------------------------------
+  // 🆕 GET AGENT CLIENTS
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> getAgentClients({
+    required int agentId,
+  }) {
+    return _postJson("get_agent_clients", {
+      "agent_id": agentId,
+    });
   }
 }
