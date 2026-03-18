@@ -42,7 +42,8 @@ exports.handler = async (event) => {
         first_name,
         last_name,
         email,
-        phone
+        phone,
+        active
       FROM users
       WHERE agent_id = $1
       ORDER BY created_at DESC
