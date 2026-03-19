@@ -16,9 +16,7 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code (optional)
 #.vscode/
 
 # Flutter/Dart/Pub related
@@ -37,11 +35,17 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android build outputs
 /android/app/debug
 /android/app/profile
 /android/app/release
-node_modules
 
-# 🔒 Local-only auth files
-/netlify/functions/agent-login-2fa.js
+# Node
+node_modules/
+
+# 🔒 Local-only auth files (FIXED PATH)
+functions/agent-login-2fa.js
+
+# 🔒 Optional future-proof (recommended)
+functions/*-dev.js
+functions/*-local.js
