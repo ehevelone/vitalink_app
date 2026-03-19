@@ -33,7 +33,7 @@ exports.handler = async (event) => {
   try {
 
     // -------------------------
-    // AUTH
+    // AUTH (FIXED)
     // -------------------------
     const token = event.headers.authorization;
 
@@ -47,9 +47,9 @@ exports.handler = async (event) => {
 
     const client = await pool.connect();
 
-    // Validate agent session
+    // 🔥 FIXED: USE agents TABLE
     const agentRes = await client.query(
-      "SELECT id FROM rsms WHERE admin_session_token=$1 LIMIT 1",
+      "SELECT id FROM agents WHERE agent_session_token=$1 LIMIT 1",
       [token]
     );
 
@@ -79,8 +79,7 @@ exports.handler = async (event) => {
     }
 
     // -------------------------
-    // SECURITY CHECK
-    // Ensure agent OWNS this client
+    // SECURITY CHECK (GOOD — KEEP THIS)
     // -------------------------
     const userCheck = await client.query(
       "SELECT id FROM users WHERE id=$1 AND agent_id=$2 LIMIT 1",

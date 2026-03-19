@@ -28,7 +28,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 GET TOKEN INSTEAD OF agent_id
+    // 🔥 TOKEN
     const token = event.headers.authorization;
 
     if (!token) {
@@ -38,12 +38,12 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 GET AGENT FROM SESSION TOKEN
+    // 🔥 GET AGENT (FIXED TABLE + COLUMN)
     const agentResult = await db.query(
       `
-      SELECT id, first_name, last_name
-      FROM rsms
-      WHERE admin_session_token = $1
+      SELECT id, name
+      FROM agents
+      WHERE agent_session_token = $1
       LIMIT 1
       `,
       [token]
@@ -58,7 +58,7 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    // 🔥 GET CLIENTS USING AGENT ID
+    // 🔥 GET CLIENTS
     const clientsResult = await db.query(
       `
       SELECT 
@@ -82,8 +82,7 @@ exports.handler = async (event) => {
     return reply(200, {
       success: true,
       agent: {
-        first_name: agent.first_name,
-        last_name: agent.last_name,
+        name: agent.name,
       },
       clients: clientsResult.rows,
     });
