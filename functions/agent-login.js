@@ -1,12 +1,15 @@
 // @ts-nocheck
 
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
+
+const DEV_MODE = true;
 
 exports.handler = async function (event) {
 
@@ -68,9 +71,34 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // FIX PHONE FORMAT (🔥 KEY FIX)
+    // 🚨 DEV MODE — SKIP 2FA
     // ==========================
+    if (DEV_MODE) {
 
+      const sessionToken = crypto.randomBytes(24).toString("hex");
+      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
+      await client.query(
+        "UPDATE rsms SET admin_session_token=$1, admin_session_expires=$2 WHERE id=$3",
+        [sessionToken, expires, user.id]
+      );
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "login_success",
+          token: sessionToken,
+          role: user.role
+        })
+      };
+    }
+
+    // ==========================
+    // NORMAL 2FA FLOW
+    // ==========================
     if (!user.phone) {
       client.release();
       return {
@@ -80,10 +108,10 @@ exports.handler = async function (event) {
       };
     }
 
-    let phone = user.phone.replace(/\D/g, ""); // strip non-digits
+    let phone = user.phone.replace(/\D/g, "");
 
     if (phone.length === 10) {
-      phone = "+1" + phone; // assume US
+      phone = "+1" + phone;
     } else if (!phone.startsWith("+")) {
       phone = "+" + phone;
     }
