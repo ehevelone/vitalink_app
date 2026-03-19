@@ -28,7 +28,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 TOKEN
+    // TOKEN
     const token = event.headers.authorization;
 
     if (!token) {
@@ -38,12 +38,12 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 GET AGENT (FIXED TABLE + COLUMN)
+    // ✅ FIXED COLUMN HERE
     const agentResult = await db.query(
       `
       SELECT id, name
       FROM agents
-      WHERE agent_session_token = $1
+      WHERE session_token = $1
       LIMIT 1
       `,
       [token]
@@ -58,7 +58,7 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    // 🔥 GET CLIENTS
+    // GET CLIENTS
     const clientsResult = await db.query(
       `
       SELECT 
