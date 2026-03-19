@@ -8,7 +8,8 @@ function reply(statusCode, obj) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "POST, OPTIONS"
     },
     body: JSON.stringify(obj),
   };
@@ -16,7 +17,8 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // CORS
+
+    // ---------------- CORS
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
@@ -28,8 +30,21 @@ exports.handler = async (event) => {
       });
     }
 
-    // ✅ BACK TO WORKING LOGIC (agentId)
-    const { agentId } = JSON.parse(event.body || "{}");
+    // ---------------- SAFE PARSE
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch (e) {
+      console.error("JSON parse error:", e);
+      return reply(400, {
+        success: false,
+        error: "Invalid JSON",
+      });
+    }
+
+    const { agentId } = body;
+
+    console.log("📥 Incoming agentId:", agentId);
 
     if (!agentId) {
       return reply(400, {
@@ -38,7 +53,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // GET AGENT
+    // ---------------- GET AGENT
     const agentResult = await db.query(
       `
       SELECT id, name
@@ -49,6 +64,8 @@ exports.handler = async (event) => {
       [agentId]
     );
 
+    console.log("👤 Agent query result:", agentResult.rows);
+
     if (agentResult.rows.length === 0) {
       return reply(404, {
         success: false,
@@ -58,7 +75,7 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    // GET CLIENTS
+    // ---------------- GET CLIENTS
     const clientsResult = await db.query(
       `
       SELECT 
@@ -79,9 +96,13 @@ exports.handler = async (event) => {
       [agent.id]
     );
 
+    console.log("👥 Clients found:", clientsResult.rows.length);
+
+    // ---------------- RESPONSE
     return reply(200, {
       success: true,
       agent: {
+        id: agent.id,        // 🔥 ADDED (helps debugging + frontend)
         name: agent.name,
       },
       clients: clientsResult.rows,
