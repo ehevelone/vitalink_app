@@ -40,8 +40,14 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
+    // 🔥 FIX: USE agents TABLE (NOT rsms)
     const result = await client.query(
-      "SELECT id, password_hash, phone, role, name FROM rsms WHERE email = $1 AND active = true LIMIT 1",
+      `
+      SELECT id, password_hash, name
+      FROM agents
+      WHERE email = $1 AND active = true
+      LIMIT 1
+      `,
       [email]
     );
 
@@ -69,13 +75,13 @@ exports.handler = async function (event) {
 
     client.release();
 
-    // 🔥 BYPASS 2FA — DIRECT LOGIN
+    // ✅ CLEAN LOGIN RESPONSE
     return {
       statusCode: 200,
       headers: corsHeaders(),
       body: JSON.stringify({
         step: "login_success",
-        token: "dev-token", // temp token
+        token: "dev-token",
         agent: {
           id: user.id,
           name: user.name || ""
