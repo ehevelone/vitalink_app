@@ -1,7 +1,6 @@
 // @ts-nocheck
 
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -69,71 +68,40 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // ADMIN FLOW (2FA)
+    // FIX PHONE FORMAT (🔥 KEY FIX)
     // ==========================
-    if (user.role === "admin") {
 
-      if (!user.phone) {
-        client.release();
-        return {
-          statusCode: 400,
-          headers: corsHeaders(),
-          body: "Admin phone not configured"
-        };
-      }
-
+    if (!user.phone) {
       client.release();
-
       return {
-        statusCode: 200,
+        statusCode: 400,
         headers: corsHeaders(),
-        body: JSON.stringify({
-          step: "firebase_2fa",
-          phone: user.phone,
-          role: "admin"
-        })
+        body: "Phone not configured for 2FA"
       };
     }
 
-    // ==========================
-    // RSM FLOW (ISSUE SESSION)
-    // ==========================
-    if (user.role === "rsm") {
+    let phone = user.phone.replace(/\D/g, ""); // strip non-digits
 
-      const sessionToken = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
-
-      await client.query(
-        `UPDATE rsms
-         SET admin_session_token = $1,
-             admin_session_expires = $2
-         WHERE id = $3`,
-        [sessionToken, expires, user.id]
-      );
-
-      client.release();
-
-      return {
-        statusCode: 200,
-        headers: corsHeaders(),
-        body: JSON.stringify({
-          step: "login_success",
-          role: "rsm",
-          token: sessionToken
-        })
-      };
+    if (phone.length === 10) {
+      phone = "+1" + phone; // assume US
+    } else if (!phone.startsWith("+")) {
+      phone = "+" + phone;
     }
 
     client.release();
 
     return {
-      statusCode: 403,
+      statusCode: 200,
       headers: corsHeaders(),
-      body: "Unauthorized"
+      body: JSON.stringify({
+        step: "firebase_2fa",
+        phone: phone,
+        role: user.role
+      })
     };
 
   } catch (err) {
-    console.error("admin-login error:", err);
+    console.error("agent-login error:", err);
     return {
       statusCode: 500,
       headers: corsHeaders(),
