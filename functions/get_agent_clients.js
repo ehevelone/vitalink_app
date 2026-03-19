@@ -8,7 +8,7 @@ function reply(statusCode, obj) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
     body: JSON.stringify(obj),
   };
@@ -28,31 +28,31 @@ exports.handler = async (event) => {
       });
     }
 
-    // TOKEN
-    const token = event.headers.authorization;
+    // ✅ BACK TO WORKING LOGIC (agentId)
+    const { agentId } = JSON.parse(event.body || "{}");
 
-    if (!token) {
-      return reply(401, {
+    if (!agentId) {
+      return reply(400, {
         success: false,
-        error: "Unauthorized",
+        error: "Missing agentId",
       });
     }
 
-    // ✅ FIXED COLUMN HERE
+    // GET AGENT
     const agentResult = await db.query(
       `
       SELECT id, name
       FROM agents
-      WHERE session_token = $1
+      WHERE id = $1
       LIMIT 1
       `,
-      [token]
+      [agentId]
     );
 
     if (agentResult.rows.length === 0) {
-      return reply(403, {
+      return reply(404, {
         success: false,
-        error: "Invalid session",
+        error: "Agent not found",
       });
     }
 
