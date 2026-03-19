@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 const db = require("./services/db");
 
 function reply(statusCode, obj) {
@@ -6,7 +8,7 @@ function reply(statusCode, obj) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
     body: JSON.stringify(obj),
   };
@@ -26,34 +28,64 @@ exports.handler = async (event) => {
       });
     }
 
-    const body = JSON.parse(event.body || "{}");
-    const { agent_id } = body;
+    // 🔥 GET TOKEN INSTEAD OF agent_id
+    const token = event.headers.authorization;
 
-    if (!agent_id) {
-      return reply(400, {
+    if (!token) {
+      return reply(401, {
         success: false,
-        error: "Missing agent_id",
+        error: "Unauthorized",
       });
     }
 
-    const result = await db.query(
+    // 🔥 GET AGENT FROM SESSION TOKEN
+    const agentResult = await db.query(
+      `
+      SELECT id, first_name, last_name
+      FROM rsms
+      WHERE admin_session_token = $1
+      LIMIT 1
+      `,
+      [token]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return reply(403, {
+        success: false,
+        error: "Invalid session",
+      });
+    }
+
+    const agent = agentResult.rows[0];
+
+    // 🔥 GET CLIENTS USING AGENT ID
+    const clientsResult = await db.query(
       `
       SELECT 
+        id,
         first_name,
         last_name,
         email,
         phone,
-        active
+        active,
+        profile_complete,
+        last_notified_at,
+        last_notified_campaign,
+        last_reviewed
       FROM users
       WHERE agent_id = $1
       ORDER BY created_at DESC
       `,
-      [agent_id]
+      [agent.id]
     );
 
     return reply(200, {
       success: true,
-      clients: result.rows,
+      agent: {
+        first_name: agent.first_name,
+        last_name: agent.last_name,
+      },
+      clients: clientsResult.rows,
     });
 
   } catch (err) {
