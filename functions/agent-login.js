@@ -28,7 +28,9 @@ exports.handler = async function (event) {
       };
     }
 
-    const { email, password } = JSON.parse(event.body || "{}");
+    const body = JSON.parse(event.body || "{}");
+
+    const { email, password, step } = body;
 
     if (!email || !password) {
       return {
@@ -40,10 +42,10 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
-    // 🔥 FIX: USE agents TABLE (NOT rsms)
+    // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
       `
-      SELECT id, password_hash, name
+      SELECT id, password_hash, name, phone
       FROM agents
       WHERE email = $1 AND active = true
       LIMIT 1
@@ -73,20 +75,80 @@ exports.handler = async function (event) {
       };
     }
 
+    // ---------------------------------------
+    // 🔥 STEP 1 → SEND TO FIREBASE 2FA
+    // ---------------------------------------
+    if (!step || step === "login") {
+
+      if (!user.phone) {
+        client.release();
+
+        // fallback → allow login WITHOUT 2FA if no phone
+        return {
+          statusCode: 200,
+          headers: corsHeaders(),
+          body: JSON.stringify({
+            step: "login_success",
+            token: "dev-token",
+            agent: {
+              id: user.id,
+              name: user.name || ""
+            }
+          })
+        };
+      }
+
+      let phone = user.phone.replace(/\D/g, "");
+
+      if (phone.length === 10) {
+        phone = "+1" + phone;
+      } else if (!phone.startsWith("+")) {
+        phone = "+" + phone;
+      }
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "firebase_2fa",
+          phone,
+          agent: {
+            id: user.id,
+            name: user.name || ""
+          }
+        })
+      };
+    }
+
+    // ---------------------------------------
+    // 🔥 STEP 2 → AFTER FIREBASE VERIFY
+    // ---------------------------------------
+    if (step === "verify") {
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "login_success",
+          token: "dev-token",
+          agent: {
+            id: user.id,
+            name: user.name || ""
+          }
+        })
+      };
+    }
+
     client.release();
 
-    // ✅ CLEAN LOGIN RESPONSE
     return {
-      statusCode: 200,
+      statusCode: 400,
       headers: corsHeaders(),
-      body: JSON.stringify({
-        step: "login_success",
-        token: "dev-token",
-        agent: {
-          id: user.id,
-          name: user.name || ""
-        }
-      })
+      body: "Invalid step"
     };
 
   } catch (err) {
