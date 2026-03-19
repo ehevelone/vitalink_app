@@ -25,10 +25,12 @@ const corsHeaders = {
 
 exports.handler = async function (event) {
 
+  // ✅ CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: corsHeaders, body: "" };
   }
 
+  // ✅ Only POST allowed
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
   }
@@ -41,6 +43,7 @@ exports.handler = async function (event) {
       return { statusCode: 400, headers: corsHeaders, body: "Missing data" };
     }
 
+    // ✅ Verify Firebase token
     const decoded = await admin.auth().verifyIdToken(idToken);
 
     if (!decoded.phone_number) {
@@ -49,6 +52,7 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
+    // ✅ SAME TABLE AS ADMIN
     const result = await client.query(
       "SELECT id, phone, role FROM rsms WHERE email=$1 AND active=true LIMIT 1",
       [email]
@@ -62,9 +66,8 @@ exports.handler = async function (event) {
     const user = result.rows[0];
 
     // ==========================
-    // PHONE NORMALIZATION (SAME AS ADMIN)
+    // PHONE NORMALIZATION (MATCH ADMIN)
     // ==========================
-
     function normalizePhone(p) {
       let digits = String(p || "").replace(/\D/g, "");
       if (digits.length === 11 && digits.startsWith("1")) {
@@ -82,14 +85,13 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // CREATE SESSION (AGENT)
+    // CREATE SESSION (MATCH ADMIN — FIXED)
     // ==========================
-
     const sessionToken = crypto.randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     await client.query(
-      "UPDATE rsms SET agent_session_token=$1, agent_session_expires=$2 WHERE id=$3",
+      "UPDATE rsms SET admin_session_token=$1, admin_session_expires=$2 WHERE id=$3",
       [sessionToken, expires, user.id]
     );
 
@@ -107,7 +109,11 @@ exports.handler = async function (event) {
 
   } catch (err) {
     console.error("agent-verify error:", err);
-    return { statusCode: 500, headers: corsHeaders, body: "Verification failed" };
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: "Verification failed"
+    };
   }
 
 };
