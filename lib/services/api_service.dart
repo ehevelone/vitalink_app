@@ -368,13 +368,13 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🆕 GET AGENT CLIENTS
+  // 🆕 GET AGENT CLIENTS (FIXED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentClients({
     required int agentId,
   }) {
     return _postJson("get_agent_clients", {
-      "agent_id": agentId,
+      "agentId": agentId,
     });
   }
 }
