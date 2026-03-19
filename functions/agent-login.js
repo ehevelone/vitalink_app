@@ -41,7 +41,7 @@ exports.handler = async function (event) {
     const client = await pool.connect();
 
     const result = await client.query(
-      "SELECT id, password_hash, phone, role FROM rsms WHERE email = $1 AND active = true LIMIT 1",
+      "SELECT id, password_hash, phone, role, name FROM rsms WHERE email = $1 AND active = true LIMIT 1",
       [email]
     );
 
@@ -67,36 +67,19 @@ exports.handler = async function (event) {
       };
     }
 
-    // ==========================
-    // FIX PHONE FORMAT (🔥 KEY FIX)
-    // ==========================
-
-    if (!user.phone) {
-      client.release();
-      return {
-        statusCode: 400,
-        headers: corsHeaders(),
-        body: "Phone not configured for 2FA"
-      };
-    }
-
-    let phone = user.phone.replace(/\D/g, ""); // strip non-digits
-
-    if (phone.length === 10) {
-      phone = "+1" + phone; // assume US
-    } else if (!phone.startsWith("+")) {
-      phone = "+" + phone;
-    }
-
     client.release();
 
+    // 🔥 BYPASS 2FA — DIRECT LOGIN
     return {
       statusCode: 200,
       headers: corsHeaders(),
       body: JSON.stringify({
-        step: "firebase_2fa",
-        phone: phone,
-        role: user.role
+        step: "login_success",
+        token: "dev-token", // temp token
+        agent: {
+          id: user.id,
+          name: user.name || ""
+        }
       })
     };
 
