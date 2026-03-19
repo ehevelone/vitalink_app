@@ -68,7 +68,7 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // FORCE 2FA FOR BOTH ROLES
+    // FIX PHONE FORMAT (🔥 KEY FIX)
     // ==========================
 
     if (!user.phone) {
@@ -80,6 +80,14 @@ exports.handler = async function (event) {
       };
     }
 
+    let phone = user.phone.replace(/\D/g, ""); // strip non-digits
+
+    if (phone.length === 10) {
+      phone = "+1" + phone; // assume US
+    } else if (!phone.startsWith("+")) {
+      phone = "+" + phone;
+    }
+
     client.release();
 
     return {
@@ -87,13 +95,13 @@ exports.handler = async function (event) {
       headers: corsHeaders(),
       body: JSON.stringify({
         step: "firebase_2fa",
-        phone: user.phone,
+        phone: phone,
         role: user.role
       })
     };
 
   } catch (err) {
-    console.error("admin-login error:", err);
+    console.error("agent-login error:", err);
     return {
       statusCode: 500,
       headers: corsHeaders(),

@@ -99,6 +99,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                         final last = client["last_name"] ?? "";
                         final email = client["email"] ?? "";
                         final phone = client["phone"] ?? "";
+                        final active = client["active"] == true;
 
                         return Card(
                           elevation: 0,
@@ -109,10 +110,39 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: const Icon(Icons.person, color: Colors.blue),
-                            title: Text(
-                              "$first $last",
-                              style: const TextStyle(fontSize: 18),
+
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "$first $last",
+                                    style: const TextStyle(fontSize: 18),
+                                  ),
+                                ),
+
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: active
+                                        ? Colors.green.shade100
+                                        : Colors.red.shade100,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    active ? "Active" : "Inactive",
+                                    style: TextStyle(
+                                      color: active
+                                          ? Colors.green.shade800
+                                          : Colors.red.shade800,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
