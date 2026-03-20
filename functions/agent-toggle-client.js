@@ -32,36 +32,7 @@ exports.handler = async (event) => {
 
   try {
 
-    // -------------------------
-    // AUTH (UNCHANGED)
-    // -------------------------
-    const token = event.headers.authorization;
-
-    if (!token) {
-      return {
-        statusCode: 401,
-        headers: corsHeaders,
-        body: "Missing token"
-      };
-    }
-
     const client = await pool.connect();
-
-    const agentRes = await client.query(
-      "SELECT id FROM agents WHERE agent_session_token=$1 LIMIT 1",
-      [token]
-    );
-
-    if (agentRes.rows.length === 0) {
-      client.release();
-      return {
-        statusCode: 403,
-        headers: corsHeaders,
-        body: "Invalid session"
-      };
-    }
-
-    const agentId = agentRes.rows[0].id;
 
     // -------------------------
     // BODY (🔥 FIXED)
@@ -69,18 +40,19 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
 
     const userId = body.clientId || body.userId;
+    const agentId = body.agentId; // 🔥 NOW USED INSTEAD OF BROKEN TOKEN
 
-    if (!userId) {
+    if (!userId || !agentId) {
       client.release();
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: "Missing userId"
+        body: "Missing userId or agentId"
       };
     }
 
     // -------------------------
-    // SECURITY CHECK (UNCHANGED)
+    // SECURITY CHECK (VALID AGENT → USER)
     // -------------------------
     const userCheck = await client.query(
       "SELECT id, active FROM users WHERE id=$1 AND agent_id=$2 LIMIT 1",
@@ -103,7 +75,7 @@ exports.handler = async (event) => {
     const newStatus = !currentStatus;
 
     // -------------------------
-    // UPDATE (UNCHANGED LOGIC)
+    // UPDATE
     // -------------------------
     await client.query(
       "UPDATE users SET active=$1 WHERE id=$2",
