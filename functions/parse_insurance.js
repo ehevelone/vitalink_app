@@ -55,6 +55,33 @@ function normalizeBenefits(input) {
   return deduped;
 }
 
+// 🔥 ADD THIS FUNCTION (NO EXISTING CODE TOUCHED)
+function fallbackExtractName(rawText) {
+  if (!rawText) return "";
+
+  const lines = rawText.split("\n");
+
+  for (const line of lines) {
+    const clean = line.trim();
+
+    if (/^[A-Z][a-z]+\s[A-Z][a-z]+/.test(clean)) {
+      const lower = clean.toLowerCase();
+
+      if (
+        !lower.includes("insurance") &&
+        !lower.includes("company") &&
+        !lower.includes("hospital") &&
+        !lower.includes("benefit") &&
+        clean.length < 40
+      ) {
+        return clean;
+      }
+    }
+  }
+
+  return "";
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -156,8 +183,6 @@ If no label is obvious:
 - Prefer name closest to:
   - member ID
   - policy number
-- If multiple names exist:
-  → choose the PRIMARY insured (not dependent unless clearly labeled)
 
 FAIL SAFE:
 If ANY human name exists → insuredName MUST NOT be empty
@@ -177,24 +202,6 @@ Return ONLY valid JSON with EXACTLY this structure:
   ],
   "notes": ""
 }
-
-BENEFITS RULES:
-- Extract ALL benefit payouts
-- Keep names clean but specific
-
-GOOD:
-- "Daily Confinement"
-- "Hospital Admission"
-- "ICU Daily"
-
-BAD:
-- "Hospital"
-- "Coverage"
-
-OTHER:
-- No duplicates
-- If none → []
-- No explanations
           `.trim(),
         },
         {
@@ -218,6 +225,13 @@ OTHER:
       parsed = safeJsonParse(cleaned, { rawText: rawContent });
     }
 
+    // 🔥 ADD THIS BLOCK (DO NOT REMOVE EXISTING LOGIC)
+    let insuredName = (parsed.insuredName || "").toString().trim();
+
+    if (!insuredName && parsed.rawText) {
+      insuredName = fallbackExtractName(parsed.rawText);
+    }
+
     const normalized = {
       carrier: (parsed.carrier || "").toString().trim(),
       policy: (parsed.policy || "").toString().trim(),
@@ -225,8 +239,9 @@ OTHER:
       group: (parsed.group || "").toString().trim(),
       planType: (parsed.planType || "").toString().trim(),
 
-      // 🔥 NOW MUCH STRONGER
-      insuredName: (parsed.insuredName || "").toString().trim(),
+      // 🔥 REPLACED ONLY THIS LINE (still same variable name)
+      insuredName: insuredName,
+
       beneficiary: (parsed.beneficiary || "").toString().trim(),
 
       benefits: normalizeBenefits(parsed.benefits),

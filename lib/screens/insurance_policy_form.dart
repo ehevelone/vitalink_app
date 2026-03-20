@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../utils/phone_formatter.dart';   // ← NEW
+import '../utils/phone_formatter.dart';
 
 class InsurancePolicyForm extends StatefulWidget {
   final Insurance policy;
@@ -26,6 +26,10 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
   late TextEditingController phone;
   late TextEditingController policyType;
 
+  // 🔥 NEW
+  late TextEditingController insuredName;
+  late TextEditingController beneficiary;
+
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
@@ -33,12 +37,17 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
   @override
   void initState() {
     super.initState();
+
     carrier = TextEditingController(text: widget.policy.carrier);
     policyNo = TextEditingController(text: widget.policy.policy);
     groupNo = TextEditingController(text: widget.policy.group);
     memberId = TextEditingController(text: widget.policy.memberId);
     phone = TextEditingController(text: widget.policy.phone);
     policyType = TextEditingController(text: widget.policy.policyType);
+
+    // 🔥 NEW
+    insuredName = TextEditingController(text: widget.policy.insuredName);
+    beneficiary = TextEditingController(text: widget.policy.beneficiary);
 
     _repo = DataRepository(SecureStore());
     _loadProfile();
@@ -60,6 +69,11 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
     memberId.dispose();
     phone.dispose();
     policyType.dispose();
+
+    // 🔥 NEW
+    insuredName.dispose();
+    beneficiary.dispose();
+
     super.dispose();
   }
 
@@ -76,8 +90,16 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
       policy: policyNo.text.trim(),
       group: groupNo.text.trim(),
       memberId: memberId.text.trim(),
-      phone: phone.text.trim(),       // ← formatted automatically
+      phone: phone.text.trim(),
       policyType: policyType.text.trim(),
+
+      // 🔥 NEW FIELDS
+      insuredName: insuredName.text.trim(),
+      beneficiary: beneficiary.text.trim(),
+
+      // KEEP EXISTING
+      benefits: widget.policy.benefits,
+      decPagePaths: widget.policy.decPagePaths,
       cards: widget.policy.cards,
     );
 
@@ -152,11 +174,24 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               controller: memberId,
               decoration: const InputDecoration(labelText: "Member ID"),
             ),
+
+            // 🔥 NEW FIELDS (THIS FIXES YOUR ISSUE)
+            TextField(
+              controller: insuredName,
+              decoration:
+                  const InputDecoration(labelText: "Insured Name"),
+            ),
+            TextField(
+              controller: beneficiary,
+              decoration:
+                  const InputDecoration(labelText: "Beneficiary"),
+            ),
+
             TextField(
               controller: phone,
               decoration: const InputDecoration(labelText: "Phone"),
               keyboardType: TextInputType.phone,
-              inputFormatters: [PhoneNumberFormatter()],   // ← NEW
+              inputFormatters: [PhoneNumberFormatter()],
             ),
             TextField(
               controller: policyType,
