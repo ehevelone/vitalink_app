@@ -72,12 +72,39 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     try {
       if (_p == null) return;
 
-      final XFile? image =
-          await _picker.pickImage(source: ImageSource.camera);
-      if (image == null) return;
+      final List<String> base64Images = [];
+      bool keepScanning = true;
 
-      final bytes = await File(image.path).readAsBytes();
-      final base64Image = base64Encode(bytes);
+      while (keepScanning) {
+        final img = await _picker.pickImage(source: ImageSource.camera);
+        if (img == null) break;
+
+        final bytes = await File(img.path).readAsBytes();
+        base64Images.add(base64Encode(bytes));
+
+        keepScanning = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Add another page?"),
+                content: Text(
+                  "You have taken ${base64Images.length} photo(s).\n\nTake another if needed.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text("Done"),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text("Add More"),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+
+      if (base64Images.isEmpty) return;
 
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_insurance";
@@ -85,7 +112,7 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       final resp = await http.post(
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"imageBase64": base64Image}),
+        body: jsonEncode({"images": base64Images}),
       );
 
       if (resp.statusCode == 200) {
@@ -97,9 +124,22 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           carrier: (normalized['carrier'] ?? '').trim(),
           policy: (normalized['policy'] ?? '').trim(),
           memberId: (normalized['memberId'] ?? '').trim(),
+          group: (normalized['group'] ?? '').trim(),
           policyType:
-              (normalized['policyType'] ?? normalized['group'] ?? '')
-                  .trim(),
+              (normalized['planType'] ?? '').trim(),
+
+          // 🔥 NEW FIELDS
+          insuredName: (normalized['insuredName'] ?? '').trim(),
+          beneficiary: (normalized['beneficiary'] ?? '').trim(),
+
+          // 🔥 BENEFITS FIX
+          benefits: (normalized['benefits'] as List<dynamic>? ?? [])
+              .map((b) => {
+                    'name': b['name']?.toString() ?? '',
+                    'value': b['value']?.toString() ?? '',
+                  })
+              .toList(),
+
           cards: [],
         );
 
