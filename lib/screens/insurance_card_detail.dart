@@ -171,18 +171,23 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                       size: 120),
             ),
           ),
-          const SizedBox(height: 20),
-          Padding(
-            padding:
-                const EdgeInsets.only(bottom: 20),
-            child: ElevatedButton.icon(
-              onPressed: _captureBack,
-              icon: const Icon(
-                  Icons.camera_alt_outlined),
-              label: Text(
-                (card.backImagePath ?? '').isEmpty
-                    ? "Add Back of Card"
-                    : "Replace Back of Card",
+
+          // ✅ FIXED SAFE AREA (THIS WAS YOUR ISSUE)
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _captureBack,
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: Text(
+                    (card.backImagePath ?? '').isEmpty
+                        ? "Add Back of Card"
+                        : "Replace Back of Card",
+                  ),
+                ),
               ),
             ),
           ),

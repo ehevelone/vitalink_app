@@ -34,16 +34,51 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
   Future<void> _load() async {
     final p = await _repo.loadProfile();
     if (!mounted) return;
+
     setState(() {
       _p = p;
       _loading = false;
     });
+
+    await _autoAttachCards(); // 🔥 ADDED
   }
 
   Future<void> _save() async {
     if (_p != null) {
       _p!.updatedAt = DateTime.now();
       await _repo.saveProfile(_p!);
+    }
+  }
+
+  // 🔥 AUTO ATTACH CARDS (NEW)
+  Future<void> _autoAttachCards() async {
+    if (_p == null) return;
+
+    final policy = _p!.insurances[widget.index];
+    final orphanCards = _p!.orphanCards;
+
+    if (orphanCards.isEmpty) return;
+
+    bool updated = false;
+
+    for (final card in List<InsuranceCard>.from(orphanCards)) {
+      final policyMatch = card.policy.trim().toLowerCase() ==
+          policy.policy.trim().toLowerCase();
+
+      if (policyMatch && card.policy.isNotEmpty) {
+        policy.cards.add(card);
+        orphanCards.remove(card);
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await _save();
+
+      if (mounted) {
+        setState(() {});
+        _showSnack("Card linked to policy");
+      }
     }
   }
 

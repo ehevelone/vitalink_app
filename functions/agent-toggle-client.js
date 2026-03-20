@@ -33,7 +33,7 @@ exports.handler = async (event) => {
   try {
 
     // -------------------------
-    // AUTH (FIXED)
+    // AUTH (UNCHANGED)
     // -------------------------
     const token = event.headers.authorization;
 
@@ -47,7 +47,6 @@ exports.handler = async (event) => {
 
     const client = await pool.connect();
 
-    // 🔥 FIXED: USE agents TABLE
     const agentRes = await client.query(
       "SELECT id FROM agents WHERE agent_session_token=$1 LIMIT 1",
       [token]
@@ -65,24 +64,26 @@ exports.handler = async (event) => {
     const agentId = agentRes.rows[0].id;
 
     // -------------------------
-    // BODY
+    // BODY (🔥 FIXED)
     // -------------------------
-    const { userId, active } = JSON.parse(event.body || "{}");
+    const body = JSON.parse(event.body || "{}");
 
-    if (!userId || typeof active !== "boolean") {
+    const userId = body.clientId || body.userId;
+
+    if (!userId) {
       client.release();
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: "Invalid payload"
+        body: "Missing userId"
       };
     }
 
     // -------------------------
-    // SECURITY CHECK (GOOD — KEEP THIS)
+    // SECURITY CHECK (UNCHANGED)
     // -------------------------
     const userCheck = await client.query(
-      "SELECT id FROM users WHERE id=$1 AND agent_id=$2 LIMIT 1",
+      "SELECT id, active FROM users WHERE id=$1 AND agent_id=$2 LIMIT 1",
       [userId, agentId]
     );
 
@@ -95,12 +96,18 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔥 CURRENT STATUS
+    const currentStatus = userCheck.rows[0].active;
+
+    // 🔥 TOGGLE
+    const newStatus = !currentStatus;
+
     // -------------------------
-    // UPDATE
+    // UPDATE (UNCHANGED LOGIC)
     // -------------------------
     await client.query(
       "UPDATE users SET active=$1 WHERE id=$2",
-      [active, userId]
+      [newStatus, userId]
     );
 
     client.release();
@@ -109,7 +116,8 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        success: true
+        success: true,
+        active: newStatus
       })
     };
 

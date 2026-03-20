@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
-import 'package:permission_handler/permission_handler.dart'; // ✅ ADDED
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -56,10 +56,9 @@ class _IOSCardScanScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // ✅ iOS Native Document Scanner WITH explicit permission request
+  // 🔥 MULTI IMAGE CARD SCAN (FRONT + BACK)
   Future<void> _scanCard() async {
     try {
-      // 🔥 Explicitly request camera permission first
       final status = await Permission.camera.request();
 
       if (!status.isGranted) {
@@ -75,25 +74,53 @@ class _IOSCardScanScreenState
         return;
       }
 
-      // Small delay helps iOS present controller cleanly
       await Future.delayed(const Duration(milliseconds: 200));
 
-      final images =
-          await CunningDocumentScanner.getPictures();
+      final List<String> images = [];
+      bool keepScanning = true;
 
-      if (images == null || images.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Scan cancelled")),
-        );
-        return;
+      while (keepScanning) {
+        final result =
+            await CunningDocumentScanner.getPictures();
+
+        if (result == null || result.isEmpty) break;
+
+        images.addAll(result);
+
+        keepScanning = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Scan Back of Card?"),
+                content: Text(
+                  "You have ${images.length} image(s).\n\nFlip the card and scan the back.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, false),
+                    child: const Text("Done"),
+                  ),
+                  FilledButton(
+                    onPressed: () =>
+                        Navigator.pop(context, true),
+                    child: const Text("Scan Back"),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
       }
 
-      final imagePath = images.first;
+      if (images.isEmpty) return;
+
+      // 🔥 FRONT + BACK ASSIGNMENT
+      final front = images[0];
+      final back = images.length > 1 ? images[1] : null;
 
       _p?.orphanCards.add(
         InsuranceCard(
-          frontImagePath: imagePath,
+          frontImagePath: front,
+          backImagePath: back,
           carrier: "",
           policy: "",
         ),
@@ -105,7 +132,7 @@ class _IOSCardScanScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Card added")),
+        const SnackBar(content: Text("Card saved (front + back)")),
       );
     } catch (e, stack) {
       print("SCAN ERROR: $e");
@@ -197,7 +224,7 @@ class _IOSCardScanScreenState
                                 ? card.carrier
                                 : "Insurance Card",
                           ),
-                          subtitle: Text(card.policy ?? ''),
+                          subtitle: Text(card.policy),
                           onTap: () {
                             Navigator.push(
                               context,
