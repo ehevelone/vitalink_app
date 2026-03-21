@@ -37,13 +37,17 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid request body" });
     }
 
+    console.log("📥 BODY:", body);
+
     const { emailOrPhone, code, newPassword, role } = body;
 
     if (!emailOrPhone || !code || !newPassword || !role) {
+      console.log("❌ Missing fields");
       return reply(400, { success: false, error: "Missing required fields" });
     }
 
     if (role !== "users" && role !== "agents") {
+      console.log("❌ Invalid role:", role);
       return reply(400, { success: false, error: "Invalid role" });
     }
 
@@ -60,26 +64,37 @@ exports.handler = async (event) => {
     );
 
     if (!result.rows.length) {
+      console.log("❌ No account found for:", email);
       return reply(404, { success: false, error: "No account found" });
     }
 
     const user = result.rows[0];
 
+    console.log("👤 DB USER:", user);
+
     const storedCode = String(user.reset_code ?? "").trim();
     const enteredCode = String(code ?? "").trim();
 
+    console.log("🔐 Stored Code:", storedCode);
+    console.log("🔐 Entered Code:", enteredCode);
+    console.log("⏱ Expires:", user.reset_expires);
+
     if (storedCode.length === 0) {
+      console.log("❌ No reset code in DB");
       return reply(400, { success: false, error: "No reset code found" });
     }
 
+    // 🔥 FIXED COMPARISON (handles spaces, weird chars)
     const cleanStored = storedCode.replace(/\s/g, "");
     const cleanEntered = enteredCode.replace(/\s/g, "");
 
     if (cleanStored !== cleanEntered) {
+      console.log("❌ Code mismatch");
       return reply(400, { success: false, error: "Invalid reset code" });
     }
 
     if (!user.reset_expires || new Date(user.reset_expires) < new Date()) {
+      console.log("❌ Code expired");
       return reply(400, { success: false, error: "Reset code expired" });
     }
 
@@ -98,10 +113,11 @@ exports.handler = async (event) => {
     );
 
     if (update.rowCount === 0) {
+      console.log("❌ Password update failed");
       return reply(500, { success: false, error: "Password update failed" });
     }
 
-    console.log(`✅ Password reset for ${user.email} (${role})`);
+    console.log(`✅ Password reset SUCCESS for ${user.email} (${role})`);
 
     return reply(200, { success: true });
 
