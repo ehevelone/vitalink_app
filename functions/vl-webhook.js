@@ -21,7 +21,9 @@ function generateCode() {
 
 exports.handler = async (event) => {
 
-  const sig = event.headers["stripe-signature"];
+  const sig =
+    event.headers["stripe-signature"] ||
+    event.headers["Stripe-Signature"];
 
   let stripeEvent;
 
@@ -46,19 +48,34 @@ exports.handler = async (event) => {
 
   }
 
+  // 🔥 HANDLE ALL SUCCESS PATHS (CARD + ACH)
   if (
     stripeEvent.type === "checkout.session.completed" ||
-    stripeEvent.type === "checkout.session.async_payment_succeeded"
+    stripeEvent.type === "checkout.session.async_payment_succeeded" ||
+    stripeEvent.type === "invoice.paid" // ✅ ADDED FOR ACH SAFETY
   ) {
 
     console.log("Payment event detected");
 
-    const session = stripeEvent.data.object;
+    const obj = stripeEvent.data.object;
 
-    console.log("Session ID:", session.id);
+    // 🔥 HANDLE DIFFERENT EVENT TYPES
+    let sessionId = null;
+    let email = null;
 
-    const email = session.customer_details?.email || null;
+    if (stripeEvent.type === "invoice.paid") {
+      // ACH final settlement
+      sessionId = obj.subscription || obj.id;
+      email = obj.customer_email || null;
 
+      console.log("Invoice paid (ACH cleared)");
+    } else {
+      // Checkout session
+      sessionId = obj.id;
+      email = obj.customer_details?.email || null;
+    }
+
+    console.log("Session/Ref ID:", sessionId);
     console.log("Customer email:", email);
 
     const code = generateCode();
@@ -73,7 +90,7 @@ exports.handler = async (event) => {
         `SELECT id FROM activation_codes
          WHERE stripe_session = $1
          LIMIT 1`,
-        [session.id]
+        [sessionId]
       );
 
       if (existing.rows.length === 0) {
@@ -84,14 +101,14 @@ exports.handler = async (event) => {
           `INSERT INTO activation_codes
            (code, email, stripe_session, created_at)
            VALUES ($1,$2,$3,NOW())`,
-          [code, email, session.id]
+          [code, email, sessionId]
         );
 
         console.log("Activation created:", code, email);
 
       } else {
 
-        console.log("Duplicate webhook ignored:", session.id);
+        console.log("Duplicate webhook ignored:", sessionId);
 
       }
 

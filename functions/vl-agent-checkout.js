@@ -20,9 +20,26 @@ exports.handler = async (event) => {
 
   try {
 
+    // 🔥 ADD BODY (needed for agent linkage)
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch (_) {}
+
+    const agentId = body.agentId || "";
+    const email = body.email || "";
+
     const session = await stripe.checkout.sessions.create({
 
-      payment_method_types: ["card"],
+      // 🔥 ACH FIRST
+      payment_method_types: ["us_bank_account", "card"],
+
+      // 🔥 SMOOTH ACH FLOW
+      payment_method_options: {
+        us_bank_account: {
+          verification_method: "automatic"
+        }
+      },
 
       mode: "subscription",
 
@@ -32,6 +49,15 @@ exports.handler = async (event) => {
           quantity: 1
         }
       ],
+
+      // 🔥 helps Stripe + receipts
+      customer_email: email || undefined,
+
+      // 🔥 CRITICAL FOR WEBHOOK MATCHING
+      metadata: {
+        agentId: String(agentId),
+        type: "agent_subscription"
+      },
 
       success_url:
         "https://myvitalink.app/agent-success.html?session_id={CHECKOUT_SESSION_ID}",

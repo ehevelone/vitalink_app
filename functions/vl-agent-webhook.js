@@ -50,15 +50,24 @@ exports.handler = async (event) => {
 
       case "checkout.session.completed":
 
-        const email = data.customer_details?.email;
+        const email =
+          data.customer_details?.email ||
+          data.customer_email ||
+          "";
+
         const customerId = data.customer;
         const subscriptionId = data.subscription;
 
-        const agentCode = generateAgentCode();   // agent unlocks app
-        const clientCode = generateClientCode(); // agent gives to clients
+        // 🔥 NEW: pull metadata (from checkout)
+        const agentIdFromMeta =
+          data.metadata?.agentId || null;
+
+        const agentCode = generateAgentCode();
+        const clientCode = generateClientCode();
 
         console.log("Generated agent unlock code:", agentCode);
         console.log("Generated client referral code:", clientCode);
+        console.log("Metadata agentId:", agentIdFromMeta);
 
         await db.query(
           `
@@ -106,10 +115,18 @@ exports.handler = async (event) => {
           ]
         );
 
-        console.log("Agent created:", email);
+        console.log("Agent created/updated:", email);
 
       break;
 
+
+      /* 🔥 ACH INITIAL (DO NOT ACTIVATE HERE) */
+
+      case "checkout.session.async_payment_succeeded":
+
+        console.log("ACH started (agent)");
+
+      break;
 
 
       /* NEW SUBSCRIPTION */
@@ -134,7 +151,6 @@ exports.handler = async (event) => {
       break;
 
 
-
       /* SUBSCRIPTION UPDATED */
 
       case "customer.subscription.updated":
@@ -157,7 +173,6 @@ exports.handler = async (event) => {
       break;
 
 
-
       /* SUBSCRIPTION CANCELLED */
 
       case "customer.subscription.deleted":
@@ -176,7 +191,6 @@ exports.handler = async (event) => {
         );
 
       break;
-
 
 
       /* PAYMENT FAILED */
@@ -199,8 +213,7 @@ exports.handler = async (event) => {
       break;
 
 
-
-      /* PAYMENT SUCCESS */
+      /* 🔥 FINAL PAYMENT SUCCESS (CARD + ACH CLEARED) */
 
       case "invoice.paid":
 
@@ -216,6 +229,8 @@ exports.handler = async (event) => {
             data.customer
           ]
         );
+
+        console.log("Agent payment confirmed:", data.customer);
 
       break;
 
