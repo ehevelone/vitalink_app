@@ -43,6 +43,8 @@ exports.handler = async (event) => {
       });
     }
 
+    console.log("📥 BODY:", body);
+
     const { emailOrPhone, role } = body;
 
     if (!emailOrPhone || !role) {
@@ -63,7 +65,7 @@ exports.handler = async (event) => {
 
     const result = await db.query(
       `
-      SELECT id, email
+      SELECT id, email, reset_code, reset_expires
       FROM ${role}
       WHERE LOWER(email) = $1
       LIMIT 1
@@ -80,20 +82,39 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
+    console.log("👤 USER:", user);
+
+    // 🔥 CRITICAL FIX — DO NOT CREATE NEW CODE IF ONE IS ACTIVE
+    if (user.reset_expires && new Date(user.reset_expires) > new Date()) {
+      console.log("⚠️ Existing code still valid — NOT generating new one");
+
+      return reply(200, {
+        success: true,
+        message: "Code already sent. Check your email.",
+        sentTo: user.email,
+      });
+    }
+
+    // 🔥 Generate NEW code ONLY if needed
     const resetCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
+
+    const expires = new Date(Date.now() + 20 * 60 * 1000);
 
     await db.query(
       `
       UPDATE ${role}
       SET reset_code = $2,
-          reset_expires = NOW() + INTERVAL '20 minutes'
+          reset_expires = $3
       WHERE id = $1
       `,
-      [user.id, resetCode]
+      [user.id, resetCode, expires]
     );
 
+    console.log("🔐 New Code Generated:", resetCode);
+
+    // 🔥 EMAIL
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT),
@@ -130,7 +151,7 @@ If you did not request this, you can ignore this email.
       text: message,
     });
 
-    console.log(`✅ Reset code sent to ${user.email} (${role})`);
+    console.log(`✅ Email sent to ${user.email}`);
 
     return reply(200, {
       success: true,
