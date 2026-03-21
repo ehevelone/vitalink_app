@@ -47,7 +47,7 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid role" });
     }
 
-    const email = emailOrPhone.trim().toLowerCase();
+    const email = String(emailOrPhone).trim().toLowerCase();
 
     const result = await db.query(
       `
@@ -65,7 +65,6 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
-    // 🔐 Hardened reset code comparison
     const storedCode = String(user.reset_code ?? "").trim();
     const enteredCode = String(code ?? "").trim();
 
@@ -73,7 +72,10 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "No reset code found" });
     }
 
-    if (storedCode !== enteredCode) {
+    const cleanStored = storedCode.replace(/\s/g, "");
+    const cleanEntered = enteredCode.replace(/\s/g, "");
+
+    if (cleanStored !== cleanEntered) {
       return reply(400, { success: false, error: "Invalid reset code" });
     }
 
