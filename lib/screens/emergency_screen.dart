@@ -192,6 +192,61 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
               const Divider(height: 32),
 
+              // 💊 MEDICATIONS
+              if (p.meds.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Medications",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...p.meds.map((m) => ListTile(
+                          dense: true,
+                          title: Text(m.name.isNotEmpty ? m.name : "Unknown"),
+                          subtitle: Text(
+                            [
+                              if (m.dose.isNotEmpty) m.dose,
+                              if (m.frequency.isNotEmpty) m.frequency,
+                            ].join(" • "),
+                          ),
+                        )),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+
+              // 👨‍⚕️ DOCTORS
+              if (p.doctors.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Doctors",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...p.doctors.map((d) => ListTile(
+                          dense: true,
+                          title: Text(d.name.isNotEmpty ? d.name : "Unknown"),
+                          subtitle: Text(
+                            d.phone.isNotEmpty
+                                ? Formatters.phone(d.phone)
+                                : "No phone",
+                          ),
+                        )),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade900,

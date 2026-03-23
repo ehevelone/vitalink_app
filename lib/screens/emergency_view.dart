@@ -70,7 +70,6 @@ class _EmergencyViewState extends State<EmergencyView> {
     final p = _p!;
     final e = p.emergency;
 
-    // 🔥 FULL PAYLOAD (MATCHES HTML)
     final payload = {
       "name": p.fullName,
       "dob": p.dob ?? "",
@@ -82,20 +81,17 @@ class _EmergencyViewState extends State<EmergencyView> {
       "organDonor": e.organDonor,
       "emergencyContactName": e.contact,
       "emergencyContactPhone": e.phone,
-
       "meds": p.meds.map((m) => {
         "name": m.name,
         "dose": m.dose,
         "frequency": m.frequency,
       }).toList(),
-
       "providers": p.doctors.map((d) => {
         "name": d.name,
         "phone": d.phone,
       }).toList(),
     };
 
-    // 🔥 ENCODE FOR WEB
     final encoded =
         base64UrlEncode(utf8.encode(jsonEncode(payload)));
 
@@ -111,7 +107,6 @@ class _EmergencyViewState extends State<EmergencyView> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            tooltip: "Edit Profile",
             onPressed: () {
               Navigator.push(
                 context,
@@ -121,71 +116,72 @@ class _EmergencyViewState extends State<EmergencyView> {
           ),
         ],
       ),
-      body: Stack(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Center(
-            child: Opacity(
-              opacity: 0.15,
-              child: Image.asset(
-                "assets/images/logo_icon.png",
-                width: MediaQuery.of(context).size.width * 0.9,
-                fit: BoxFit.contain,
-              ),
+          if (p.fullName.isNotEmpty)
+            ListTile(title: const Text("Name"), subtitle: Text(p.fullName)),
+
+          if (p.dob?.isNotEmpty == true)
+            ListTile(title: const Text("DOB"), subtitle: Text(Formatters.dob(p.dob!))),
+
+          if (e.allergies.isNotEmpty)
+            ListTile(title: const Text("Allergies"), subtitle: Text(e.allergies)),
+
+          if (e.conditions.isNotEmpty)
+            ListTile(title: const Text("Conditions"), subtitle: Text(e.conditions)),
+
+          if (e.implants.isNotEmpty)
+            ListTile(title: const Text("Implants"), subtitle: Text(e.implants)),
+
+          if (e.procedures.isNotEmpty)
+            ListTile(title: const Text("Procedures"), subtitle: Text(e.procedures)),
+
+          if (e.contact.isNotEmpty || e.phone.isNotEmpty)
+            ListTile(
+              title: const Text("Emergency Contact"),
+              subtitle: Text([
+                if (e.contact.isNotEmpty) e.contact,
+                if (e.phone.isNotEmpty) Formatters.phone(e.phone),
+              ].join(" • ")),
             ),
-          ),
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (p.fullName.isNotEmpty)
-                ListTile(
-                  title: const Text("Name"),
-                  subtitle: Text(p.fullName),
-                ),
-              if (p.dob?.isNotEmpty == true)
-                ListTile(
-                  title: const Text("Date of Birth"),
-                  subtitle: Text(Formatters.dob(p.dob!)),
-                ),
-              if (e.allergies.isNotEmpty)
-                ListTile(
-                  title: const Text("Allergies"),
-                  subtitle: Text(e.allergies),
-                ),
-              if (e.conditions.isNotEmpty)
-                ListTile(
-                  title: const Text("Medical Conditions"),
-                  subtitle: Text(e.conditions),
-                ),
-              if (e.contact.isNotEmpty || e.phone.isNotEmpty)
-                ListTile(
-                  title: const Text("Emergency Contact"),
-                  subtitle: Text([
-                    if (e.contact.isNotEmpty) e.contact,
-                    if (e.phone.isNotEmpty) Formatters.phone(e.phone),
-                  ].join(" • ")),
-                ),
 
-              const Divider(height: 32, color: Colors.redAccent),
+          const Divider(height: 32),
 
-              const Text(
-                "Show this QR code to emergency personnel:",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(height: 12),
+          if (p.meds.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Medications", style: TextStyle(fontWeight: FontWeight.bold)),
+                ...p.meds.map((m) => ListTile(
+                      dense: true,
+                      title: Text(m.name),
+                      subtitle: Text("${m.dose} • ${m.frequency}"),
+                    )),
+              ],
+            ),
 
-              // 🔥 FIXED QR (NOW USES URL)
-              Center(
-                child: QrImageView(
-                  data: qrUrl,
-                  version: QrVersions.auto,
-                  size: 240,
-                ),
-              ),
-            ],
+          if (p.doctors.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Doctors", style: TextStyle(fontWeight: FontWeight.bold)),
+                ...p.doctors.map((d) => ListTile(
+                      dense: true,
+                      title: Text(d.name),
+                      subtitle: Text(d.phone),
+                    )),
+              ],
+            ),
+
+          const SizedBox(height: 20),
+
+          Center(
+            child: QrImageView(
+              data: qrUrl,
+              size: 240,
+              backgroundColor: Colors.white,
+            ),
           ),
         ],
       ),
