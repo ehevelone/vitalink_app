@@ -131,7 +131,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
             ),
           ),
           ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              MediaQuery.of(context).padding.bottom + 100,
+            ),
             children: [
               if (p.dob?.isNotEmpty == true)
                 ListTile(
@@ -192,7 +197,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
               const Divider(height: 32),
 
-              // 💊 MEDICATIONS
               if (p.meds.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,7 +224,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   ],
                 ),
 
-              // 👨‍⚕️ DOCTORS
               if (p.doctors.isNotEmpty)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
