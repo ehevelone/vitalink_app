@@ -1,172 +1,269 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emergency Info | VitaLink</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-import '../models.dart';
-import '../services/data_repository.dart';
-import '../services/secure_store.dart';
-import 'edit_profile.dart';
+<style>
 
-class Formatters {
-  static String phone(String raw) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 10) return raw;
-    return "(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6, 10)}";
-  }
-
-  static String dob(String raw) {
-    try {
-      final date = DateTime.tryParse(raw);
-      if (date != null) {
-        return "${date.month.toString().padLeft(2, '0')}/"
-            "${date.day.toString().padLeft(2, '0')}/"
-            "${date.year}";
-      }
-    } catch (_) {}
-    return raw;
-  }
+:root{
+--bg:#000000;
+--card:#0c0c0c;
+--text:#ffffff;
+--muted:#aaaaaa;
+--divider:#1e1e1e;
+--alert-bg:#2a0000;
+--alert-border:#e53935;
 }
 
-class EmergencyView extends StatefulWidget {
-  const EmergencyView({super.key});
-
-  @override
-  State<EmergencyView> createState() => _EmergencyViewState();
+body.light{
+--bg:#f5f5f5;
+--card:#ffffff;
+--text:#111;
+--muted:#555;
+--divider:#ddd;
+--alert-bg:#ffeaea;
+--alert-border:#e53935;
 }
 
-class _EmergencyViewState extends State<EmergencyView> {
-  late final DataRepository _repo;
-  Profile? _p;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _repo = DataRepository(SecureStore());
-    _load();
-  }
-
-  Future<void> _load() async {
-    final p = await _repo.loadProfile();
-    setState(() {
-      _p = p;
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.red),
-        ),
-      );
-    }
-
-    final p = _p!;
-    final e = p.emergency;
-
-    final qrData = jsonEncode({
-      "name": p.fullName,
-      "dob": p.dob ?? "",
-      "allergies": e.allergies,
-      "conditions": e.conditions,
-      "emergencyContactName": e.contact,
-      "emergencyContactPhone": e.phone,
-      "meds": p.meds
-          .map((m) => {"name": m.name, "dose": m.dose, "frequency": m.frequency})
-          .toList(),
-      "providers": p.doctors.map((d) => {"name": d.name, "phone": d.phone}).toList(),
-      "updatedAt": p.updatedAt.toIso8601String(),
-    });
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.red.shade900, // ✅ red theme
-        foregroundColor: Colors.white,
-        title: Text(
-          "Emergency Info${p.fullName.isNotEmpty ? " – ${p.fullName}" : ""}",
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: "Edit Profile",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-              ).then((_) => _load());
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Center(
-            child: Opacity(
-              opacity: 0.15,
-              child: Image.asset(
-                "assets/images/logo_icon.png",
-                width: MediaQuery.of(context).size.width * 0.9,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (p.fullName.isNotEmpty)
-                ListTile(
-                  title: const Text("Name"),
-                  subtitle: Text(p.fullName),
-                ),
-              if (p.dob?.isNotEmpty == true)
-                ListTile(
-                  title: const Text("Date of Birth"),
-                  subtitle: Text(Formatters.dob(p.dob!)),
-                ),
-              if (e.allergies.isNotEmpty)
-                ListTile(
-                  title: const Text("Allergies"),
-                  subtitle: Text(e.allergies),
-                ),
-              if (e.conditions.isNotEmpty)
-                ListTile(
-                  title: const Text("Medical Conditions"),
-                  subtitle: Text(e.conditions),
-                ),
-              if (e.contact.isNotEmpty || e.phone.isNotEmpty)
-                ListTile(
-                  title: const Text("Emergency Contact"),
-                  subtitle: Text([
-                    if (e.contact.isNotEmpty) e.contact,
-                    if (e.phone.isNotEmpty) Formatters.phone(e.phone),
-                  ].join(" • ")),
-                ),
-
-              const Divider(height: 32, color: Colors.redAccent), // ✅ red accent
-
-              const Text(
-                "Show this QR code to emergency personnel:",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: QrImageView(
-                  data: qrData,
-                  version: QrVersions.auto,
-                  size: 240,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+body.ems{
+--text:#ffffff;
+--muted:#cccccc;
+--divider:#333;
 }
+
+body{
+margin:0;
+background:var(--bg);
+color:var(--text);
+font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+display:flex;
+justify-content:center;
+padding:20px;
+}
+
+.card{
+width:100%;
+max-width:520px;
+padding:28px;
+border-radius:18px;
+background:var(--card);
+box-shadow:0 20px 60px rgba(0,0,0,0.6);
+position:relative;
+}
+
+.logo{text-align:center;margin-bottom:20px;}
+.logo img{height:120px;}
+
+h1{color:#e53935;text-align:center;margin-bottom:18px;}
+
+.section{
+margin-bottom:18px;
+border-top:1px solid var(--divider);
+padding-top:14px;
+}
+
+.label{
+font-size:13px;
+color:var(--muted);
+text-transform:uppercase;
+}
+
+.value{
+font-size:17px;
+margin-top:4px;
+line-height:1.4;
+}
+
+body.ems .value{
+font-size:20px;
+font-weight:600;
+}
+
+.alert{
+background:var(--alert-bg);
+border-left:5px solid var(--alert-border);
+padding:12px;
+border-radius:8px;
+}
+
+.hint{
+margin-top:18px;
+font-size:14px;
+color:var(--muted);
+text-align:center;
+}
+
+.toggle-wrap{
+position:absolute;
+top:14px;
+right:14px;
+display:flex;
+gap:6px;
+}
+
+.theme-toggle{
+background:none;
+border:1px solid var(--divider);
+color:var(--text);
+padding:6px 12px;
+border-radius:999px;
+font-size:12px;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card" id="app">
+
+<div class="toggle-wrap">
+<button class="theme-toggle" onclick="toggleTheme()">Light</button>
+<button class="theme-toggle" onclick="toggleEMS()">EMS</button>
+</div>
+
+<div class="logo">
+<img src="/images/vitalink-logo.png" />
+</div>
+
+<h1>Emergency Session Expired</h1>
+
+<div class="hint">Scan QR Code to access emergency data</div>
+
+</div>
+
+<script>
+
+function toggleTheme(){
+document.body.classList.toggle("light");
+}
+
+function toggleEMS(){
+document.body.classList.toggle("ems");
+}
+
+(function(){
+
+const params = new URLSearchParams(window.location.search);
+const raw = params.get("data");
+if(!raw) return;
+
+const normalized = raw.replace(/-/g,'+').replace(/_/g,'/');
+
+let decoded;
+try{
+decoded = JSON.parse(atob(normalized));
+}catch{
+return;
+}
+
+const app = document.getElementById("app");
+
+app.innerHTML = `
+
+<div class="toggle-wrap">
+<button class="theme-toggle" onclick="toggleTheme()">Light</button>
+<button class="theme-toggle" onclick="toggleEMS()">EMS</button>
+</div>
+
+<div class="logo">
+<img src="/images/vitalink-logo.png" />
+</div>
+
+<h1>Emergency Information</h1>
+
+<div class="section">
+<div class="label">Name</div>
+<div class="value">${decoded.name || "N/A"}</div>
+</div>
+
+<div class="section">
+<div class="label">DOB</div>
+<div class="value">${decoded.dob || "N/A"}</div>
+</div>
+
+<div class="section alert">
+<div class="label">Allergies</div>
+<div class="value">${decoded.allergies || "None reported"}</div>
+</div>
+
+<div class="section alert">
+<div class="label">Conditions</div>
+<div class="value">${decoded.conditions || "None reported"}</div>
+</div>
+
+<div class="section">
+<div class="label">Implants</div>
+<div class="value">${decoded.implants || "None reported"}</div>
+</div>
+
+<div class="section">
+<div class="label">Procedures</div>
+<div class="value">${decoded.procedures || "None reported"}</div>
+</div>
+
+<div class="section">
+<div class="label">Blood Type</div>
+<div class="value">${decoded.bloodType || "Unknown"}</div>
+</div>
+
+<div class="section">
+<div class="label">Organ Donor</div>
+<div class="value">${decoded.organDonor ? "YES" : "NO"}</div>
+</div>
+
+<div class="section">
+<div class="label">Emergency Contact</div>
+<div class="value">${decoded.emergencyContactName || "N/A"}</div>
+</div>
+
+<div class="section">
+<div class="label">Phone</div>
+<div class="value">${decoded.emergencyContactPhone || "N/A"}</div>
+</div>
+
+${
+decoded.meds?.length
+? `
+<div class="section">
+<div class="label">Medications</div>
+<div class="value">
+${decoded.meds.map(m =>
+`${m.name || ""}${m.dose ? " – " + m.dose : ""}${m.frequency ? " (" + m.frequency + ")" : ""}`
+).join("<br>")}
+</div>
+</div>
+`
+: ""
+}
+
+${
+decoded.providers?.length
+? `
+<div class="section">
+<div class="label">Doctors</div>
+<div class="value">
+${decoded.providers.map(d =>
+`${d.name || ""}${d.phone ? " – " + d.phone : ""}`
+).join("<br>")}
+</div>
+</div>
+`
+: ""
+}
+
+<div class="hint">
+Session ends when page is closed
+</div>
+
+`;
+
+})();
+
+</script>
+
+</body>
+</html>
