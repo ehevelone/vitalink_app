@@ -2,17 +2,19 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
-import 'secure_store.dart'; // keep for compatibility with existing calls
+import 'secure_store.dart';
 
 class DataRepository {
-  // ✅ Compatibility constructor (prevents 40 screen errors)
-  DataRepository([SecureStore? _]);
+  final SecureStore _store;
+
+  // ✅ KEEP compatibility
+  DataRepository([SecureStore? store]) : _store = store ?? SecureStore();
 
   static const String _profilesKey = 'profiles_json';
   static const String _activeIndexKey = 'active_profile_index';
 
   // ==========================================================
-  // INTERNAL LOAD (SAFE — NO STORAGE WIPE)
+  // INTERNAL LOAD
   // ==========================================================
   Future<List<Profile>> _loadProfilesInternal() async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,15 +36,14 @@ class DataRepository {
               ),
             );
           } catch (_) {
-            // Skip corrupted profile entry ONLY
+            // skip bad entry only
           }
         }
 
         return profiles;
       }
     } catch (_) {
-      // ❗ DO NOT DELETE STORAGE
-      // Just fail gracefully
+      // fail safe — no wipe
     }
 
     return [];
@@ -80,14 +81,25 @@ class DataRepository {
   }
 
   // ==========================================================
+  // 🔥 NAME SYNC
+  // ==========================================================
+  Future<void> _syncName(Profile p) async {
+    final name = (p.fullName).trim();
+
+    if (name.isNotEmpty) {
+      await _store.setString("userName", name);
+    }
+  }
+
+  // ==========================================================
   // PUBLIC API
   // ==========================================================
 
-  // 🔥 FIXED — NEVER RETURNS NULL
+  // 🔥 FIXED + SELF-HEALING PROFILE LOAD
   Future<Profile> loadProfile() async {
     final list = await _loadProfilesInternal();
 
-    // If no profile exists → create fresh one
+    // Create profile if none exists
     if (list.isEmpty) {
       final newProfile = Profile();
       await addProfile(newProfile);
@@ -95,7 +107,19 @@ class DataRepository {
     }
 
     final idx = await _getActiveIndex(list);
-    return list[idx];
+    final p = list[idx];
+
+    final name = p.fullName.trim();
+
+    // 🔥 CRITICAL FIX — HEAL OLD / BROKEN PROFILES
+    if (name.isNotEmpty) {
+      await saveProfile(p); // forces clean rewrite
+    }
+
+    // 🔥 always sync name to backup storage
+    await _syncName(p);
+
+    return p;
   }
 
   Future<List<Profile>> loadAllProfiles() async {
@@ -107,6 +131,7 @@ class DataRepository {
 
     if (profiles.isEmpty) {
       await _saveProfilesInternal([profile], activeIndex: 0);
+      await _syncName(profile);
       return;
     }
 
@@ -115,6 +140,9 @@ class DataRepository {
     updated[idx] = profile;
 
     await _saveProfilesInternal(updated, activeIndex: idx);
+
+    // 🔥 sync name after save
+    await _syncName(profile);
   }
 
   Future<void> addProfile(Profile profile) async {
@@ -124,6 +152,9 @@ class DataRepository {
     final newIndex = updated.length - 1;
 
     await _saveProfilesInternal(updated, activeIndex: newIndex);
+
+    // 🔥 sync new profile name
+    await _syncName(profile);
   }
 
   Future<void> setActiveProfileIndex(int index) async {
@@ -132,6 +163,10 @@ class DataRepository {
     if (index < 0 || index >= profiles.length) return;
 
     await _saveProfilesInternal(profiles, activeIndex: index);
+
+    // 🔥 sync newly active profile name
+    final p = profiles[index];
+    await _syncName(p);
   }
 
   Future<int> getActiveProfileIndex() async {
@@ -153,5 +188,10 @@ class DataRepository {
     }
 
     await _saveProfilesInternal(profiles, activeIndex: newActive);
+
+    // 🔥 sync new active profile
+    if (profiles.isNotEmpty) {
+      await _syncName(profiles[newActive]);
+    }
   }
 }

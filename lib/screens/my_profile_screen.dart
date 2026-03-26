@@ -21,7 +21,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   final _agencyNameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _npnCtrl = TextEditingController();         // ⭐ NEW
+  final _npnCtrl = TextEditingController();
 
   bool _loading = true;
   String _role = "user";
@@ -51,7 +51,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       _phoneCtrl.text = await store.getString("agentPhone") ?? "";
       _agencyNameCtrl.text = await store.getString("agencyName") ?? "";
       _addressCtrl.text = await store.getString("agencyAddress") ?? "";
-      _npnCtrl.text = await store.getString("agentId") ?? ""; // ⭐ NEW
+      _npnCtrl.text = await store.getString("agentId") ?? "";
     }
 
     if (mounted) setState(() => _loading = false);
@@ -73,9 +73,12 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         p.updatedAt = DateTime.now();
         await repo.saveProfile(p);
       }
+
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text("Profile updated")));
+
+        Navigator.pop(context, true); // 🔥 FIX
       }
     }
 
@@ -97,11 +100,12 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         await store.setString("agentPhone", _phoneCtrl.text.trim());
         await store.setString("agencyName", _agencyNameCtrl.text.trim());
         await store.setString("agencyAddress", _addressCtrl.text.trim());
-        // NPN never changes — no overwrite (security best practice)
 
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text("Profile updated")));
+
+          Navigator.pop(context, true); // 🔥 FIX
         }
       } else {
         if (mounted) {
@@ -131,7 +135,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           key: _formKey,
           child: ListView(
             children: [
-              // ⭐ Agent-only — email displayed (not editable)
               if (_role == "agent" && _email.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -157,7 +160,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 validator: (v) => (v == null || v.isEmpty) ? "Required" : null,
               ),
 
-              // ⭐ Agent-only UI
               if (_role == "agent") ...[
                 const SizedBox(height: 12),
                 TextFormField(
@@ -172,7 +174,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ⭐ NPN — read-only (stored + displayed)
                 TextFormField(
                   controller: _npnCtrl,
                   enabled: false,

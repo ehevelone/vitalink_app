@@ -17,114 +17,136 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen>
+    with WidgetsBindingObserver {
   late final DataRepository _repo;
+  final SecureStore _store = SecureStore();
+
   Profile? _p;
   bool _loading = true;
+  String _displayName = "User";
+
   StreamSubscription<String>? _tokenSub;
 
   @override
   void initState() {
     super.initState();
-    _repo = DataRepository(SecureStore());
+    WidgetsBinding.instance.addObserver(this);
+
+    _repo = DataRepository(_store);
+
     _loadProfile();
     _setupFCM();
   }
 
-  Future<void> _setupFCM() async {
-    final store = SecureStore();
+  // 🔥 RELOAD WHEN APP COMES BACK (CRITICAL FOR CHEAP DEVICES)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadProfile();
+    }
+  }
 
+  Future<void> _loadProfile() async {
     try {
-      // 1️⃣ Request permission
+      final p = await _repo.loadProfile();
+
+      // 🔥 fallback from storage
+      final storedName = await _store.getString("userName");
+
+      String name = "";
+
+      if (p?.fullName.trim().isNotEmpty == true) {
+        name = p!.fullName.trim();
+
+        // 🔥 keep backup in storage
+        await _store.setString("userName", name);
+      } else if (storedName != null && storedName.trim().isNotEmpty) {
+        name = storedName.trim();
+      } else {
+        name = "User";
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _p = p;
+        _displayName = name;
+        _loading = false;
+      });
+    } catch (e) {
+      print("Profile load error: $e");
+
+      if (!mounted) return;
+
+      setState(() {
+        _displayName = "User";
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _setupFCM() async {
+    try {
       final settings =
           await FirebaseMessaging.instance.requestPermission();
 
       if (settings.authorizationStatus !=
           AuthorizationStatus.authorized) {
-        print("Notifications not authorized");
         return;
       }
 
-      // 2️⃣ iOS only: wait for APNs token
       if (Platform.isIOS) {
-        String? apnsToken;
         for (int i = 0; i < 10; i++) {
-          apnsToken =
+          final apns =
               await FirebaseMessaging.instance.getAPNSToken();
-          if (apnsToken != null) break;
+          if (apns != null) break;
           await Future.delayed(const Duration(milliseconds: 500));
         }
-
-        if (apnsToken == null) {
-          print("APNS token never arrived");
-          return;
-        }
-
-        print("APNS TOKEN: $apnsToken");
       }
 
-      // 3️⃣ Get FCM token
-      final fcmToken =
+      final token =
           await FirebaseMessaging.instance.getToken();
 
-      if (fcmToken == null || fcmToken.isEmpty) {
-        print("FCM token null");
-        return;
-      }
+      if (token == null || token.isEmpty) return;
 
-      print("FCM TOKEN: $fcmToken");
-
-      final email = await store.getString('userEmail');
-      final role = await store.getString('role');
+      final email = await _store.getString('userEmail');
+      final role = await _store.getString('role');
 
       if (email == null || role == null) return;
 
       await ApiService.registerDeviceToken(
         email: email,
-        fcmToken: fcmToken,
+        fcmToken: token,
         role: role,
         platform: Platform.isIOS ? "ios" : "android",
       );
 
-      // 4️⃣ Listen for refresh
-      _tokenSub = FirebaseMessaging.instance.onTokenRefresh
-          .listen((newToken) async {
+      _tokenSub =
+          FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
+        final e = await _store.getString('userEmail');
+        final r = await _store.getString('role');
 
-        final refreshedEmail = await store.getString('userEmail');
-        final refreshedRole = await store.getString('role');
-
-        if (refreshedEmail == null || refreshedRole == null) return;
+        if (e == null || r == null) return;
 
         await ApiService.registerDeviceToken(
-          email: refreshedEmail,
-          fcmToken: newToken,
-          role: refreshedRole,
+          email: e,
+          fcmToken: t,
+          role: r,
           platform: Platform.isIOS ? "ios" : "android",
         );
       });
-
     } catch (e) {
-      print("FCM setup error: $e");
+      print("FCM error: $e");
     }
   }
 
-  Future<void> _loadProfile() async {
-    final p = await _repo.loadProfile();
-    if (!mounted) return;
-    setState(() {
-      _p = p;
-      _loading = false;
-    });
-  }
-
   Future<void> _logout(BuildContext context) async {
-    final store = SecureStore();
-
-    await store.remove('userLoggedIn');
-    await store.remove('rememberMe');
-    await store.remove('role');
-    await store.remove('authToken');
-    await store.remove('userEmail');
+    await _store.remove('userLoggedIn');
+    await _store.remove('rememberMe');
+    await _store.remove('role');
+    await _store.remove('authToken');
+    await _store.remove('userEmail');
 
     await AppState.clearAuth();
 
@@ -139,20 +161,18 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tokenSub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final displayName =
-        (_p?.fullName.isNotEmpty == true) ? _p!.fullName : "User";
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         title: Text(
-          "Welcome $displayName",
+          "Welcome $_displayName",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
