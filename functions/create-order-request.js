@@ -1,5 +1,24 @@
 const db = require("./services/db");
-const admin = require("./services/firebase");
+const admin = require("firebase-admin");
+
+/* LOAD FIREBASE SERVICE ACCOUNT */
+let serviceAccount;
+
+try {
+  serviceAccount = require("./firebase-service-account.json");
+  console.log("Firebase service account loaded");
+} catch (err) {
+  console.error("Failed to load firebase-service-account.json", err);
+  throw err;
+}
+
+/* INIT FIREBASE */
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("Firebase initialized");
+}
 
 exports.handler = async (event) => {
 
