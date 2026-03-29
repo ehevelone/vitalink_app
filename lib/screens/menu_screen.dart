@@ -37,6 +37,9 @@ class _MenuScreenState extends State<MenuScreen>
 
     _loadProfile();
     _setupFCM();
+
+    // 🔥 NEW — SILENT PROFILE SYNC (DO NOT AWAIT)
+    ApiService.syncProfilesToServer();
   }
 
   // 🔥 RELOAD WHEN APP COMES BACK (CRITICAL FOR CHEAP DEVICES)
