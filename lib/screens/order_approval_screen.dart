@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class OrderApprovalScreen extends StatefulWidget {
-  const OrderApprovalScreen({super.key});
+  final int? requestId; // 🔥 from push
+
+  const OrderApprovalScreen({super.key, this.requestId});
 
   @override
   State<OrderApprovalScreen> createState() => _OrderApprovalScreenState();
@@ -20,13 +22,17 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     loadOrders();
   }
 
-  // 🔥 LOAD PENDING ORDERS
+  // 🔥 LOAD USER-SPECIFIC ORDERS
   Future<void> loadOrders() async {
 
     try{
 
-      final res = await http.get(
-        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders")
+      final res = await http.post(
+        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders"),
+        headers: {"Content-Type":"application/json"},
+        body: jsonEncode({
+          "request_id": widget.requestId // 🔥 optional filter
+        })
       );
 
       final data = jsonDecode(res.body);
@@ -43,7 +49,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     }
   }
 
-  // 🔥 APPROVE ORDER
+  // 🔥 APPROVE
   Future<void> approveOrder(int orderId) async {
 
     try{
@@ -56,11 +62,30 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         })
       );
 
-      // reload after approval
       loadOrders();
 
     } catch(e){
       debugPrint("Approve failed");
+    }
+  }
+
+  // 🔥 REJECT
+  Future<void> rejectOrder(int orderId) async {
+
+    try{
+
+      await http.post(
+        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/reject_order"),
+        headers: {"Content-Type":"application/json"},
+        body: jsonEncode({
+          "order_id": orderId
+        })
+      );
+
+      loadOrders();
+
+    } catch(e){
+      debugPrint("Reject failed");
     }
   }
 
@@ -69,7 +94,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pending Orders"),
+        title: const Text("Order Approval"),
       ),
 
       body: loading
@@ -101,19 +126,42 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                             const SizedBox(height: 10),
 
                             ...order["items"].map<Widget>((item){
-                              return Text(
-                                "${item["product"]} - ${item["profile_name"]}"
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom:4),
+                                child: Text(
+                                  "${item["product"]} - ${item["profile_name"]}"
+                                ),
                               );
                             }).toList(),
 
                             const SizedBox(height: 15),
 
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () => approveOrder(order["id"]),
-                                child: const Text("Approve & Generate QR"),
-                              ),
+                            Row(
+                              children: [
+
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green
+                                    ),
+                                    onPressed: () => approveOrder(order["id"]),
+                                    child: const Text("Approve"),
+                                  ),
+                                ),
+
+                                const SizedBox(width:10),
+
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red
+                                    ),
+                                    onPressed: () => rejectOrder(order["id"]),
+                                    child: const Text("Reject"),
+                                  ),
+                                ),
+
+                              ],
                             )
 
                           ],
