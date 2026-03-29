@@ -1,16 +1,18 @@
 const db = require("./services/db");
 
+const headers = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 exports.handler = async (event) => {
 
-  // 🔥 HANDLE PREFLIGHT (CORS)
+  // 🔥 HANDLE PREFLIGHT
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
+      headers,
       body: "",
     };
   }
@@ -22,10 +24,8 @@ exports.handler = async (event) => {
     if (!user_id) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app",
-        },
-        body: JSON.stringify({ error: "Missing user_id" })
+        headers,
+        body: JSON.stringify({ error: "Missing user_id" }),
       };
     }
 
@@ -41,9 +41,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app",
-      },
+      headers,
       body: JSON.stringify({
         success: true,
         profiles: result.rows
@@ -52,13 +50,11 @@ exports.handler = async (event) => {
 
   } catch (err) {
 
-    console.error(err);
+    console.error("get-profiles error:", err);
 
     return {
       statusCode: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app",
-      },
+      headers,
       body: JSON.stringify({ error: "Server error" })
     };
 
