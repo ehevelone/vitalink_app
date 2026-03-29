@@ -11,31 +11,45 @@ exports.handler = async (event) => {
 
     const { user_id, profiles } = body;
 
-    if (!user_id || !profiles) {
+    if (!user_id || !profiles || !Array.isArray(profiles)) {
       return {
         statusCode: 400,
         body: JSON.stringify({
           success: false,
-          error: "Missing user_id or profiles",
+          error: "Missing or invalid user_id / profiles",
         }),
       };
     }
 
-    // 🔥 Save FULL profile list (overwrite)
+    console.log("🔥 Saving profiles for user:", user_id);
+    console.log("📦 Profiles received:", profiles.length);
+
+    // 🔥 STEP 1 — CLEAR EXISTING PROFILES
     await pool.query(
-      `
-      UPDATE users
-      SET profiles = $1,
-          updated_at = NOW()
-      WHERE id = $2
-      `,
-      [JSON.stringify(profiles), user_id]
+      `DELETE FROM profiles WHERE user_id = $1`,
+      [user_id]
     );
+
+    // 🔥 STEP 2 — INSERT NEW PROFILES
+    for (const p of profiles) {
+      const name = (p.fullName || p.name || "").trim();
+
+      if (!name) continue;
+
+      await pool.query(
+        `
+        INSERT INTO profiles (user_id, name)
+        VALUES ($1, $2)
+        `,
+        [user_id, name]
+      );
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
+        count: profiles.length,
       }),
     };
 
