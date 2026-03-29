@@ -2,44 +2,66 @@ const db = require("./services/db");
 
 exports.handler = async (event) => {
 
-try{
+  // 🔥 HANDLE PREFLIGHT (CORS)
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+      body: "",
+    };
+  }
 
-const { user_id } = JSON.parse(event.body);
+  try {
 
-if(!user_id){
-  return {
-    statusCode:400,
-    body: JSON.stringify({ error:"Missing user_id" })
-  };
-}
+    const { user_id } = JSON.parse(event.body || "{}");
 
-const result = await db.query(
-`
-SELECT id, name
-FROM profiles
-WHERE user_id = $1
-ORDER BY name ASC
-`,
-[user_id]
-);
+    if (!user_id) {
+      return {
+        statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app",
+        },
+        body: JSON.stringify({ error: "Missing user_id" })
+      };
+    }
 
-return {
-  statusCode:200,
-  body: JSON.stringify({
-    success:true,
-    profiles: result.rows
-  })
-};
+    const result = await db.query(
+      `
+      SELECT id, name
+      FROM profiles
+      WHERE user_id = $1
+      ORDER BY name ASC
+      `,
+      [user_id]
+    );
 
-}catch(err){
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app",
+      },
+      body: JSON.stringify({
+        success: true,
+        profiles: result.rows
+      })
+    };
 
-console.error(err);
+  } catch (err) {
 
-return {
-  statusCode:500,
-  body: JSON.stringify({ error:"Server error" })
-};
+    console.error(err);
 
-}
+    return {
+      statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app",
+      },
+      body: JSON.stringify({ error: "Server error" })
+    };
+
+  }
 
 };
