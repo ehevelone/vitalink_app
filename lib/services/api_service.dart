@@ -3,6 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+// 🔥 ADDED FOR PROFILE SYNC
+import '../services/secure_store.dart';
+import '../services/data_repository.dart';
+
 // 🔁 Rebuild trigger: markReviewed API added and verified (force fresh CI build)
 
 class ApiService {
@@ -376,5 +380,35 @@ class ApiService {
     return _postJson("get_agent_clients", {
       "agentId": agentId,
     });
+  }
+
+  // -------------------------------------------------------------
+  // 🔥 SYNC USER PROFILES (NEW)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> syncProfilesToServer() async {
+    try {
+      final store = SecureStore();
+      final repo = DataRepository(store);
+
+      final userId = await store.getString("userId");
+
+      if (userId == null) {
+        debugPrint("❌ No userId found — skipping profile sync");
+        return {"success": false};
+      }
+
+      final profiles = await repo.loadAllProfiles();
+
+      final body = {
+        "user_id": userId,
+        "profiles": profiles.map((p) => p.toJson()).toList(),
+      };
+
+      return await _postJson("save_user_profiles", body);
+
+    } catch (e, st) {
+      debugPrint("❌ Profile Sync Error: $e\n$st");
+      return {"success": false, "error": e.toString()};
+    }
   }
 }
