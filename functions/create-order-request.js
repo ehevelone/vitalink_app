@@ -12,7 +12,7 @@ try {
     throw new Error("FIREBASE_PRIVATE_KEY MISSING");
   }
 
-  // ✅ FIXED LINE (trim added)
+  // ✅ FIXED LINE (trim + newline restore)
   serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY.trim().replace(/\\n/g, '\n');
 
   console.log("Firebase service account loaded");
@@ -113,18 +113,30 @@ exports.handler = async (event) => {
 
       const token = deviceRes.rows[0].device_token;
 
+      console.log("📱 SENDING TO TOKEN:", token);
+
       try {
         await admin.messaging().send({
           token,
+
+          // 🔥 CRITICAL ANDROID DELIVERY FIX
+          android: {
+            priority: "high"
+          },
+
           notification: {
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
           },
+
           data: {
             type: "order_approval",
             request_id: request_id.toString()
           }
         });
+
+        console.log("✅ PUSH SENT");
+
       } catch (pushErr) {
         console.error("Push failed:", pushErr);
       }
