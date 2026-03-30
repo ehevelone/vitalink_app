@@ -1,14 +1,15 @@
 const db = require("./services/db");
 
+// ✅ CORS HEADERS (PRODUCTION SAFE)
 const headers = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://myvitalink.app",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 exports.handler = async (event) => {
 
-  // 🔥 HANDLE PREFLIGHT
+  // 🔥 HANDLE PREFLIGHT (REQUIRED)
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -17,9 +18,30 @@ exports.handler = async (event) => {
     };
   }
 
+  // 🔒 ONLY ALLOW POST (extra safety)
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: "Method not allowed" }),
+    };
+  }
+
   try {
 
-    const { user_id } = JSON.parse(event.body || "{}");
+    // ✅ SAFE PARSE
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch (e) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "Invalid JSON" }),
+      };
+    }
+
+    const { user_id } = body;
 
     if (!user_id) {
       return {
@@ -29,6 +51,7 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔥 QUERY
     const result = await db.query(
       `
       SELECT id, name
@@ -39,25 +62,28 @@ exports.handler = async (event) => {
       [user_id]
     );
 
+    // ✅ SUCCESS RESPONSE
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        profiles: result.rows
-      })
+        profiles: result.rows || [],
+      }),
     };
 
   } catch (err) {
 
     console.error("get-profiles error:", err);
 
+    // ❗ IMPORTANT: still return headers on error
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: "Server error" })
+      body: JSON.stringify({
+        error: "Server error",
+      }),
     };
 
   }
-
 };
