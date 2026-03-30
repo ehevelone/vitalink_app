@@ -27,6 +27,9 @@ import 'screens/emergency_view.dart';
 // NEW SCREEN
 import 'screens/agent_clients_screen.dart';
 
+// 🔥 ADD THIS
+import 'screens/order_approval_screen.dart';
+
 // PROFILE
 import 'screens/profile_user_screen.dart';
 import 'screens/profile_agent_screen.dart';
@@ -218,6 +221,9 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         // NEW ROUTE
         '/agent_clients': (context) => const AgentClientsScreen(),
+
+        // 🔥 ADD THIS
+        '/orderApproval': (context) => const OrderApprovalScreen(),
 
         '/my_agent_user': (context) => const MyAgentUser(),
         '/my_agent_agent': (context) => const MyAgentAgent(),
