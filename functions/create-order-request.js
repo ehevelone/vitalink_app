@@ -22,15 +22,36 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
+  console.log("🔥 RAW BODY:", event.body);
+
   try {
 
-    const body = JSON.parse(event.body);
-    const { user_id, items } = body;
-
-    if (!user_id || !items) {
+    // ✅ SAFE PARSE
+    if (!event.body) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Missing data" }),
+        body: JSON.stringify({ success:false, error: "Missing request body" }),
+      };
+    }
+
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch (err) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ success:false, error: "Invalid JSON" }),
+      };
+    }
+
+    // ✅ ACCEPT BOTH (cart OR items)
+    const user_id = body.user_id;
+    const items = body.items || body.cart;
+
+    if (!user_id || !items || items.length === 0) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
 
@@ -82,15 +103,15 @@ exports.handler = async (event) => {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        request_id
+        order_id: request_id   // ✅ FIXED (frontend expects this)
       }),
     };
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ SERVER ERROR:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Server error" }),
+      body: JSON.stringify({ success:false, error: "Server error" }),
     };
   }
 };
