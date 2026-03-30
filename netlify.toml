@@ -1,5 +1,5 @@
 [build]
-  command = "echo 'API only'"
+  functions = "functions"
   publish = "public"
 
 [functions]
@@ -16,7 +16,6 @@
     "speakeasy"
   ]
 
-# 🔥 ADD THIS BLOCK (THIS IS THE FIX)
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
