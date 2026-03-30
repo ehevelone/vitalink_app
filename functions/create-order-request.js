@@ -77,10 +77,10 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🧾 SAVE ORDER REQUEST
+    // 🧾 SAVE ORDER REQUEST (✅ FIXED SCHEMA)
     const result = await db.query(
       `
-      INSERT INTO order_requests (user_id, items, status)
+      INSERT INTO public.order_requests (user_id, items, status)
       VALUES ($1, $2, 'pending')
       RETURNING id
       `,
@@ -89,11 +89,11 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN (FOR PUSH)
+    // 🔥 GET DEVICE TOKEN (✅ FIXED SCHEMA)
     const deviceRes = await db.query(
       `
       SELECT device_token
-      FROM user_devices
+      FROM public.user_devices
       WHERE user_id = $1
       LIMIT 1
       `,
