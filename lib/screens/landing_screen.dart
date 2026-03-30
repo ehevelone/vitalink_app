@@ -14,6 +14,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
   String? activationCode;
 
+  bool _checkedRoute = false; // 🔥 NEW
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -29,6 +31,37 @@ class _LandingScreenState extends State<LandingScreen> {
     }
 
     activationCode ??= VitaLinkDeepLink.code;
+
+    // 🔥 ADD THIS BLOCK
+    if (!_checkedRoute) {
+      _checkedRoute = true;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePendingRoute();
+      });
+    }
+  }
+
+  // 🔥 NEW FUNCTION
+  void _handlePendingRoute() {
+
+    if (!mounted) return;
+
+    if (pendingRoute != null) {
+
+      final route = pendingRoute!;
+      final args = pendingArgs;
+
+      // clear so it doesn't loop
+      pendingRoute = null;
+      pendingArgs = null;
+
+      Navigator.pushReplacementNamed(
+        context,
+        route,
+        arguments: args,
+      );
+    }
   }
 
   void _showLoginPopup() {
@@ -183,7 +216,7 @@ class _LandingScreenState extends State<LandingScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        color: Colors.black, // 🔥 FULL SCREEN BLACK GUARANTEE
+        color: Colors.black,
         child: SafeArea(
           child: Column(
             children: [
@@ -253,14 +286,13 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
               ),
 
-              // 🔥 FIXED BOTTOM IMAGE
               Container(
                 width: double.infinity,
                 color: Colors.black,
                 child: Image.asset(
                   'assets/images/landing-bottom.png',
                   width: double.infinity,
-                  fit: BoxFit.cover, // 🔥 KEY FIX
+                  fit: BoxFit.cover,
                 ),
               ),
 

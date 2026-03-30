@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,8 +25,6 @@ import 'screens/emergency_view.dart';
 
 // NEW SCREEN
 import 'screens/agent_clients_screen.dart';
-
-// 🔥 ADD THIS
 import 'screens/order_approval_screen.dart';
 
 // PROFILE
@@ -58,6 +55,10 @@ import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+// 🔥 FIX: GLOBAL NAV QUEUE (THIS WAS MISSING)
+String? pendingRoute;
+dynamic pendingArgs;
 
 class VitaLinkDeepLink {
   static String? _code;
@@ -180,9 +181,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
-
       home: const LandingScreen(),
-
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
           int index = 0;
@@ -201,9 +200,31 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
           );
         }
 
+        if (settings.name == '/orderApproval') {
+          int? requestId;
+          final args = settings.arguments;
+
+          if (args is int) {
+            requestId = args;
+          } else if (args is String) {
+            requestId = int.tryParse(args);
+          } else if (args is Map) {
+            final v = args['request_id'] ?? args['requestId'];
+            if (v is int) {
+              requestId = v;
+            } else if (v is String) {
+              requestId = int.tryParse(v);
+            }
+          }
+
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => OrderApprovalScreen(requestId: requestId),
+          );
+        }
+
         return null;
       },
-
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
@@ -218,13 +239,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/logo': (context) => const LogoScreen(),
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),
-
-        // NEW ROUTE
         '/agent_clients': (context) => const AgentClientsScreen(),
-
-        // 🔥 ADD THIS
-        '/orderApproval': (context) => const OrderApprovalScreen(),
-
         '/my_agent_user': (context) => const MyAgentUser(),
         '/my_agent_agent': (context) => const MyAgentAgent(),
         '/emergency': (context) => const EmergencyScreen(),

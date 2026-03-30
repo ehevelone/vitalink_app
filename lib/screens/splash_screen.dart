@@ -28,7 +28,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacementNamed('/landing');
+    // 🔥 PRESERVE ANY INCOMING ARGUMENTS (future-safe)
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    Navigator.of(context).pushReplacementNamed(
+      '/landing',
+      arguments: args,
+    );
   }
 
   @override

@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import '../main.dart'; // 🔥 ADD THIS
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -95,6 +96,23 @@ class _LogoScreenState extends State<LogoScreen> {
 
       if (!mounted) return;
 
+      // 🔥 FIRST — HANDLE NOTIFICATION ROUTE
+      if (pendingRoute != null) {
+        final route = pendingRoute!;
+        final args = pendingArgs;
+
+        pendingRoute = null;
+        pendingArgs = null;
+
+        Navigator.pushReplacementNamed(
+          context,
+          route,
+          arguments: args,
+        );
+        return;
+      }
+
+      // 🔥 NORMAL FLOW
       if (!loggedIn) {
         Navigator.pushReplacementNamed(context, '/landing');
         return;
@@ -106,6 +124,7 @@ class _LogoScreenState extends State<LogoScreen> {
       }
 
       Navigator.pushReplacementNamed(context, '/menu');
+
     } catch (_) {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');
@@ -162,7 +181,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
               const SizedBox(height: 48),
 
-              // 🔴 EMERGENCY BUTTON RESTORED
               GestureDetector(
                 onTap: _openEmergencyScreen,
                 child: Container(

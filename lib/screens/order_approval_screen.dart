@@ -16,9 +16,21 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   bool loading = true;
   List orders = [];
 
+  int? requestId; // 🔥 LOCAL COPY
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // 🔥 FIX — pull from navigation args
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map && args["request_id"] != null) {
+      requestId = int.tryParse(args["request_id"].toString());
+    } else {
+      requestId = widget.requestId;
+    }
+
     loadOrders();
   }
 
@@ -30,7 +42,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders"),
         headers: {"Content-Type":"application/json"},
         body: jsonEncode({
-          "request_id": widget.requestId
+          "request_id": requestId
         })
       );
 
@@ -48,7 +60,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     }
   }
 
-  // 🔥 APPROVE (UPDATED)
   Future<void> approveOrder(int orderId) async {
 
     try{
@@ -63,13 +74,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
       if(res.statusCode == 200){
 
-        // ✅ OPTIONAL UX: close screen after approval
         if(mounted){
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Order approved"))
           );
 
-          Navigator.pop(context); // 🔥 CLOSE SCREEN
+          Navigator.pop(context);
         }
 
       } else {

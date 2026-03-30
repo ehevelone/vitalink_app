@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import '../main.dart'; // 🔥 REQUIRED FOR pendingRoute
+
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
@@ -38,21 +40,42 @@ class _MenuScreenState extends State<MenuScreen>
     _loadProfile();
     _setupFCM();
 
-    // 🔥 NEW — SILENT PROFILE SYNC (DO NOT AWAIT)
     ApiService.syncProfilesToServer();
+
+    // 🔥 NEW — EXECUTE ANY PENDING NAV
+    _checkPendingNavigation();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
+
+      // 🔥 NEW — HANDLE NAV WHEN APP RETURNS
+      _checkPendingNavigation();
+    }
+  }
+
+  // 🔥 NEW — EXECUTE STORED ROUTE
+  void _checkPendingNavigation() {
+    if (pendingRoute != null) {
+      final route = pendingRoute!;
+      final args = pendingArgs;
+
+      pendingRoute = null;
+      pendingArgs = null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        Navigator.pushNamed(context, route, arguments: args);
+      });
     }
   }
 
   Future<void> _loadProfile() async {
     try {
       final p = await _repo.loadProfile();
-
       final storedName = await _store.getString("userName");
 
       String name = "";
@@ -95,7 +118,6 @@ class _MenuScreenState extends State<MenuScreen>
         return;
       }
 
-      // 🔥 REQUIRED FOR iOS (YOU WERE MISSING THIS)
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
         alert: true,
@@ -144,14 +166,14 @@ class _MenuScreenState extends State<MenuScreen>
         );
       });
 
-      // 🔥 HANDLE TAP WHEN APP CLOSED
+      // 🔥 CLOSED APP TAP
       FirebaseMessaging.instance.getInitialMessage().then((message) {
         if (message != null) {
           _handleNotificationTap(message);
         }
       });
 
-      // 🔥 HANDLE TAP WHEN APP IN BACKGROUND
+      // 🔥 BACKGROUND TAP
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
         _handleNotificationTap(message);
       });
@@ -161,19 +183,18 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
-  // 🔥 NEW FUNCTION
+  // 🔥 STORE NAV ONLY
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
 
     if (data["type"] == "order_approval") {
       final requestId = data["request_id"];
 
-      if (requestId != null && mounted) {
-        Navigator.pushNamed(
-          context,
-          '/orderApproval',
-          arguments: requestId,
-        );
+      if (requestId != null) {
+        pendingRoute = '/orderApproval';
+        pendingArgs = {
+          "request_id": requestId,
+        };
       }
     }
   }
