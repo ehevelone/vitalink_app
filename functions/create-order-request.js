@@ -6,15 +6,6 @@ let serviceAccount;
 
 try {
   serviceAccount = require("./firebase-service-account.json");
-
-  if (!process.env.FIREBASE_PRIVATE_KEY) {
-    throw new Error("FIREBASE_PRIVATE_KEY MISSING");
-  }
-
-  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY
-    .trim()
-    .replace(/\\n/g, '\n');
-
   console.log("Firebase service account loaded");
 } catch (err) {
   console.error("Failed to load firebase-service-account.json", err);
@@ -31,6 +22,7 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
+  // 🔥 CORS PREFLIGHT HANDLER
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -47,28 +39,45 @@ exports.handler = async (event) => {
 
   try {
 
+    // ✅ SAFE PARSE
     if (!event.body) {
       return {
         statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
         body: JSON.stringify({ success:false, error: "Missing request body" }),
       };
     }
 
-    const body = JSON.parse(event.body);
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch (err) {
+      return {
+        statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
+        body: JSON.stringify({ success:false, error: "Invalid JSON" }),
+      };
+    }
 
+    // ✅ ACCEPT BOTH (cart OR items)
     const user_id = body.user_id;
     const items = body.items || body.cart;
 
     if (!user_id || !items || items.length === 0) {
       return {
         statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
         body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
 
-    // SAVE ORDER
+    // 🧾 SAVE ORDER REQUEST
     const result = await db.query(
       `
       INSERT INTO public.order_requests (user_id, items, status)
@@ -80,13 +89,12 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // GET TOKEN
+    // 🔥 GET DEVICE TOKEN
     const deviceRes = await db.query(
       `
       SELECT device_token
       FROM public.user_devices
       WHERE user_id = $1
-      ORDER BY updated_at DESC
       LIMIT 1
       `,
       [user_id]
@@ -96,12 +104,8 @@ exports.handler = async (event) => {
 
       const token = deviceRes.rows[0].device_token;
 
-      console.log("📱 TOKEN FOUND:", token);
-
       try {
-
-        // 🔧 SURGICAL FIX — ONLY THIS BLOCK CHANGED
-        const response = await admin.messaging().send({
+        await admin.messaging().send({
           token,
 
           notification: {
@@ -111,26 +115,19 @@ exports.handler = async (event) => {
 
           data: {
             type: "order_approval",
-            request_id: String(request_id)
+            request_id: request_id.toString()
           },
 
+          // ✅ SAFE ADD (does NOT break anything)
           android: {
-            priority: "high",
-            notification: {
-              channelId: "high_importance_channel"
-            }
+            priority: "high"
           }
 
         });
 
-        console.log("✅ PUSH SENT:", response);
-
       } catch (pushErr) {
-        console.error("❌ PUSH FAILED:", pushErr);
+        console.error("Push failed:", pushErr);
       }
-
-    } else {
-      console.log("❌ NO DEVICE TOKEN FOUND");
     }
 
     return {
