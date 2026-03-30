@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // ✅ ADDED
 import 'package:app_links/app_links.dart';
 
 // SCREENS
@@ -56,7 +57,13 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// 🔥 FIX: GLOBAL NAV QUEUE (THIS WAS MISSING)
+// 🔥 REQUIRED BACKGROUND HANDLER (ADDED ONLY)
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("📩 BACKGROUND MESSAGE: ${message.messageId}");
+}
+
+// 🔥 FIX: GLOBAL NAV QUEUE (UNCHANGED)
 String? pendingRoute;
 dynamic pendingArgs;
 
@@ -95,6 +102,11 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp();
     } catch (_) {}
+
+    // 🔥 ONLY ADDITION (CRITICAL)
+    FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler,
+    );
 
     runApp(const VitaLinkApp());
   }, (error, stack) {
