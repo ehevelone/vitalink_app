@@ -6,6 +6,10 @@ let serviceAccount;
 
 try {
   serviceAccount = require("./firebase-service-account.json");
+
+  // 🔥 INJECT PRIVATE KEY FROM ENV (FIX)
+  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY;
+
   console.log("Firebase service account loaded");
 } catch (err) {
   console.error("Failed to load firebase-service-account.json", err);
@@ -77,7 +81,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🧾 SAVE ORDER REQUEST (✅ FIXED SCHEMA)
+    // 🧾 SAVE ORDER REQUEST
     const result = await db.query(
       `
       INSERT INTO public.order_requests (user_id, items, status)
@@ -89,7 +93,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN (✅ FIXED SCHEMA)
+    // 🔥 GET DEVICE TOKEN
     const deviceRes = await db.query(
       `
       SELECT device_token
