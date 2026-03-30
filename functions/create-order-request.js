@@ -7,8 +7,12 @@ let serviceAccount;
 try {
   serviceAccount = require("./firebase-service-account.json");
 
-  // 🔥 INJECT PRIVATE KEY FROM ENV (FIX)
-  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY;
+  // 🔥 REQUIRED FIX (THIS IS WHAT YOU WERE MISSING)
+  if (!process.env.FIREBASE_PRIVATE_KEY) {
+    throw new Error("FIREBASE_PRIVATE_KEY MISSING");
+  }
+
+  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
 
   console.log("Firebase service account loaded");
 } catch (err) {
