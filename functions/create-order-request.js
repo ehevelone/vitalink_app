@@ -22,6 +22,19 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
+  // 🔥 CORS PREFLIGHT HANDLER
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS"
+      },
+      body: ""
+    };
+  }
+
   console.log("🔥 RAW BODY:", event.body);
 
   try {
@@ -30,6 +43,9 @@ exports.handler = async (event) => {
     if (!event.body) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
         body: JSON.stringify({ success:false, error: "Missing request body" }),
       };
     }
@@ -40,6 +56,9 @@ exports.handler = async (event) => {
     } catch (err) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
         body: JSON.stringify({ success:false, error: "Invalid JSON" }),
       };
     }
@@ -51,6 +70,9 @@ exports.handler = async (event) => {
     if (!user_id || !items || items.length === 0) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "https://myvitalink.app"
+        },
         body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
@@ -101,9 +123,12 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app"
+      },
       body: JSON.stringify({
         success: true,
-        order_id: request_id   // ✅ FIXED (frontend expects this)
+        order_id: request_id
       }),
     };
 
@@ -111,6 +136,9 @@ exports.handler = async (event) => {
     console.error("❌ SERVER ERROR:", err);
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "https://myvitalink.app"
+      },
       body: JSON.stringify({ success:false, error: "Server error" }),
     };
   }
