@@ -42,7 +42,6 @@ class _MenuScreenState extends State<MenuScreen>
     ApiService.syncProfilesToServer();
   }
 
-  // 🔥 RELOAD WHEN APP COMES BACK (CRITICAL FOR CHEAP DEVICES)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -54,15 +53,12 @@ class _MenuScreenState extends State<MenuScreen>
     try {
       final p = await _repo.loadProfile();
 
-      // 🔥 fallback from storage
       final storedName = await _store.getString("userName");
 
       String name = "";
 
       if (p?.fullName.trim().isNotEmpty == true) {
         name = p!.fullName.trim();
-
-        // 🔥 keep backup in storage
         await _store.setString("userName", name);
       } else if (storedName != null && storedName.trim().isNotEmpty) {
         name = storedName.trim();
@@ -98,6 +94,14 @@ class _MenuScreenState extends State<MenuScreen>
           AuthorizationStatus.authorized) {
         return;
       }
+
+      // 🔥 REQUIRED FOR iOS (YOU WERE MISSING THIS)
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       if (Platform.isIOS) {
         for (int i = 0; i < 10; i++) {
@@ -139,8 +143,38 @@ class _MenuScreenState extends State<MenuScreen>
           platform: Platform.isIOS ? "ios" : "android",
         );
       });
+
+      // 🔥 HANDLE TAP WHEN APP CLOSED
+      FirebaseMessaging.instance.getInitialMessage().then((message) {
+        if (message != null) {
+          _handleNotificationTap(message);
+        }
+      });
+
+      // 🔥 HANDLE TAP WHEN APP IN BACKGROUND
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        _handleNotificationTap(message);
+      });
+
     } catch (e) {
       print("FCM error: $e");
+    }
+  }
+
+  // 🔥 NEW FUNCTION
+  void _handleNotificationTap(RemoteMessage message) {
+    final data = message.data;
+
+    if (data["type"] == "order_approval") {
+      final requestId = data["request_id"];
+
+      if (requestId != null && mounted) {
+        Navigator.pushNamed(
+          context,
+          '/orderApproval',
+          arguments: requestId,
+        );
+      }
     }
   }
 
