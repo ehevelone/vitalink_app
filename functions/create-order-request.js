@@ -6,6 +6,15 @@ let serviceAccount;
 
 try {
   serviceAccount = require("./firebase-service-account.json");
+
+  // 🔥 REQUIRED FIX
+  if (!process.env.FIREBASE_PRIVATE_KEY) {
+    throw new Error("FIREBASE_PRIVATE_KEY MISSING");
+  }
+
+  // ✅ FIXED LINE (trim + newline restore)
+  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY.trim().replace(/\\n/g, '\n');
+
   console.log("Firebase service account loaded");
 } catch (err) {
   console.error("Failed to load firebase-service-account.json", err);
@@ -104,9 +113,16 @@ exports.handler = async (event) => {
 
       const token = deviceRes.rows[0].device_token;
 
+      console.log("📱 SENDING TO TOKEN:", token);
+
       try {
         await admin.messaging().send({
           token,
+
+          // 🔥 CRITICAL ANDROID DELIVERY FIX
+          android: {
+            priority: "high"
+          },
 
           notification: {
             title: "VitaLink Order Approval",
@@ -116,14 +132,10 @@ exports.handler = async (event) => {
           data: {
             type: "order_approval",
             request_id: request_id.toString()
-          },
-
-          // ✅ SAFE ADD (does NOT break anything)
-          android: {
-            priority: "high"
           }
-
         });
+
+        console.log("✅ PUSH SENT");
 
       } catch (pushErr) {
         console.error("Push failed:", pushErr);
