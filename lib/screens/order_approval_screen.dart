@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class OrderApprovalScreen extends StatefulWidget {
-  final int? requestId; // 🔥 from push
+  final int? requestId;
 
   const OrderApprovalScreen({super.key, this.requestId});
 
@@ -22,7 +22,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     loadOrders();
   }
 
-  // 🔥 LOAD USER-SPECIFIC ORDERS
   Future<void> loadOrders() async {
 
     try{
@@ -31,7 +30,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders"),
         headers: {"Content-Type":"application/json"},
         body: jsonEncode({
-          "request_id": widget.requestId // 🔥 optional filter
+          "request_id": widget.requestId
         })
       );
 
@@ -49,12 +48,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
     }
   }
 
-  // 🔥 APPROVE
+  // 🔥 APPROVE (UPDATED)
   Future<void> approveOrder(int orderId) async {
 
     try{
 
-      await http.post(
+      final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve_order"),
         headers: {"Content-Type":"application/json"},
         body: jsonEncode({
@@ -62,14 +61,32 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         })
       );
 
-      loadOrders();
+      if(res.statusCode == 200){
+
+        // ✅ OPTIONAL UX: close screen after approval
+        if(mounted){
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Order approved"))
+          );
+
+          Navigator.pop(context); // 🔥 CLOSE SCREEN
+        }
+
+      } else {
+        throw Exception("Approve failed");
+      }
 
     } catch(e){
-      debugPrint("Approve failed");
+      debugPrint("Approve failed: $e");
+
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to approve order"))
+        );
+      }
     }
   }
 
-  // 🔥 REJECT
   Future<void> rejectOrder(int orderId) async {
 
     try{
