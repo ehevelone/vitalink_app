@@ -31,7 +31,6 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
-  // 🔥 CORS
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -56,16 +55,7 @@ exports.handler = async (event) => {
       };
     }
 
-    let body;
-    try {
-      body = JSON.parse(event.body);
-    } catch (err) {
-      return {
-        statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false, error: "Invalid JSON" }),
-      };
-    }
+    const body = JSON.parse(event.body);
 
     const user_id = body.user_id;
     const items = body.items || body.cart;
@@ -78,7 +68,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🧾 SAVE ORDER
+    // SAVE ORDER
     const result = await db.query(
       `
       INSERT INTO public.order_requests (user_id, items, status)
@@ -90,12 +80,13 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN
+    // GET TOKEN
     const deviceRes = await db.query(
       `
       SELECT device_token
       FROM public.user_devices
       WHERE user_id = $1
+      ORDER BY updated_at DESC
       LIMIT 1
       `,
       [user_id]
@@ -110,43 +101,19 @@ exports.handler = async (event) => {
       try {
 
         const response = await admin.messaging().send({
+
           token,
 
+          // 🔥 THIS IS THE KEY FIX
           notification: {
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
           },
 
-          data: {
-            type: "order_approval",
-            request_id: request_id.toString()
-          },
+          // ❌ NO data block (this was breaking Android closed behavior)
 
-          // 🔥 ANDROID FIX
           android: {
-            priority: "high",
-            notification: {
-              channelId: "default",
-              sound: "default"
-            }
-          },
-
-          // 🔥 IOS FIX (THIS WAS MISSING)
-          apns: {
-            headers: {
-              "apns-priority": "10"
-            },
-            payload: {
-              aps: {
-                alert: {
-                  title: "VitaLink Order Approval",
-                  body: "Tap to review and approve your accessory order"
-                },
-                sound: "default",
-                badge: 1,
-                contentAvailable: true
-              }
-            }
+            priority: "high"
           }
 
         });
@@ -156,6 +123,7 @@ exports.handler = async (event) => {
       } catch (pushErr) {
         console.error("❌ PUSH FAILED:", pushErr);
       }
+
     } else {
       console.log("❌ NO DEVICE TOKEN FOUND");
     }

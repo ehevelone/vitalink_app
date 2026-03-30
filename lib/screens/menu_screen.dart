@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import '../main.dart'; // 🔥 REQUIRED FOR pendingRoute
+import '../main.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
@@ -42,7 +42,6 @@ class _MenuScreenState extends State<MenuScreen>
 
     ApiService.syncProfilesToServer();
 
-    // 🔥 NEW — EXECUTE ANY PENDING NAV
     _checkPendingNavigation();
   }
 
@@ -50,13 +49,10 @@ class _MenuScreenState extends State<MenuScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
-
-      // 🔥 NEW — HANDLE NAV WHEN APP RETURNS
       _checkPendingNavigation();
     }
   }
 
-  // 🔥 NEW — EXECUTE STORED ROUTE
   void _checkPendingNavigation() {
     if (pendingRoute != null) {
       final route = pendingRoute!;
@@ -67,7 +63,6 @@ class _MenuScreenState extends State<MenuScreen>
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-
         Navigator.pushNamed(context, route, arguments: args);
       });
     }
@@ -137,6 +132,8 @@ class _MenuScreenState extends State<MenuScreen>
       final token =
           await FirebaseMessaging.instance.getToken();
 
+      print("🔥 FCM TOKEN: $token");
+
       if (token == null || token.isEmpty) return;
 
       final email = await _store.getString('userEmail');
@@ -166,7 +163,23 @@ class _MenuScreenState extends State<MenuScreen>
         );
       });
 
-      // 🔥 CLOSED APP TAP
+      // 🔥 FOREGROUND (THIS FIXES YOUR ISSUE)
+      FirebaseMessaging.onMessage.listen((message) {
+        print("📩 FOREGROUND MESSAGE: ${message.data}");
+
+        final notification = message.notification;
+
+        if (notification != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  notification.title ?? "New Notification"),
+            ),
+          );
+        }
+      });
+
+      // 🔥 CLOSED APP
       FirebaseMessaging.instance.getInitialMessage().then((message) {
         if (message != null) {
           _handleNotificationTap(message);
@@ -183,7 +196,6 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
-  // 🔥 STORE NAV ONLY
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
 
