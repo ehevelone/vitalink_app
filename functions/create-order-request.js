@@ -100,20 +100,25 @@ exports.handler = async (event) => {
 
       try {
 
+        // 🔧 SURGICAL FIX — ONLY THIS BLOCK CHANGED
         const response = await admin.messaging().send({
-
           token,
 
-          // 🔥 THIS IS THE KEY FIX
           notification: {
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
           },
 
-          // ❌ NO data block (this was breaking Android closed behavior)
+          data: {
+            type: "order_approval",
+            request_id: String(request_id)
+          },
 
           android: {
-            priority: "high"
+            priority: "high",
+            notification: {
+              channelId: "high_importance_channel"
+            }
           }
 
         });
