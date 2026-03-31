@@ -47,7 +47,7 @@ const pool = new Pool({
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://myvitalink.app",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
