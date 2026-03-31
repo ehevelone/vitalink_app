@@ -4,39 +4,9 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
 
-/* INIT FIREBASE (SAFE ENV ONLY) */
+/* ✅ SIMPLE FIREBASE INIT (ROLLBACK TO WORKING STATE) */
 if (!admin.apps.length) {
-  try {
-
-    if (
-      !process.env.FIREBASE_PROJECT_ID ||
-      !process.env.FIREBASE_CLIENT_EMAIL ||
-      !process.env.FIREBASE_PRIVATE_KEY
-    ) {
-      console.error("❌ FIREBASE ENV MISSING");
-      throw new Error("Firebase ENV not set");
-    }
-
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-    if (privateKey.includes("\\n")) {
-      privateKey = privateKey.replace(/\\n/g, "\n");
-    }
-
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey
-      })
-    });
-
-    console.log("✅ Firebase initialized");
-
-  } catch (err) {
-    console.error("🔥 Firebase init crash:", err);
-    throw err;
-  }
+  admin.initializeApp();
 }
 
 const pool = new Pool({
