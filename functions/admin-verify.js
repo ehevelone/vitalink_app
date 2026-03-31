@@ -4,12 +4,29 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
 
-const serviceAccount = require("./firebase-service-account.json");
-
+/* INIT FIREBASE (ENV ONLY — NO JSON) */
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
+  try {
+    if (!process.env.FIREBASE_PRIVATE_KEY) {
+      throw new Error("FIREBASE_PRIVATE_KEY MISSING");
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY
+          .trim()
+          .replace(/\\n/g, "\n")
+      })
+    });
+
+    console.log("Firebase initialized from ENV");
+
+  } catch (err) {
+    console.error("Firebase init failed:", err);
+    throw err;
+  }
 }
 
 const pool = new Pool({
@@ -61,10 +78,6 @@ exports.handler = async function (event) {
 
     const user = result.rows[0];
 
-    // ==========================
-    // PHONE NORMALIZATION FIX
-    // ==========================
-
     function normalizePhone(p) {
       let digits = String(p || "").replace(/\D/g, "");
       if (digits.length === 11 && digits.startsWith("1")) {
@@ -80,10 +93,6 @@ exports.handler = async function (event) {
       client.release();
       return { statusCode: 403, headers: corsHeaders, body: "Phone mismatch" };
     }
-
-    // ==========================
-    // CREATE SESSION
-    // ==========================
 
     const sessionToken = crypto.randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);

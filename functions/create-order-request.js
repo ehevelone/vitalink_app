@@ -12,8 +12,13 @@ try {
     throw new Error("FIREBASE_PRIVATE_KEY MISSING");
   }
 
-  // ✅ FIXED LINE (trim + newline restore)
-  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY.trim().replace(/\\n/g, '\n');
+  // ✅ PRIVATE KEY (fixed formatting)
+  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY
+    .trim()
+    .replace(/\\n/g, '\n');
+
+  // ✅ ADD THIS (PRIVATE KEY ID FROM ENV)
+  serviceAccount.private_key_id = process.env.FIREBASE_PRIVATE_KEY_ID;
 
   console.log("Firebase service account loaded");
 } catch (err) {

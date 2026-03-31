@@ -1,23 +1,29 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
 
-/* LOAD FIREBASE SERVICE ACCOUNT */
-let serviceAccount;
-
-try {
-  serviceAccount = require("./firebase-service-account.json");
-  console.log("Firebase service account loaded");
-} catch (err) {
-  console.error("Failed to load firebase-service-account.json", err);
-  throw err;
-}
-
-/* INIT FIREBASE */
+/* INIT FIREBASE (ENV ONLY — NO JSON) */
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-  console.log("Firebase initialized");
+  try {
+    if (!process.env.FIREBASE_PRIVATE_KEY) {
+      throw new Error("FIREBASE_PRIVATE_KEY MISSING");
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY
+          .trim()
+          .replace(/\\n/g, "\n")
+      })
+    });
+
+    console.log("Firebase initialized from ENV");
+
+  } catch (err) {
+    console.error("Firebase init failed:", err);
+    throw err;
+  }
 }
 
 /* RESPONSE HELPER */
