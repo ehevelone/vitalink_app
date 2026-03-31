@@ -25,7 +25,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 405,
         headers: corsHeaders(),
-        body: "Method Not Allowed"
+        body: JSON.stringify({ success:false, error:"Method Not Allowed" })
       };
     }
 
@@ -35,7 +35,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 400,
         headers: corsHeaders(),
-        body: "Missing credentials"
+        body: JSON.stringify({ success:false, error:"Missing credentials" })
       };
     }
 
@@ -51,7 +51,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: "Unauthorized"
+        body: JSON.stringify({ success:false, error:"Unauthorized" })
       };
     }
 
@@ -64,7 +64,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: "Unauthorized"
+        body: JSON.stringify({ success:false, error:"Unauthorized" })
       };
     }
 
@@ -78,7 +78,7 @@ exports.handler = async function (event) {
         return {
           statusCode: 400,
           headers: corsHeaders(),
-          body: "Admin phone not configured"
+          body: JSON.stringify({ success:false, error:"Admin phone not configured" })
         };
       }
 
@@ -96,12 +96,12 @@ exports.handler = async function (event) {
     }
 
     // ==========================
-    // RSM FLOW (ISSUE SESSION)
+    // RSM FLOW (SESSION)
     // ==========================
     if (user.role === "rsm") {
 
       const sessionToken = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
       await client.query(
         `UPDATE rsms
@@ -129,7 +129,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 403,
       headers: corsHeaders(),
-      body: "Unauthorized"
+      body: JSON.stringify({ success:false, error:"Unauthorized" })
     };
 
   } catch (err) {
@@ -137,7 +137,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 500,
       headers: corsHeaders(),
-      body: "Server error"
+      body: JSON.stringify({ success:false, error:"Server error" })
     };
   }
 };

@@ -24,7 +24,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 405,
         headers: corsHeaders(),
-        body: "Method Not Allowed"
+        body: JSON.stringify({ success:false, error:"Method Not Allowed" })
       };
     }
 
@@ -36,7 +36,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 400,
         headers: corsHeaders(),
-        body: "Missing credentials"
+        body: JSON.stringify({ success:false, error:"Missing credentials" })
       };
     }
 
@@ -58,7 +58,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: "Unauthorized"
+        body: JSON.stringify({ success:false, error:"Unauthorized" })
       };
     }
 
@@ -71,7 +71,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: "Unauthorized"
+        body: JSON.stringify({ success:false, error:"Unauthorized" })
       };
     }
 
@@ -148,7 +148,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 400,
       headers: corsHeaders(),
-      body: "Invalid step"
+      body: JSON.stringify({ success:false, error:"Invalid step" })
     };
 
   } catch (err) {
@@ -156,7 +156,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 500,
       headers: corsHeaders(),
-      body: "Server error"
+      body: JSON.stringify({ success:false, error:"Server error" })
     };
   }
 };
