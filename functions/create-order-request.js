@@ -1,37 +1,40 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
 
-/* LOAD FIREBASE SERVICE ACCOUNT */
-let serviceAccount;
-
-try {
-  serviceAccount = require("./firebase-service-account.json");
-
-  // 🔥 REQUIRED FIX
-  if (!process.env.FIREBASE_PRIVATE_KEY) {
-    throw new Error("FIREBASE_PRIVATE_KEY MISSING");
-  }
-
-  // ✅ PRIVATE KEY (fixed formatting)
-  serviceAccount.private_key = process.env.FIREBASE_PRIVATE_KEY
-    .trim()
-    .replace(/\\n/g, '\n');
-
-  // ✅ ADD THIS (PRIVATE KEY ID FROM ENV)
-  serviceAccount.private_key_id = process.env.FIREBASE_PRIVATE_KEY_ID;
-
-  console.log("Firebase service account loaded");
-} catch (err) {
-  console.error("Failed to load firebase-service-account.json", err);
-  throw err;
-}
-
-/* INIT FIREBASE */
+/* INIT FIREBASE (SAFE ENV ONLY) */
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-  console.log("Firebase initialized");
+  try {
+
+    if (
+      !process.env.FIREBASE_PROJECT_ID ||
+      !process.env.FIREBASE_CLIENT_EMAIL ||
+      !process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      console.error("❌ FIREBASE ENV MISSING");
+      throw new Error("Firebase ENV not set");
+    }
+
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    // handle escaped keys only if needed
+    if (privateKey.includes("\\n")) {
+      privateKey = privateKey.replace(/\\n/g, "\n");
+    }
+
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey
+      })
+    });
+
+    console.log("✅ Firebase initialized");
+
+  } catch (err) {
+    console.error("🔥 Firebase init crash:", err);
+    throw err;
+  }
 }
 
 exports.handler = async (event) => {
@@ -124,7 +127,6 @@ exports.handler = async (event) => {
         await admin.messaging().send({
           token,
 
-          // 🔥 CRITICAL ANDROID DELIVERY FIX
           android: {
             priority: "high"
           },

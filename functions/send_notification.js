@@ -1,27 +1,38 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
 
-/* INIT FIREBASE (ENV ONLY — NO JSON) */
+/* INIT FIREBASE (SAFE ENV ONLY) */
 if (!admin.apps.length) {
   try {
-    if (!process.env.FIREBASE_PRIVATE_KEY) {
-      throw new Error("FIREBASE_PRIVATE_KEY MISSING");
+
+    if (
+      !process.env.FIREBASE_PROJECT_ID ||
+      !process.env.FIREBASE_CLIENT_EMAIL ||
+      !process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      console.error("❌ FIREBASE ENV MISSING");
+      throw new Error("Firebase ENV not set");
+    }
+
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    // only convert if escaped
+    if (privateKey.includes("\\n")) {
+      privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY
-          .trim()
-          .replace(/\\n/g, "\n")
+        privateKey: privateKey
       })
     });
 
-    console.log("Firebase initialized from ENV");
+    console.log("✅ Firebase initialized");
 
   } catch (err) {
-    console.error("Firebase init failed:", err);
+    console.error("🔥 Firebase init crash:", err);
     throw err;
   }
 }
