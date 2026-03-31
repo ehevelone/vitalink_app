@@ -19,7 +19,6 @@ if (!admin.apps.length) {
 
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // only fix if escaped
     if (privateKey.includes("\\n")) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
@@ -46,8 +45,8 @@ const pool = new Pool({
 });
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://myvitalink.app",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
@@ -58,7 +57,11 @@ exports.handler = async function (event) {
   }
 
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
+    return {
+      statusCode: 405,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Method Not Allowed" })
+    };
   }
 
   try {
@@ -66,13 +69,21 @@ exports.handler = async function (event) {
     const { idToken, email } = JSON.parse(event.body || "{}");
 
     if (!idToken || !email) {
-      return { statusCode: 400, headers: corsHeaders, body: "Missing data" };
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Missing data" })
+      };
     }
 
     const decoded = await admin.auth().verifyIdToken(idToken);
 
     if (!decoded.phone_number) {
-      return { statusCode: 403, headers: corsHeaders, body: "Phone verification required" };
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Phone verification required" })
+      };
     }
 
     const client = await pool.connect();
@@ -84,7 +95,11 @@ exports.handler = async function (event) {
 
     if (result.rows.length === 0) {
       client.release();
-      return { statusCode: 403, headers: corsHeaders, body: "Unauthorized" };
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Unauthorized" })
+      };
     }
 
     const user = result.rows[0];
@@ -102,7 +117,11 @@ exports.handler = async function (event) {
 
     if (dbPhone !== firebasePhone) {
       client.release();
-      return { statusCode: 403, headers: corsHeaders, body: "Phone mismatch" };
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Phone mismatch" })
+      };
     }
 
     const sessionToken = crypto.randomBytes(24).toString("hex");
@@ -127,7 +146,12 @@ exports.handler = async function (event) {
 
   } catch (err) {
     console.error("admin-verify error:", err);
-    return { statusCode: 500, headers: corsHeaders, body: "Verification failed" };
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Verification failed" })
+    };
   }
 
 };
