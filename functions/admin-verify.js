@@ -4,9 +4,15 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
 
-/* ✅ SIMPLE FIREBASE INIT (ROLLBACK TO WORKING STATE) */
+/* ✅ FIXED FIREBASE INIT (NO JSON FILE, NO GCP DEPENDENCY) */
 if (!admin.apps.length) {
-  admin.initializeApp();
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL
+    })
+  });
 }
 
 const pool = new Pool({
