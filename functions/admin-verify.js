@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
 
-/* ✅ FIXED FIREBASE INIT (NO JSON FILE, NO GCP DEPENDENCY) */
+/* ✅ FIXED FIREBASE INIT (SURGICAL FIX) */
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -42,7 +42,19 @@ exports.handler = async function (event) {
 
   try {
 
-    const { idToken, email } = JSON.parse(event.body || "{}");
+    /* ✅ SAFE JSON PARSE (SURGICAL FIX) */
+    let parsed;
+    try {
+      parsed = JSON.parse(event.body || "{}");
+    } catch (e) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Invalid JSON" })
+      };
+    }
+
+    const { idToken, email } = parsed;
 
     if (!idToken || !email) {
       return {
