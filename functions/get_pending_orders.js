@@ -19,6 +19,14 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
     const request_id = body.request_id;
 
+    if (!request_id) {
+      return {
+        statusCode: 400,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({ success:false })
+      };
+    }
+
     const result = await db.query(
       `
       SELECT id, items, status, qr_code
@@ -37,7 +45,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 FIX: parse + normalize keys
     const orders = result.rows.map(order => {
 
       let items = [];
@@ -50,15 +57,16 @@ exports.handler = async (event) => {
         items = [];
       }
 
-      // 🔥 normalize keys to match Flutter
       items = items.map(i => ({
         product: i.name || i.product || "Unknown",
         profile_name: i.profile || i.profile_name || "Unknown"
       }));
 
       return {
-        ...order,
-        items
+        id: order.id,
+        status: order.status,
+        items: items,
+        qr_code: order.qr_code
       };
     });
 

@@ -16,7 +16,6 @@ if (!admin.apps.length) {
 
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // handle escaped keys only if needed
     if (privateKey.includes("\\n")) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
@@ -39,7 +38,7 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
-  // 🔥 CORS PREFLIGHT HANDLER
+  // 🔥 CORS
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -56,13 +55,10 @@ exports.handler = async (event) => {
 
   try {
 
-    // ✅ SAFE PARSE
     if (!event.body) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Missing request body" }),
       };
     }
@@ -73,40 +69,37 @@ exports.handler = async (event) => {
     } catch (err) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Invalid JSON" }),
       };
     }
 
-    // ✅ ACCEPT BOTH (cart OR items)
+    // ✅ REQUIRED DATA
     const user_id = body.user_id;
     const items = body.items || body.cart;
+    const qr_code = body.qr_code; // 🔥 ADD THIS
 
-    if (!user_id || !items || items.length === 0) {
+    if (!user_id || !items || items.length === 0 || !qr_code) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
 
-    // 🧾 SAVE ORDER REQUEST
+    // 🧾 SAVE ORDER + QR
     const result = await db.query(
       `
-      INSERT INTO public.order_requests (user_id, items, status)
-      VALUES ($1, $2, 'pending')
+      INSERT INTO public.order_requests (user_id, items, qr_code, status)
+      VALUES ($1, $2, $3, 'pending')
       RETURNING id
       `,
-      [user_id, JSON.stringify(items)]
+      [user_id, JSON.stringify(items), qr_code]
     );
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN
+    // 🔔 PUSH TO USER DEVICE
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -151,9 +144,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app"
-      },
+      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({
         success: true,
         order_id: request_id
@@ -164,9 +155,7 @@ exports.handler = async (event) => {
     console.error("❌ SERVER ERROR:", err);
     return {
       statusCode: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app"
-      },
+      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({ success:false, error: "Server error" }),
     };
   }

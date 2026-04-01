@@ -17,7 +17,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   List orders = [];
 
   int? requestId;
-
   bool _loadedOnce = false;
 
   @override
@@ -39,10 +38,10 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> loadOrders() async {
-    try{
+    try {
       final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders"),
-        headers: {"Content-Type":"application/json"},
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "request_id": requestId
         })
@@ -50,43 +49,45 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
       final data = jsonDecode(res.body);
 
-      if(data["success"]){
+      if (data["success"] == true) {
         setState(() {
           orders = data["orders"];
           loading = false;
         });
+      } else {
+        setState(() => loading = false);
       }
 
-    } catch(e){
+    } catch (e) {
       setState(() => loading = false);
     }
   }
 
   Future<void> approveOrder(int orderId) async {
-    try{
+    try {
       final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve_order"),
-        headers: {"Content-Type":"application/json"},
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "order_id": orderId
         })
       );
 
-      if(res.statusCode == 200){
-        if(mounted){
+      final data = jsonDecode(res.body);
+
+      if (res.statusCode == 200 && data["success"] == true) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Order approved"))
           );
-          await loadOrders();
         }
+        await loadOrders();
       } else {
         throw Exception("Approve failed");
       }
 
-    } catch(e){
-      debugPrint("Approve failed: $e");
-
-      if(mounted){
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Failed to approve order"))
         );
@@ -95,19 +96,34 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> rejectOrder(int orderId) async {
-    try{
-      await http.post(
+    try {
+      final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/reject_order"),
-        headers: {"Content-Type":"application/json"},
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "order_id": orderId
         })
       );
 
-      loadOrders();
+      final data = jsonDecode(res.body);
 
-    } catch(e){
-      debugPrint("Reject failed");
+      if (res.statusCode == 200 && data["success"] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Order rejected"))
+          );
+        }
+        await loadOrders();
+      } else {
+        throw Exception("Reject failed");
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to reject order"))
+        );
+      }
     }
   }
 
@@ -116,7 +132,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.green.shade700, // ✅ match menu
+        backgroundColor: Colors.green.shade700,
         title: const Text(
           "Order Approval",
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -127,7 +143,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
         child: Stack(
           children: [
 
-            // 🔥 WATERMARK (matches menu)
             Center(
               child: Opacity(
                 opacity: 0.15,
@@ -141,7 +156,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             loading
                 ? const Center(child: CircularProgressIndicator())
                 : orders.isEmpty
-                    ? const Center(child: Text("No pending orders"))
+                    ? const Center(child: Text("No orders to review"))
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: orders.length,
@@ -189,6 +204,16 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                                       ),
                                     );
                                   }).toList(),
+
+                                  if (order["qr_code"] != null && order["status"] == "approved") ...[
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      "QR Code:",
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Image.network(order["qr_code"], height: 120),
+                                  ],
 
                                   const SizedBox(height: 15),
 
