@@ -1,8 +1,8 @@
 const db = require("./services/db");
-const QRCode = require("qrcode");
 
 exports.handler = async (event) => {
 
+  // 🔥 CORS
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -17,7 +17,26 @@ exports.handler = async (event) => {
 
   try {
 
-    const body = JSON.parse(event.body || "{}");
+    // 🔒 SAFE PARSE
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({ success:false, error:"Missing body" })
+      };
+    }
+
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch {
+      return {
+        statusCode: 400,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({ success:false, error:"Invalid JSON" })
+      };
+    }
+
     const order_id = body.order_id;
 
     if (!order_id) {
@@ -28,13 +47,18 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 GET ORDER
-    const orderRes = await db.query(
-      `SELECT id, user_id, items FROM public.order_requests WHERE id=$1 LIMIT 1`,
+    // 🔍 GET EXISTING QR (DO NOT TOUCH IT)
+    const result = await db.query(
+      `
+      SELECT qr_code
+      FROM public.order_requests
+      WHERE id = $1
+      LIMIT 1
+      `,
       [order_id]
     );
 
-    if (orderRes.rows.length === 0) {
+    if (result.rows.length === 0) {
       return {
         statusCode: 404,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
@@ -42,28 +66,18 @@ exports.handler = async (event) => {
       };
     }
 
-    const order = orderRes.rows[0];
+    const qr_code = result.rows[0].qr_code;
 
-    // 🔥 GENERATE QR (1 per order for now)
-    const qrPayload = JSON.stringify({
-      order_id: order.id,
-      user_id: order.user_id,
-      ts: Date.now()
-    });
-
-    const qrImage = await QRCode.toDataURL(qrPayload);
-
-    // 🔥 UPDATE ORDER → APPROVED + STORE QR
+    // ✅ APPROVE ONLY
     await db.query(
       `
       UPDATE public.order_requests
-      SET 
+      SET
         status = 'approved',
-        qr_code = $1,
         approved_at = NOW()
-      WHERE id = $2
+      WHERE id = $1
       `,
-      [qrImage, order_id]
+      [order_id]
     );
 
     return {
@@ -71,8 +85,7 @@ exports.handler = async (event) => {
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({
         success: true,
-        order_id: order_id,
-        qr_code: qrImage
+        qr_code: qr_code   // 🔥 RETURN EXISTING QR
       })
     };
 
@@ -82,7 +95,10 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-      body: JSON.stringify({ success:false, error:"Server error" })
+      body: JSON.stringify({
+        success:false,
+        error:"Server error"
+      })
     };
   }
 };
