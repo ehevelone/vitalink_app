@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // ✅ ADDED
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:app_links/app_links.dart';
 
 // SCREENS
@@ -57,13 +57,31 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// 🔥 REQUIRED BACKGROUND HANDLER (ADDED ONLY)
+// 🔥 REQUIRED BACKGROUND HANDLER
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print("📩 BACKGROUND MESSAGE: ${message.messageId}");
 }
 
-// 🔥 FIX: GLOBAL NAV QUEUE (UNCHANGED)
+// 🔥 NOTIFICATION TAP HANDLER
+void _handleNotificationNavigation(RemoteMessage message) {
+  final data = message.data;
+  debugPrint("📩 TAP DATA: $data");
+
+  if (data["type"] == "order_approval") {
+    final requestId = data["request_id"] ?? data["requestId"];
+
+    pendingRoute = "/orderApproval";
+    pendingArgs = {"requestId": requestId};
+
+    navigatorKey.currentState?.pushNamed(
+      "/orderApproval",
+      arguments: {"requestId": requestId},
+    );
+  }
+}
+
+// 🔥 GLOBAL NAV QUEUE
 String? pendingRoute;
 dynamic pendingArgs;
 
@@ -103,10 +121,20 @@ Future<void> main() async {
       await Firebase.initializeApp();
     } catch (_) {}
 
-    // 🔥 ONLY ADDITION (CRITICAL)
     FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler,
     );
+
+    // 🔥 HANDLE NOTIFICATION TAPS
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        _handleNotificationNavigation(message);
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationNavigation(message);
+    });
 
     runApp(const VitaLinkApp());
   }, (error, stack) {
