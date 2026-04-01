@@ -19,23 +19,32 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
     const request_id = body.request_id;
 
-    if (!request_id) {
-      return {
-        statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false })
-      };
-    }
+    let result;
 
-    const result = await db.query(
-      `
-      SELECT id, items, status, qr_code
-      FROM public.order_requests
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [request_id]
-    );
+    // ✅ IF request_id EXISTS → get ONE
+    if (request_id) {
+
+      result = await db.query(
+        `
+        SELECT id, items, status, qr_code
+        FROM public.order_requests
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [request_id]
+      );
+
+    } else {
+      // ✅ IF NO request_id → get ALL PENDING
+      result = await db.query(
+        `
+        SELECT id, items, status, qr_code
+        FROM public.order_requests
+        WHERE status = 'pending'
+        ORDER BY id DESC
+        `
+      );
+    }
 
     if (result.rows.length === 0) {
       return {
