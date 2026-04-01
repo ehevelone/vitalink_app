@@ -37,12 +37,37 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔥 FIX: parse + normalize keys
+    const orders = result.rows.map(order => {
+
+      let items = [];
+
+      try {
+        items = typeof order.items === "string"
+          ? JSON.parse(order.items)
+          : order.items;
+      } catch (e) {
+        items = [];
+      }
+
+      // 🔥 normalize keys to match Flutter
+      items = items.map(i => ({
+        product: i.name || i.product || "Unknown",
+        profile_name: i.profile || i.profile_name || "Unknown"
+      }));
+
+      return {
+        ...order,
+        items
+      };
+    });
+
     return {
       statusCode: 200,
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({
         success: true,
-        orders: result.rows
+        orders: orders
       })
     };
 

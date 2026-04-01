@@ -16,13 +16,17 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   bool loading = true;
   List orders = [];
 
-  int? requestId; // 🔥 LOCAL COPY
+  int? requestId;
+
+  bool _loadedOnce = false; // ✅ ADDED (prevents duplicate calls)
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // 🔥 FIX — pull from navigation args
+    if (_loadedOnce) return; // ✅ FIX
+    _loadedOnce = true;
+
     final args = ModalRoute.of(context)?.settings.arguments;
 
     if (args is Map && args["request_id"] != null) {
@@ -79,7 +83,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             const SnackBar(content: Text("Order approved"))
           );
 
-          Navigator.pop(context);
+          await loadOrders(); // ✅ FIX (refresh instead of pop)
         }
 
       } else {
@@ -134,6 +138,8 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
                     final order = orders[index];
 
+                    final items = order["items"] ?? []; // ✅ FIX (null safety)
+
                     return Card(
                       margin: const EdgeInsets.all(12),
                       child: Padding(
@@ -152,11 +158,11 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
                             const SizedBox(height: 10),
 
-                            ...order["items"].map<Widget>((item){
+                            ...items.map<Widget>((item){
                               return Padding(
                                 padding: const EdgeInsets.only(bottom:4),
                                 child: Text(
-                                  "${item["product"]} - ${item["profile_name"]}"
+                                  "${item["product"] ?? "Unknown"} - ${item["profile_name"] ?? "Unknown"}"
                                 ),
                               );
                             }).toList(),
