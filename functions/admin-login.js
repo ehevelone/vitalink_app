@@ -19,6 +19,8 @@ exports.handler = async function (event) {
     };
   }
 
+  let client;
+
   try {
 
     if (event.httpMethod !== "POST") {
@@ -29,7 +31,19 @@ exports.handler = async function (event) {
       };
     }
 
-    const { email, password } = JSON.parse(event.body || "{}");
+    /* ✅ SAFE JSON PARSE (SURGICAL FIX) */
+    let parsed;
+    try {
+      parsed = JSON.parse(event.body || "{}");
+    } catch (e) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders(),
+        body: JSON.stringify({ success:false, error:"Invalid JSON" })
+      };
+    }
+
+    const { email, password } = parsed;
 
     if (!email || !password) {
       return {
@@ -39,7 +53,7 @@ exports.handler = async function (event) {
       };
     }
 
-    const client = await pool.connect();
+    client = await pool.connect();
 
     const result = await client.query(
       "SELECT id, password_hash, phone, role FROM rsms WHERE email = $1 AND active = true LIMIT 1",
@@ -134,6 +148,9 @@ exports.handler = async function (event) {
 
   } catch (err) {
     console.error("admin-login error:", err);
+
+    if (client) client.release(); // ✅ SAFETY FIX
+
     return {
       statusCode: 500,
       headers: corsHeaders(),

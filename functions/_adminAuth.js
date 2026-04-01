@@ -1,4 +1,3 @@
-// functions/_adminAuth.js
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -8,7 +7,11 @@ const pool = new Pool({
 
 async function requireAdmin(event) {
   try {
-    const token = event.headers["x-admin-token"];
+
+    // ✅ FIXED HEADER
+    const token =
+      event.headers["x-admin-session"] ||
+      event.headers["X-Admin-Session"]; // fallback for case issues
 
     if (!token) {
       return { error: "Missing session token" };

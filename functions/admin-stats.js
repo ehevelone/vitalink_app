@@ -1,4 +1,3 @@
-// functions/admin-stats.js
 const { requireAdmin } = require("./_adminAuth");
 const { Pool } = require("pg");
 
@@ -9,7 +8,7 @@ const pool = new Pool({
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://myvitalink.app",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-session",
   "Access-Control-Allow-Methods": "GET, OPTIONS"
 };
 
@@ -28,8 +27,10 @@ exports.handler = async function (event) {
     return { statusCode: 401, headers: corsHeaders, body: auth.error };
   }
 
+  let client;
+
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
 
     const rsmCount = await client.query(`
       SELECT COUNT(*) 
@@ -56,6 +57,7 @@ exports.handler = async function (event) {
     `);
 
     client.release();
+    client = null;
 
     return {
       statusCode: 200,
@@ -69,6 +71,9 @@ exports.handler = async function (event) {
 
   } catch (err) {
     console.error("admin-stats error:", err);
+
+    if (client) client.release();
+
     return { statusCode: 500, headers: corsHeaders, body: "Server error" };
   }
 };
