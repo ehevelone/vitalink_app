@@ -18,13 +18,13 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
   int? requestId;
 
-  bool _loadedOnce = false; // ✅ ADDED (prevents duplicate calls)
+  bool _loadedOnce = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    if (_loadedOnce) return; // ✅ FIX
+    if (_loadedOnce) return;
     _loadedOnce = true;
 
     final args = ModalRoute.of(context)?.settings.arguments;
@@ -39,9 +39,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> loadOrders() async {
-
     try{
-
       final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/get_pending_orders"),
         headers: {"Content-Type":"application/json"},
@@ -65,9 +63,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> approveOrder(int orderId) async {
-
     try{
-
       final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve_order"),
         headers: {"Content-Type":"application/json"},
@@ -77,15 +73,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
       );
 
       if(res.statusCode == 200){
-
         if(mounted){
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Order approved"))
           );
-
-          await loadOrders(); // ✅ FIX (refresh instead of pop)
+          await loadOrders();
         }
-
       } else {
         throw Exception("Approve failed");
       }
@@ -102,9 +95,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> rejectOrder(int orderId) async {
-
     try{
-
       await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/reject_order"),
         headers: {"Content-Type":"application/json"},
@@ -125,84 +116,125 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Order Approval"),
+        backgroundColor: Colors.green.shade700, // ✅ match menu
+        title: const Text(
+          "Order Approval",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
 
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : orders.isEmpty
-              ? const Center(child: Text("No pending orders"))
-              : ListView.builder(
-                  itemCount: orders.length,
-                  itemBuilder: (context, index){
+      body: SafeArea(
+        child: Stack(
+          children: [
 
-                    final order = orders[index];
+            // 🔥 WATERMARK (matches menu)
+            Center(
+              child: Opacity(
+                opacity: 0.15,
+                child: Image.asset(
+                  "assets/images/logo_icon.png",
+                  width: MediaQuery.of(context).size.width * 0.85,
+                ),
+              ),
+            ),
 
-                    final items = order["items"] ?? []; // ✅ FIX (null safety)
+            loading
+                ? const Center(child: CircularProgressIndicator())
+                : orders.isEmpty
+                    ? const Center(child: Text("No pending orders"))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: orders.length,
+                        itemBuilder: (context, index){
 
-                    return Card(
-                      margin: const EdgeInsets.all(12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          final order = orders[index];
+                          final items = order["items"] ?? [];
 
-                            Text(
-                              "Order #${order["id"]}",
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold
+                          return Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            margin: const EdgeInsets.only(bottom:16),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+
+                                  Text(
+                                    "Order #${order["id"]}",
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  ...items.map<Widget>((item){
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom:6),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.qr_code, size:16, color: Colors.green),
+                                          const SizedBox(width:6),
+                                          Expanded(
+                                            child: Text(
+                                              "${item["product"] ?? "Unknown"} - ${item["profile_name"] ?? "Unknown"}",
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+
+                                  const SizedBox(height: 15),
+
+                                  Row(
+                                    children: [
+
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green.shade700,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8)
+                                            )
+                                          ),
+                                          onPressed: () => approveOrder(order["id"]),
+                                          child: const Text("Approve"),
+                                        ),
+                                      ),
+
+                                      const SizedBox(width:10),
+
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red.shade700,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8)
+                                            )
+                                          ),
+                                          onPressed: () => rejectOrder(order["id"]),
+                                          child: const Text("Reject"),
+                                        ),
+                                      ),
+
+                                    ],
+                                  )
+
+                                ],
                               ),
                             ),
-
-                            const SizedBox(height: 10),
-
-                            ...items.map<Widget>((item){
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom:4),
-                                child: Text(
-                                  "${item["product"] ?? "Unknown"} - ${item["profile_name"] ?? "Unknown"}"
-                                ),
-                              );
-                            }).toList(),
-
-                            const SizedBox(height: 15),
-
-                            Row(
-                              children: [
-
-                                Expanded(
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green
-                                    ),
-                                    onPressed: () => approveOrder(order["id"]),
-                                    child: const Text("Approve"),
-                                  ),
-                                ),
-
-                                const SizedBox(width:10),
-
-                                Expanded(
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red
-                                    ),
-                                    onPressed: () => rejectOrder(order["id"]),
-                                    child: const Text("Reject"),
-                                  ),
-                                ),
-
-                              ],
-                            )
-
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+          ],
+        ),
+      ),
     );
   }
 }
