@@ -19,7 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
-  bool _loading = false;
+  bool _loading = true;
   bool _rememberMe = false;
   bool _showPassword = false;
 
@@ -28,21 +28,29 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSaved();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initLogin();
+    });
   }
 
-  Future<void> _loadSaved() async {
+  // 🔥 FIXED INIT (NO AUTO LOGIN)
+  Future<void> _initLogin() async {
     final store = SecureStore();
+
     final remember = await store.getBool("rememberMeUser");
-    if (remember != true) return;
 
-    final email = await store.getString("savedUserEmail") ?? "";
-    final pass = await store.getString("savedUserPassword") ?? "";
+    if (remember == true) {
+      final email = await store.getString("savedUserEmail") ?? "";
+      final pass = await store.getString("savedUserPassword") ?? "";
 
-    setState(() {
-      _rememberMe = true;
       _emailCtrl.text = email;
       _passwordCtrl.text = pass;
+      _rememberMe = true;
+    }
+
+    setState(() {
+      _loading = false;
     });
   }
 
@@ -80,10 +88,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text(
-                      "YES",
-                      style: TextStyle(color: Colors.black),
-                    ),
+                    child: const Text("YES",
+                        style: TextStyle(color: Colors.black)),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
@@ -92,10 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text(
-                      "NO",
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    child: const Text("NO",
+                        style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -105,8 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
         false;
   }
 
-  Future<void> _login({bool replace = false}) async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _login({bool replace = false, bool auto = false}) async {
+    if (!auto && !_formKey.currentState!.validate()) return;
 
     setState(() {
       _loading = true;
@@ -117,10 +121,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordCtrl.text.trim();
     final deviceId = await DeviceId.getOrCreate();
 
+    final platform = Theme.of(context).platform == TargetPlatform.iOS
+        ? "ios"
+        : "android";
+
     final res = await ApiService.loginUser(
       email: email,
       password: password,
-      platform: "android",
+      platform: platform,
       deviceId: deviceId,
       replace: replace,
     );
@@ -160,12 +168,23 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (_) {}
 
       Navigator.pushReplacementNamed(context, "/logo");
-    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
+    }
+
+    else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
       final confirmed = await _showReplacePopup();
       if (confirmed) {
         await _login(replace: true);
       }
-    } else {
+    }
+
+    else {
+      final store = SecureStore();
+
+      if (auto) {
+        await store.remove("savedUserPassword");
+        await store.setBool("rememberMeUser", false);
+      }
+
       String msg = "Login failed";
 
       if (res["status"] == 401) {
@@ -216,6 +235,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text("User Login")),
       body: Padding(
@@ -282,12 +307,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: () => _login(),
-                      child: const Text("Login"),
-                    ),
+              ElevatedButton(
+                onPressed: () => _login(),
+                child: const Text("Login"),
+              ),
             ],
           ),
         ),
