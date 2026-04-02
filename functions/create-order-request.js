@@ -119,13 +119,9 @@ exports.handler = async (event) => {
             request_id: request_id.toString()
           },
 
+          // ✅ FIXED (REMOVED BAD CHANNEL)
           android: {
-            priority: "high",
-            notification: {
-              channelId: "default",
-              priority: "high",
-              sound: "default"
-            }
+            priority: "high"
           }
         });
 
