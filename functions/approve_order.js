@@ -2,7 +2,6 @@ const db = require("./services/db");
 
 exports.handler = async (event) => {
 
-  // 🔥 CORS
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -17,7 +16,6 @@ exports.handler = async (event) => {
 
   try {
 
-    // 🔒 SAFE PARSE
     if (!event.body) {
       return {
         statusCode: 400,
@@ -37,7 +35,10 @@ exports.handler = async (event) => {
       };
     }
 
-    const order_id = body.order_id;
+    // ✅ ACCEPT BOTH (THIS FIXES YOUR ISSUE)
+    const order_id = body.order_id || body.request_id;
+
+    console.log("APPROVE HIT:", order_id);
 
     if (!order_id) {
       return {
@@ -47,7 +48,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔍 GET EXISTING QR (DO NOT TOUCH IT)
     const result = await db.query(
       `
       SELECT qr_code
@@ -68,7 +68,6 @@ exports.handler = async (event) => {
 
     const qr_code = result.rows[0].qr_code;
 
-    // ✅ APPROVE ONLY
     await db.query(
       `
       UPDATE public.order_requests
@@ -85,7 +84,7 @@ exports.handler = async (event) => {
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({
         success: true,
-        qr_code: qr_code   // 🔥 RETURN EXISTING QR
+        qr_code: qr_code
       })
     };
 

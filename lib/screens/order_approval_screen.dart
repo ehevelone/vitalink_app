@@ -64,6 +64,9 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
   }
 
   Future<void> approveOrder(int orderId) async {
+
+    print("APPROVE CLICKED: $orderId");
+
     try {
       final res = await http.post(
         Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve_order"),
@@ -81,7 +84,10 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
             const SnackBar(content: Text("Order approved"))
           );
         }
-        await loadOrders();
+
+        // ✅ FIX: CLOSE SCREEN INSTEAD OF RELOADING
+        Navigator.pop(context, true);
+
       } else {
         throw Exception("Approve failed");
       }
