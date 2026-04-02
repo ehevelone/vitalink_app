@@ -20,8 +20,13 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
 
     const amount = body.amount;
-    const request_id = body.request_id;   // ✅ ADD THIS
-    const isTest = body.test === true;
+    const request_id = body.request_id;
+
+    // 🔥 FIX: HANDLE STRING + BOOL
+    const isTest = body.test === true || body.test === "true";
+
+    // 🔥 DEBUG LOG
+    console.log("CHECKOUT BODY:", body);
 
     if (!request_id) {
       return {
@@ -31,7 +36,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // ✅ TEST MODE — SKIP STRIPE
+    // ✅ TEST MODE — ALWAYS WORK
     if (isTest) {
       return {
         statusCode: 200,
@@ -46,7 +51,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false })
+        body: JSON.stringify({ success:false, error:"Missing amount" })
       };
     }
 
@@ -68,7 +73,6 @@ exports.handler = async (event) => {
 
       mode: "payment",
 
-      // ✅ FIX: PASS request_id THROUGH STRIPE
       success_url: `https://myvitalink.app/checkout-success.html?request_id=${request_id}`,
       cancel_url: "https://myvitalink.app/order.html"
     });
@@ -87,7 +91,10 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-      body: JSON.stringify({ success:false })
+      body: JSON.stringify({
+        success:false,
+        error: err.message
+      })
     };
   }
 };
