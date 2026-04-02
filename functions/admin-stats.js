@@ -32,23 +32,41 @@ exports.handler = async function (event) {
   try {
     client = await pool.connect();
 
+    // ✅ TOTAL RSMS
     const rsmCount = await client.query(`
       SELECT COUNT(*) 
       FROM rsms 
       WHERE role='rsm'
     `);
 
-    const agentCount = await client.query(`
+    // ✅ TOTAL AGENTS (ALL)
+    const totalAgents = await client.query(`
       SELECT COUNT(*) 
-      FROM agents 
-      WHERE active=true
+      FROM agents
     `);
 
+    // ✅ ACTIVE AGENTS
+    const activeAgents = await client.query(`
+      SELECT COUNT(*) 
+      FROM agents 
+      WHERE active = true
+    `);
+
+    // ✅ INACTIVE AGENTS
+    const inactiveAgents = await client.query(`
+      SELECT COUNT(*) 
+      FROM agents 
+      WHERE active = false OR active IS NULL
+    `);
+
+    // ✅ FULL BREAKDOWN PER RSM
     const breakdown = await client.query(`
       SELECT 
         r.id,
         r.email,
-        COUNT(a.id) FILTER (WHERE a.active = true) AS active_agents
+        COUNT(a.id) AS total_agents,
+        COUNT(a.id) FILTER (WHERE a.active = true) AS active_agents,
+        COUNT(a.id) FILTER (WHERE a.active = false OR a.active IS NULL) AS inactive_agents
       FROM rsms r
       LEFT JOIN agents a ON a.rsm_id = r.id
       WHERE r.role='rsm'
@@ -64,7 +82,12 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         total_rsms: Number(rsmCount.rows[0].count),
-        total_enrolled_agents: Number(agentCount.rows[0].count),
+
+        // 🔥 FIXED
+        total_enrolled_agents: Number(totalAgents.rows[0].count),
+        active_agents: Number(activeAgents.rows[0].count),
+        inactive_agents: Number(inactiveAgents.rows[0].count),
+
         breakdown: breakdown.rows
       })
     };
