@@ -1,22 +1,13 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
 
-/* INIT FIREBASE (SAFE ENV ONLY) */
+/* INIT FIREBASE */
 if (!admin.apps.length) {
   try {
 
-    if (
-      !process.env.FIREBASE_PROJECT_ID ||
-      !process.env.FIREBASE_CLIENT_EMAIL ||
-      !process.env.FIREBASE_PRIVATE_KEY
-    ) {
-      console.error("❌ FIREBASE ENV MISSING");
-      throw new Error("Firebase ENV not set");
-    }
-
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    if (privateKey.includes("\\n")) {
+    if (privateKey && privateKey.includes("\\n")) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
@@ -65,7 +56,7 @@ exports.handler = async (event) => {
     let body;
     try {
       body = JSON.parse(event.body);
-    } catch (err) {
+    } catch {
       return {
         statusCode: 400,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
@@ -73,12 +64,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // ✅ REQUIRED
     const user_id = body.user_id;
     const items = body.items || body.cart;
-
-    // ❌ REMOVE QR REQUIREMENT (THIS WAS BREAKING EVERYTHING)
-    const qr_code = body.qr_code || null;
 
     if (!user_id || !items || items.length === 0) {
       return {
@@ -91,16 +78,16 @@ exports.handler = async (event) => {
     // 🧾 SAVE ORDER
     const result = await db.query(
       `
-      INSERT INTO public.order_requests (user_id, items, qr_code, status)
-      VALUES ($1, $2, $3, 'pending')
+      INSERT INTO public.order_requests (user_id, items, status)
+      VALUES ($1, $2, 'pending')
       RETURNING id
       `,
-      [user_id, JSON.stringify(items), qr_code]
+      [user_id, JSON.stringify(items)]
     );
 
     const request_id = result.rows[0].id;
 
-    // 🔔 PUSH
+    // 🔥 GET DEVICE TOKEN
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -118,23 +105,30 @@ exports.handler = async (event) => {
       console.log("📱 SENDING TO TOKEN:", token);
 
       try {
+
         await admin.messaging().send({
           token,
-          android: { priority: "high" },
+
+          android: {
+            priority: "high"
+          },
+
           notification: {
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
           },
+
           data: {
             type: "order_approval",
             request_id: request_id.toString()
           }
+
         });
 
         console.log("✅ PUSH SENT");
 
       } catch (pushErr) {
-        console.error("Push failed:", pushErr);
+        console.error("❌ PUSH FAILED:", pushErr);
       }
     }
 
@@ -152,7 +146,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-      body: JSON.stringify({ success:false, error: err.message }),
+      body: JSON.stringify({ success:false, error: "Server error" }),
     };
   }
 };
