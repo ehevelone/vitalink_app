@@ -32,63 +32,49 @@ exports.handler = async function (event) {
   try {
     client = await pool.connect();
 
-    // ✅ TOTAL RSMS
-    const rsmCount = await client.query(`
-      SELECT COUNT(*) 
-      FROM rsms 
-      WHERE role='rsm'
-    `);
+    // 🔥 ONE QUERY → FULL REPORT
+    const stats = await client.query(`
+      SELECT
+        -- 1A: TOTAL RSMS
+        (SELECT COUNT(*) FROM rsms WHERE role='rsm') AS total_rsms,
 
-    // ✅ TOTAL AGENTS (ALL)
-    const totalAgents = await client.query(`
-      SELECT COUNT(*) 
-      FROM agents
-    `);
+        -- 1B: AGENTS UNDER RSMS
+        COUNT(DISTINCT a.id) FILTER (WHERE a.rsm_id IS NOT NULL) AS rsm_agents,
 
-    // ✅ ACTIVE AGENTS
-    const activeAgents = await client.query(`
-      SELECT COUNT(*) 
-      FROM agents 
-      WHERE active = true
-    `);
+        -- 1C: USERS UNDER THOSE AGENTS
+        COUNT(u.id) FILTER (WHERE a.rsm_id IS NOT NULL AND u.agent_id IS NOT NULL) AS rsm_users,
 
-    // ✅ INACTIVE AGENTS
-    const inactiveAgents = await client.query(`
-      SELECT COUNT(*) 
-      FROM agents 
-      WHERE active = false OR active IS NULL
-    `);
+        -- 2A: INDEPENDENT AGENTS
+        COUNT(DISTINCT a.id) FILTER (WHERE a.rsm_id IS NULL AND u.agent_id IS NOT NULL) AS independent_agents,
 
-    // ✅ FULL BREAKDOWN PER RSM
-    const breakdown = await client.query(`
-      SELECT 
-        r.id,
-        r.email,
-        COUNT(a.id) AS total_agents,
-        COUNT(a.id) FILTER (WHERE a.active = true) AS active_agents,
-        COUNT(a.id) FILTER (WHERE a.active = false OR a.active IS NULL) AS inactive_agents
-      FROM rsms r
-      LEFT JOIN agents a ON a.rsm_id = r.id
-      WHERE r.role='rsm'
-      GROUP BY r.id
-      ORDER BY r.email ASC
+        -- 2B: THEIR USERS
+        COUNT(u.id) FILTER (WHERE a.rsm_id IS NULL AND u.agent_id IS NOT NULL) AS independent_agent_users,
+
+        -- 3: INDEPENDENT USERS
+        COUNT(u.id) FILTER (WHERE u.agent_id IS NULL) AS independent_users
+
+      FROM users u
+      LEFT JOIN agents a ON u.agent_id = a.id
     `);
 
     client.release();
     client = null;
 
+    const row = stats.rows[0];
+
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        total_rsms: Number(rsmCount.rows[0].count),
+        total_rsms: Number(row.total_rsms),
 
-        // 🔥 FIXED
-        total_enrolled_agents: Number(totalAgents.rows[0].count),
-        active_agents: Number(activeAgents.rows[0].count),
-        inactive_agents: Number(inactiveAgents.rows[0].count),
+        rsm_agents: Number(row.rsm_agents),
+        rsm_users: Number(row.rsm_users),
 
-        breakdown: breakdown.rows
+        independent_agents: Number(row.independent_agents),
+        independent_agent_users: Number(row.independent_agent_users),
+
+        independent_users: Number(row.independent_users)
       })
     };
 
