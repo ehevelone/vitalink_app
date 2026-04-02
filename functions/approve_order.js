@@ -1,4 +1,22 @@
 const db = require("./services/db");
+const admin = require("firebase-admin");
+
+/* INIT FIREBASE */
+if (!admin.apps.length) {
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (privateKey && privateKey.includes("\\n")) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: privateKey
+    })
+  });
+}
 
 exports.handler = async (event) => {
 
@@ -16,29 +34,9 @@ exports.handler = async (event) => {
 
   try {
 
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false, error:"Missing body" })
-      };
-    }
+    const body = JSON.parse(event.body || "{}");
 
-    let body;
-    try {
-      body = JSON.parse(event.body);
-    } catch {
-      return {
-        statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false, error:"Invalid JSON" })
-      };
-    }
-
-    // ✅ ACCEPT BOTH (THIS FIXES YOUR ISSUE)
     const order_id = body.order_id || body.request_id;
-
-    console.log("APPROVE HIT:", order_id);
 
     if (!order_id) {
       return {
@@ -48,9 +46,10 @@ exports.handler = async (event) => {
       };
     }
 
+    // ✅ GET ORDER + USER
     const result = await db.query(
       `
-      SELECT qr_code
+      SELECT user_id, qr_code
       FROM public.order_requests
       WHERE id = $1
       LIMIT 1
@@ -66,18 +65,53 @@ exports.handler = async (event) => {
       };
     }
 
-    const qr_code = result.rows[0].qr_code;
+    const { user_id, qr_code } = result.rows[0];
 
+    // ✅ APPROVE
     await db.query(
       `
       UPDATE public.order_requests
-      SET
-        status = 'approved',
-        approved_at = NOW()
+      SET status = 'approved', approved_at = NOW()
       WHERE id = $1
       `,
       [order_id]
     );
+
+    // 🔔 SEND PUSH AGAIN (GUARANTEED)
+    const deviceRes = await db.query(
+      `
+      SELECT device_token
+      FROM public.user_devices
+      WHERE user_id = $1
+      LIMIT 1
+      `,
+      [user_id]
+    );
+
+    if (deviceRes.rows.length > 0) {
+
+      const token = deviceRes.rows[0].device_token;
+
+      try {
+        await admin.messaging().send({
+          token,
+          android: { priority: "high" },
+          notification: {
+            title: "VitaLink Order Approved",
+            body: "Your order has been approved"
+          },
+          data: {
+            type: "order_approved",
+            order_id: order_id.toString()
+          }
+        });
+
+        console.log("✅ APPROVAL PUSH SENT");
+
+      } catch (err) {
+        console.error("Push failed:", err);
+      }
+    }
 
     return {
       statusCode: 200,
