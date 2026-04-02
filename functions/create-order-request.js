@@ -98,68 +98,27 @@ exports.handler = async (event) => {
       [user_id]
     );
 
-    console.log("📱 DEVICE QUERY RESULT:", deviceRes.rows);
+    if (deviceRes.rows.length > 0) {
 
-    if (deviceRes.rows.length === 0) {
-      console.error("❌ NO DEVICE TOKEN FOUND");
-      return {
-        statusCode: 200,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({
-          success: true,
-          order_id: request_id,
-          warning: "No device token"
-        }),
-      };
-    }
+      const token = deviceRes.rows[0].device_token;
 
-    const token = deviceRes.rows[0].device_token;
+      console.log("📱 SENDING TO TOKEN:", token);
 
-    if (!token || token.length < 20) {
-      console.error("❌ INVALID TOKEN:", token);
-      return {
-        statusCode: 200,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({
-          success: true,
-          order_id: request_id,
-          warning: "Invalid token"
-        }),
-      };
-    }
+      try {
 
-    console.log("📱 SENDING TO TOKEN:", token);
+        await admin.messaging().send({
+          token,
+          notification: {
+            title: "VitaLink Order Approval",
+            body: "Tap to review and approve your accessory order"
+          }
+        });
 
-    try {
+        console.log("✅ PUSH SENT");
 
-      const response = await admin.messaging().send({
-        token,
-        android: { priority: "high" },
-        notification: {
-          title: "VitaLink Order Approval",
-          body: "Tap to review and approve your accessory order"
-        },
-        data: {
-          type: "order_approval",
-          request_id: request_id.toString()
-        }
-      });
-
-      console.log("✅ PUSH SENT:", response);
-
-    } catch (pushErr) {
-
-      console.error("❌ PUSH FAILED FULL:", JSON.stringify(pushErr, null, 2));
-
-      return {
-        statusCode: 200,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({
-          success: true,
-          order_id: request_id,
-          push_error: pushErr.message
-        }),
-      };
+      } catch (pushErr) {
+        console.error("Push failed:", pushErr);
+      }
     }
 
     return {
@@ -176,7 +135,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-      body: JSON.stringify({ success:false, error: err.message }),
+      body: JSON.stringify({ success:false, error: "Server error" }),
     };
   }
 };
