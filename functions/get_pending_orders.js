@@ -17,12 +17,14 @@ exports.handler = async (event) => {
   try {
 
     const body = JSON.parse(event.body || "{}");
-    const request_id = body.request_id;
+
+    // 🔥 FIX: support BOTH (backward safe)
+    const order_id = body.order_id || body.request_id;
 
     let result;
 
-    // ✅ IF request_id EXISTS → get ONE
-    if (request_id) {
+    // ✅ IF ID EXISTS → get ONE
+    if (order_id) {
 
       result = await db.query(
         `
@@ -31,11 +33,11 @@ exports.handler = async (event) => {
         WHERE id = $1
         LIMIT 1
         `,
-        [request_id]
+        [order_id]
       );
 
     } else {
-      // ✅ IF NO request_id → get ALL PENDING
+      // ✅ IF NO ID → get ALL PENDING (UNCHANGED)
       result = await db.query(
         `
         SELECT id, items, status, qr_code

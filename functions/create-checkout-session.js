@@ -20,29 +20,25 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
 
     const amount = body.amount;
-    const request_id = body.request_id;
-
-    // 🔥 FIX: HANDLE STRING + BOOL
+    const order_id = body.order_id;
     const isTest = body.test === true || body.test === "true";
 
-    // 🔥 DEBUG LOG
     console.log("CHECKOUT BODY:", body);
 
-    if (!request_id) {
+    if (!order_id) {
       return {
         statusCode: 400,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:false, error:"Missing request_id" })
+        body: JSON.stringify({ success:false, error:"Missing order_id" })
       };
     }
 
-    // ✅ TEST MODE — ALWAYS WORK
     if (isTest) {
       return {
         statusCode: 200,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({
-          url: `https://myvitalink.app/checkout-success.html?test=true&request_id=${request_id}`
+          url: `https://myvitalink.app/checkout-success.html?test=true&order_id=${order_id}`
         })
       };
     }
@@ -57,7 +53,6 @@ exports.handler = async (event) => {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-
       line_items: [
         {
           price_data: {
@@ -70,10 +65,8 @@ exports.handler = async (event) => {
           quantity: 1
         }
       ],
-
       mode: "payment",
-
-      success_url: `https://myvitalink.app/checkout-success.html?request_id=${request_id}`,
+      success_url: `https://myvitalink.app/checkout-success.html?order_id=${order_id}`,
       cancel_url: "https://myvitalink.app/order.html"
     });
 
