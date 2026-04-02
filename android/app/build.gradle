@@ -56,6 +56,13 @@ android {
             )
         }
     }
+
+    // 🔥 ADD THIS ONLY
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 flutter {

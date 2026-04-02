@@ -27,3 +27,13 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
+
+
+// 🔥 ML KIT FIX (CORRECT DEPENDENCY FORCED)
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force "com.google.android.gms:play-services-mlkit-document-scanner:16.0.0"
+        }
+    }
+}

@@ -163,30 +163,33 @@ class _MenuScreenState extends State<MenuScreen>
         );
       });
 
-      // 🔥 FOREGROUND (THIS FIXES YOUR ISSUE)
+      // 🔥 FIXED FOREGROUND HANDLER (DATA PAYLOAD)
       FirebaseMessaging.onMessage.listen((message) {
         print("📩 FOREGROUND MESSAGE: ${message.data}");
 
-        final notification = message.notification;
+        final data = message.data;
 
-        if (notification != null && mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  notification.title ?? "New Notification"),
+              content: Text(data["title"] ?? "New Notification"),
+              action: SnackBarAction(
+                label: "OPEN",
+                onPressed: () {
+                  _handleNotificationTap(message);
+                },
+              ),
             ),
           );
         }
       });
 
-      // 🔥 CLOSED APP
       FirebaseMessaging.instance.getInitialMessage().then((message) {
         if (message != null) {
           _handleNotificationTap(message);
         }
       });
 
-      // 🔥 BACKGROUND TAP
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
         _handleNotificationTap(message);
       });
