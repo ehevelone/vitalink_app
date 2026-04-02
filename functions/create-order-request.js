@@ -106,24 +106,25 @@ exports.handler = async (event) => {
 
       try {
 
-        await admin.messaging().send({
-          token,
+        // 🔥 FORCE DATA-FIRST DELIVERY (THIS IS THE FIX)
+        const message = {
+          token: token,
 
-          android: {
-            priority: "high"
-          },
-
-          notification: {
+          data: {
+            type: "order_approval",
+            request_id: request_id.toString(),
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
           },
 
-          data: {
-            type: "order_approval",
-            request_id: request_id.toString()
+          android: {
+            priority: "high"
           }
+        };
 
-        });
+        console.log("🔥 FINAL PUSH PAYLOAD:", message);
+
+        await admin.messaging().send(message);
 
         console.log("✅ PUSH SENT");
 
