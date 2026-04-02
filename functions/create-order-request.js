@@ -108,16 +108,31 @@ exports.handler = async (event) => {
 
         await admin.messaging().send({
           token,
+
           notification: {
             title: "VitaLink Order Approval",
             body: "Tap to review and approve your accessory order"
+          },
+
+          data: {
+            type: "order_approval",
+            request_id: request_id.toString()
+          },
+
+          android: {
+            priority: "high",
+            notification: {
+              channelId: "default",
+              priority: "high",
+              sound: "default"
+            }
           }
         });
 
         console.log("✅ PUSH SENT");
 
       } catch (pushErr) {
-        console.error("Push failed:", pushErr);
+        console.error("❌ PUSH FAILED:", pushErr);
       }
     }
 
