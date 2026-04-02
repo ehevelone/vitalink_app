@@ -1,23 +1,13 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
 
-/* INIT FIREBASE (SAFE ENV ONLY) */
+/* INIT FIREBASE */
 if (!admin.apps.length) {
   try {
 
-    if (
-      !process.env.FIREBASE_PROJECT_ID ||
-      !process.env.FIREBASE_CLIENT_EMAIL ||
-      !process.env.FIREBASE_PRIVATE_KEY
-    ) {
-      console.error("❌ FIREBASE ENV MISSING");
-      throw new Error("Firebase ENV not set");
-    }
-
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // handle escaped keys only if needed
-    if (privateKey.includes("\\n")) {
+    if (privateKey && privateKey.includes("\\n")) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
 
@@ -39,7 +29,6 @@ if (!admin.apps.length) {
 
 exports.handler = async (event) => {
 
-  // 🔥 CORS PREFLIGHT HANDLER
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -56,13 +45,10 @@ exports.handler = async (event) => {
 
   try {
 
-    // ✅ SAFE PARSE
     if (!event.body) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Missing request body" }),
       };
     }
@@ -70,31 +56,26 @@ exports.handler = async (event) => {
     let body;
     try {
       body = JSON.parse(event.body);
-    } catch (err) {
+    } catch {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Invalid JSON" }),
       };
     }
 
-    // ✅ ACCEPT BOTH (cart OR items)
     const user_id = body.user_id;
     const items = body.items || body.cart;
 
     if (!user_id || !items || items.length === 0) {
       return {
         statusCode: 400,
-        headers: {
-          "Access-Control-Allow-Origin": "https://myvitalink.app"
-        },
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
 
-    // 🧾 SAVE ORDER REQUEST
+    // 🧾 SAVE ORDER
     const result = await db.query(
       `
       INSERT INTO public.order_requests (user_id, items, status)
@@ -117,43 +98,73 @@ exports.handler = async (event) => {
       [user_id]
     );
 
-    if (deviceRes.rows.length > 0) {
+    console.log("📱 DEVICE QUERY RESULT:", deviceRes.rows);
 
-      const token = deviceRes.rows[0].device_token;
+    if (deviceRes.rows.length === 0) {
+      console.error("❌ NO DEVICE TOKEN FOUND");
+      return {
+        statusCode: 200,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({
+          success: true,
+          order_id: request_id,
+          warning: "No device token"
+        }),
+      };
+    }
 
-      console.log("📱 SENDING TO TOKEN:", token);
+    const token = deviceRes.rows[0].device_token;
 
-      try {
-        await admin.messaging().send({
-          token,
+    if (!token || token.length < 20) {
+      console.error("❌ INVALID TOKEN:", token);
+      return {
+        statusCode: 200,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({
+          success: true,
+          order_id: request_id,
+          warning: "Invalid token"
+        }),
+      };
+    }
 
-          android: {
-            priority: "high"
-          },
+    console.log("📱 SENDING TO TOKEN:", token);
 
-          notification: {
-            title: "VitaLink Order Approval",
-            body: "Tap to review and approve your accessory order"
-          },
+    try {
 
-          data: {
-            type: "order_approval",
-            request_id: request_id.toString()
-          }
-        });
+      const response = await admin.messaging().send({
+        token,
+        android: { priority: "high" },
+        notification: {
+          title: "VitaLink Order Approval",
+          body: "Tap to review and approve your accessory order"
+        },
+        data: {
+          type: "order_approval",
+          request_id: request_id.toString()
+        }
+      });
 
-        console.log("✅ PUSH SENT");
+      console.log("✅ PUSH SENT:", response);
 
-      } catch (pushErr) {
-        console.error("Push failed:", pushErr);
-      }
+    } catch (pushErr) {
+
+      console.error("❌ PUSH FAILED FULL:", JSON.stringify(pushErr, null, 2));
+
+      return {
+        statusCode: 200,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({
+          success: true,
+          order_id: request_id,
+          push_error: pushErr.message
+        }),
+      };
     }
 
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app"
-      },
+      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
       body: JSON.stringify({
         success: true,
         order_id: request_id
@@ -164,10 +175,8 @@ exports.handler = async (event) => {
     console.error("❌ SERVER ERROR:", err);
     return {
       statusCode: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app"
-      },
-      body: JSON.stringify({ success:false, error: "Server error" }),
+      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+      body: JSON.stringify({ success:false, error: err.message }),
     };
   }
 };
