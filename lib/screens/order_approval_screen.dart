@@ -69,11 +69,11 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
     try {
       final res = await http.post(
-        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve-order-request")
+        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve-order-request"), // ✅ FIXED
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "order_id": orderId
-        })
+        }),
       );
 
       final data = jsonDecode(res.body);
@@ -85,7 +85,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
           );
         }
 
-        // ✅ FIX: CLOSE SCREEN INSTEAD OF RELOADING
         Navigator.pop(context, true);
 
       } else {
