@@ -87,12 +87,13 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN
+    // 🔥 GET LATEST DEVICE TOKEN (FIXED)
     const deviceRes = await db.query(
       `
       SELECT device_token
       FROM public.user_devices
       WHERE user_id = $1
+      ORDER BY updated_at DESC NULLS LAST
       LIMIT 1
       `,
       [user_id]
@@ -100,36 +101,40 @@ exports.handler = async (event) => {
 
     if (deviceRes.rows.length > 0) {
 
-      const token = deviceRes.rows[0].device_token;
+      let token = deviceRes.rows[0].device_token;
 
-      console.log("📱 SENDING TO TOKEN:", token);
+      if (!token || token.length < 20) {
+        console.log("❌ INVALID TOKEN");
+      } else {
 
-      try {
+        console.log("📱 SENDING TO TOKEN:", token);
 
-        // 🔥 FORCE DATA-FIRST DELIVERY (THIS IS THE FIX)
-        const message = {
-          token: token,
+        try {
 
-          data: {
-            type: "order_approval",
-            request_id: request_id.toString(),
-            title: "VitaLink Order Approval",
-            body: "Tap to review and approve your accessory order"
-          },
+          const message = {
+            token: token,
 
-          android: {
-            priority: "high"
-          }
-        };
+            data: {
+              type: "order_approval",
+              request_id: request_id.toString(),
+              title: "VitaLink Order Approval",
+              body: "Tap to review and approve your accessory order"
+            },
 
-        console.log("🔥 FINAL PUSH PAYLOAD:", message);
+            android: {
+              priority: "high"
+            }
+          };
 
-        await admin.messaging().send(message);
+          console.log("🔥 FINAL PUSH PAYLOAD:", message);
 
-        console.log("✅ PUSH SENT");
+          await admin.messaging().send(message);
 
-      } catch (pushErr) {
-        console.error("❌ PUSH FAILED:", pushErr);
+          console.log("✅ PUSH SENT");
+
+        } catch (pushErr) {
+          console.error("❌ PUSH FAILED:", pushErr);
+        }
       }
     }
 
