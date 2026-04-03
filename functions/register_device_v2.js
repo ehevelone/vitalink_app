@@ -58,12 +58,8 @@ exports.handler = async (event) => {
 
     const { id: userId, agent_id: agentId } = userRes.rows[0];
 
-    if (!agentId) {
-      console.log("⛔ No agent — device not registered");
-      return reply(200, { success: true, message: "No agent attached" });
-    }
+    // 🔥 FIX: ALWAYS REGISTER DEVICE (removed agent requirement)
 
-    // 🔥 ALWAYS update by user_id (single row per user)
     const existing = await db.query(
       `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
       [userId]
@@ -80,14 +76,13 @@ exports.handler = async (event) => {
         WHERE user_id=$4
         RETURNING *;
         `,
-        [deviceToken, platform || "unknown", agentId, userId]
+        [deviceToken, platform || "unknown", agentId || null, userId]
       );
 
       console.log("♻️ Device updated:", updated.rows[0]);
       return reply(200, { success: true, device: updated.rows[0] });
     }
 
-    // Safety fallback — insert if somehow missing
     const inserted = await db.query(
       `
       INSERT INTO user_devices
@@ -95,7 +90,7 @@ exports.handler = async (event) => {
       VALUES ($1,$2,$3,$4,NOW(),NOW())
       RETURNING *;
       `,
-      [userId, agentId, deviceToken, platform || "unknown"]
+      [userId, agentId || null, deviceToken, platform || "unknown"]
     );
 
     console.log("✅ Device inserted:", inserted.rows[0]);
