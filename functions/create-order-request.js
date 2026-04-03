@@ -4,7 +4,6 @@ const admin = require("firebase-admin");
 /* INIT FIREBASE */
 if (!admin.apps.length) {
   try {
-
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (privateKey && privateKey.includes("\\n")) {
@@ -87,71 +86,63 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET DEVICE TOKEN
+    // 🔥 HARDENED TOKEN PULL (FIXED)
     const deviceRes = await db.query(
       `
       SELECT device_token
       FROM public.user_devices
       WHERE user_id = $1
+        AND device_token IS NOT NULL
+        AND LENGTH(device_token) > 20
       ORDER BY updated_at DESC NULLS LAST
       LIMIT 1
       `,
       [user_id]
     );
 
-    if (deviceRes.rows.length > 0) {
+    if (deviceRes.rows.length === 0) {
+      console.error("❌ NO DEVICE TOKEN FOUND FOR USER:", user_id);
 
-      let token = deviceRes.rows[0].device_token;
+      return {
+        statusCode: 500,
+        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        body: JSON.stringify({
+          success: false,
+          error: "No device token found — user must open app first"
+        }),
+      };
+    }
 
-      if (!token || token.length < 20) {
-        console.log("❌ INVALID TOKEN");
-      } else {
+    const token = deviceRes.rows[0].device_token;
 
-        console.log("📱 SENDING TO TOKEN:", token);
+    console.log("📱 USING TOKEN:", token);
 
-        try {
+    // 🔔 SEND PUSH
+    try {
 
-          const message = {
-            token: token,
+      const message = {
+        token: token,
 
-            // ✅ THIS IS THE FIX
-            notification: {
-              title: "VitaLink Order Approval",
-              body: "Tap to review and approve your accessory order"
-            },
+        data: {
+          type: "order_approval",
+          request_id: request_id.toString(),
+          title: "VitaLink Order Approval",
+          body: "Tap to review and approve your accessory order"
+        },
 
-            data: {
-              type: "order_approval",
-              request_id: request_id.toString()
-            },
-
-            android: {
-              priority: "high",
-              notification: {
-                sound: "default",
-                channelId: "default"
-              }
-            },
-
-            apns: {
-              payload: {
-                aps: {
-                  sound: "default"
-                }
-              }
-            }
-          };
-
-          console.log("🔥 FINAL PUSH PAYLOAD:", message);
-
-          await admin.messaging().send(message);
-
-          console.log("✅ PUSH SENT");
-
-        } catch (pushErr) {
-          console.error("❌ PUSH FAILED:", pushErr);
+        android: {
+          priority: "high"
         }
-      }
+      };
+
+      console.log("🔥 FINAL PUSH PAYLOAD:", message);
+
+      await admin.messaging().send(message);
+
+      console.log("✅ PUSH SENT");
+
+    } catch (pushErr) {
+      console.error("❌ PUSH FAILED:", pushErr);
     }
 
     return {
