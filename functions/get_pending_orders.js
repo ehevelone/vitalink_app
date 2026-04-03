@@ -2,28 +2,37 @@ const db = require("./services/db");
 
 exports.handler = async (event) => {
 
+  // ✅ FULL CORS FIX
+  const headers = {
+    "Access-Control-Allow-Origin": "https://myvitalink.app",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "POST, OPTIONS"
+  };
+
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS"
-      },
+      headers,
       body: ""
     };
   }
 
   try {
 
-    const body = JSON.parse(event.body || "{}");
+    let body = {};
 
-    // 🔥 FIX: support BOTH (backward safe)
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch (e) {
+      body = {};
+    }
+
+    // 🔥 SUPPORT BOTH KEYS
     const order_id = body.order_id || body.request_id;
 
     let result;
 
-    // ✅ IF ID EXISTS → get ONE
+    // ✅ GET ONE ORDER
     if (order_id) {
 
       result = await db.query(
@@ -37,7 +46,8 @@ exports.handler = async (event) => {
       );
 
     } else {
-      // ✅ IF NO ID → get ALL PENDING (UNCHANGED)
+
+      // ✅ GET ALL PENDING
       result = await db.query(
         `
         SELECT id, items, status, qr_code
@@ -48,11 +58,11 @@ exports.handler = async (event) => {
       );
     }
 
-    if (result.rows.length === 0) {
+    if (!result || !result.rows || result.rows.length === 0) {
       return {
         statusCode: 200,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({ success:true, orders:[] })
+        headers,
+        body: JSON.stringify({ success: true, orders: [] })
       };
     }
 
@@ -68,7 +78,7 @@ exports.handler = async (event) => {
         items = [];
       }
 
-      items = items.map(i => ({
+      items = (items || []).map(i => ({
         product: i.name || i.product || "Unknown",
         profile_name: i.profile || i.profile_name || "Unknown"
       }));
@@ -83,7 +93,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+      headers,
       body: JSON.stringify({
         success: true,
         orders: orders
@@ -94,9 +104,12 @@ exports.handler = async (event) => {
     console.error("get_pending_orders error:", err);
 
     return {
-      statusCode: 500,
-      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-      body: JSON.stringify({ success:false })
+      statusCode: 200, // 🔥 NEVER THROW 500 (prevents browser crash loop)
+      headers,
+      body: JSON.stringify({
+        success: false,
+        orders: []
+      })
     };
   }
 };

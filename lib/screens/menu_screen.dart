@@ -163,7 +163,6 @@ class _MenuScreenState extends State<MenuScreen>
         );
       });
 
-      // 🔥 FIXED FOREGROUND HANDLER (DATA PAYLOAD)
       FirebaseMessaging.onMessage.listen((message) {
         print("📩 FOREGROUND MESSAGE: ${message.data}");
 
@@ -199,18 +198,30 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
+  // 🔥 FIXED HANDLER
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
 
-    if (data["type"] == "order_approval") {
-      final requestId = data["request_id"];
+    final type = data["type"];
+    final requestId = data["request_id"];
 
-      if (requestId != null) {
-        pendingRoute = '/orderApproval';
-        pendingArgs = {
-          "request_id": requestId,
-        };
-      }
+    if (requestId == null) return;
+
+    if (type == "order_approval") {
+      pendingRoute = '/orderApproval';
+      pendingArgs = {
+        "request_id": requestId,
+      };
+    } else if (type == "order_approved") {
+      pendingRoute = '/orderApproved';
+      pendingArgs = {
+        "request_id": requestId,
+      };
+    } else if (type == "order_rejected") {
+      pendingRoute = '/orderRejected';
+      pendingArgs = {
+        "request_id": requestId,
+      };
     }
   }
 
