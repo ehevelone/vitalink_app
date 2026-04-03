@@ -32,18 +32,20 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid JSON body" });
     }
 
-    const { email, deviceToken, platform } = body;
+    // 🔥 FIX: support BOTH deviceToken AND fcmToken
+    const { email, deviceToken, fcmToken, platform } = body;
+    const token = deviceToken || fcmToken;
 
-    if (!email || !deviceToken) {
+    if (!email || !token) {
       return reply(400, {
         success: false,
-        error: "Missing email or deviceToken",
+        error: "Missing email or token",
       });
     }
 
     console.log("📲 Device registration attempt:", {
       email,
-      token: deviceToken.slice(0, 10) + "...",
+      token: token.slice(0, 10) + "...",
       platform,
     });
 
@@ -58,7 +60,7 @@ exports.handler = async (event) => {
 
     const { id: userId, agent_id: agentId } = userRes.rows[0];
 
-    // 🔥 FIX: ALWAYS REGISTER DEVICE (removed agent requirement)
+    // 🔥 ALWAYS REGISTER DEVICE
 
     const existing = await db.query(
       `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
@@ -76,7 +78,7 @@ exports.handler = async (event) => {
         WHERE user_id=$4
         RETURNING *;
         `,
-        [deviceToken, platform || "unknown", agentId || null, userId]
+        [token, platform || "unknown", agentId || null, userId]
       );
 
       console.log("♻️ Device updated:", updated.rows[0]);
@@ -90,7 +92,7 @@ exports.handler = async (event) => {
       VALUES ($1,$2,$3,$4,NOW(),NOW())
       RETURNING *;
       `,
-      [userId, agentId || null, deviceToken, platform || "unknown"]
+      [userId, agentId || null, token, platform || "unknown"]
     );
 
     console.log("✅ Device inserted:", inserted.rows[0]);
