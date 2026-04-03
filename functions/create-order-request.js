@@ -87,7 +87,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET LATEST DEVICE TOKEN (FIXED)
+    // 🔥 GET DEVICE TOKEN
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -114,15 +114,31 @@ exports.handler = async (event) => {
           const message = {
             token: token,
 
-            data: {
-              type: "order_approval",
-              request_id: request_id.toString(),
+            // ✅ THIS IS THE FIX
+            notification: {
               title: "VitaLink Order Approval",
               body: "Tap to review and approve your accessory order"
             },
 
+            data: {
+              type: "order_approval",
+              request_id: request_id.toString()
+            },
+
             android: {
-              priority: "high"
+              priority: "high",
+              notification: {
+                sound: "default",
+                channelId: "default"
+              }
+            },
+
+            apns: {
+              payload: {
+                aps: {
+                  sound: "default"
+                }
+              }
             }
           };
 
