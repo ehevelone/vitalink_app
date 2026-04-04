@@ -1,5 +1,18 @@
 const Stripe = require("stripe");
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+/* =========================================================
+   🔧 STRIPE KEY SETUP
+   ---------------------------------------------------------
+   👉 FOR TESTING:
+   Replace process.env line with your test key
+
+   const stripe = new Stripe("sk_test_XXXXXXXX");
+
+   👉 FOR LIVE (DEFAULT):
+   Use environment variable below
+   ========================================================= */
+
+const stripe = new Stripe("sk_test_51T9pl92eFONDuxiMC18B8uqUAPhmpS38vnSeWMIzlJLtIpmdBbRoZUph3ppJn5ySMv14bJn2iFMB3ZIOerVbM9Pn006TLgPlck");
 
 exports.handler = async (event) => {
 
@@ -33,12 +46,16 @@ exports.handler = async (event) => {
       };
     }
 
+    /* =========================================================
+       🔥 TEST MODE (BYPASS STRIPE COMPLETELY)
+       👉 Trigger by sending: { test: true }
+       ========================================================= */
     if (isTest) {
       return {
         statusCode: 200,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({
-          url: `https://myvitalink.app/checkout-success.html?test=true&order_id=${order_id}`
+          url: `https://myvitalink.app/checkout-success.html?test=true&request_id=${order_id}`
         })
       };
     }
@@ -66,8 +83,18 @@ exports.handler = async (event) => {
         }
       ],
       mode: "payment",
-      success_url: `https://myvitalink.app/checkout-success.html?order_id=${order_id}`,
-      cancel_url: "https://myvitalink.app/order.html"
+
+      /* =========================================================
+         🔥 SUCCESS REDIRECT (CRITICAL FIX APPLIED)
+         ========================================================= */
+      success_url: `https://myvitalink.app/checkout-success.html?request_id=${order_id}`,
+
+      cancel_url: "https://myvitalink.app/order.html",
+
+      /* Optional but smart for future webhook use */
+      metadata: {
+        order_id: order_id
+      }
     });
 
     return {

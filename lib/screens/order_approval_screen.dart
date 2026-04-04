@@ -85,7 +85,6 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
           );
         }
 
-        // 🔥 FIX: refresh before leaving
         await loadOrders();
 
         if (mounted) {
@@ -175,6 +174,9 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                           final order = orders[index];
                           final items = order["items"] ?? [];
 
+                          // 🔥 FIX: ensure int
+                          final int orderId = int.tryParse(order["id"].toString()) ?? 0;
+
                           return Card(
                             elevation: 4,
                             shape: RoundedRectangleBorder(
@@ -238,7 +240,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                                               borderRadius: BorderRadius.circular(8)
                                             )
                                           ),
-                                          onPressed: () => approveOrder(order["id"]),
+                                          onPressed: orderId == 0 ? null : () => approveOrder(orderId),
                                           child: const Text("Approve"),
                                         ),
                                       ),
@@ -253,7 +255,7 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
                                               borderRadius: BorderRadius.circular(8)
                                             )
                                           ),
-                                          onPressed: () => rejectOrder(order["id"]),
+                                          onPressed: orderId == 0 ? null : () => rejectOrder(orderId),
                                           child: const Text("Reject"),
                                         ),
                                       ),
