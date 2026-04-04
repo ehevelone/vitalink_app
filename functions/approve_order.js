@@ -57,7 +57,7 @@ exports.handler = async (event) => {
       [order_id]
     );
 
-    // 🔥 PARSE ITEMS
+    // 🔥 PARSE ITEMS (SAFE)
     let parsedItems = [];
     try {
       parsedItems = typeof items === "string"
@@ -67,15 +67,25 @@ exports.handler = async (event) => {
       parsedItems = [];
     }
 
-    // 🔥 BUILD QR DATA PER PROFILE
-    const qr = parsedItems.map((item, i) => ({
-      id: `${order_id}-${i}`,
-      profile: item.profile || null,
-      name: item.name,
-      qr_url: `https://myvitalink.app/qr/${order_id}-${i}`
-    }));
+    if (!Array.isArray(parsedItems)) {
+      parsedItems = [];
+    }
 
-    console.log("✅ APPROVED + QR BUILT:", order_id);
+    // 🔥 BUILD QR DATA (CLEAN + CONSISTENT)
+    const qr = parsedItems.map((item, i) => {
+
+      const profile = item.profile || item.profile_name || null;
+      const name = item.name || item.product || "Item";
+
+      return {
+        id: `${order_id}-${i}`,
+        profile,
+        name,
+        qr_url: `https://myvitalink.app/qr/${order_id}-${i}`
+      };
+    });
+
+    console.log("✅ APPROVED + QR BUILT:", order_id, qr.length);
 
     return reply(200, {
       success: true,

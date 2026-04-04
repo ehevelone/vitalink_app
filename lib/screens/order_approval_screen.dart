@@ -69,11 +69,11 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
 
     try {
       final res = await http.post(
-        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve-order-request"), // ✅ FIXED
+        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/approve-order-request"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "order_id": orderId
-        }),
+        })
       );
 
       final data = jsonDecode(res.body);
