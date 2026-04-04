@@ -85,7 +85,12 @@ class _OrderApprovalScreenState extends State<OrderApprovalScreen> {
           );
         }
 
-        Navigator.pop(context, true);
+        // 🔥 FIX: refresh before leaving
+        await loadOrders();
+
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
 
       } else {
         throw Exception("Approve failed");

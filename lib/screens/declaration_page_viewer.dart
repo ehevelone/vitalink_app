@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart'; // ✅ Add this package
+import 'package:printing/printing.dart'; // ✅ SAFE replacement
 import '../widgets/app_header.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -58,19 +58,18 @@ class _DeclarationPageViewerState extends State<DeclarationPageViewer> {
   /// ✅ Check if path is a PDF
   bool _isPdf(String path) => path.toLowerCase().endsWith(".pdf");
 
-  /// ✅ PDF viewer widget
+  /// ✅ SAFE PDF viewer (NO native pdfium)
   Widget _buildPdfView(File file) {
-    return PDFView(
-      filePath: file.path,
-      autoSpacing: true,
-      enableSwipe: true,
-      swipeHorizontal: true,
-      pageSnap: true,
-      nightMode: false,
+    return PdfPreview(
+      build: (format) async => await file.readAsBytes(),
+      canChangePageFormat: false,
+      canChangeOrientation: false,
+      allowPrinting: false,
+      allowSharing: false,
     );
   }
 
-  /// ✅ Image viewer widget
+  /// ✅ Image viewer widget (unchanged)
   Widget _buildImageView(File file) {
     return InteractiveViewer(
       panEnabled: true,

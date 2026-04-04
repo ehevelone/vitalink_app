@@ -47,15 +47,20 @@ exports.handler = async (event) => {
 
     const { items } = result.rows[0];
 
-    // 🔥 APPROVE ORDER
-    await db.query(
+    // 🔥 APPROVE ORDER (FIXED)
+    const updateResult = await db.query(
       `
       UPDATE public.order_requests
       SET status = 'approved', approved_at = NOW()
       WHERE id = $1
+      RETURNING id
       `,
       [order_id]
     );
+
+    if (!updateResult.rows.length) {
+      return reply(500, { success:false, error:"Failed to approve order" });
+    }
 
     // 🔥 PARSE ITEMS (SAFE)
     let parsedItems = [];

@@ -37,7 +37,7 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, items, status, qr_code
+        SELECT id, items, status
         FROM public.order_requests
         WHERE id = $1
         LIMIT 1
@@ -50,7 +50,7 @@ exports.handler = async (event) => {
       // ✅ GET ALL PENDING
       result = await db.query(
         `
-        SELECT id, items, status, qr_code
+        SELECT id, items, status
         FROM public.order_requests
         WHERE status = 'pending'
         ORDER BY id DESC
@@ -83,11 +83,19 @@ exports.handler = async (event) => {
         profile_name: i.profile || i.profile_name || "Unknown"
       }));
 
+      // 🔥 BUILD QR HERE (MATCH APPROVE FUNCTION)
+      const qr = (items || []).map((item, i) => ({
+        id: `${order.id}-${i}`,
+        profile: item.profile_name,
+        name: item.product,
+        qr_url: `https://myvitalink.app/qr/${order.id}-${i}`
+      }));
+
       return {
         id: order.id,
         status: order.status,
         items: items,
-        qr_code: order.qr_code
+        qr: qr // ✅ THIS IS THE FIX
       };
     });
 
@@ -104,7 +112,7 @@ exports.handler = async (event) => {
     console.error("get_pending_orders error:", err);
 
     return {
-      statusCode: 200, // 🔥 NEVER THROW 500 (prevents browser crash loop)
+      statusCode: 200, // 🔥 NEVER THROW 500
       headers,
       body: JSON.stringify({
         success: false,

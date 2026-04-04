@@ -134,16 +134,13 @@ class _MenuScreenState extends State<MenuScreen>
 
         final data = message.data;
 
+        // 🔥 AUTO HANDLE (FIX)
+        _handleNotificationTap(message);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(data["title"] ?? "New Notification"),
-              action: SnackBarAction(
-                label: "OPEN",
-                onPressed: () {
-                  _handleNotificationTap(message);
-                },
-              ),
             ),
           );
         }
@@ -164,7 +161,6 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
-  // 🔥 FIXED HANDLER
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
 

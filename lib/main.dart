@@ -64,6 +64,38 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// 🔥 GLOBAL POPUP (NEW)
+void showGlobalNotificationPopup(RemoteMessage message) {
+  final ctx = navigatorKey.currentContext;
+  if (ctx == null) return;
+
+  final data = message.data;
+
+  showDialog(
+    context: ctx,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        title: Text(data["title"] ?? "New Notification"),
+        content: Text(data["body"] ?? "You have a new update."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Dismiss"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleNotificationNavigation(message);
+            },
+            child: const Text("Open"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 // 🔥 REQUIRED BACKGROUND HANDLER
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -190,6 +222,12 @@ Future<void> main() async {
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       _handleNotificationNavigation(message);
+    });
+
+    // 🔥🔥🔥 FOREGROUND (APP OPEN) FIX
+    FirebaseMessaging.onMessage.listen((message) {
+      print("📩 FOREGROUND MESSAGE: ${message.data}");
+      showGlobalNotificationPopup(message);
     });
 
     runApp(const VitaLinkApp());
