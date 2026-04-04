@@ -28,8 +28,6 @@ class _MenuScreenState extends State<MenuScreen>
   bool _loading = true;
   String _displayName = "User";
 
-  StreamSubscription<String>? _tokenSub;
-
   @override
   void initState() {
     super.initState();
@@ -129,39 +127,7 @@ class _MenuScreenState extends State<MenuScreen>
         }
       }
 
-      final token =
-          await FirebaseMessaging.instance.getToken();
-
-      print("🔥 FCM TOKEN: $token");
-
-      if (token == null || token.isEmpty) return;
-
-      final email = await _store.getString('userEmail');
-      final role = await _store.getString('role');
-
-      if (email == null || role == null) return;
-
-      await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: token,
-        role: role,
-        platform: Platform.isIOS ? "ios" : "android",
-      );
-
-      _tokenSub =
-          FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
-        final e = await _store.getString('userEmail');
-        final r = await _store.getString('role');
-
-        if (e == null || r == null) return;
-
-        await ApiService.registerDeviceToken(
-          email: e,
-          fcmToken: t,
-          role: r,
-          platform: Platform.isIOS ? "ios" : "android",
-        );
-      });
+      // 🔥 TOKEN HANDLING REMOVED (NOW IN main.dart)
 
       FirebaseMessaging.onMessage.listen((message) {
         print("📩 FOREGROUND MESSAGE: ${message.data}");
@@ -246,7 +212,6 @@ class _MenuScreenState extends State<MenuScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _tokenSub?.cancel();
     super.dispose();
   }
 

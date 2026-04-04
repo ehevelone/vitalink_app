@@ -1,9 +1,16 @@
+// lib/main.dart
+
 import 'dart:async';
+import 'dart:io'; // 🔥 ADDED
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:app_links/app_links.dart';
+
+// 🔥 ADDED
+import 'services/api_service.dart';
+import 'services/secure_store.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -85,6 +92,53 @@ void _handleNotificationNavigation(RemoteMessage message) {
 String? pendingRoute;
 dynamic pendingArgs;
 
+// 🔥🔥🔥 NEW GLOBAL FCM SETUP (CRITICAL)
+Future<void> _setupFCMGlobal() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+
+    final token = await messaging.getToken();
+    print("🔥 GLOBAL FCM TOKEN: $token");
+
+    final store = SecureStore();
+    final email = await store.getString('userEmail');
+    final role = await store.getString('role');
+
+    if (token != null && email != null && role != null) {
+      print("📡 GLOBAL TOKEN REGISTER: $email");
+
+      await ApiService.registerDeviceToken(
+        email: email,
+        fcmToken: token,
+        role: role,
+        platform: Platform.isIOS ? "ios" : "android",
+      );
+    } else {
+      print("⚠️ GLOBAL FCM skipped (missing email/role)");
+    }
+
+    // 🔄 TOKEN REFRESH LISTENER
+    messaging.onTokenRefresh.listen((newToken) async {
+      print("🔄 TOKEN REFRESH: $newToken");
+
+      final email = await store.getString('userEmail');
+      final role = await store.getString('role');
+
+      if (email != null && role != null) {
+        await ApiService.registerDeviceToken(
+          email: email,
+          fcmToken: newToken,
+          role: role,
+          platform: Platform.isIOS ? "ios" : "android",
+        );
+      }
+    });
+
+  } catch (e) {
+    print("❌ FCM GLOBAL ERROR: $e");
+  }
+}
+
 class VitaLinkDeepLink {
   static String? _code;
   static String? _lastRawUri;
@@ -121,11 +175,13 @@ Future<void> main() async {
       await Firebase.initializeApp();
     } catch (_) {}
 
+    // 🔥🔥🔥 THIS IS THE FIX
+    await _setupFCMGlobal();
+
     FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler,
     );
 
-    // 🔥 HANDLE NOTIFICATION TAPS
     FirebaseMessaging.instance.getInitialMessage().then((message) {
       if (message != null) {
         _handleNotificationNavigation(message);
