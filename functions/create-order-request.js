@@ -86,7 +86,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 HARDENED TOKEN PULL (FIXED)
+    // 🔥 GET ALL VALID TOKENS (MULTI-DEVICE SAFE)
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -94,52 +94,73 @@ exports.handler = async (event) => {
       WHERE user_id = $1
         AND device_token IS NOT NULL
         AND LENGTH(device_token) > 20
-      ORDER BY updated_at DESC NULLS LAST
-      LIMIT 1
       `,
       [user_id]
     );
 
     if (deviceRes.rows.length === 0) {
-      console.error("❌ NO DEVICE TOKEN FOUND FOR USER:", user_id);
+      console.error("❌ NO DEVICE TOKENS FOUND FOR USER:", user_id);
 
       return {
         statusCode: 500,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({
           success: false,
-          error: "No device token found — user must open app first"
+          error: "No device tokens found — user must open app first"
         }),
       };
     }
 
-    const token = deviceRes.rows[0].device_token;
+    const tokens = deviceRes.rows.map(r => r.device_token);
 
-    console.log("📱 USING TOKEN:", token);
+    console.log("📱 TOKENS:", tokens);
 
-    // 🔔 SEND PUSH
+    // 🔔 SEND PUSH TO ALL TOKENS
     try {
 
-      const message = {
-        token: token,
-
+      const response = await admin.messaging().sendEachForMulticast({
+        tokens: tokens,
         data: {
           type: "order_approval",
           request_id: request_id.toString(),
           title: "VitaLink Order Approval",
           body: "Tap to review and approve your accessory order"
         },
-
         android: {
           priority: "high"
         }
-      };
+      });
 
-      console.log("🔥 FINAL PUSH PAYLOAD:", message);
+      console.log("✅ MULTI PUSH SENT:", response);
 
-      await admin.messaging().send(message);
+      // 🔥 CLEAN DEAD TOKENS
+      if (response.responses && response.responses.length > 0) {
+        for (let i = 0; i < response.responses.length; i++) {
+          const res = response.responses[i];
 
-      console.log("✅ PUSH SENT");
+          if (!res.success) {
+            const errCode = res.error?.errorInfo?.code;
+
+            if (
+              errCode === "messaging/registration-token-not-registered" ||
+              errCode === "messaging/invalid-registration-token"
+            ) {
+              const badToken = tokens[i];
+
+              console.log("🧹 REMOVING DEAD TOKEN:", badToken);
+
+              await db.query(
+                `
+                UPDATE public.user_devices
+                SET device_token = NULL
+                WHERE user_id = $1 AND device_token = $2
+                `,
+                [user_id, badToken]
+              );
+            }
+          }
+        }
+      }
 
     } catch (pushErr) {
       console.error("❌ PUSH FAILED:", pushErr);
