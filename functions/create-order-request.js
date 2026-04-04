@@ -86,7 +86,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 GET ALL VALID TOKENS (MULTI-DEVICE SAFE)
+    // 🔥 FORCE LATEST TOKENS FIRST (CRITICAL FIX)
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -94,6 +94,7 @@ exports.handler = async (event) => {
       WHERE user_id = $1
         AND device_token IS NOT NULL
         AND LENGTH(device_token) > 20
+      ORDER BY updated_at DESC
       `,
       [user_id]
     );
@@ -113,19 +114,24 @@ exports.handler = async (event) => {
 
     const tokens = deviceRes.rows.map(r => r.device_token);
 
-    console.log("📱 TOKENS:", tokens);
+    console.log("📱 ORDERED TOKENS:", tokens);
 
-    // 🔔 SEND PUSH TO ALL TOKENS
+    // 🔔 SEND PUSH (VISIBLE + DATA)
     try {
 
       const response = await admin.messaging().sendEachForMulticast({
         tokens: tokens,
-        data: {
-          type: "order_approval",
-          request_id: request_id.toString(),
+
+        notification: {
           title: "VitaLink Order Approval",
           body: "Tap to review and approve your accessory order"
         },
+
+        data: {
+          type: "order_approval",
+          request_id: request_id.toString()
+        },
+
         android: {
           priority: "high"
         }
