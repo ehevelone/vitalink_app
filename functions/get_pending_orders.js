@@ -83,19 +83,19 @@ exports.handler = async (event) => {
         profile_name: i.profile || i.profile_name || "Unknown"
       }));
 
-      // 🔥 BUILD QR HERE (MATCH APPROVE FUNCTION)
+      // 🔥 FIX: POINT QR TO APP BACKEND FUNCTION (NOT WEBSITE)
       const qr = (items || []).map((item, i) => ({
         id: `${order.id}-${i}`,
         profile: item.profile_name,
         name: item.product,
-        qr_url: `https://myvitalink.app/qr/${order.id}-${i}`
+        qr_url: `https://vitalink-app.netlify.app/.netlify/functions/qr?id=${order.id}-${i}`
       }));
 
       return {
         id: order.id,
         status: order.status,
         items: items,
-        qr: qr // ✅ THIS IS THE FIX
+        qr: qr
       };
     });
 

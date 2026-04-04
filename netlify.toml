@@ -22,3 +22,9 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Headers = "Content-Type"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+
+# 🔥 ADD THIS
+[[redirects]]
+  from = "/qr/*"
+  to = "/.netlify/functions/qr"
+  status = 200
