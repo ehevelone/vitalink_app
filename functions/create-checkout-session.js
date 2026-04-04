@@ -55,7 +55,7 @@ exports.handler = async (event) => {
         statusCode: 200,
         headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
         body: JSON.stringify({
-          url: `https://myvitalink.app/checkout-success.html?test=true&request_id=${order_id}`
+          url: `https://myvitalink.app/accessories/checkout-success.html?test=true&request_id=${order_id}`
         })
       };
     }
@@ -87,7 +87,7 @@ exports.handler = async (event) => {
       /* =========================================================
          🔥 SUCCESS REDIRECT (CRITICAL FIX APPLIED)
          ========================================================= */
-      success_url: `https://myvitalink.app/checkout-success.html?request_id=${order_id}`,
+      success_url: `https://myvitalink.app/accessories/checkout-success.html?request_id=${order_id}`,
 
       cancel_url: "https://myvitalink.app/order.html",
 
