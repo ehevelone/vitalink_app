@@ -179,7 +179,23 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
               ),
 
-              const SizedBox(height: 48),
+              const SizedBox(height: 24),
+
+              // 🔥 ADDED DISCLOSURE (surgical)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
 
               GestureDetector(
                 onTap: _openEmergencyScreen,

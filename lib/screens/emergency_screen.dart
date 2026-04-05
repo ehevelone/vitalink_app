@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/api_service.dart'; // 🔥 ADDED
 import 'qr_screen.dart';
 import 'edit_profile.dart';
 
@@ -55,11 +56,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  void _showQr() {
+  Future<void> _showQr() async {
     final p = _p;
     if (p == null) return;
     final e = p.emergency;
 
+    // 🔥 SAME DATA (no change)
     final data = {
       "name": p.fullName,
       "dob": p.dob ?? "",
@@ -82,11 +84,25 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           }).toList(),
     };
 
+    try {
+      // 🔥 SAVE ENCRYPTED PROFILE TO BACKEND
+      await ApiService.saveEmergencyProfile(
+        profileId: p.id, // ⚠️ must exist
+        data: data,
+      );
+    } catch (e) {
+      debugPrint("Save emergency profile failed: $e");
+    }
+
+    // 🔥 STATIC QR (THIS IS THE BIG CHANGE)
+    final qrUrl =
+        "https://vitalink-app.netlify.app/.netlify/functions/get_emergency_profile?id=${p.id}";
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => QrScreen(
-          data: jsonEncode(data),
+          data: qrUrl, // 🔥 CHANGED (was JSON)
           title: "Emergency Info",
         ),
       ),
