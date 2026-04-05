@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 // =========================
 // Medication Model
 // =========================
@@ -95,7 +97,7 @@ class InsuranceCard {
     this.imagePath,
     this.source = 'Manual',
     DateTime? updatedAt,
-  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+  })  : id = id ?? const Uuid().v4(),
         updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
@@ -127,7 +129,7 @@ class InsuranceCard {
 }
 
 // =========================
-// Insurance Model (UPDATED ONLY)
+// Insurance Model
 // =========================
 class Insurance {
   String carrier;
@@ -141,9 +143,7 @@ class Insurance {
   String beneficiary;
 
   List<String> decPagePaths;
-
   List<Map<String, String>> benefits;
-
   List<InsuranceCard> cards;
 
   Insurance({
@@ -279,10 +279,10 @@ class EmergencyInfo {
 }
 
 // =========================
-// Profile Model (ONLY CHANGE HERE)
+// Profile Model
 // =========================
 class Profile {
-  String id; // 🔥 ADDED
+  String id;
 
   String fullName;
   String? dob;
@@ -313,7 +313,7 @@ class Profile {
   String? agentNpn;
 
   Profile({
-    String? id, // 🔥 ADDED
+    String? id,
     this.fullName = '',
     this.dob,
     DateTime? updatedAt,
@@ -337,7 +337,7 @@ class Profile {
     this.agentEmail,
     this.agentPhone,
     this.agentNpn,
-  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+  })  : id = id ?? const Uuid().v4(),
         updatedAt = updatedAt ?? DateTime.now(),
         meds = meds ?? [],
         doctors = doctors ?? [],

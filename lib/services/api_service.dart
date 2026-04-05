@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 
 // 🔥 ADDED FOR PROFILE SYNC
 import '../services/secure_store.dart';
@@ -10,6 +11,19 @@ import '../services/data_repository.dart';
 class ApiService {
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
+
+  // -------------------------------------------------------------
+  // 🔥 UUID FIX (ADDED)
+  // -------------------------------------------------------------
+  static String _ensureUuid(String? id) {
+    if (id == null || id.isEmpty) return const Uuid().v4();
+
+    final uuidRegex = RegExp(r'^[0-9a-fA-F-]{36}$');
+
+    if (uuidRegex.hasMatch(id)) return id;
+
+    return const Uuid().v5(Uuid.NAMESPACE_URL, id);
+  }
 
   // -------------------------------------------------------------
   // 🔧 Internal POST helper (SAFE)
@@ -65,14 +79,14 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🚨 SAVE EMERGENCY PROFILE (QR SYSTEM)  ← ADDED
+  // 🚨 SAVE EMERGENCY PROFILE (FIXED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> saveEmergencyProfile({
     required String profileId,
     required Map<String, dynamic> data,
   }) async {
     return _postJson("save_emergency_profile", {
-      "profile_id": profileId,
+      "profile_id": _ensureUuid(profileId), // 🔥 FIX
       "data": data,
     });
   }
@@ -394,7 +408,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔥 SYNC USER PROFILES
+  // 🔥 SYNC USER PROFILES (FIXED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> syncProfilesToServer() async {
     try {
@@ -410,9 +424,15 @@ class ApiService {
 
       final profiles = await repo.loadAllProfiles();
 
+      final fixedProfiles = profiles.map((p) {
+        final json = p.toJson();
+        json["id"] = _ensureUuid(p.id); // 🔥 FIX
+        return json;
+      }).toList();
+
       final body = {
         "user_id": userId,
-        "profiles": profiles.map((p) => p.toJson()).toList(),
+        "profiles": fixedProfiles,
       };
 
       return await _postJson("save_user_profiles", body);
