@@ -2,25 +2,51 @@ const QRCode = require("qrcode");
 
 exports.handler = async (event) => {
 
+  // 🔥 FULL EVENT DUMP (DEBUG)
+  console.log("========== QR FUNCTION HIT ==========");
+  console.log("EVENT DUMP:", JSON.stringify(event, null, 2));
+
   try {
 
-    const path = event.path || "";
-    const id = path.split("/qr/")[1];
+    // 🔍 LOG INDIVIDUAL PIECES (EASIER TO READ)
+    console.log("queryStringParameters:", event.queryStringParameters);
+    console.log("rawQuery:", event.rawQuery);
+    console.log("path:", event.path);
+
+    // 🔥 SAFE PARAM EXTRACTION
+    let id = null;
+
+    if (event.queryStringParameters && event.queryStringParameters.id) {
+      id = event.queryStringParameters.id;
+      console.log("ID FROM queryStringParameters:", id);
+    } else if (event.rawQuery) {
+      const params = new URLSearchParams(event.rawQuery);
+      id = params.get("id");
+      console.log("ID FROM rawQuery:", id);
+    } else {
+      console.log("NO QUERY PARAMS FOUND");
+    }
 
     if (!id) {
+      console.log("❌ FINAL RESULT: MISSING ID");
       return {
         statusCode: 400,
         body: "Missing QR id"
       };
     }
 
-    // 🔥 THIS is what the QR contains
+    console.log("✅ FINAL ID:", id);
+
+    // 🔥 QR CONTENT
     const qrData = `vitalink://profile/${id}`;
+    console.log("QR DATA:", qrData);
 
     const qrImage = await QRCode.toBuffer(qrData, {
       type: "png",
       width: 300
     });
+
+    console.log("✅ QR GENERATED SUCCESSFULLY");
 
     return {
       statusCode: 200,
@@ -33,7 +59,7 @@ exports.handler = async (event) => {
     };
 
   } catch (err) {
-    console.error("QR ERROR:", err);
+    console.error("🔥 QR ERROR:", err);
 
     return {
       statusCode: 500,
