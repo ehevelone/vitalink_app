@@ -27,12 +27,10 @@ exports.handler = async (event) => {
       body = {};
     }
 
-    // 🔥 SUPPORT BOTH KEYS
     const order_id = body.order_id || body.request_id;
 
     let result;
 
-    // ✅ GET ONE ORDER
     if (order_id) {
 
       result = await db.query(
@@ -47,7 +45,6 @@ exports.handler = async (event) => {
 
     } else {
 
-      // ✅ GET ALL PENDING
       result = await db.query(
         `
         SELECT id, items, status
@@ -68,27 +65,31 @@ exports.handler = async (event) => {
 
     const orders = result.rows.map(order => {
 
-      let items = [];
+      let rawItems = [];
 
       try {
-        items = typeof order.items === "string"
+        rawItems = typeof order.items === "string"
           ? JSON.parse(order.items)
           : order.items;
       } catch (e) {
-        items = [];
+        rawItems = [];
       }
 
-      items = (items || []).map(i => ({
+      // ✅ KEEP profile_id
+      const items = (rawItems || []).map(i => ({
         product: i.name || i.product || "Unknown",
-        profile_name: i.profile || i.profile_name || "Unknown"
+        profile_name: i.profile || i.profile_name || "Unknown",
+        profile_id: i.profile_id || null
       }));
 
-      // 🔥 FIX: POINT QR TO APP BACKEND FUNCTION (NOT WEBSITE)
+      // ✅ REAL QR (NO FAKE / NO FUNCTION)
       const qr = (items || []).map((item, i) => ({
         id: `${order.id}-${i}`,
         profile: item.profile_name,
         name: item.product,
-        qr_url: `https://vitalink-app.netlify.app/.netlify/functions/qr?id=${order.id}-${i}`
+        qr_url: item.profile_id
+          ? `https://myvitalink.app/emergency/${item.profile_id}`
+          : null
       }));
 
       return {
@@ -112,7 +113,7 @@ exports.handler = async (event) => {
     console.error("get_pending_orders error:", err);
 
     return {
-      statusCode: 200, // 🔥 NEVER THROW 500
+      statusCode: 200,
       headers,
       body: JSON.stringify({
         success: false,

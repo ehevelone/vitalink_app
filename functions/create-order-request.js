@@ -64,7 +64,7 @@ exports.handler = async (event) => {
     }
 
     const user_id = body.user_id;
-    const items = body.items || body.cart;
+    let items = body.items || body.cart;
 
     if (!user_id || !items || items.length === 0) {
       return {
@@ -73,6 +73,24 @@ exports.handler = async (event) => {
         body: JSON.stringify({ success:false, error: "Missing data" }),
       };
     }
+
+    // 🔥 DEBUG — SEE EXACT ITEMS
+    console.log("🧾 ITEMS RECEIVED:", items);
+
+    // 🚨 ENFORCE profile_id
+    items = items.map((item, i) => {
+
+      if (!item.profile_id && item.profile) {
+        console.warn(`⚠️ Missing profile_id for item ${i}:`, item);
+      }
+
+      return {
+        ...item,
+        profile_id: item.profile_id || null
+      };
+    });
+
+    console.log("✅ FINAL ITEMS SAVED:", items);
 
     // 🧾 SAVE ORDER
     const result = await db.query(
@@ -86,7 +104,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 FORCE LATEST TOKENS FIRST (CRITICAL FIX)
+    // 🔥 DEVICE TOKENS
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -116,57 +134,25 @@ exports.handler = async (event) => {
 
     console.log("📱 ORDERED TOKENS:", tokens);
 
-    // 🔔 SEND PUSH (VISIBLE + DATA)
+    // 🔔 SEND PUSH
     try {
 
       const response = await admin.messaging().sendEachForMulticast({
         tokens: tokens,
-
         notification: {
           title: "VitaLink Order Approval",
           body: "Tap to review and approve your accessory order"
         },
-
         data: {
           type: "order_approval",
           request_id: request_id.toString()
         },
-
         android: {
           priority: "high"
         }
       });
 
       console.log("✅ MULTI PUSH SENT:", response);
-
-      // 🔥 CLEAN DEAD TOKENS
-      if (response.responses && response.responses.length > 0) {
-        for (let i = 0; i < response.responses.length; i++) {
-          const res = response.responses[i];
-
-          if (!res.success) {
-            const errCode = res.error?.errorInfo?.code;
-
-            if (
-              errCode === "messaging/registration-token-not-registered" ||
-              errCode === "messaging/invalid-registration-token"
-            ) {
-              const badToken = tokens[i];
-
-              console.log("🧹 REMOVING DEAD TOKEN:", badToken);
-
-              await db.query(
-                `
-                UPDATE public.user_devices
-                SET device_token = NULL
-                WHERE user_id = $1 AND device_token = $2
-                `,
-                [user_id, badToken]
-              );
-            }
-          }
-        }
-      }
 
     } catch (pushErr) {
       console.error("❌ PUSH FAILED:", pushErr);
