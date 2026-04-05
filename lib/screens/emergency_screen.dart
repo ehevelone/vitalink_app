@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../services/api_service.dart'; // 🔥 ADDED
+import '../services/api_service.dart';
 import 'qr_screen.dart';
 import 'edit_profile.dart';
 
@@ -56,12 +56,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  Future<void> _showQr() async {
-    final p = _p;
-    if (p == null) return;
+  Future<void> _syncToBackend(Profile p) async {
     final e = p.emergency;
 
-    // 🔥 SAME DATA (no change)
     final data = {
       "name": p.fullName,
       "dob": p.dob ?? "",
@@ -85,16 +82,34 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     };
 
     try {
-      // 🔥 SAVE ENCRYPTED PROFILE TO BACKEND
-      await ApiService.saveEmergencyProfile(
-        profileId: p.id, // ⚠️ must exist
+      final res = await ApiService.saveEmergencyProfile(
+        profileId: p.id,
         data: data,
       );
+
+      if (res["success"] != true) {
+        debugPrint("⚠️ Save failed: ${res["error"]}");
+      }
     } catch (e) {
       debugPrint("Save emergency profile failed: $e");
     }
+  }
 
-    // 🔥 STATIC QR (THIS IS THE BIG CHANGE)
+  Future<void> _showQr() async {
+    final p = _p;
+    if (p == null) return;
+
+    // 🔥 SAFETY: ENSURE PROFILE ID EXISTS
+    if (p.id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile not ready. Please try again.")),
+      );
+      return;
+    }
+
+    await _syncToBackend(p);
+
+    // 🔥 STATIC QR URL
     final qrUrl =
         "https://vitalink-app.netlify.app/.netlify/functions/get_emergency_profile?id=${p.id}";
 
@@ -102,7 +117,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => QrScreen(
-          data: qrUrl, // 🔥 CHANGED (was JSON)
+          data: qrUrl,
           title: "Emergency Info",
         ),
       ),
@@ -151,7 +166,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               16,
               16,
               16,
-              MediaQuery.of(context).padding.bottom + 100,
+              MediaQuery.of(context).padding.bottom + 120, // 🔥 spacing for disclaimer
             ),
             children: [
               if (p.dob?.isNotEmpty == true)
@@ -278,6 +293,22 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               ),
             ],
           ),
+
+          // 🔥 DISCLAIMER (LOCKED TO BOTTOM)
+          Positioned(
+            bottom: 10,
+            left: 16,
+            right: 16,
+            child: Text(
+              "VitaLink provides personal health information for emergency reference only. "
+              "It does not replace professional medical care. Always rely on medical professionals.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade400,
+              ),
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -286,7 +317,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-          ).then((_) => _load());
+          ).then((_) async {
+            await _load();
+            if (_p != null && _p!.id.isNotEmpty) {
+              await _syncToBackend(_p!);
+            }
+          });
         },
         child: const Icon(Icons.edit),
       ),

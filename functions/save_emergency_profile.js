@@ -1,11 +1,40 @@
 const db = require("./services/db");
 const crypto = require("crypto");
 
-// 🔐 ENV KEY (64 hex chars = 32 bytes)
-const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+// 🔐 SAFE KEY (NO INIT CRASH)
+function getKey() {
+  const raw = process.env.ENCRYPTION_KEY;
+
+  if (!raw) {
+    console.warn("⚠️ ENCRYPTION_KEY missing");
+    return null;
+  }
+
+  try {
+    const k = Buffer.from(raw, "hex");
+
+    if (k.length !== 32) {
+      console.warn("⚠️ ENCRYPTION_KEY wrong length");
+      return null;
+    }
+
+    return k;
+
+  } catch (e) {
+    console.warn("⚠️ ENCRYPTION_KEY invalid format");
+    return null;
+  }
+}
 
 // 🔐 ENCRYPT
 function encrypt(text){
+  const key = getKey();
+
+  if (!key) {
+    // fallback — DO NOT CRASH
+    return text;
+  }
+
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
 
@@ -24,11 +53,7 @@ exports.handler = async (event) => {
   };
 
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers,
-      body: ""
-    };
+    return { statusCode: 200, headers, body: "" };
   }
 
   try {
@@ -55,10 +80,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔐 ENCRYPT DATA
     const encrypted = encrypt(JSON.stringify(data));
 
-    // 💾 UPSERT
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -74,9 +97,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true
-      })
+      body: JSON.stringify({ success: true })
     };
 
   } catch (err) {
@@ -87,7 +108,8 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         success:false,
-        error:"Server error"
+        error:"Server error",
+        details: err.message
       })
     };
   }

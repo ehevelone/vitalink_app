@@ -137,13 +137,11 @@ class Insurance {
   String phone;
   String policyType;
 
-  // 🔥 NEW FIELDS
   String insuredName;
   String beneficiary;
 
   List<String> decPagePaths;
 
-  // 🔥 CHANGED TYPE
   List<Map<String, String>> benefits;
 
   List<InsuranceCard> cards;
@@ -189,8 +187,6 @@ class Insurance {
         beneficiary: json['beneficiary'] ?? '',
         decPagePaths:
             (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
-
-        // 🔥 SAFE CONVERSION (handles old + new data)
         benefits: (json['benefits'] as List<dynamic>? ?? [])
             .map((b) {
               if (b is Map) {
@@ -206,7 +202,6 @@ class Insurance {
               }
             })
             .toList(),
-
         cards: (json['cards'] as List<dynamic>? ?? [])
             .map((c) => InsuranceCard.fromJson(c))
             .toList(),
@@ -284,9 +279,11 @@ class EmergencyInfo {
 }
 
 // =========================
-// Profile Model
+// Profile Model (ONLY CHANGE HERE)
 // =========================
 class Profile {
+  String id; // 🔥 ADDED
+
   String fullName;
   String? dob;
   DateTime updatedAt;
@@ -316,6 +313,7 @@ class Profile {
   String? agentNpn;
 
   Profile({
+    String? id, // 🔥 ADDED
     this.fullName = '',
     this.dob,
     DateTime? updatedAt,
@@ -339,7 +337,8 @@ class Profile {
     this.agentEmail,
     this.agentPhone,
     this.agentNpn,
-  })  : updatedAt = updatedAt ?? DateTime.now(),
+  })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        updatedAt = updatedAt ?? DateTime.now(),
         meds = meds ?? [],
         doctors = doctors ?? [],
         insurances = insurances ?? [],
@@ -347,6 +346,7 @@ class Profile {
         emergency = emergency ?? EmergencyInfo();
 
   Profile copyWith({
+    String? id,
     String? fullName,
     String? dob,
     DateTime? updatedAt,
@@ -372,6 +372,7 @@ class Profile {
     String? agentNpn,
   }) {
     return Profile(
+      id: id ?? this.id,
       fullName: fullName ?? this.fullName,
       dob: dob ?? this.dob,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -399,6 +400,7 @@ class Profile {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'fullName': fullName,
         'dob': dob,
         'updatedAt': updatedAt.toIso8601String(),
@@ -425,6 +427,7 @@ class Profile {
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
+        id: json['id'],
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
         updatedAt:

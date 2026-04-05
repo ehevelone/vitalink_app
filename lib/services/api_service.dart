@@ -7,8 +7,6 @@ import 'package:http/http.dart' as http;
 import '../services/secure_store.dart';
 import '../services/data_repository.dart';
 
-// 🔁 Rebuild trigger: markReviewed API added and verified (force fresh CI build)
-
 class ApiService {
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
@@ -67,6 +65,19 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // 🚨 SAVE EMERGENCY PROFILE (QR SYSTEM)  ← ADDED
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> saveEmergencyProfile({
+    required String profileId,
+    required Map<String, dynamic> data,
+  }) async {
+    return _postJson("save_emergency_profile", {
+      "profile_id": profileId,
+      "data": data,
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getUserAgent(String email) {
@@ -113,7 +124,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Agent login (NO device enforcement)
+  // 🔹 Agent login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
@@ -151,7 +162,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 User login (Device enforced)
+  // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -209,7 +220,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔎 Activation lookup (autofill registration)
+  // 🔎 Activation lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> lookupActivation(String code) {
     return _postJson("lookup_activation", {
@@ -268,7 +279,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔹 Register device token (push)
+  // 🔹 Register device token
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerDeviceToken({
     required String email,
@@ -351,7 +362,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔎 Resolve agent by QR / agent code
+  // 🔎 Resolve agent by code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
     final res = await _postJson("resolve_agent_code", {
@@ -372,7 +383,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🆕 GET AGENT CLIENTS (FINAL FIX)
+  // 🆕 GET AGENT CLIENTS
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentClients({
     required int agentId,
@@ -383,7 +394,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔥 SYNC USER PROFILES (NEW)
+  // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> syncProfilesToServer() async {
     try {
@@ -405,7 +416,6 @@ class ApiService {
       };
 
       return await _postJson("save_user_profiles", body);
-
     } catch (e, st) {
       debugPrint("❌ Profile Sync Error: $e\n$st");
       return {"success": false, "error": e.toString()};
