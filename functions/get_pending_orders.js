@@ -82,15 +82,22 @@ exports.handler = async (event) => {
         profile_id: i.profile_id || null
       }));
 
-      // ✅ REAL QR (NO FAKE / NO FUNCTION)
-      const qr = (items || []).map((item, i) => ({
-        id: `${order.id}-${i}`,
-        profile: item.profile_name,
-        name: item.product,
-        qr_url: item.profile_id
-          ? `https://myvitalink.app/emergency/${item.profile_id}`
-          : null
-      }));
+      // ✅ FIXED QR GENERATION (REAL IMAGE)
+      const qr = (items || []).map((item, i) => {
+
+        const targetUrl = item.profile_id
+          ? `https://myvitalink.app/emergency.html?id=${item.profile_id}`
+          : null;
+
+        return {
+          id: `${order.id}-${i}`,
+          profile: item.profile_name,
+          name: item.product,
+          qr_url: targetUrl
+            ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`
+            : null
+        };
+      });
 
       return {
         id: order.id,
