@@ -46,7 +46,6 @@ function reply(statusCode, obj) {
 
 exports.handler = async (event) => {
   try {
-    // 🔒 GET only
     if (event.httpMethod !== "GET") {
       return reply(405, {
         success: false,
@@ -105,7 +104,45 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🎯 RETURN DATA (same structure your frontend expects)
+    // 🔥 GET REAL PROFILE ID
+    const profileRes = await db.query(
+      `
+      SELECT id
+      FROM profiles
+      WHERE id::text = $1 OR id::text = $2
+      LIMIT 1
+      `,
+      [rawId, normalizedId]
+    );
+
+    let medications = [];
+
+    if (profileRes.rows.length) {
+      const profileId = profileRes.rows[0].id;
+
+      // 💊 REAL MEDS FROM DB
+      const medsRes = await db.query(
+        `
+        SELECT name, dose, frequency
+        FROM meds
+        WHERE profile_id = $1
+        ORDER BY name
+        `,
+        [profileId]
+      );
+
+      medications = medsRes.rows.map(m => ({
+        name: m.name || "",
+        dose: m.dose || "",
+        frequency: m.frequency || ""
+      }));
+    }
+
+    // 🔁 FALLBACK (if DB empty, use encrypted)
+    if (!medications.length && Array.isArray(data.medications)) {
+      medications = data.medications;
+    }
+
     return reply(200, {
       success: true,
       emergency: {
@@ -117,7 +154,7 @@ exports.handler = async (event) => {
         emergencyPhone: data.phone || "",
         allergies: data.allergies || "",
         conditions: data.conditions || "",
-        medications: data.medications || [],
+        medications,
         providers: data.providers || [],
       },
     });
