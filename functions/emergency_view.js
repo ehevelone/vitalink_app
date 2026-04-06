@@ -5,20 +5,15 @@ const { v4: uuidv4, v5: uuidv5 } = require("uuid");
 // 🔐 ENV KEY
 const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
 
-// -------------------------------------------------------------
-// 🔥 UUID FIX
-// -------------------------------------------------------------
+// UUID FIX
 function ensureUuid(id) {
   if (!id) return uuidv4();
-
   const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-
   if (uuidRegex.test(id)) return id;
-
   return uuidv5(id.toString(), uuidv5.URL);
 }
 
-// 🔐 DECRYPT
+// DECRYPT
 function decrypt(encryptedText) {
   const parts = encryptedText.split(":");
   const iv = Buffer.from(parts[0], "hex");
@@ -66,10 +61,6 @@ exports.handler = async (event) => {
     rawId = String(rawId).trim();
     const normalizedId = ensureUuid(rawId);
 
-    console.log("🔎 RAW ID:", rawId);
-    console.log("🔎 NORMALIZED ID:", normalizedId);
-
-    // 🔐 LOAD ENCRYPTED RECORD
     const result = await db.query(
       `
       SELECT encrypted_data
@@ -87,24 +78,19 @@ exports.handler = async (event) => {
       });
     }
 
-    const encrypted = result.rows[0].encrypted_data;
-
-    // 🔐 DECRYPT + PARSE
     let data;
 
     try {
-      const decrypted = decrypt(encrypted);
+      const decrypted = decrypt(result.rows[0].encrypted_data);
       data = JSON.parse(decrypted);
       console.log("DECRYPTED DATA:", JSON.stringify(data, null, 2));
     } catch (e) {
-      console.error("❌ decrypt fail:", e);
       return reply(500, {
         success: false,
         error: "Decrypt failed",
       });
     }
 
-    // 🔥 GET REAL PROFILE ID
     const profileRes = await db.query(
       `
       SELECT id
@@ -120,7 +106,6 @@ exports.handler = async (event) => {
     if (profileRes.rows.length) {
       const profileId = profileRes.rows[0].id;
 
-      // 💊 REAL MEDS FROM DB
       const medsRes = await db.query(
         `
         SELECT name, dose, frequency
@@ -138,10 +123,20 @@ exports.handler = async (event) => {
       }));
     }
 
-    // 🔁 FALLBACK (if DB empty, use encrypted)
     if (!meds.length && Array.isArray(data.meds)) {
       meds = data.meds;
     }
+
+    // 🔥 FIX: SUPPORT BOTH FIELD TYPES
+    const contactName =
+      data.emergencyContactName ||
+      data.contact ||
+      "";
+
+    const contactPhone =
+      data.emergencyContactPhone ||
+      data.phone ||
+      "";
 
     return reply(200, {
       success: true,
@@ -151,18 +146,15 @@ exports.handler = async (event) => {
         bloodType: data.bloodType || "",
         organDonor: data.organDonor || false,
 
-        // ✅ FIXED FIELD NAMES
-        emergencyContactName: data.emergencyContactName || "",
-        emergencyContactPhone: data.emergencyContactPhone || "",
+        emergencyContactName: contactName,
+        emergencyContactPhone: contactPhone,
 
         allergies: data.allergies || "",
         conditions: data.conditions || "",
         implants: data.implants || "",
         procedures: data.procedures || "",
 
-        // ✅ MUST BE meds (NOT medications)
-        meds: meds,
-
+        meds,
         providers: data.providers || [],
       },
     });
