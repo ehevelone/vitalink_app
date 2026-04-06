@@ -1,4 +1,3 @@
-// functions/emergency_view.js
 const db = require("./services/db");
 const crypto = require("crypto");
 const { v4: uuidv4, v5: uuidv5 } = require("uuid");
@@ -116,7 +115,7 @@ exports.handler = async (event) => {
       [rawId, normalizedId]
     );
 
-    let medications = [];
+    let meds = [];
 
     if (profileRes.rows.length) {
       const profileId = profileRes.rows[0].id;
@@ -132,7 +131,7 @@ exports.handler = async (event) => {
         [profileId]
       );
 
-      medications = medsRes.rows.map(m => ({
+      meds = medsRes.rows.map(m => ({
         name: m.name || "",
         dose: m.dose || "",
         frequency: m.frequency || ""
@@ -140,8 +139,8 @@ exports.handler = async (event) => {
     }
 
     // 🔁 FALLBACK (if DB empty, use encrypted)
-    if (!medications.length && Array.isArray(data.medications)) {
-      medications = data.medications;
+    if (!meds.length && Array.isArray(data.meds)) {
+      meds = data.meds;
     }
 
     return reply(200, {
@@ -151,11 +150,19 @@ exports.handler = async (event) => {
         dob: data.dob || "",
         bloodType: data.bloodType || "",
         organDonor: data.organDonor || false,
-        emergencyContact: data.contact || "",
-        emergencyPhone: data.phone || "",
+
+        // ✅ FIXED FIELD NAMES
+        emergencyContactName: data.emergencyContactName || "",
+        emergencyContactPhone: data.emergencyContactPhone || "",
+
         allergies: data.allergies || "",
         conditions: data.conditions || "",
-        medications,
+        implants: data.implants || "",
+        procedures: data.procedures || "",
+
+        // ✅ MUST BE meds (NOT medications)
+        meds: meds,
+
         providers: data.providers || [],
       },
     });
