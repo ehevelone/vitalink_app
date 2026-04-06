@@ -2,7 +2,7 @@ const db = require("./services/db");
 
 exports.handler = async (event) => {
 
-  // ✅ FULL CORS FIX
+  // ✅ CORS
   const headers = {
     "Access-Control-Allow-Origin": "https://myvitalink.app",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -29,102 +29,83 @@ exports.handler = async (event) => {
 
     const order_id = body.order_id || body.request_id;
 
-    let result;
-
-    if (order_id) {
-
-      result = await db.query(
-        `
-        SELECT id, items, status
-        FROM public.order_requests
-        WHERE id = $1
-        LIMIT 1
-        `,
-        [order_id]
-      );
-
-    } else {
-
-      result = await db.query(
-        `
-        SELECT id, items, status
-        FROM public.order_requests
-        WHERE status = 'pending'
-        ORDER BY id DESC
-        `
-      );
+    if (!order_id) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: "Missing order_id"
+        })
+      };
     }
 
-    if (!result || !result.rows || result.rows.length === 0) {
+    // ✅ GET ORDER (expects qr already stored)
+    const result = await db.query(
+      `
+      SELECT id, qr
+      FROM public.order_requests
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [order_id]
+    );
+
+    if (!result.rows.length) {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, orders: [] })
+        body: JSON.stringify({
+          success: false,
+          error: "Order not found"
+        })
       };
     }
 
-    const orders = result.rows.map(order => {
+    const order = result.rows[0];
 
-      let rawItems = [];
+    let qr = [];
 
-      try {
-        rawItems = typeof order.items === "string"
-          ? JSON.parse(order.items)
-          : order.items;
-      } catch (e) {
-        rawItems = [];
-      }
+    try {
+      qr = typeof order.qr === "string"
+        ? JSON.parse(order.qr)
+        : order.qr;
+    } catch {
+      qr = [];
+    }
 
-      // ✅ KEEP profile_id
-      const items = (rawItems || []).map(i => ({
-        product: i.name || i.product || "Unknown",
-        profile_name: i.profile || i.profile_name || "Unknown",
-        profile_id: i.profile_id || null
-      }));
-
-      // ✅ FIXED QR GENERATION (REAL IMAGE)
-      const qr = (items || []).map((item, i) => {
-
-        const targetUrl = item.profile_id
-          ? `https://myvitalink.app/emergency.html?id=${item.profile_id}`
-          : null;
-
-        return {
-          id: `${order.id}-${i}`,
-          profile: item.profile_name,
-          name: item.product,
-          qr_url: targetUrl
-            ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`
-            : null
-        };
-      });
-
+    if (!qr || qr.length === 0) {
       return {
-        id: order.id,
-        status: order.status,
-        items: items,
-        qr: qr
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: "No QR data"
+        })
       };
-    });
+    }
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        orders: orders
+        order: {
+          id: order.id,
+          qr: qr
+        }
       })
     };
 
   } catch (err) {
-    console.error("get_pending_orders error:", err);
+    console.error("get_order error:", err);
 
     return {
-      statusCode: 200,
+      statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
-        orders: []
+        error: "Server error"
       })
     };
   }
