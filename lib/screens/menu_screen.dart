@@ -1,3 +1,4 @@
+// lib/screens/menu_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -48,6 +49,22 @@ class _MenuScreenState extends State<MenuScreen>
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
       _checkPendingNavigation();
+
+      // 🔥 RE-REGISTER TOKEN ON RESUME
+      _registerToken();
+    }
+  }
+
+  Future<void> _registerToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+
+      if (token != null && token.isNotEmpty) {
+        await ApiService.registerDeviceToken(token);
+        print("✅ FCM TOKEN REGISTERED: $token");
+      }
+    } catch (e) {
+      print("Token registration error: $e");
     }
   }
 
@@ -127,14 +144,20 @@ class _MenuScreenState extends State<MenuScreen>
         }
       }
 
-      // 🔥 TOKEN HANDLING REMOVED (NOW IN main.dart)
+      // 🔥 REGISTER TOKEN ON INIT
+      await _registerToken();
+
+      // 🔥 HANDLE TOKEN ROTATION (CRITICAL FIX)
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        await ApiService.registerDeviceToken(newToken);
+        print("🔁 TOKEN REFRESHED: $newToken");
+      });
 
       FirebaseMessaging.onMessage.listen((message) {
         print("📩 FOREGROUND MESSAGE: ${message.data}");
 
         final data = message.data;
 
-        // 🔥 AUTO HANDLE (FIX)
         _handleNotificationTap(message);
 
         if (mounted) {

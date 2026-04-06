@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
-import '../utils/phone_formatter.dart'; // ✅ ADDED
+import '../utils/phone_formatter.dart';
 
 class ProfileUserScreen extends StatefulWidget {
   const ProfileUserScreen({super.key});
@@ -107,6 +107,11 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     }
   }
 
+  bool _validFullName(String v) {
+    final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
+    return parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,22 +134,18 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _nameCtrl,
-                  decoration: const InputDecoration(labelText: "Full Name"),
+                  decoration: const InputDecoration(
+                    labelText: "Full Name (First & Last)",
+                    hintText: "First and Last Name",
+                    helperText: "Required for emergency identification",
+                  ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return "Enter your name";
                     }
-
-                    final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
-
-                    if (parts.length < 2) {
+                    if (!_validFullName(v)) {
                       return "Enter first & last name";
                     }
-
-                    if (parts[0].length < 2 || parts[1].length < 2) {
-                      return "Enter valid full name";
-                    }
-
                     return null;
                   },
                 ),
@@ -159,7 +160,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,

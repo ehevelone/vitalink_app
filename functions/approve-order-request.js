@@ -1,4 +1,5 @@
 const db = require("./services/db");
+const crypto = require("crypto");
 
 const reply = (statusCode, obj) => ({
   statusCode,
@@ -47,7 +48,7 @@ exports.handler = async (event) => {
 
     const { items } = result.rows[0];
 
-    // 🔥 APPROVE ORDER (FIXED)
+    // 🔥 APPROVE ORDER
     const updateResult = await db.query(
       `
       UPDATE public.order_requests
@@ -62,7 +63,7 @@ exports.handler = async (event) => {
       return reply(500, { success:false, error:"Failed to approve order" });
     }
 
-    // 🔥 PARSE ITEMS (SAFE)
+    // 🔥 PARSE ITEMS
     let parsedItems = [];
     try {
       parsedItems = typeof items === "string"
@@ -76,21 +77,43 @@ exports.handler = async (event) => {
       parsedItems = [];
     }
 
-    // 🔥 BUILD QR DATA (CLEAN + CONSISTENT)
-    const qr = parsedItems.map((item, i) => {
+    // 🔥 GENERATE TOKENS PER PROFILE
+    const qr = [];
 
+    for (let i = 0; i < parsedItems.length; i++) {
+
+      const item = parsedItems[i];
+
+      const profile_id = item.profile_id || null;
       const profile = item.profile || item.profile_name || null;
       const name = item.name || item.product || "Item";
 
-      return {
-        id: `${order_id}-${i}`,
+      // 🔐 TOKEN
+      const raw_token = crypto.randomBytes(32).toString("hex");
+      const token_hash = crypto.createHash("sha256").update(raw_token).digest("hex");
+
+      // 💾 STORE TOKEN
+      await db.query(
+        `
+        INSERT INTO public.qr_tokens
+        (order_id, profile_id, raw_token, token_hash, created_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        `,
+        [order_id, profile_id, raw_token, token_hash]
+      );
+
+      // 🔗 BUILD URL
+      const qr_url = `https://myvitalink.app/emergency.html?token=${raw_token}`;
+
+      qr.push({
+        profile_id,
         profile,
         name,
-        qr_url: `https://myvitalink.app/qr/${order_id}-${i}`
-      };
-    });
+        qr_url
+      });
+    }
 
-    console.log("✅ APPROVED + QR BUILT:", order_id, qr.length);
+    console.log("✅ TOKENS CREATED:", order_id, qr.length);
 
     return reply(200, {
       success: true,

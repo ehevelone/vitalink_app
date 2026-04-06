@@ -1,17 +1,8 @@
 const db = require("./services/db");
 const crypto = require("crypto");
-const { v4: uuidv4, v5: uuidv5 } = require("uuid");
 
 // 🔐 ENV KEY
 const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
-
-// UUID FIX
-function ensureUuid(id) {
-  if (!id) return uuidv4();
-  const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-  if (uuidRegex.test(id)) return id;
-  return uuidv5(id.toString(), uuidv5.URL);
-}
 
 // DECRYPT
 function decrypt(encryptedText) {
@@ -47,31 +38,61 @@ exports.handler = async (event) => {
       });
     }
 
-    let rawId =
-      event.queryStringParameters?.id ||
-      event.queryStringParameters?.profileId;
+    const token = event.queryStringParameters?.token;
 
-    if (!rawId) {
+    if (!token) {
       return reply(400, {
         success: false,
-        error: "Missing emergency profile id",
+        error: "Missing token",
       });
     }
 
-    rawId = String(rawId).trim();
-    const normalizedId = ensureUuid(rawId);
+    // 🔐 HASH TOKEN
+    const token_hash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
+    // 🔍 LOOKUP TOKEN
+    const tokenRes = await db.query(
+      `
+      SELECT profile_id
+      FROM public.qr_tokens
+      WHERE token_hash = $1
+        AND (revoked IS NULL OR revoked = false)
+      LIMIT 1
+      `,
+      [token_hash]
+    );
+
+    if (!tokenRes.rows.length) {
+      return reply(404, {
+        success: false,
+        error: "Invalid or expired QR",
+      });
+    }
+
+    const profileId = tokenRes.rows[0].profile_id;
+
+    if (!profileId) {
+      return reply(404, {
+        success: false,
+        error: "Profile not found",
+      });
+    }
+
+    // 🔥 LOAD ENCRYPTED PROFILE
     const result = await db.query(
       `
       SELECT encrypted_data
       FROM emergency_profiles
-      WHERE id::text = $1 OR id::text = $2
+      WHERE id = $1
       LIMIT 1
       `,
-      [rawId, normalizedId]
+      [profileId]
     );
 
-    if (!result.rows || result.rows.length === 0) {
+    if (!result.rows.length) {
       return reply(404, {
         success: false,
         error: "Emergency profile not found",
@@ -83,7 +104,6 @@ exports.handler = async (event) => {
     try {
       const decrypted = decrypt(result.rows[0].encrypted_data);
       data = JSON.parse(decrypted);
-      console.log("DECRYPTED DATA:", JSON.stringify(data, null, 2));
     } catch (e) {
       return reply(500, {
         success: false,
@@ -91,43 +111,28 @@ exports.handler = async (event) => {
       });
     }
 
-    const profileRes = await db.query(
+    // 🔥 GET MEDS
+    const medsRes = await db.query(
       `
-      SELECT id
-      FROM profiles
-      WHERE id::text = $1 OR id::text = $2
-      LIMIT 1
+      SELECT name, dose, frequency
+      FROM meds
+      WHERE profile_id = $1
+      ORDER BY name
       `,
-      [rawId, normalizedId]
+      [profileId]
     );
 
-    let meds = [];
-
-    if (profileRes.rows.length) {
-      const profileId = profileRes.rows[0].id;
-
-      const medsRes = await db.query(
-        `
-        SELECT name, dose, frequency
-        FROM meds
-        WHERE profile_id = $1
-        ORDER BY name
-        `,
-        [profileId]
-      );
-
-      meds = medsRes.rows.map(m => ({
-        name: m.name || "",
-        dose: m.dose || "",
-        frequency: m.frequency || ""
-      }));
-    }
+    let meds = medsRes.rows.map(m => ({
+      name: m.name || "",
+      dose: m.dose || "",
+      frequency: m.frequency || ""
+    }));
 
     if (!meds.length && Array.isArray(data.meds)) {
       meds = data.meds;
     }
 
-    // 🔥 FIX: SUPPORT BOTH FIELD TYPES
+    // 🔥 CONTACT SAFE MAPPING
     const contactName =
       data.emergencyContactName ||
       data.contact ||

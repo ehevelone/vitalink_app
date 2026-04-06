@@ -164,7 +164,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
+                decoration: const InputDecoration(
+                  labelText: "Full Name (First & Last)",
+                  hintText: "First and Last Name",
+                  helperText: "Required for emergency identification",
+                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return "Required";
