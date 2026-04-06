@@ -1,6 +1,10 @@
 // functions/emergency_view.js
 const db = require("./services/db");
+const crypto = require("crypto");
 const { v4: uuidv4, v5: uuidv5 } = require("uuid");
+
+// 🔐 ENV KEY
+const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
 
 // -------------------------------------------------------------
 // 🔥 UUID FIX
@@ -13,6 +17,20 @@ function ensureUuid(id) {
   if (uuidRegex.test(id)) return id;
 
   return uuidv5(id.toString(), uuidv5.URL);
+}
+
+// 🔐 DECRYPT
+function decrypt(encryptedText) {
+  const parts = encryptedText.split(":");
+  const iv = Buffer.from(parts[0], "hex");
+  const encrypted = parts[1];
+
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+
+  return decrypted;
 }
 
 function reply(statusCode, obj) {
@@ -53,71 +71,54 @@ exports.handler = async (event) => {
     console.log("🔎 RAW ID:", rawId);
     console.log("🔎 NORMALIZED ID:", normalizedId);
 
-    // 🧍 Load profile + emergency
-    const profileRes = await db.query(
+    // 🔐 LOAD ENCRYPTED RECORD
+    const result = await db.query(
       `
-      SELECT
-        p.id,
-        p.full_name,
-        p.dob,
-        e.contact,
-        e.phone,
-        e.allergies,
-        e.conditions,
-        e.blood_type,
-        e.organ_donor
-      FROM profiles p
-      LEFT JOIN emergency_profiles e ON e.profile_id = p.id
-      WHERE p.id::text = $1 OR p.id::text = $2
+      SELECT encrypted_data
+      FROM emergency_profiles
+      WHERE id::text = $1 OR id::text = $2
       LIMIT 1
       `,
       [rawId, normalizedId]
     );
 
-    if (!profileRes.rows.length) {
+    if (!result.rows || result.rows.length === 0) {
       return reply(404, {
         success: false,
         error: "Emergency profile not found",
       });
     }
 
-    const profile = profileRes.rows[0];
+    const encrypted = result.rows[0].encrypted_data;
 
-    // 💊 Medications
-    const medsRes = await db.query(
-      `
-      SELECT name, dose, frequency
-      FROM meds
-      WHERE profile_id::text = $1 OR profile_id::text = $2
-      ORDER BY name
-      `,
-      [rawId, normalizedId]
-    );
+    // 🔐 DECRYPT + PARSE
+    let data;
 
-    // 🩺 Providers
-    const providersRes = await db.query(
-      `
-      SELECT name, phone
-      FROM doctors
-      WHERE profile_id::text = $1 OR profile_id::text = $2
-      ORDER BY name
-      `,
-      [rawId, normalizedId]
-    );
+    try {
+      const decrypted = decrypt(encrypted);
+      data = JSON.parse(decrypted);
+    } catch (e) {
+      console.error("❌ decrypt fail:", e);
+      return reply(500, {
+        success: false,
+        error: "Decrypt failed",
+      });
+    }
 
+    // 🎯 RETURN DATA (same structure your frontend expects)
     return reply(200, {
       success: true,
       emergency: {
-        name: profile.full_name,
-        dob: profile.dob,
-        bloodType: profile.blood_type,
-        organDonor: profile.organ_donor,
-        emergencyContact: profile.contact,
-        emergencyPhone: profile.phone,
-        allergies: profile.allergies,
-        conditions: profile.conditions,
-        medications: medsRes.rows,
-        providers: providersRes.rows,
+        name: data.name || "",
+        dob: data.dob || "",
+        bloodType: data.bloodType || "",
+        organDonor: data.organDonor || false,
+        emergencyContact: data.contact || "",
+        emergencyPhone: data.phone || "",
+        allergies: data.allergies || "",
+        conditions: data.conditions || "",
+        medications: data.medications || [],
+        providers: data.providers || [],
       },
     });
 
