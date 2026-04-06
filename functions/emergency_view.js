@@ -1,5 +1,20 @@
 // functions/emergency_view.js
 const db = require("./services/db");
+const { v4: uuidv4, v5: uuidv5 } = require("uuid");
+
+// -------------------------------------------------------------
+// 🔥 UUID FIX (ADDED)
+// -------------------------------------------------------------
+function ensureUuid(id) {
+  if (!id) return uuidv4();
+
+  const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+
+  if (uuidRegex.test(id)) return id;
+
+  // Convert old timestamp → stable UUID
+  return uuidv5(id.toString(), uuidv5.URL);
+}
 
 function reply(statusCode, obj) {
   return {
@@ -22,7 +37,7 @@ exports.handler = async (event) => {
       });
     }
 
-    const id =
+    let id =
       event.queryStringParameters?.id ||
       event.queryStringParameters?.profileId;
 
@@ -32,6 +47,9 @@ exports.handler = async (event) => {
         error: "Missing emergency profile id",
       });
     }
+
+    // 🔥 FIX: normalize ID
+    id = ensureUuid(id);
 
     // 🧍 Load profile + emergency
     const profileRes = await db.query(

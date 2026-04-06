@@ -109,9 +109,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
     await _syncToBackend(p);
 
-    // 🔥 STATIC QR URL
+    // 🔥 FIXED: POINT TO FRONTEND PAGE (NOT FUNCTION)
     final qrUrl =
-        "https://vitalink-app.netlify.app/.netlify/functions/get_emergency_profile?id=${p.id}";
+        "https://myvitalink.app/emergency.html?id=${p.id}";
 
     Navigator.push(
       context,
@@ -166,7 +166,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               16,
               16,
               16,
-              MediaQuery.of(context).padding.bottom + 120, // 🔥 spacing for disclaimer
+              MediaQuery.of(context).padding.bottom + 120,
             ),
             children: [
               if (p.dob?.isNotEmpty == true)
@@ -294,7 +294,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
             ],
           ),
 
-          // 🔥 DISCLAIMER (LOCKED TO BOTTOM)
           Positioned(
             bottom: 10,
             left: 16,
