@@ -130,8 +130,23 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(labelText: "Full Name"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your name" : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return "Enter your name";
+                    }
+
+                    final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
+
+                    if (parts.length < 2) {
+                      return "Enter first & last name";
+                    }
+
+                    if (parts[0].length < 2 || parts[1].length < 2) {
+                      return "Enter valid full name";
+                    }
+
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
 

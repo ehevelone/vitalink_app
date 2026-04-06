@@ -74,19 +74,47 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 DEBUG — SEE EXACT ITEMS
     console.log("🧾 ITEMS RECEIVED:", items);
 
-    // 🚨 ENFORCE profile_id
+    // 🔥 LOAD USER PROFILES
+    const profileRes = await db.query(
+      `
+      SELECT id, name
+      FROM public.profiles
+      WHERE user_id = $1
+      `,
+      [user_id]
+    );
+
+    const profileMap = {};
+    profileRes.rows.forEach(p => {
+      if (p.name) {
+        profileMap[p.name.trim().toLowerCase()] = p.id;
+      }
+    });
+
+    console.log("👤 PROFILE MAP:", profileMap);
+
+    // 🔥 ENRICH ITEMS WITH profile_id
     items = items.map((item, i) => {
 
-      if (!item.profile_id && item.profile) {
-        console.warn(`⚠️ Missing profile_id for item ${i}:`, item);
+      let profile_id = item.profile_id || null;
+
+      if (!profile_id && item.profile) {
+        const key = item.profile.trim().toLowerCase();
+
+        profile_id = profileMap[key] || null;
+
+        if (!profile_id) {
+          console.warn(`⚠️ Profile not found for item ${i}:`, item.profile);
+        } else {
+          console.log(`✅ Matched profile_id for ${item.profile}:`, profile_id);
+        }
       }
 
       return {
         ...item,
-        profile_id: item.profile_id || null
+        profile_id
       };
     });
 
