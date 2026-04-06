@@ -96,6 +96,7 @@ exports.handler = async (event) => {
     try {
       const decrypted = decrypt(encrypted);
       data = JSON.parse(decrypted);
+      console.log("DECRYPTED DATA:", JSON.stringify(data, null, 2));
     } catch (e) {
       console.error("❌ decrypt fail:", e);
       return reply(500, {
