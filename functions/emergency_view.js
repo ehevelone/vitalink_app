@@ -3,7 +3,7 @@ const db = require("./services/db");
 const { v4: uuidv4, v5: uuidv5 } = require("uuid");
 
 // -------------------------------------------------------------
-// 🔥 UUID FIX (ADDED)
+// 🔥 UUID FIX
 // -------------------------------------------------------------
 function ensureUuid(id) {
   if (!id) return uuidv4();
@@ -12,7 +12,6 @@ function ensureUuid(id) {
 
   if (uuidRegex.test(id)) return id;
 
-  // Convert old timestamp → stable UUID
   return uuidv5(id.toString(), uuidv5.URL);
 }
 
@@ -37,19 +36,22 @@ exports.handler = async (event) => {
       });
     }
 
-    let id =
+    let rawId =
       event.queryStringParameters?.id ||
       event.queryStringParameters?.profileId;
 
-    if (!id) {
+    if (!rawId) {
       return reply(400, {
         success: false,
         error: "Missing emergency profile id",
       });
     }
 
-    // 🔥 FIX: normalize ID
-    id = ensureUuid(id);
+    rawId = String(rawId).trim();
+    const normalizedId = ensureUuid(rawId);
+
+    console.log("🔎 RAW ID:", rawId);
+    console.log("🔎 NORMALIZED ID:", normalizedId);
 
     // 🧍 Load profile + emergency
     const profileRes = await db.query(
@@ -65,11 +67,11 @@ exports.handler = async (event) => {
         e.blood_type,
         e.organ_donor
       FROM profiles p
-      LEFT JOIN emergency e ON e.profile_id = p.id
-      WHERE p.id = $1
+      LEFT JOIN emergency_profiles e ON e.profile_id = p.id
+      WHERE p.id::text = $1 OR p.id::text = $2
       LIMIT 1
       `,
-      [id]
+      [rawId, normalizedId]
     );
 
     if (!profileRes.rows.length) {
@@ -86,10 +88,10 @@ exports.handler = async (event) => {
       `
       SELECT name, dose, frequency
       FROM meds
-      WHERE profile_id = $1
+      WHERE profile_id::text = $1 OR profile_id::text = $2
       ORDER BY name
       `,
-      [id]
+      [rawId, normalizedId]
     );
 
     // 🩺 Providers
@@ -97,10 +99,10 @@ exports.handler = async (event) => {
       `
       SELECT name, phone
       FROM doctors
-      WHERE profile_id = $1
+      WHERE profile_id::text = $1 OR profile_id::text = $2
       ORDER BY name
       `,
-      [id]
+      [rawId, normalizedId]
     );
 
     return reply(200, {
