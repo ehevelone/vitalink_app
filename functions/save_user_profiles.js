@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
     let inserted = 0;
 
-    // 🔥 STEP 2 — INSERT NEW PROFILES
+    // 🔥 STEP 2 — INSERT FULL PROFILE DATA
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
 
@@ -44,10 +44,28 @@ exports.handler = async (event) => {
       try {
         await pool.query(
           `
-          INSERT INTO profiles (user_id, name)
-          VALUES ($1, $2)
+          INSERT INTO profiles (
+            user_id,
+            name,
+            dob,
+            medications,
+            conditions,
+            allergies,
+            notes,
+            raw_data
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
           `,
-          [user_id, name]
+          [
+            user_id,
+            name,
+            p.dob || null,
+            JSON.stringify(p.medications || []),
+            JSON.stringify(p.conditions || []),
+            JSON.stringify(p.allergies || []),
+            p.notes || null,
+            JSON.stringify(p) // 🔥 FULL BACKUP OF PROFILE
+          ]
         );
 
         inserted++;

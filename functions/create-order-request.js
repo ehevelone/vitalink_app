@@ -27,6 +27,11 @@ if (!admin.apps.length) {
   }
 }
 
+// 🔐 HASH FUNCTION
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 exports.handler = async (event) => {
 
   const headers = {
@@ -120,42 +125,44 @@ exports.handler = async (event) => {
       };
     });
 
-    console.log("✅ FINAL ITEMS SAVED:", items);
+    console.log("✅ FINAL ITEMS:", items);
 
-    // 🔥 BUILD QR DATA
-    const qr = items.map(item => {
+    // 🔥 BUILD QR DATA + SAVE TO PROFILES
+    const qr = [];
 
-      const token = crypto.randomBytes(32).toString("hex");
+    for (const item of items) {
 
-      return {
+      if (!item.profile_id) continue;
+
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashToken(rawToken);
+
+      // ✅ SAVE DIRECTLY TO PROFILES
+      await db.query(
+        `
+        UPDATE public.profiles
+        SET 
+          qr_token = $1,
+          token_hash = $2,
+          qr_created_at = NOW(),
+          qr_revoked = false
+        WHERE id = $3 AND user_id = $4
+        `,
+        [rawToken, tokenHash, item.profile_id, user_id]
+      );
+
+      const qr_url = `https://myvitalink.app/emergency.html?token=${rawToken}`;
+
+      qr.push({
         profile: item.profile || "Profile",
         profile_id: item.profile_id,
-        token: token,
-        qr_url: `https://myvitalink.app/emergency.html?token=${token}`
-      };
-    });
+        qr_url
+      });
 
-    // 🔥 SAVE TOKENS TO qr_codes TABLE (THIS WAS MISSING)
-    for (const q of qr) {
-      if (!q.profile_id) continue;
-
-      try {
-        await db.query(
-          `
-          INSERT INTO public.qr_codes (token, profile_id, user_id)
-          VALUES ($1, $2, $3)
-          `,
-          [q.token, q.profile_id, user_id]
-        );
-
-        console.log("✅ QR SAVED:", q.token);
-
-      } catch (e) {
-        console.error("❌ QR INSERT FAILED:", e);
-      }
+      console.log("✅ QR SAVED TO PROFILE:", item.profile_id);
     }
 
-    // 🧾 SAVE ORDER (WITH QR INCLUDED)
+    // 🧾 SAVE ORDER
     const result = await db.query(
       `
       INSERT INTO public.order_requests (user_id, items, qr, status)
@@ -167,7 +174,7 @@ exports.handler = async (event) => {
 
     const request_id = result.rows[0].id;
 
-    // 🔥 PUSH IS NOW OPTIONAL (LEFT IN, BUT SAFE)
+    // 🔔 PUSH (UNCHANGED)
     const deviceRes = await db.query(
       `
       SELECT device_token
@@ -182,13 +189,10 @@ exports.handler = async (event) => {
 
     const tokens = deviceRes.rows.map(r => r.device_token);
 
-    if (tokens.length === 0) {
-      console.warn("⚠️ No device tokens — skipping push (OK)");
-    } else {
-
+    if (tokens.length > 0) {
       try {
         await admin.messaging().sendEachForMulticast({
-          tokens: tokens,
+          tokens,
           notification: {
             title: "VitaLink Order Created",
             body: "Your QR access is ready"

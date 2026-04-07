@@ -1,23 +1,6 @@
 const db = require("./services/db");
 const crypto = require("crypto");
 
-// 🔐 ENV KEY
-const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
-
-// DECRYPT
-function decrypt(encryptedText) {
-  const parts = encryptedText.split(":");
-  const iv = Buffer.from(parts[0], "hex");
-  const encrypted = parts[1];
-
-  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-
-  return decrypted;
-}
-
 function reply(statusCode, obj) {
   return {
     statusCode,
@@ -53,119 +36,77 @@ exports.handler = async (event) => {
       .update(token)
       .digest("hex");
 
-    // 🔍 LOOKUP TOKEN
-    const tokenRes = await db.query(
+    // 🔥 LOOKUP PROFILE DIRECTLY
+    const result = await db.query(
       `
-      SELECT profile_id
-      FROM public.qr_tokens
+      SELECT *
+      FROM public.profiles
       WHERE token_hash = $1
-        AND (revoked IS NULL OR revoked = false)
+        AND (qr_revoked IS NULL OR qr_revoked = false)
       LIMIT 1
       `,
       [token_hash]
     );
 
-    if (!tokenRes.rows.length) {
+    if (!result.rows.length) {
       return reply(404, {
         success: false,
         error: "Invalid or expired QR",
       });
     }
 
-    const profileId = tokenRes.rows[0].profile_id;
+    const profile = result.rows[0];
 
-    if (!profileId) {
-      return reply(404, {
-        success: false,
-        error: "Profile not found",
-      });
-    }
-
-    // 🔥 LOAD ENCRYPTED PROFILE
-    const result = await db.query(
-      `
-      SELECT encrypted_data
-      FROM emergency_profiles
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [profileId]
-    );
-
-    if (!result.rows.length) {
-      return reply(404, {
-        success: false,
-        error: "Emergency profile not found",
-      });
-    }
-
-    let data;
+    // 🔥 PARSE STORED DATA
+    let raw = {};
 
     try {
-      const decrypted = decrypt(result.rows[0].encrypted_data);
-      data = JSON.parse(decrypted);
+      raw = profile.raw_data || {};
+      if (typeof raw === "string") {
+        raw = JSON.parse(raw);
+      }
     } catch (e) {
-      return reply(500, {
-        success: false,
-        error: "Decrypt failed",
-      });
+      console.warn("⚠️ Failed to parse raw_data");
     }
 
-    // 🔥 GET MEDS
-    const medsRes = await db.query(
-      `
-      SELECT name, dose, frequency
-      FROM meds
-      WHERE profile_id = $1
-      ORDER BY name
-      `,
-      [profileId]
-    );
-
-    let meds = medsRes.rows.map(m => ({
-      name: m.name || "",
-      dose: m.dose || "",
-      frequency: m.frequency || ""
-    }));
-
-    if (!meds.length && Array.isArray(data.meds)) {
-      meds = data.meds;
-    }
-
-    // 🔥 CONTACT SAFE MAPPING
-    const contactName =
-      data.emergencyContactName ||
-      data.contact ||
-      "";
-
-    const contactPhone =
-      data.emergencyContactPhone ||
-      data.phone ||
-      "";
-
+    // 🔥 SAFE FIELD MAPPING
     return reply(200, {
       success: true,
       emergency: {
-        name: data.name || "",
-        dob: data.dob || "",
-        bloodType: data.bloodType || "",
-        organDonor: data.organDonor || false,
+        name: profile.name || raw.name || "",
+        dob: profile.dob || raw.dob || "",
+        bloodType: raw.bloodType || "",
+        organDonor: raw.organDonor || false,
 
-        emergencyContactName: contactName,
-        emergencyContactPhone: contactPhone,
+        emergencyContactName:
+          raw.emergencyContactName || raw.contact || "",
 
-        allergies: data.allergies || "",
-        conditions: data.conditions || "",
-        implants: data.implants || "",
-        procedures: data.procedures || "",
+        emergencyContactPhone:
+          raw.emergencyContactPhone || raw.phone || "",
 
-        meds,
-        providers: data.providers || [],
+        allergies:
+          profile.allergies
+            ? JSON.parse(profile.allergies)
+            : raw.allergies || [],
+
+        conditions:
+          profile.conditions
+            ? JSON.parse(profile.conditions)
+            : raw.conditions || [],
+
+        meds:
+          profile.medications
+            ? JSON.parse(profile.medications)
+            : raw.medications || [],
+
+        providers: raw.providers || [],
+        notes: profile.notes || raw.notes || "",
       },
     });
 
   } catch (err) {
     console.error("❌ emergency_view error:", err);
+
     return reply(500, {
       success: false,
       error: "Server error loading emergency view",
