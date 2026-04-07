@@ -47,19 +47,17 @@ exports.handler = async (event) => {
           INSERT INTO profiles (
             user_id,
             name,
-            dob,
             medications,
             conditions,
             allergies,
             notes,
             raw_data
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
           `,
           [
             user_id,
             name,
-            p.dob || null,
             JSON.stringify(p.medications || []),
             JSON.stringify(p.conditions || []),
             JSON.stringify(p.allergies || []),
