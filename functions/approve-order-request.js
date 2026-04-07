@@ -88,18 +88,20 @@ exports.handler = async (event) => {
       const profile = item.profile || item.profile_name || null;
       const name = item.name || item.product || "Item";
 
+      if (!profile_id) continue;
+
       // 🔐 TOKEN
       const raw_token = crypto.randomBytes(32).toString("hex");
       const token_hash = crypto.createHash("sha256").update(raw_token).digest("hex");
 
-      // 💾 STORE TOKEN
+      // 💾 STORE TOKEN DIRECTLY IN PROFILES
       await db.query(
         `
-        INSERT INTO public.qr_tokens
-        (order_id, profile_id, raw_token, token_hash, created_at)
-        VALUES ($1, $2, $3, $4, NOW())
+        UPDATE public.profiles
+        SET token_hash = $1
+        WHERE id = $2
         `,
-        [order_id, profile_id, raw_token, token_hash]
+        [token_hash, profile_id]
       );
 
       // 🔗 BUILD URL
@@ -113,7 +115,7 @@ exports.handler = async (event) => {
       });
     }
 
-    console.log("✅ TOKENS CREATED:", order_id, qr.length);
+    console.log("✅ TOKENS STORED IN PROFILES:", order_id, qr.length);
 
     return reply(200, {
       success: true,

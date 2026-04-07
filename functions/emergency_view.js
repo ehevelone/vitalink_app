@@ -1,115 +1,130 @@
 const db = require("./services/db");
 const crypto = require("crypto");
 
-function reply(statusCode, obj) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify(obj),
-  };
-}
+const reply = (statusCode, obj) => ({
+  statusCode,
+  headers: {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "https://myvitalink.app",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  },
+  body: JSON.stringify(obj),
+});
 
 exports.handler = async (event) => {
+
+  if (event.httpMethod === "OPTIONS") {
+    return reply(200, {});
+  }
+
   try {
-    if (event.httpMethod !== "GET") {
-      return reply(405, {
-        success: false,
-        error: "Method Not Allowed",
-      });
+
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch {}
+
+    const order_id = body.order_id || body.request_id;
+
+    if (!order_id) {
+      return reply(400, { success:false, error:"Missing order_id" });
     }
 
-    const token = event.queryStringParameters?.token;
-
-    if (!token) {
-      return reply(400, {
-        success: false,
-        error: "Missing token",
-      });
-    }
-
-    // 🔐 HASH TOKEN
-    const token_hash = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
-
-    // 🔥 LOOKUP PROFILE DIRECTLY
+    // 🔥 GET ORDER
     const result = await db.query(
       `
-      SELECT *
-      FROM public.profiles
-      WHERE token_hash = $1
-        AND (qr_revoked IS NULL OR qr_revoked = false)
+      SELECT items
+      FROM public.order_requests
+      WHERE id = $1
       LIMIT 1
       `,
-      [token_hash]
+      [order_id]
     );
 
     if (!result.rows.length) {
-      return reply(404, {
-        success: false,
-        error: "Invalid or expired QR",
+      return reply(404, { success:false, error:"Order not found" });
+    }
+
+    const { items } = result.rows[0];
+
+    // 🔥 APPROVE ORDER
+    const updateResult = await db.query(
+      `
+      UPDATE public.order_requests
+      SET status = 'approved', approved_at = NOW()
+      WHERE id = $1
+      RETURNING id
+      `,
+      [order_id]
+    );
+
+    if (!updateResult.rows.length) {
+      return reply(500, { success:false, error:"Failed to approve order" });
+    }
+
+    // 🔥 PARSE ITEMS
+    let parsedItems = [];
+    try {
+      parsedItems = typeof items === "string"
+        ? JSON.parse(items)
+        : items;
+    } catch {
+      parsedItems = [];
+    }
+
+    if (!Array.isArray(parsedItems)) {
+      parsedItems = [];
+    }
+
+    // 🔥 GENERATE TOKENS PER PROFILE
+    const qr = [];
+
+    for (let i = 0; i < parsedItems.length; i++) {
+
+      const item = parsedItems[i];
+
+      const profile_id = item.profile_id || null;
+      const profile = item.profile || item.profile_name || null;
+      const name = item.name || item.product || "Item";
+
+      if (!profile_id) continue;
+
+      // 🔐 TOKEN
+      const raw_token = crypto.randomBytes(32).toString("hex");
+      const token_hash = crypto.createHash("sha256").update(raw_token).digest("hex");
+
+      // 💾 STORE TOKEN IN PROFILES
+      await db.query(
+        `
+        UPDATE public.profiles
+        SET token_hash = $1
+        WHERE id = $2
+        `,
+        [token_hash, profile_id]
+      );
+
+      // 🔗 BUILD URL
+      const qr_url = `https://myvitalink.app/emergency.html?token=${raw_token}`;
+
+      qr.push({
+        profile_id,
+        profile,
+        name,
+        qr_url
       });
     }
 
-    const profile = result.rows[0];
+    console.log("✅ TOKENS STORED IN PROFILES:", order_id, qr.length);
 
-    // 🔥 PARSE STORED DATA
-    let raw = {};
-
-    try {
-      raw = profile.raw_data || {};
-      if (typeof raw === "string") {
-        raw = JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn("⚠️ Failed to parse raw_data");
-    }
-
-    // 🔥 SAFE FIELD MAPPING
     return reply(200, {
       success: true,
-      emergency: {
-        name: profile.name || raw.name || "",
-        dob: profile.dob || raw.dob || "",
-        bloodType: raw.bloodType || "",
-        organDonor: raw.organDonor || false,
-
-        emergencyContactName:
-          raw.emergencyContactName || raw.contact || "",
-
-        emergencyContactPhone:
-          raw.emergencyContactPhone || raw.phone || "",
-
-        allergies:
-          profile.allergies
-            ? JSON.parse(profile.allergies)
-            : raw.allergies || [],
-
-        conditions:
-          profile.conditions
-            ? JSON.parse(profile.conditions)
-            : raw.conditions || [],
-
-        meds:
-          profile.medications
-            ? JSON.parse(profile.medications)
-            : raw.medications || [],
-
-        providers: raw.providers || [],
-        notes: profile.notes || raw.notes || "",
-      },
+      order_id,
+      qr
     });
 
   } catch (err) {
-    console.error("❌ emergency_view error:", err);
-
-    return reply(500, {
-      success: false,
-      error: "Server error loading emergency view",
-    });
+    console.error("❌ approve_order error:", err);
+    return reply(500, { success:false, error:"Server error" });
   }
 };
