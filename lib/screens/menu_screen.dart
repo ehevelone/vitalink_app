@@ -29,29 +29,36 @@ class _MenuScreenState extends State<MenuScreen>
   bool _loading = true;
   String _displayName = "User";
 
+  bool _syncRan = false; // 🔥 prevents duplicate calls
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    print("🚀 MENU INIT HIT");
 
     _repo = DataRepository(_store);
 
     _loadProfile();
     _setupFCM();
 
-    // 🔥 FIXED SYNC (THIS WAS YOUR ISSUE)
-    Future.microtask(() async {
-      print("🔥 SYNC STARTING");
-
-      try {
-        final res = await ApiService.syncProfilesToServer();
-        print("✅ SYNC RESULT: $res");
-      } catch (e) {
-        print("❌ SYNC ERROR: $e");
-      }
-    });
-
     _checkPendingNavigation();
+  }
+
+  // 🔥 GUARANTEED SYNC TRIGGER
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_syncRan) return;
+    _syncRan = true;
+
+    print("🔥 SYNC STARTING");
+
+    ApiService.syncProfilesToServer()
+        .then((res) => print("✅ SYNC RESULT: $res"))
+        .catchError((e) => print("❌ SYNC ERROR: $e"));
   }
 
   @override

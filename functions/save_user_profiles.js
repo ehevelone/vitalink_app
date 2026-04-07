@@ -22,7 +22,7 @@ exports.handler = async (event) => {
     }
 
     console.log("🔥 Saving profiles for user:", user_id);
-    console.log("📦 Profiles received:", profiles.length);
+    console.log("📦 Profiles received:", profiles);
 
     // 🔥 STEP 1 — CLEAR EXISTING PROFILES
     await pool.query(
@@ -30,37 +30,51 @@ exports.handler = async (event) => {
       [user_id]
     );
 
+    let inserted = 0;
+
     // 🔥 STEP 2 — INSERT NEW PROFILES
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
 
-      if (!name) continue;
+      if (!name) {
+        console.log("⚠️ Skipping empty profile:", p);
+        continue;
+      }
 
-      await pool.query(
-        `
-        INSERT INTO profiles (user_id, name)
-        VALUES ($1, $2)
-        `,
-        [user_id, name]
-      );
+      try {
+        await pool.query(
+          `
+          INSERT INTO profiles (user_id, name)
+          VALUES ($1, $2)
+          `,
+          [user_id, name]
+        );
+
+        inserted++;
+
+      } catch (err) {
+        console.error("❌ INSERT FAILED:", err, p);
+      }
     }
+
+    console.log("✅ Inserted profiles:", inserted);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        count: profiles.length,
+        count: inserted,
       }),
     };
 
   } catch (err) {
-    console.error("save_user_profiles error:", err);
+    console.error("🔥 save_user_profiles error:", err);
 
     return {
       statusCode: 500,
       body: JSON.stringify({
         success: false,
-        error: "Server error",
+        error: err.message || "Server error",
       }),
     };
   }

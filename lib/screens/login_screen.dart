@@ -34,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  // 🔥 FIXED INIT (NO AUTO LOGIN)
   Future<void> _initLogin() async {
     final store = SecureStore();
 
@@ -143,7 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await AppState.setRole("user");
       await AppState.setEmail(user["email"]);
 
+      // ✅ FIX — STORE AS STRING
       await store.setString("userId", user["id"].toString());
+
       await store.setString("userEmail", user["email"]);
 
       if (_rememberMe) {
@@ -168,16 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (_) {}
 
       Navigator.pushReplacementNamed(context, "/logo");
-    }
-
-    else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
+    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
       final confirmed = await _showReplacePopup();
       if (confirmed) {
         await _login(replace: true);
       }
-    }
-
-    else {
+    } else {
       final store = SecureStore();
 
       if (auto) {

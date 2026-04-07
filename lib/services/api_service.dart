@@ -415,10 +415,12 @@ class ApiService {
       final store = SecureStore();
       final repo = DataRepository(store);
 
-      final email = await store.getString("userEmail");
+      // ✅ FIX: USE user_id INSTEAD OF EMAIL
+      final userIdStr = await store.getString("userId");
+      final userId = int.tryParse(userIdStr ?? "");
 
-      if (email == null || email.isEmpty) {
-        debugPrint("❌ No email found — skipping profile sync");
+      if (userId == null) {
+        debugPrint("❌ No userId found — skipping profile sync");
         return {"success": false};
       }
 
@@ -436,7 +438,7 @@ class ApiService {
       }).toList();
 
       final body = {
-        "email": email,
+        "user_id": userId, // 🔥 FIXED
         "profiles": fixedProfiles,
       };
 
