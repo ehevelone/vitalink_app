@@ -13,7 +13,7 @@ class ApiService {
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔥 UUID FIX (ADDED)
+  // 🔥 UUID FIX
   // -------------------------------------------------------------
   static String _ensureUuid(String? id) {
     if (id == null || id.isEmpty) return const Uuid().v4();
@@ -79,14 +79,14 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🚨 SAVE EMERGENCY PROFILE (FIXED)
+  // 🚨 SAVE EMERGENCY PROFILE
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> saveEmergencyProfile({
     required String profileId,
     required Map<String, dynamic> data,
   }) async {
     return _postJson("save_emergency_profile", {
-      "profile_id": _ensureUuid(profileId), // 🔥 FIX
+      "profile_id": _ensureUuid(profileId),
       "data": data,
     });
   }
@@ -415,25 +415,32 @@ class ApiService {
       final store = SecureStore();
       final repo = DataRepository(store);
 
-      final userId = await store.getString("userId");
+      final email = await store.getString("userEmail");
 
-      if (userId == null) {
-        debugPrint("❌ No userId found — skipping profile sync");
+      if (email == null || email.isEmpty) {
+        debugPrint("❌ No email found — skipping profile sync");
         return {"success": false};
       }
 
       final profiles = await repo.loadAllProfiles();
 
+      if (profiles.isEmpty) {
+        debugPrint("⚠️ No profiles to sync");
+        return {"success": false};
+      }
+
       final fixedProfiles = profiles.map((p) {
         final json = p.toJson();
-        json["id"] = _ensureUuid(p.id); // 🔥 FIX
+        json["id"] = _ensureUuid(p.id);
         return json;
       }).toList();
 
       final body = {
-        "user_id": userId,
+        "email": email,
         "profiles": fixedProfiles,
       };
+
+      debugPrint("🚀 SENDING PROFILES: $body");
 
       return await _postJson("save_user_profiles", body);
     } catch (e, st) {

@@ -39,7 +39,17 @@ class _MenuScreenState extends State<MenuScreen>
     _loadProfile();
     _setupFCM();
 
-    ApiService.syncProfilesToServer();
+    // 🔥 FIXED SYNC (THIS WAS YOUR ISSUE)
+    Future.microtask(() async {
+      print("🔥 SYNC STARTING");
+
+      try {
+        final res = await ApiService.syncProfilesToServer();
+        print("✅ SYNC RESULT: $res");
+      } catch (e) {
+        print("❌ SYNC ERROR: $e");
+      }
+    });
 
     _checkPendingNavigation();
   }
@@ -49,8 +59,6 @@ class _MenuScreenState extends State<MenuScreen>
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
       _checkPendingNavigation();
-
-      // 🔥 RE-REGISTER TOKEN ON RESUME
       _registerToken();
     }
   }
@@ -60,7 +68,14 @@ class _MenuScreenState extends State<MenuScreen>
       final token = await FirebaseMessaging.instance.getToken();
 
       if (token != null && token.isNotEmpty) {
-        await ApiService.registerDeviceToken(token);
+        final email = await _store.getString("userEmail");
+
+        await ApiService.registerDeviceToken(
+          email: email ?? "",
+          fcmToken: token,
+          role: "user",
+        );
+
         print("✅ FCM TOKEN REGISTERED: $token");
       }
     } catch (e) {
@@ -144,12 +159,17 @@ class _MenuScreenState extends State<MenuScreen>
         }
       }
 
-      // 🔥 REGISTER TOKEN ON INIT
       await _registerToken();
 
-      // 🔥 HANDLE TOKEN ROTATION (CRITICAL FIX)
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        await ApiService.registerDeviceToken(newToken);
+        final email = await _store.getString("userEmail");
+
+        await ApiService.registerDeviceToken(
+          email: email ?? "",
+          fcmToken: newToken,
+          role: "user",
+        );
+
         print("🔁 TOKEN REFRESHED: $newToken");
       });
 
