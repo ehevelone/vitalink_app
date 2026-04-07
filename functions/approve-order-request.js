@@ -94,11 +94,13 @@ exports.handler = async (event) => {
       const raw_token = crypto.randomBytes(32).toString("hex");
       const token_hash = crypto.createHash("sha256").update(raw_token).digest("hex");
 
-      // 💾 STORE TOKEN DIRECTLY IN PROFILES
+      // 🔥 CLEAR OLD TOKEN + SET NEW ONE
       await db.query(
         `
         UPDATE public.profiles
-        SET token_hash = $1
+        SET token_hash = $1,
+            qr_revoked = false,
+            updated_at = NOW()
         WHERE id = $2
         `,
         [token_hash, profile_id]

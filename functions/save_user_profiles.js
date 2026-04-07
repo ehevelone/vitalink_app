@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const crypto = require("crypto");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -42,27 +43,26 @@ exports.handler = async (event) => {
       }
 
       try {
+        // ✅ CREATE UUID
+        const id = crypto.randomUUID();
+
         await pool.query(
           `
           INSERT INTO profiles (
+            id,
             user_id,
             name,
-            medications,
-            conditions,
-            allergies,
-            notes,
-            raw_data
+            raw_data,
+            created_at,
+            updated_at
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7)
+          VALUES ($1,$2,$3,$4,NOW(),NOW())
           `,
           [
+            id,
             user_id,
             name,
-            JSON.stringify(p.medications || []),
-            JSON.stringify(p.conditions || []),
-            JSON.stringify(p.allergies || []),
-            p.notes || null,
-            JSON.stringify(p) // 🔥 FULL BACKUP OF PROFILE
+            JSON.stringify(p) // 🔥 THIS is your entire system now
           ]
         );
 
