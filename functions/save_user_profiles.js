@@ -53,16 +53,15 @@ exports.handler = async (event) => {
             user_id,
             name,
             raw_data,
-            created_at,
-            updated_at
+            created_at
           )
-          VALUES ($1,$2,$3,$4,NOW(),NOW())
+          VALUES ($1,$2,$3,$4,NOW())
           `,
           [
             id,
             user_id,
             name,
-            JSON.stringify(p) // 🔥 THIS is your entire system now
+            JSON.stringify(p)
           ]
         );
 
