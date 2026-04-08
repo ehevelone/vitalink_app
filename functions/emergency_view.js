@@ -1,6 +1,6 @@
 const db = require("./services/db");
 const crypto = require("crypto");
-const { decrypt } = require("./utils/encrypt"); // ✅ ADD THIS
+const { decrypt } = require("./utils/encrypt.js"); // ✅ FIXED
 
 function reply(statusCode, obj) {
   return {
@@ -31,13 +31,11 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔐 HASH TOKEN
     const token_hash = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
-    // 🔍 LOOKUP ENCRYPTED + RAW DATA
     const tokenRes = await db.query(
       `
       SELECT id, encrypted_data, raw_data
@@ -62,7 +60,6 @@ exports.handler = async (event) => {
     const encrypted = row.encrypted_data;
     const raw = row.raw_data;
 
-    // 🔥 HANDLE BOTH (OLD + NEW DATA)
     let data = {};
 
     if (encrypted) {
@@ -90,7 +87,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 GET MEDS (unchanged)
     const medsRes = await db.query(
       `
       SELECT name, dose, frequency

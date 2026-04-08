@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
 const crypto = require("crypto");
-const { encrypt } = require("./utils/encrypt"); // ✅ ADD THIS
+const { encrypt } = require("./utils/encrypt.js"); // ✅ FIXED
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -26,7 +26,6 @@ exports.handler = async (event) => {
     console.log("🔥 Saving profiles for user:", user_id);
     console.log("📦 Profiles received:", profiles);
 
-    // 🔥 STEP 1 — CLEAR EXISTING PROFILES
     await pool.query(
       `DELETE FROM profiles WHERE user_id = $1`,
       [user_id]
@@ -34,7 +33,6 @@ exports.handler = async (event) => {
 
     let inserted = 0;
 
-    // 🔥 STEP 2 — INSERT FULL PROFILE DATA (ENCRYPTED)
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
 
@@ -46,7 +44,6 @@ exports.handler = async (event) => {
       try {
         const id = crypto.randomUUID();
 
-        // 🔐 ENCRYPT DATA
         const encrypted_data = encrypt(JSON.stringify(p));
 
         await pool.query(

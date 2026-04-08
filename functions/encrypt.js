@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
-// 🔐 LOAD KEY
+// 🔐 LOAD KEY (force rebuild v1)
 const keyHex = process.env.ENCRYPTION_KEY;
 
 if (!keyHex) {
@@ -40,6 +40,7 @@ function decrypt(encryptedText) {
   return decrypted;
 }
 
+// 🔁 export (no change - rebuild trigger)
 module.exports = {
   encrypt,
   decrypt
