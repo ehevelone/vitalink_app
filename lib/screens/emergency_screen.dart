@@ -91,9 +91,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         debugPrint("⚠️ Save failed: ${res["error"]}");
       }
 
-      // 🔥 FIXED: capture token from correct location
-      if (res["profile"] != null && res["profile"]["qr_token"] != null) {
-        p.qrToken = res["profile"]["qr_token"];
+      // ✅ NEW: capture token IF backend gives one (non-breaking)
+      if (res["qr_token"] != null && res["qr_token"].toString().isNotEmpty) {
+        p.qrToken = res["qr_token"];
       }
 
     } catch (e) {
@@ -112,18 +112,13 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
+    // 🔥 KEEP ORIGINAL WORKING FLOW
     await _syncToBackend(p);
 
-    // 🔥 HARD STOP if token missing
-    if (p.qrToken == null || p.qrToken!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("QR token not available. Try again.")),
-      );
-      return;
-    }
-
-    final qrUrl =
-        "https://myvitalink.app/emergency.html?token=${p.qrToken}";
+    // ✅ NEW: use token if available, otherwise fallback (DO NOT BREAK)
+    final qrUrl = (p.qrToken != null && p.qrToken!.isNotEmpty)
+        ? "https://myvitalink.app/emergency.html?token=${p.qrToken}"
+        : "https://myvitalink.app/emergency.html?id=${p.id}";
 
     Navigator.push(
       context,

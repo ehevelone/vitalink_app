@@ -27,11 +27,10 @@ function getKey() {
 }
 
 // 🔐 ENCRYPT
-function encrypt(text){
+function encrypt(text) {
   const key = getKey();
 
   if (!key) {
-    // fallback — DO NOT CRASH
     return text;
   }
 
@@ -66,7 +65,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success:false, error:"Invalid JSON" })
+        body: JSON.stringify({ success: false, error: "Invalid JSON" })
       };
     }
 
@@ -76,12 +75,13 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success:false, error:"Missing profile_id or data" })
+        body: JSON.stringify({ success: false, error: "Missing profile_id or data" })
       };
     }
 
     const encrypted = encrypt(JSON.stringify(data));
 
+    // 🔥 SAVE EMERGENCY PAYLOAD TO emergency_profiles
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -94,13 +94,42 @@ exports.handler = async (event) => {
       [profile_id, encrypted]
     );
 
-    // 🔥 FETCH QR TOKEN FROM profiles TABLE (ADDED)
+    // 🔥 GET EXISTING TOKEN + HASH FROM profiles
     const tokenRes = await db.query(
-      `SELECT qr_token FROM profiles WHERE id = $1 LIMIT 1`,
+      `
+      SELECT qr_token, token_hash
+      FROM profiles
+      WHERE id = $1
+      LIMIT 1
+      `,
       [profile_id]
     );
 
-    const qr_token = tokenRes.rows[0]?.qr_token || null;
+    let qr_token = tokenRes.rows[0]?.qr_token || null;
+    let token_hash = tokenRes.rows[0]?.token_hash || null;
+
+    // ✅ CREATE TOKEN IF MISSING
+    if (!qr_token) {
+      qr_token = crypto.randomBytes(16).toString("hex");
+    }
+
+    // ✅ ALWAYS KEEP HASH IN SYNC WITH TOKEN
+    token_hash = crypto
+      .createHash("sha256")
+      .update(qr_token)
+      .digest("hex");
+
+    // 🔥 SAVE BOTH TO profiles
+    await db.query(
+      `
+      UPDATE profiles
+      SET qr_token = $1,
+          token_hash = $2,
+          qr_revoked = false
+      WHERE id = $3
+      `,
+      [qr_token, token_hash, profile_id]
+    );
 
     return {
       statusCode: 200,
@@ -118,8 +147,8 @@ exports.handler = async (event) => {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        success:false,
-        error:"Server error",
+        success: false,
+        error: "Server error",
         details: err.message
       })
     };

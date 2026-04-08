@@ -1,6 +1,6 @@
 const db = require("./services/db");
 const crypto = require("crypto");
-const { decrypt } = require("./encrypt.js"); // ✅ FIXED
+const { decrypt } = require("./encrypt.js");
 
 function reply(statusCode, obj) {
   return {
@@ -46,9 +46,10 @@ exports.handler = async (event) => {
 
     console.log("TOKEN HASH:", token_hash);
 
+    // 🔥 LOOK UP PROFILE BY HASH IN profiles
     const tokenRes = await db.query(
       `
-      SELECT id, encrypted_data
+      SELECT id
       FROM public.profiles
       WHERE token_hash = $1
         AND (qr_revoked IS NULL OR qr_revoked = false)
@@ -57,7 +58,7 @@ exports.handler = async (event) => {
       [token_hash]
     );
 
-    console.log("DB RESULT COUNT:", tokenRes.rows.length);
+    console.log("PROFILE MATCH COUNT:", tokenRes.rows.length);
 
     if (!tokenRes.rows.length) {
       return reply(404, {
@@ -67,7 +68,28 @@ exports.handler = async (event) => {
     }
 
     const profileId = tokenRes.rows[0].id;
-    const encrypted = tokenRes.rows[0].encrypted_data;
+
+    // 🔥 LOAD ENCRYPTED EMERGENCY DATA FROM emergency_profiles
+    const emergencyRes = await db.query(
+      `
+      SELECT encrypted_data
+      FROM public.emergency_profiles
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [profileId]
+    );
+
+    console.log("EMERGENCY PROFILE COUNT:", emergencyRes.rows.length);
+
+    if (!emergencyRes.rows.length) {
+      return reply(404, {
+        success: false,
+        error: "No emergency data found",
+      });
+    }
+
+    const encrypted = emergencyRes.rows[0].encrypted_data;
 
     let data = {};
 
