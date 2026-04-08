@@ -22,15 +22,28 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 SAFE TOKEN EXTRACTION
-    let token = event.queryStringParameters?.token;
+    // 🔥 BULLETPROOF TOKEN EXTRACTION
+    let token =
+      event.queryStringParameters?.token ||
+      event.query?.token || // fallback
+      null;
 
+    // fallback for rawQuery (Netlify edge cases)
     if (!token && event.rawQuery) {
       const params = new URLSearchParams(event.rawQuery);
       token = params.get("token");
     }
 
-    console.log("TOKEN RECEIVED:", token);
+    // fallback for full raw URL (LAST RESORT)
+    if (!token && event.rawUrl) {
+      try {
+        const url = new URL(event.rawUrl);
+        token = url.searchParams.get("token");
+      } catch (e) {}
+    }
+
+    console.log("🔥 FULL EVENT:", JSON.stringify(event));
+    console.log("🔥 TOKEN RECEIVED:", token);
 
     if (!token) {
       return reply(400, {
@@ -46,7 +59,7 @@ exports.handler = async (event) => {
 
     console.log("TOKEN HASH:", token_hash);
 
-    // 🔥 LOOK UP PROFILE BY HASH IN profiles
+    // 🔥 LOOK UP PROFILE
     const tokenRes = await db.query(
       `
       SELECT id
@@ -69,7 +82,7 @@ exports.handler = async (event) => {
 
     const profileId = tokenRes.rows[0].id;
 
-    // 🔥 LOAD ENCRYPTED EMERGENCY DATA FROM emergency_profiles
+    // 🔥 LOAD ENCRYPTED DATA
     const emergencyRes = await db.query(
       `
       SELECT encrypted_data

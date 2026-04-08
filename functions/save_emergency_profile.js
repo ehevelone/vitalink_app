@@ -81,7 +81,7 @@ exports.handler = async (event) => {
 
     const encrypted = encrypt(JSON.stringify(data));
 
-    // 🔥 SAVE EMERGENCY PAYLOAD TO emergency_profiles
+    // 🔥 SAVE EMERGENCY PAYLOAD
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -94,10 +94,10 @@ exports.handler = async (event) => {
       [profile_id, encrypted]
     );
 
-    // 🔥 GET EXISTING TOKEN + HASH FROM profiles
+    // 🔥 GET TOKEN (SAFE)
     const tokenRes = await db.query(
       `
-      SELECT qr_token, token_hash
+      SELECT qr_token
       FROM profiles
       WHERE id = $1
       LIMIT 1
@@ -106,30 +106,33 @@ exports.handler = async (event) => {
     );
 
     let qr_token = tokenRes.rows[0]?.qr_token || null;
-    let token_hash = tokenRes.rows[0]?.token_hash || null;
 
-    // ✅ CREATE TOKEN IF MISSING
+    // ✅ ALWAYS ENSURE TOKEN EXISTS
     if (!qr_token) {
       qr_token = crypto.randomBytes(16).toString("hex");
     }
 
-    // ✅ ALWAYS KEEP HASH IN SYNC WITH TOKEN
-    token_hash = crypto
+    // ✅ ALWAYS REBUILD HASH (SOURCE OF TRUTH)
+    const token_hash = crypto
       .createHash("sha256")
       .update(qr_token)
       .digest("hex");
 
-    // 🔥 SAVE BOTH TO profiles
+    // 🔥 GUARANTEE PROFILE ROW EXISTS + UPDATE
     await db.query(
       `
-      UPDATE profiles
-      SET qr_token = $1,
-          token_hash = $2,
-          qr_revoked = false
-      WHERE id = $3
+      INSERT INTO profiles (id, qr_token, token_hash, qr_revoked)
+      VALUES ($1, $2, $3, false)
+      ON CONFLICT (id)
+      DO UPDATE SET
+        qr_token = EXCLUDED.qr_token,
+        token_hash = EXCLUDED.token_hash,
+        qr_revoked = false
       `,
-      [qr_token, token_hash, profile_id]
+      [profile_id, qr_token, token_hash]
     );
+
+    console.log("✅ TOKEN SAVED:", qr_token);
 
     return {
       statusCode: 200,
