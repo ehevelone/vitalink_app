@@ -1,4 +1,6 @@
 const QRCode = require("qrcode");
+const crypto = require("crypto");
+const db = require("./services/db");
 
 exports.handler = async (event) => {
 
@@ -34,8 +36,27 @@ exports.handler = async (event) => {
 
     console.log("✅ FINAL ID:", id);
 
-    // 🔥 CHANGE IS RIGHT HERE
-    const qrData = `https://myvitalink.app/emergency.html?token=${id}`;
+    // 🔥 GENERATE REAL TOKEN
+    const token = crypto.randomBytes(16).toString("hex");
+
+    const token_hash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    // 🔥 STORE TOKEN HASH
+    await db.query(
+      `
+      UPDATE public.profiles
+      SET token_hash = $1,
+          qr_revoked = false
+      WHERE id = $2
+      `,
+      [token_hash, id]
+    );
+
+    // 🔥 QR USES TOKEN (NOT ID)
+    const qrData = `https://myvitalink.app/emergency.html?token=${token}`;
 
     console.log("QR DATA:", qrData);
 

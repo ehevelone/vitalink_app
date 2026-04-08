@@ -22,7 +22,15 @@ exports.handler = async (event) => {
       });
     }
 
-    const token = event.queryStringParameters?.token;
+    // 🔥 SAFE TOKEN EXTRACTION (FIXED)
+    let token = event.queryStringParameters?.token;
+
+    if (!token && event.rawQuery) {
+      const params = new URLSearchParams(event.rawQuery);
+      token = params.get("token");
+    }
+
+    console.log("TOKEN RECEIVED:", token);
 
     if (!token) {
       return reply(400, {
@@ -36,6 +44,8 @@ exports.handler = async (event) => {
       .update(token)
       .digest("hex");
 
+    console.log("TOKEN HASH:", token_hash);
+
     const tokenRes = await db.query(
       `
       SELECT id, encrypted_data, raw_data
@@ -46,6 +56,8 @@ exports.handler = async (event) => {
       `,
       [token_hash]
     );
+
+    console.log("DB RESULT COUNT:", tokenRes.rows.length);
 
     if (!tokenRes.rows.length) {
       return reply(404, {
@@ -66,6 +78,7 @@ exports.handler = async (event) => {
       try {
         data = JSON.parse(decrypt(encrypted));
       } catch (e) {
+        console.error("DECRYPT ERROR:", e);
         return reply(500, {
           success: false,
           error: "Decrypt failed",
@@ -75,6 +88,7 @@ exports.handler = async (event) => {
       try {
         data = typeof raw === "string" ? JSON.parse(raw) : raw;
       } catch (e) {
+        console.error("RAW PARSE ERROR:", e);
         return reply(500, {
           success: false,
           error: "Raw data parse failed",
