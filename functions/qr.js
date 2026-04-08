@@ -2,18 +2,15 @@ const QRCode = require("qrcode");
 
 exports.handler = async (event) => {
 
-  // 🔥 FULL EVENT DUMP (DEBUG)
   console.log("========== QR FUNCTION HIT ==========");
   console.log("EVENT DUMP:", JSON.stringify(event, null, 2));
 
   try {
 
-    // 🔍 LOG INDIVIDUAL PIECES (EASIER TO READ)
     console.log("queryStringParameters:", event.queryStringParameters);
     console.log("rawQuery:", event.rawQuery);
     console.log("path:", event.path);
 
-    // 🔥 SAFE PARAM EXTRACTION
     let id = null;
 
     if (event.queryStringParameters && event.queryStringParameters.id) {
@@ -37,8 +34,9 @@ exports.handler = async (event) => {
 
     console.log("✅ FINAL ID:", id);
 
-    // 🔥 QR CONTENT
-    const qrData = `vitalink://profile/${id}`;
+    // 🔥 CHANGE IS RIGHT HERE
+    const qrData = `https://myvitalink.app/emergency.html?token=${id}`;
+
     console.log("QR DATA:", qrData);
 
     const qrImage = await QRCode.toBuffer(qrData, {
