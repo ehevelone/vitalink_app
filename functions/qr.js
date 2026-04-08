@@ -44,16 +44,32 @@ exports.handler = async (event) => {
       .update(token)
       .digest("hex");
 
-    // 🔥 STORE TOKEN HASH
-    await db.query(
+    console.log("TOKEN:", token);
+    console.log("TOKEN HASH:", token_hash);
+
+    // 🔥 STORE TOKEN HASH (WITH RESULT CHECK)
+    const result = await db.query(
       `
       UPDATE public.profiles
       SET token_hash = $1,
           qr_revoked = false
       WHERE id = $2
+      RETURNING id
       `,
       [token_hash, id]
     );
+
+    console.log("UPDATED ROWS:", result.rowCount);
+    console.log("UPDATED ID:", result.rows[0]?.id);
+
+    // 🚨 HARD FAIL IF UPDATE DIDN'T WORK
+    if (result.rowCount === 0) {
+      console.error("❌ NO PROFILE UPDATED — BAD ID");
+      return {
+        statusCode: 500,
+        body: "Profile not found for QR generation"
+      };
+    }
 
     // 🔥 QR USES TOKEN (NOT ID)
     const qrData = `https://myvitalink.app/emergency.html?token=${token}`;
