@@ -1,130 +1,160 @@
 const db = require("./services/db");
 const crypto = require("crypto");
+const { decrypt } = require("./utils/encrypt"); // ✅ ADD THIS
 
-const reply = (statusCode, obj) => ({
-  statusCode,
-  headers: {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "https://myvitalink.app",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  },
-  body: JSON.stringify(obj),
-});
+function reply(statusCode, obj) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify(obj),
+  };
+}
 
 exports.handler = async (event) => {
-
-  if (event.httpMethod === "OPTIONS") {
-    return reply(200, {});
-  }
-
   try {
-
-    let body = {};
-    try {
-      body = JSON.parse(event.body || "{}");
-    } catch {}
-
-    const order_id = body.order_id || body.request_id;
-
-    if (!order_id) {
-      return reply(400, { success:false, error:"Missing order_id" });
-    }
-
-    // 🔥 GET ORDER
-    const result = await db.query(
-      `
-      SELECT items
-      FROM public.order_requests
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [order_id]
-    );
-
-    if (!result.rows.length) {
-      return reply(404, { success:false, error:"Order not found" });
-    }
-
-    const { items } = result.rows[0];
-
-    // 🔥 APPROVE ORDER
-    const updateResult = await db.query(
-      `
-      UPDATE public.order_requests
-      SET status = 'approved', approved_at = NOW()
-      WHERE id = $1
-      RETURNING id
-      `,
-      [order_id]
-    );
-
-    if (!updateResult.rows.length) {
-      return reply(500, { success:false, error:"Failed to approve order" });
-    }
-
-    // 🔥 PARSE ITEMS
-    let parsedItems = [];
-    try {
-      parsedItems = typeof items === "string"
-        ? JSON.parse(items)
-        : items;
-    } catch {
-      parsedItems = [];
-    }
-
-    if (!Array.isArray(parsedItems)) {
-      parsedItems = [];
-    }
-
-    // 🔥 GENERATE TOKENS PER PROFILE
-    const qr = [];
-
-    for (let i = 0; i < parsedItems.length; i++) {
-
-      const item = parsedItems[i];
-
-      const profile_id = item.profile_id || null;
-      const profile = item.profile || item.profile_name || null;
-      const name = item.name || item.product || "Item";
-
-      if (!profile_id) continue;
-
-      // 🔐 TOKEN
-      const raw_token = crypto.randomBytes(32).toString("hex");
-      const token_hash = crypto.createHash("sha256").update(raw_token).digest("hex");
-
-      // 💾 STORE TOKEN IN PROFILES
-      await db.query(
-        `
-        UPDATE public.profiles
-        SET token_hash = $1
-        WHERE id = $2
-        `,
-        [token_hash, profile_id]
-      );
-
-      // 🔗 BUILD URL
-      const qr_url = `https://myvitalink.app/emergency.html?token=${raw_token}`;
-
-      qr.push({
-        profile_id,
-        profile,
-        name,
-        qr_url
+    if (event.httpMethod !== "GET") {
+      return reply(405, {
+        success: false,
+        error: "Method Not Allowed",
       });
     }
 
-    console.log("✅ TOKENS STORED IN PROFILES:", order_id, qr.length);
+    const token = event.queryStringParameters?.token;
+
+    if (!token) {
+      return reply(400, {
+        success: false,
+        error: "Missing token",
+      });
+    }
+
+    // 🔐 HASH TOKEN
+    const token_hash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    // 🔍 LOOKUP ENCRYPTED + RAW DATA
+    const tokenRes = await db.query(
+      `
+      SELECT id, encrypted_data, raw_data
+      FROM public.profiles
+      WHERE token_hash = $1
+        AND (qr_revoked IS NULL OR qr_revoked = false)
+      LIMIT 1
+      `,
+      [token_hash]
+    );
+
+    if (!tokenRes.rows.length) {
+      return reply(404, {
+        success: false,
+        error: "Invalid or expired QR",
+      });
+    }
+
+    const profileId = tokenRes.rows[0].id;
+    const row = tokenRes.rows[0];
+
+    const encrypted = row.encrypted_data;
+    const raw = row.raw_data;
+
+    // 🔥 HANDLE BOTH (OLD + NEW DATA)
+    let data = {};
+
+    if (encrypted) {
+      try {
+        data = JSON.parse(decrypt(encrypted));
+      } catch (e) {
+        return reply(500, {
+          success: false,
+          error: "Decrypt failed",
+        });
+      }
+    } else if (raw) {
+      try {
+        data = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch (e) {
+        return reply(500, {
+          success: false,
+          error: "Raw data parse failed",
+        });
+      }
+    } else {
+      return reply(404, {
+        success: false,
+        error: "No emergency data found",
+      });
+    }
+
+    // 🔥 GET MEDS (unchanged)
+    const medsRes = await db.query(
+      `
+      SELECT name, dose, frequency
+      FROM meds
+      WHERE profile_id = $1
+      ORDER BY name
+      `,
+      [profileId]
+    );
+
+    let meds = medsRes.rows.map(m => ({
+      name: m.name || "",
+      dose: m.dose || "",
+      frequency: m.frequency || ""
+    }));
+
+    if (!meds.length && Array.isArray(data.meds)) {
+      meds = data.meds;
+    }
+
+    if (!meds.length && Array.isArray(data.medications)) {
+      meds = data.medications;
+    }
+
+    const emergency = data.emergency || {};
+
+    const contactName =
+      emergency.contact ||
+      data.emergencyContactName ||
+      data.contact ||
+      "";
+
+    const contactPhone =
+      emergency.phone ||
+      data.emergencyContactPhone ||
+      data.phone ||
+      "";
 
     return reply(200, {
       success: true,
-      order_id,
-      qr
+      emergency: {
+        name: data.fullName || data.name || "",
+        dob: data.dob || "",
+        bloodType: emergency.bloodType || data.bloodType || "",
+        organDonor: emergency.organDonor || data.organDonor || false,
+
+        emergencyContactName: contactName,
+        emergencyContactPhone: contactPhone,
+
+        allergies: emergency.allergies || data.allergies || "",
+        conditions: emergency.conditions || data.conditions || "",
+        implants: emergency.implants || data.implants || "",
+        procedures: emergency.procedures || data.procedures || "",
+
+        meds,
+        providers: data.providers || data.doctors || [],
+      },
     });
 
   } catch (err) {
-    console.error("❌ approve_order error:", err);
-    return reply(500, { success:false, error:"Server error" });
+    console.error("❌ emergency_view error:", err);
+    return reply(500, {
+      success: false,
+      error: "Server error loading emergency view",
+    });
   }
 };

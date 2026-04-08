@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const crypto = require("crypto");
+const { encrypt } = require("./utils/encrypt"); // ✅ ADD THIS
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -33,7 +34,7 @@ exports.handler = async (event) => {
 
     let inserted = 0;
 
-    // 🔥 STEP 2 — INSERT FULL PROFILE DATA
+    // 🔥 STEP 2 — INSERT FULL PROFILE DATA (ENCRYPTED)
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
 
@@ -43,8 +44,10 @@ exports.handler = async (event) => {
       }
 
       try {
-        // ✅ CREATE UUID
         const id = crypto.randomUUID();
+
+        // 🔐 ENCRYPT DATA
+        const encrypted_data = encrypt(JSON.stringify(p));
 
         await pool.query(
           `
@@ -52,7 +55,7 @@ exports.handler = async (event) => {
             id,
             user_id,
             name,
-            raw_data,
+            encrypted_data,
             created_at
           )
           VALUES ($1,$2,$3,$4,NOW())
@@ -61,7 +64,7 @@ exports.handler = async (event) => {
             id,
             user_id,
             name,
-            JSON.stringify(p)
+            encrypted_data
           ]
         );
 
