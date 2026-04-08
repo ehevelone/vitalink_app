@@ -91,9 +91,10 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         debugPrint("⚠️ Save failed: ${res["error"]}");
       }
 
-      // ✅ NEW: capture token IF backend gives one (non-breaking)
+      // 🔥 FIX: Persist token locally
       if (res["qr_token"] != null && res["qr_token"].toString().isNotEmpty) {
         p.qrToken = res["qr_token"];
+        await _repo.saveProfile(p); // ✅ CRITICAL FIX
       }
 
     } catch (e) {
@@ -112,10 +113,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
-    // 🔥 KEEP ORIGINAL WORKING FLOW
     await _syncToBackend(p);
 
-    // ✅ NEW: use token if available, otherwise fallback (DO NOT BREAK)
     final qrUrl = (p.qrToken != null && p.qrToken!.isNotEmpty)
         ? "https://myvitalink.app/emergency.html?token=${p.qrToken}"
         : "https://myvitalink.app/emergency.html?id=${p.id}";
