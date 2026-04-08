@@ -17,11 +17,11 @@ exports.handler = async (event) => {
 
     if (event.queryStringParameters && event.queryStringParameters.id) {
       id = event.queryStringParameters.id;
-      console.log("ID FROM queryStringParameters:", id);
+      console.log("PROFILE ID:", id);
     } else if (event.rawQuery) {
       const params = new URLSearchParams(event.rawQuery);
       id = params.get("id");
-      console.log("ID FROM rawQuery:", id);
+      console.log("PROFILE ID (rawQuery):", id);
     } else {
       console.log("NO QUERY PARAMS FOUND");
     }
@@ -34,9 +34,9 @@ exports.handler = async (event) => {
       };
     }
 
-    console.log("✅ FINAL ID:", id);
+    console.log("✅ FINAL PROFILE ID:", id);
 
-    // 🔥 GENERATE REAL TOKEN
+    // 🔥 GENERATE TOKEN
     const token = crypto.randomBytes(16).toString("hex");
 
     const token_hash = crypto
@@ -47,13 +47,13 @@ exports.handler = async (event) => {
     console.log("TOKEN:", token);
     console.log("TOKEN HASH:", token_hash);
 
-    // 🔥 FIXED LINE RIGHT HERE
+    // 🔥 FIXED: FORCE UUID MATCH
     const result = await db.query(
       `
       UPDATE public.profiles
       SET token_hash = $1,
           qr_revoked = false
-      WHERE user_id = $2
+      WHERE id = $2::uuid
       RETURNING id
       `,
       [token_hash, id]
@@ -63,7 +63,7 @@ exports.handler = async (event) => {
     console.log("UPDATED ID:", result.rows[0]?.id);
 
     if (result.rowCount === 0) {
-      console.error("❌ NO PROFILE UPDATED — BAD USER ID");
+      console.error("❌ NO PROFILE UPDATED — BAD PROFILE ID");
       return {
         statusCode: 500,
         body: "Profile not found for QR generation"
