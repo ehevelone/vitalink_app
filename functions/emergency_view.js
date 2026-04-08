@@ -22,7 +22,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 SAFE TOKEN EXTRACTION (FIXED)
+    // 🔥 SAFE TOKEN EXTRACTION
     let token = event.queryStringParameters?.token;
 
     if (!token && event.rawQuery) {
@@ -48,7 +48,7 @@ exports.handler = async (event) => {
 
     const tokenRes = await db.query(
       `
-      SELECT id, encrypted_data, raw_data
+      SELECT id, encrypted_data
       FROM public.profiles
       WHERE token_hash = $1
         AND (qr_revoked IS NULL OR qr_revoked = false)
@@ -67,10 +67,7 @@ exports.handler = async (event) => {
     }
 
     const profileId = tokenRes.rows[0].id;
-    const row = tokenRes.rows[0];
-
-    const encrypted = row.encrypted_data;
-    const raw = row.raw_data;
+    const encrypted = tokenRes.rows[0].encrypted_data;
 
     let data = {};
 
@@ -82,16 +79,6 @@ exports.handler = async (event) => {
         return reply(500, {
           success: false,
           error: "Decrypt failed",
-        });
-      }
-    } else if (raw) {
-      try {
-        data = typeof raw === "string" ? JSON.parse(raw) : raw;
-      } catch (e) {
-        console.error("RAW PARSE ERROR:", e);
-        return reply(500, {
-          success: false,
-          error: "Raw data parse failed",
         });
       }
     } else {

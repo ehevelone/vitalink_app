@@ -46,6 +46,14 @@ exports.handler = async (event) => {
 
         const encrypted_data = encrypt(JSON.stringify(p));
 
+        // 🔥 GENERATE TOKEN
+        const token = crypto.randomBytes(16).toString("hex");
+
+        const token_hash = crypto
+          .createHash("sha256")
+          .update(token)
+          .digest("hex");
+
         await pool.query(
           `
           INSERT INTO profiles (
@@ -53,15 +61,19 @@ exports.handler = async (event) => {
             user_id,
             name,
             encrypted_data,
+            token_hash,
+            qr_revoked,
             created_at
           )
-          VALUES ($1,$2,$3,$4,NOW())
+          VALUES ($1,$2,$3,$4,$5,$6,NOW())
           `,
           [
             id,
             user_id,
             name,
-            encrypted_data
+            encrypted_data,
+            token_hash,
+            false
           ]
         );
 

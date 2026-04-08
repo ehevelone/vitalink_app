@@ -1,5 +1,4 @@
 const QRCode = require("qrcode");
-const crypto = require("crypto");
 const db = require("./services/db");
 
 exports.handler = async (event) => {
@@ -8,10 +7,6 @@ exports.handler = async (event) => {
   console.log("EVENT DUMP:", JSON.stringify(event, null, 2));
 
   try {
-
-    console.log("queryStringParameters:", event.queryStringParameters);
-    console.log("rawQuery:", event.rawQuery);
-    console.log("path:", event.path);
 
     let id = null;
 
@@ -22,51 +17,42 @@ exports.handler = async (event) => {
       const params = new URLSearchParams(event.rawQuery);
       id = params.get("id");
       console.log("PROFILE ID (rawQuery):", id);
-    } else {
-      console.log("NO QUERY PARAMS FOUND");
     }
 
     if (!id) {
-      console.log("❌ FINAL RESULT: MISSING ID");
       return {
         statusCode: 400,
-        body: "Missing QR id"
+        body: "Missing profile id"
       };
     }
 
     console.log("✅ FINAL PROFILE ID:", id);
 
-    // 🔥 GENERATE TOKEN
-    const token = crypto.randomBytes(16).toString("hex");
-
-    const token_hash = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
-
-    console.log("TOKEN:", token);
-    console.log("TOKEN HASH:", token_hash);
-
-    // 🔥 FIXED: FORCE UUID MATCH
-    const result = await db.query(
+    // 🔍 GET STORED TOKEN
+    const profile = await db.query(
       `
-      UPDATE public.profiles
-      SET token_hash = $1,
-          qr_revoked = false
-      WHERE id = $2::uuid
-      RETURNING id
+      SELECT id, qr_token
+      FROM public.profiles
+      WHERE id = $1::uuid
       `,
-      [token_hash, id]
+      [id]
     );
 
-    console.log("UPDATED ROWS:", result.rowCount);
-    console.log("UPDATED ID:", result.rows[0]?.id);
+    if (profile.rowCount === 0) {
+      console.error("❌ PROFILE NOT FOUND");
+      return {
+        statusCode: 404,
+        body: "Profile not found"
+      };
+    }
 
-    if (result.rowCount === 0) {
-      console.error("❌ NO PROFILE UPDATED — BAD PROFILE ID");
+    const token = profile.rows[0].qr_token;
+
+    if (!token) {
+      console.error("❌ NO TOKEN FOUND ON PROFILE");
       return {
         statusCode: 500,
-        body: "Profile not found for QR generation"
+        body: "QR token missing"
       };
     }
 
