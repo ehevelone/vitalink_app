@@ -79,16 +79,29 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🚨 SAVE EMERGENCY PROFILE
+  // 🚨 SAVE EMERGENCY PROFILE (FIXED + LOGGING)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> saveEmergencyProfile({
     required String profileId,
     required Map<String, dynamic> data,
   }) async {
-    return _postJson("save_emergency_profile", {
+    final res = await _postJson("save_emergency_profile", {
       "profile_id": _ensureUuid(profileId),
       "data": data,
     });
+
+    // 🔥 HARD VERIFY TOKEN COMES BACK
+    if (res["success"] != true) {
+      debugPrint("❌ saveEmergencyProfile FAILED: ${res["error"]}");
+    }
+
+    if (res["qr_token"] == null || res["qr_token"].toString().isEmpty) {
+      debugPrint("🚨 NO QR TOKEN RETURNED FROM BACKEND");
+    } else {
+      debugPrint("✅ QR TOKEN RECEIVED: ${res["qr_token"]}");
+    }
+
+    return res;
   }
 
   // -------------------------------------------------------------
@@ -415,7 +428,6 @@ class ApiService {
       final store = SecureStore();
       final repo = DataRepository(store);
 
-      // ✅ FIX: USE user_id INSTEAD OF EMAIL
       final userIdStr = await store.getString("userId");
       final userId = int.tryParse(userIdStr ?? "");
 
@@ -438,7 +450,7 @@ class ApiService {
       }).toList();
 
       final body = {
-        "user_id": userId, // 🔥 FIXED
+        "user_id": userId,
         "profiles": fixedProfiles,
       };
 
