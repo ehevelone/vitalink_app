@@ -61,18 +61,20 @@ exports.handler = async (event) => {
             user_id,
             name,
             encrypted_data,
+            qr_token,
             token_hash,
             qr_revoked,
             created_at
           )
-          VALUES ($1,$2,$3,$4,$5,$6,NOW())
+          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
           `,
           [
             id,
             user_id,
             name,
             encrypted_data,
-            token_hash,
+            token,        // ✅ RAW TOKEN SAVED
+            token_hash,   // ✅ HASH SAVED
             false
           ]
         );
