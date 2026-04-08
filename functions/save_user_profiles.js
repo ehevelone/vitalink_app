@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
 const crypto = require("crypto");
-const { encrypt } = require("./utils/encrypt.js"); // ✅ FIXED
+const { encrypt } = require("./encrypt.js"); // ✅ FIXED
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,

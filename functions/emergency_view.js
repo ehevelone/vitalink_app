@@ -1,6 +1,6 @@
 const db = require("./services/db");
 const crypto = require("crypto");
-const { decrypt } = require("./utils/encrypt.js"); // ✅ FIXED
+const { decrypt } = require("./encrypt.js"); // ✅ FIXED
 
 function reply(statusCode, obj) {
   return {
