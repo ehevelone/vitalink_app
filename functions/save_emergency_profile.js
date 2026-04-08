@@ -94,10 +94,21 @@ exports.handler = async (event) => {
       [profile_id, encrypted]
     );
 
+    // 🔥 FETCH QR TOKEN FROM profiles TABLE (ADDED)
+    const tokenRes = await db.query(
+      `SELECT qr_token FROM profiles WHERE id = $1 LIMIT 1`,
+      [profile_id]
+    );
+
+    const qr_token = tokenRes.rows[0]?.qr_token || null;
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true })
+      body: JSON.stringify({
+        success: true,
+        qr_token
+      })
     };
 
   } catch (err) {

@@ -312,6 +312,8 @@ class Profile {
   String? agentPhone;
   String? agentNpn;
 
+  String? qrToken; // ✅ ADDED
+
   Profile({
     String? id,
     this.fullName = '',
@@ -337,6 +339,7 @@ class Profile {
     this.agentEmail,
     this.agentPhone,
     this.agentNpn,
+    this.qrToken, // ✅ ADDED
   })  : id = id ?? const Uuid().v4(),
         updatedAt = updatedAt ?? DateTime.now(),
         meds = meds ?? [],
@@ -370,6 +373,7 @@ class Profile {
     String? agentEmail,
     String? agentPhone,
     String? agentNpn,
+    String? qrToken,
   }) {
     return Profile(
       id: id ?? this.id,
@@ -396,6 +400,7 @@ class Profile {
       agentEmail: agentEmail ?? this.agentEmail,
       agentPhone: agentPhone ?? this.agentPhone,
       agentNpn: agentNpn ?? this.agentNpn,
+      qrToken: qrToken ?? this.qrToken,
     );
   }
 
@@ -424,6 +429,7 @@ class Profile {
         'agentEmail': agentEmail,
         'agentPhone': agentPhone,
         'agentNpn': agentNpn,
+        'qr_token': qrToken,
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
@@ -462,6 +468,7 @@ class Profile {
         agentEmail: json['agentEmail'],
         agentPhone: json['agentPhone'],
         agentNpn: json['agentNpn'],
+        qrToken: json['qr_token'],
       );
 }
 
