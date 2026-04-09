@@ -13,7 +13,7 @@ class ApiService {
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔥 UUID FIX
+  // 🔥 UUID FIX (KEEP FOR OTHER USES)
   // -------------------------------------------------------------
   static String _ensureUuid(String? id) {
     if (id == null || id.isEmpty) return const Uuid().v4();
@@ -79,18 +79,18 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🚨 SAVE EMERGENCY PROFILE (FIXED + LOGGING)
+  // 🚨 SAVE EMERGENCY PROFILE (FIXED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> saveEmergencyProfile({
     required String profileId,
     required Map<String, dynamic> data,
   }) async {
     final res = await _postJson("save_emergency_profile", {
-      "profile_id": _ensureUuid(profileId),
+      // 🔥 FIXED — DO NOT ALTER ID
+      "profile_id": profileId,
       "data": data,
     });
 
-    // 🔥 HARD VERIFY TOKEN COMES BACK
     if (res["success"] != true) {
       debugPrint("❌ saveEmergencyProfile FAILED: ${res["error"]}");
     }
@@ -421,7 +421,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔥 SYNC USER PROFILES (FIXED)
+  // 🔥 SYNC USER PROFILES (UNCHANGED)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> syncProfilesToServer() async {
     try {

@@ -79,9 +79,10 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔐 ENCRYPT DATA
     const encrypted = encrypt(JSON.stringify(data));
 
-    // 🔥 SAVE EMERGENCY PAYLOAD
+    // 🔥 SAVE EMERGENCY DATA ONLY
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -94,7 +95,7 @@ exports.handler = async (event) => {
       [profile_id, encrypted]
     );
 
-    // 🔥 GET TOKEN (SAFE)
+    // 🔥 LOAD EXISTING TOKEN (DO NOT CREATE / DO NOT MODIFY)
     const tokenRes = await db.query(
       `
       SELECT qr_token
@@ -105,34 +106,23 @@ exports.handler = async (event) => {
       [profile_id]
     );
 
-    let qr_token = tokenRes.rows[0]?.qr_token || null;
+    const qr_token = tokenRes.rows[0]?.qr_token;
 
-    // ✅ ALWAYS ENSURE TOKEN EXISTS
+    // 🚨 HARD FAIL IF TOKEN MISSING
     if (!qr_token) {
-      qr_token = crypto.randomBytes(16).toString("hex");
+      console.error("❌ TOKEN MISSING FOR PROFILE:", profile_id);
+
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: "QR token missing. Profile must be initialized first."
+        })
+      };
     }
 
-    // ✅ ALWAYS REBUILD HASH (SOURCE OF TRUTH)
-    const token_hash = crypto
-      .createHash("sha256")
-      .update(qr_token)
-      .digest("hex");
-
-    // 🔥 GUARANTEE PROFILE ROW EXISTS + UPDATE
-    await db.query(
-      `
-      INSERT INTO profiles (id, qr_token, token_hash, qr_revoked)
-      VALUES ($1, $2, $3, false)
-      ON CONFLICT (id)
-      DO UPDATE SET
-        qr_token = EXCLUDED.qr_token,
-        token_hash = EXCLUDED.token_hash,
-        qr_revoked = false
-      `,
-      [profile_id, qr_token, token_hash]
-    );
-
-    console.log("✅ TOKEN SAVED:", qr_token);
+    console.log("✅ USING EXISTING TOKEN:", qr_token);
 
     return {
       statusCode: 200,
@@ -144,7 +134,7 @@ exports.handler = async (event) => {
     };
 
   } catch (err) {
-    console.error("save_emergency_profile error:", err);
+    console.error("❌ save_emergency_profile error:", err);
 
     return {
       statusCode: 500,
