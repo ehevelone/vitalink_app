@@ -2,7 +2,6 @@ const db = require("./services/db");
 
 exports.handler = async (event) => {
 
-  // ✅ CORS
   const headers = {
     "Access-Control-Allow-Origin": "https://myvitalink.app",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -20,12 +19,9 @@ exports.handler = async (event) => {
   try {
 
     let body = {};
-
     try {
       body = JSON.parse(event.body || "{}");
-    } catch (e) {
-      body = {};
-    }
+    } catch {}
 
     const order_id = body.order_id || body.request_id;
 
@@ -40,18 +36,18 @@ exports.handler = async (event) => {
       };
     }
 
-    // ✅ GET ORDER (expects qr already stored)
-    const result = await db.query(
+    // 🔥 NEW SYSTEM — GET ORDER (profiles only)
+    const orderRes = await db.query(
       `
-      SELECT id, qr
-      FROM public.order_requests
+      SELECT id, profiles
+      FROM public.orders
       WHERE id = $1
       LIMIT 1
       `,
       [order_id]
     );
 
-    if (!result.rows.length) {
+    if (!orderRes.rows.length) {
       return {
         statusCode: 200,
         headers,
@@ -62,28 +58,42 @@ exports.handler = async (event) => {
       };
     }
 
-    const order = result.rows[0];
-
-    let qr = [];
+    let profileIds = orderRes.rows[0].profiles;
 
     try {
-      qr = typeof order.qr === "string"
-        ? JSON.parse(order.qr)
-        : order.qr;
+      profileIds = typeof profileIds === "string"
+        ? JSON.parse(profileIds)
+        : profileIds;
     } catch {
-      qr = [];
+      profileIds = [];
     }
 
-    if (!qr || qr.length === 0) {
+    if (!profileIds || profileIds.length === 0) {
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: false,
-          error: "No QR data"
+          error: "No profiles found"
         })
       };
     }
+
+    // 🔥 GET QR TOKENS FROM PROFILES
+    const result = await db.query(
+      `
+      SELECT id, name, qr_token
+      FROM profiles
+      WHERE id = ANY($1)
+      `,
+      [profileIds]
+    );
+
+    const qr = result.rows.map(p => ({
+      profile: p.name,
+      profile_id: p.id,
+      qr_url: `https://myvitalink.app/emergency.html?token=${p.qr_token}`
+    }));
 
     return {
       statusCode: 200,
@@ -91,14 +101,14 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         success: true,
         order: {
-          id: order.id,
-          qr: qr
+          id: order_id,
+          qr
         }
       })
     };
 
   } catch (err) {
-    console.error("get_order error:", err);
+    console.error("get_pending_orders error:", err);
 
     return {
       statusCode: 500,
