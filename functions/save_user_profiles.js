@@ -30,30 +30,29 @@ exports.handler = async (event) => {
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
 
-      if (!name) {
-        console.log("⚠️ Skipping empty profile:", p);
-        continue;
-      }
+      if (!name) continue;
 
       try {
         const profileId = p.id || crypto.randomUUID();
-
         const encrypted_data = encrypt(JSON.stringify(p));
 
-        // 🔥 CHECK IF PROFILE EXISTS
         const existing = await pool.query(
           `SELECT id, qr_token FROM profiles WHERE id = $1 LIMIT 1`,
           [profileId]
         );
 
-        let token = null;
-        let token_hash = null;
+        let token;
+        let token_hash;
 
         if (existing.rows.length) {
-          // ✅ KEEP EXISTING TOKEN
           token = existing.rows[0].qr_token;
+
+          token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
         } else {
-          // ✅ CREATE TOKEN ONLY ON FIRST INSERT
           token = crypto.randomBytes(16).toString("hex");
 
           token_hash = crypto
@@ -72,15 +71,14 @@ exports.handler = async (event) => {
             qr_token,
             token_hash,
             qr_revoked,
-            updated_at,
             created_at
           )
-          VALUES ($1,$2,$3,$4,$5,$6,false,NOW(),NOW())
+          VALUES ($1,$2,$3,$4,$5,$6,false,NOW())
           ON CONFLICT (id)
           DO UPDATE SET
             name = EXCLUDED.name,
             encrypted_data = EXCLUDED.encrypted_data,
-            updated_at = NOW()
+            token_hash = EXCLUDED.token_hash
           `,
           [
             profileId,
