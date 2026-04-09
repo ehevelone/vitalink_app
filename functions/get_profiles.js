@@ -10,11 +10,7 @@ const headers = {
 exports.handler = async (event) => {
 
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers,
-      body: "",
-    };
+    return { statusCode: 200, headers, body: "" };
   }
 
   if (event.httpMethod !== "POST") {
@@ -30,7 +26,7 @@ exports.handler = async (event) => {
     let body = {};
     try {
       body = JSON.parse(event.body || "{}");
-    } catch (e) {
+    } catch {
       return {
         statusCode: 400,
         headers,
@@ -38,26 +34,26 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 FIXED — use id (UUID), NOT user_id
-    const { id } = body;
+    const ids =
+      Array.isArray(body.profiles) ? body.profiles :
+      body.id ? [body.id] :
+      [];
 
-    if (!id) {
+    if (!ids.length) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "Missing id" }),
+        body: JSON.stringify({ error: "Missing id(s)" }),
       };
     }
 
-    // 🔥 MATCH BY UUID
     const result = await db.query(
       `
       SELECT id, name, qr_token
       FROM profiles
-      WHERE id = $1
-      LIMIT 1
+      WHERE id = ANY($1)
       `,
-      [id]
+      [ids]
     );
 
     return {
@@ -80,6 +76,5 @@ exports.handler = async (event) => {
         error: "Server error",
       }),
     };
-
   }
 };
