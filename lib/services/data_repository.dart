@@ -1,4 +1,3 @@
-// lib/services/data_repository.dart
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
@@ -109,9 +108,24 @@ class DataRepository {
     final idx = await _getActiveIndex(list);
     final p = list[idx];
 
+    // ==========================================================
+    // 🔥 CRITICAL FIX — VALIDATE ID
+    // ==========================================================
+    if (p.id.isEmpty || p.id.length < 30) {
+      print("🚨 INVALID PROFILE ID DETECTED → RESETTING");
+
+      final newProfile = Profile(); // generates proper UUID
+      await saveProfile(newProfile);
+
+      await _syncName(newProfile);
+      return newProfile;
+    }
+
+    // ==========================================================
+    // EXISTING LOGIC (UNCHANGED)
+    // ==========================================================
     final name = p.fullName.trim();
 
-    // 🔥 CRITICAL FIX — HEAL OLD / BROKEN PROFILES
     if (name.isNotEmpty) {
       await saveProfile(p); // forces clean rewrite
     }

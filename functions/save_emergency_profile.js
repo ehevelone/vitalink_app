@@ -79,6 +79,23 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔥 ✅ UUID VALIDATION (SAFE ADD)
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    if (typeof profile_id !== "string" || !uuidRegex.test(profile_id)) {
+      console.error("❌ INVALID PROFILE ID:", profile_id);
+
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: "Invalid profile_id format"
+        })
+      };
+    }
+
     // 🔐 ENCRYPT DATA
     const encrypted = encrypt(JSON.stringify(data));
 
