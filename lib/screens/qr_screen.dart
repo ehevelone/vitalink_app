@@ -1,14 +1,13 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class QrScreen extends StatelessWidget {
-  final String data; // JSON string passed from EmergencyScreen
+  final String qrToken; // 🔥 CHANGE: use token, NOT data
   final String? title;
 
   const QrScreen({
     super.key,
-    required this.data,
+    required this.qrToken,
     this.title,
   });
 
@@ -17,11 +16,9 @@ class QrScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Encode JSON → base64url
-    final encoded =
-        base64UrlEncode(utf8.encode(data));
 
-    final qrUrl = "$_baseUrl?data=$encoded";
+    // 🔥 NEW — TOKEN BASED URL
+    final qrUrl = "$_baseUrl?token=$qrToken";
 
     return Scaffold(
       appBar: AppBar(

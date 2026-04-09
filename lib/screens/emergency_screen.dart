@@ -56,7 +56,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  Future<void> _syncToBackend(Profile p) async {
+  // 🔥 NOW RETURNS TOKEN DIRECTLY FROM DB
+  Future<String?> _syncToBackend(Profile p) async {
     final e = p.emergency;
 
     final data = {
@@ -89,16 +90,23 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
       if (res["success"] != true) {
         debugPrint("⚠️ Save failed: ${res["error"]}");
+        return null;
       }
 
-      // 🔥 Persist token locally
-      if (res["qr_token"] != null && res["qr_token"].toString().isNotEmpty) {
-        p.qrToken = res["qr_token"];
+      final token = res["qr_token"];
+
+      if (token != null && token.toString().isNotEmpty) {
+        // optional cache only
+        p.qrToken = token;
         await _repo.saveProfile(p);
+        return token;
       }
+
+      return null;
 
     } catch (e) {
       debugPrint("Save emergency profile failed: $e");
+      return null;
     }
   }
 
@@ -113,21 +121,21 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
-    await _syncToBackend(p);
+    // 🔥 DIRECTLY GET TOKEN FROM DB RESPONSE
+    final qrToken = await _syncToBackend(p);
 
-    // 🔥 CRITICAL FIX — reload profile AFTER sync
-    final updated = await _repo.loadProfile();
-    final qrToken = updated?.qrToken;
-
-    final qrUrl = (qrToken != null && qrToken.isNotEmpty)
-        ? "https://myvitalink.app/emergency.html?token=$qrToken"
-        : "https://myvitalink.app/emergency.html?id=${p.id}";
+    if (qrToken == null || qrToken.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("QR not ready. Try again.")),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => QrScreen(
-          data: qrUrl,
+          qrToken: qrToken,
           title: "Emergency Info",
         ),
       ),

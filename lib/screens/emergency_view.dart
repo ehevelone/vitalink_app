@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -70,32 +69,21 @@ class _EmergencyViewState extends State<EmergencyView> {
     final p = _p!;
     final e = p.emergency;
 
-    final payload = {
-      "name": p.fullName,
-      "dob": p.dob ?? "",
-      "allergies": e.allergies,
-      "conditions": e.conditions,
-      "implants": e.implants,
-      "procedures": e.procedures,
-      "bloodType": e.bloodType,
-      "organDonor": e.organDonor,
-      "emergencyContactName": e.contact,
-      "emergencyContactPhone": e.phone,
-      "meds": p.meds.map((m) => {
-        "name": m.name,
-        "dose": m.dose,
-        "frequency": m.frequency,
-      }).toList(),
-      "providers": p.doctors.map((d) => {
-        "name": d.name,
-        "phone": d.phone,
-      }).toList(),
-    };
+    // 🔥 TOKEN ONLY — NO DATA PAYLOAD
+    final qrToken = p.qrToken;
 
-    final encoded =
-        base64UrlEncode(utf8.encode(jsonEncode(payload)));
+    if (qrToken == null || qrToken.isEmpty) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            "QR Token missing. Please refresh profile.",
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
 
-    final qrUrl = "$_baseUrl?data=$encoded";
+    final qrUrl = "$_baseUrl?token=$qrToken";
 
     return Scaffold(
       appBar: AppBar(
