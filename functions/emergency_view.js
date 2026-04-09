@@ -74,10 +74,9 @@ exports.handler = async (event) => {
     }
 
     const row = tokenRes.rows[0];
-    const profileId = row.id;
     const encrypted = row.encrypted_data;
 
-    console.log("✅ PROFILE FOUND:", profileId);
+    console.log("✅ PROFILE FOUND:", row.id);
 
     if (!encrypted) {
       return reply(404, {
@@ -98,28 +97,12 @@ exports.handler = async (event) => {
       });
     }
 
-    // 🔥 MEDS (optional table)
-    const medsRes = await db.query(
-      `
-      SELECT name, dose, frequency
-      FROM meds
-      WHERE profile_id = $1
-      ORDER BY name
-      `,
-      [profileId]
-    );
+    // 🔥 USE ONLY JSON (NO DB TABLES)
+    let meds = [];
 
-    let meds = medsRes.rows.map(m => ({
-      name: m.name || "",
-      dose: m.dose || "",
-      frequency: m.frequency || ""
-    }));
-
-    if (!meds.length && Array.isArray(data.meds)) {
+    if (Array.isArray(data.meds)) {
       meds = data.meds;
-    }
-
-    if (!meds.length && Array.isArray(data.medications)) {
+    } else if (Array.isArray(data.medications)) {
       meds = data.medications;
     }
 
