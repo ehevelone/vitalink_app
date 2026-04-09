@@ -429,7 +429,7 @@ class Profile {
         'agentEmail': agentEmail,
         'agentPhone': agentPhone,
         'agentNpn': agentNpn,
-        'qr_token': qrToken,
+        'qr_Token': qrToken,
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(

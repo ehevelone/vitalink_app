@@ -79,29 +79,20 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🚨 SAVE EMERGENCY PROFILE (FIXED)
+  // 🔥 NEW — SAVE USER PROFILES (PRIMARY SYSTEM)
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> saveEmergencyProfile({
-    required String profileId,
-    required Map<String, dynamic> data,
+  static Future<Map<String, dynamic>> saveUserProfiles({
+    required String userId,
+    required List<Map<String, dynamic>> profiles,
   }) async {
-    final res = await _postJson("save_emergency_profile", {
-      // 🔥 FIXED — DO NOT ALTER ID
-      "profile_id": profileId,
-      "data": data,
-    });
+    final body = {
+      "user_id": int.tryParse(userId) ?? userId,
+      "profiles": profiles,
+    };
 
-    if (res["success"] != true) {
-      debugPrint("❌ saveEmergencyProfile FAILED: ${res["error"]}");
-    }
+    debugPrint("🚀 SAVE USER PROFILES: $body");
 
-    if (res["qr_token"] == null || res["qr_token"].toString().isEmpty) {
-      debugPrint("🚨 NO QR TOKEN RETURNED FROM BACKEND");
-    } else {
-      debugPrint("✅ QR TOKEN RECEIVED: ${res["qr_token"]}");
-    }
-
-    return res;
+    return await _postJson("save_user_profiles", body);
   }
 
   // -------------------------------------------------------------

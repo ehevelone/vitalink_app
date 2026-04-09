@@ -1,4 +1,4 @@
-const db = require("./services/db");
+const db = require("./services/db"); 
 const crypto = require("crypto");
 
 // 🔐 SAFE KEY (NO INIT CRASH)
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 ✅ UUID VALIDATION (SAFE ADD)
+    // 🔥 UUID VALIDATION
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -99,7 +99,7 @@ exports.handler = async (event) => {
     // 🔐 ENCRYPT DATA
     const encrypted = encrypt(JSON.stringify(data));
 
-    // 🔥 SAVE EMERGENCY DATA ONLY
+    // 🔥 SAVE EMERGENCY DATA
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -112,8 +112,8 @@ exports.handler = async (event) => {
       [profile_id, encrypted]
     );
 
-    // 🔥 LOAD EXISTING TOKEN (DO NOT CREATE / DO NOT MODIFY)
-    const tokenRes = await db.query(
+    // 🔥 CHECK PROFILE / TOKEN
+    let tokenRes = await db.query(
       `
       SELECT qr_token
       FROM profiles
@@ -123,23 +123,29 @@ exports.handler = async (event) => {
       [profile_id]
     );
 
-    const qr_token = tokenRes.rows[0]?.qr_token;
+    let qr_token = tokenRes.rows[0]?.qr_token;
 
-    // 🚨 HARD FAIL IF TOKEN MISSING
+    // 🔥 AUTO-CREATE PROFILE IF MISSING (FIX)
     if (!qr_token) {
-      console.error("❌ TOKEN MISSING FOR PROFILE:", profile_id);
+      console.warn("⚠️ PROFILE NOT FOUND — CREATING:", profile_id);
 
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: "QR token missing. Profile must be initialized first."
-        })
-      };
+      const newToken = crypto.randomBytes(16).toString("hex");
+
+      await db.query(
+        `
+        INSERT INTO profiles (id, qr_token, created_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [profile_id, newToken]
+      );
+
+      qr_token = newToken;
+
+      console.log("✅ NEW TOKEN CREATED:", qr_token);
     }
 
-    console.log("✅ USING EXISTING TOKEN:", qr_token);
+    console.log("✅ USING TOKEN:", qr_token);
 
     return {
       statusCode: 200,

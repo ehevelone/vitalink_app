@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
 const crypto = require("crypto");
-const { encrypt } = require("./encrypt.js"); // ✅ FIXED
+const { encrypt } = require("./encrypt.js");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -24,14 +24,8 @@ exports.handler = async (event) => {
     }
 
     console.log("🔥 Saving profiles for user:", user_id);
-    console.log("📦 Profiles received:", profiles);
 
-    await pool.query(
-      `DELETE FROM profiles WHERE user_id = $1`,
-      [user_id]
-    );
-
-    let inserted = 0;
+    let saved = 0;
 
     for (const p of profiles) {
       const name = (p.fullName || p.name || "").trim();
@@ -42,17 +36,31 @@ exports.handler = async (event) => {
       }
 
       try {
-        const id = crypto.randomUUID();
+        const profileId = p.id || crypto.randomUUID();
 
         const encrypted_data = encrypt(JSON.stringify(p));
 
-        // 🔥 GENERATE TOKEN
-        const token = crypto.randomBytes(16).toString("hex");
+        // 🔥 CHECK IF PROFILE EXISTS
+        const existing = await pool.query(
+          `SELECT id, qr_token FROM profiles WHERE id = $1 LIMIT 1`,
+          [profileId]
+        );
 
-        const token_hash = crypto
-          .createHash("sha256")
-          .update(token)
-          .digest("hex");
+        let token = null;
+        let token_hash = null;
+
+        if (existing.rows.length) {
+          // ✅ KEEP EXISTING TOKEN
+          token = existing.rows[0].qr_token;
+        } else {
+          // ✅ CREATE TOKEN ONLY ON FIRST INSERT
+          token = crypto.randomBytes(16).toString("hex");
+
+          token_hash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+        }
 
         await pool.query(
           `
@@ -64,35 +72,38 @@ exports.handler = async (event) => {
             qr_token,
             token_hash,
             qr_revoked,
+            updated_at,
             created_at
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+          VALUES ($1,$2,$3,$4,$5,$6,false,NOW(),NOW())
+          ON CONFLICT (id)
+          DO UPDATE SET
+            name = EXCLUDED.name,
+            encrypted_data = EXCLUDED.encrypted_data,
+            updated_at = NOW()
           `,
           [
-            id,
+            profileId,
             user_id,
             name,
             encrypted_data,
-            token,        // ✅ RAW TOKEN SAVED
-            token_hash,   // ✅ HASH SAVED
-            false
+            token,
+            token_hash
           ]
         );
 
-        inserted++;
+        saved++;
 
       } catch (err) {
-        console.error("❌ INSERT FAILED:", err, p);
+        console.error("❌ SAVE FAILED:", err, p);
       }
     }
-
-    console.log("✅ Inserted profiles:", inserted);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        count: inserted,
+        count: saved,
       }),
     };
 

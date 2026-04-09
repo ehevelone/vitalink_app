@@ -56,36 +56,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  // 🔥 NOW RETURNS TOKEN DIRECTLY FROM DB
+  // 🔥 FIXED — ONLY CALL save_user_profiles
   Future<String?> _syncToBackend(Profile p) async {
-    final e = p.emergency;
-
-    final data = {
-      "name": p.fullName,
-      "dob": p.dob ?? "",
-      "allergies": e.allergies,
-      "conditions": e.conditions,
-      "implants": e.implants,
-      "procedures": e.procedures,
-      "bloodType": e.bloodType,
-      "organDonor": e.organDonor,
-      "emergencyContactName": e.contact,
-      "emergencyContactPhone": e.phone,
-      "meds": p.meds.map((m) => {
-            "name": m.name,
-            "dose": m.dose,
-            "frequency": m.frequency,
-          }).toList(),
-      "providers": p.doctors.map((d) => {
-            "name": d.name,
-            "phone": d.phone,
-          }).toList(),
-    };
-
     try {
-      final res = await ApiService.saveEmergencyProfile(
-        profileId: p.id,
-        data: data,
+      final res = await ApiService.saveUserProfiles(
+        userId: p.userId,
+        profiles: [p.toJson()],
       );
 
       if (res["success"] != true) {
@@ -93,19 +69,19 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         return null;
       }
 
-      final token = res["qr_token"];
+      // 🔥 reload profile (token should already exist and NOT change)
+      final updated = await _repo.loadProfile();
 
-      if (token != null && token.toString().isNotEmpty) {
-        // optional cache only
-        p.qrToken = token;
-        await _repo.saveProfile(p);
+      final token = updated?.qrToken;
+
+      if (token != null && token.isNotEmpty) {
         return token;
       }
 
       return null;
 
     } catch (e) {
-      debugPrint("Save emergency profile failed: $e");
+      debugPrint("Save profile failed: $e");
       return null;
     }
   }
@@ -121,7 +97,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
-    // 🔥 DIRECTLY GET TOKEN FROM DB RESPONSE
     final qrToken = await _syncToBackend(p);
 
     if (qrToken == null || qrToken.isEmpty) {

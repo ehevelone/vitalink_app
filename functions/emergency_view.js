@@ -25,16 +25,14 @@ exports.handler = async (event) => {
     // 🔥 BULLETPROOF TOKEN EXTRACTION
     let token =
       event.queryStringParameters?.token ||
-      event.query?.token || // fallback
+      event.query?.token ||
       null;
 
-    // fallback for rawQuery (Netlify edge cases)
     if (!token && event.rawQuery) {
       const params = new URLSearchParams(event.rawQuery);
       token = params.get("token");
     }
 
-    // fallback for full raw URL (LAST RESORT)
     if (!token && event.rawUrl) {
       try {
         const url = new URL(event.rawUrl);
@@ -42,7 +40,6 @@ exports.handler = async (event) => {
       } catch (e) {}
     }
 
-    console.log("🔥 FULL EVENT:", JSON.stringify(event));
     console.log("🔥 TOKEN RECEIVED:", token);
 
     if (!token) {
@@ -57,12 +54,10 @@ exports.handler = async (event) => {
       .update(token)
       .digest("hex");
 
-    console.log("TOKEN HASH:", token_hash);
-
     // 🔥 LOOK UP PROFILE
     const tokenRes = await db.query(
       `
-      SELECT id
+      SELECT id, encrypted_data
       FROM public.profiles
       WHERE token_hash = $1
         AND (qr_revoked IS NULL OR qr_revoked = false)
@@ -71,8 +66,6 @@ exports.handler = async (event) => {
       [token_hash]
     );
 
-    console.log("PROFILE MATCH COUNT:", tokenRes.rows.length);
-
     if (!tokenRes.rows.length) {
       return reply(404, {
         success: false,
@@ -80,49 +73,32 @@ exports.handler = async (event) => {
       });
     }
 
-    const profileId = tokenRes.rows[0].id;
+    const row = tokenRes.rows[0];
+    const profileId = row.id;
+    const encrypted = row.encrypted_data;
 
-    // 🔥 LOAD ENCRYPTED DATA
-    const emergencyRes = await db.query(
-      `
-      SELECT encrypted_data
-      FROM public.emergency_profiles
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [profileId]
-    );
+    console.log("✅ PROFILE FOUND:", profileId);
 
-    console.log("EMERGENCY PROFILE COUNT:", emergencyRes.rows.length);
-
-    if (!emergencyRes.rows.length) {
+    if (!encrypted) {
       return reply(404, {
         success: false,
         error: "No emergency data found",
       });
     }
-
-    const encrypted = emergencyRes.rows[0].encrypted_data;
 
     let data = {};
 
-    if (encrypted) {
-      try {
-        data = JSON.parse(decrypt(encrypted));
-      } catch (e) {
-        console.error("DECRYPT ERROR:", e);
-        return reply(500, {
-          success: false,
-          error: "Decrypt failed",
-        });
-      }
-    } else {
-      return reply(404, {
+    try {
+      data = JSON.parse(decrypt(encrypted));
+    } catch (e) {
+      console.error("DECRYPT ERROR:", e);
+      return reply(500, {
         success: false,
-        error: "No emergency data found",
+        error: "Decrypt failed",
       });
     }
 
+    // 🔥 MEDS (optional table)
     const medsRes = await db.query(
       `
       SELECT name, dose, frequency
