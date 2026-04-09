@@ -9,7 +9,6 @@ const headers = {
 
 exports.handler = async (event) => {
 
-  // 🔥 HANDLE PREFLIGHT (REQUIRED)
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -18,7 +17,6 @@ exports.handler = async (event) => {
     };
   }
 
-  // 🔒 ONLY ALLOW POST (extra safety)
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -29,7 +27,6 @@ exports.handler = async (event) => {
 
   try {
 
-    // ✅ SAFE PARSE
     let body = {};
     try {
       body = JSON.parse(event.body || "{}");
@@ -51,10 +48,9 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 QUERY
     const result = await db.query(
       `
-      SELECT id, name
+      SELECT id, name, qr_token
       FROM profiles
       WHERE user_id = $1
       ORDER BY name ASC
@@ -62,7 +58,6 @@ exports.handler = async (event) => {
       [user_id]
     );
 
-    // ✅ SUCCESS RESPONSE
     return {
       statusCode: 200,
       headers,
@@ -76,7 +71,6 @@ exports.handler = async (event) => {
 
     console.error("get-profiles error:", err);
 
-    // ❗ IMPORTANT: still return headers on error
     return {
       statusCode: 500,
       headers,

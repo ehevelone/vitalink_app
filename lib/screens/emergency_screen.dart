@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../services/api_service.dart';
 import 'qr_screen.dart';
 import 'edit_profile.dart';
 
@@ -56,36 +55,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  // 🔥 FIXED — ONLY CALL save_user_profiles
-  Future<String?> _syncToBackend(Profile p) async {
-    try {
-      final res = await ApiService.saveUserProfiles(
-        userId: p.userId,
-        profiles: [p.toJson()],
-      );
-
-      if (res["success"] != true) {
-        debugPrint("⚠️ Save failed: ${res["error"]}");
-        return null;
-      }
-
-      // 🔥 reload profile (token should already exist and NOT change)
-      final updated = await _repo.loadProfile();
-
-      final token = updated?.qrToken;
-
-      if (token != null && token.isNotEmpty) {
-        return token;
-      }
-
-      return null;
-
-    } catch (e) {
-      debugPrint("Save profile failed: $e");
-      return null;
-    }
-  }
-
   Future<void> _showQr() async {
     final p = _p;
     if (p == null) return;
@@ -97,7 +66,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
-    final qrToken = await _syncToBackend(p);
+    final qrToken = p.qrToken;
 
     if (qrToken == null || qrToken.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -311,9 +280,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
             MaterialPageRoute(builder: (_) => const EditProfileScreen()),
           ).then((_) async {
             await _load();
-            if (_p != null && _p!.id.isNotEmpty) {
-              await _syncToBackend(_p!);
-            }
           });
         },
         child: const Icon(Icons.edit),
