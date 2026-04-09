@@ -11,19 +11,20 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
 
-    const { user_id, profiles } = body;
+    // 🔥 CHANGED: use UUID id instead of user_id
+    const { id, profiles } = body;
 
-    if (!user_id || !profiles || !Array.isArray(profiles)) {
+    if (!id || !profiles || !Array.isArray(profiles)) {
       return {
         statusCode: 400,
         body: JSON.stringify({
           success: false,
-          error: "Missing or invalid user_id / profiles",
+          error: "Missing or invalid id / profiles",
         }),
       };
     }
 
-    console.log("🔥 Saving profiles for user:", user_id);
+    console.log("🔥 Saving profiles for UUID:", id);
 
     let saved = 0;
 
@@ -82,7 +83,7 @@ exports.handler = async (event) => {
           `,
           [
             profileId,
-            user_id,
+            id, // 🔥 THIS IS NOW UUID
             name,
             encrypted_data,
             token,

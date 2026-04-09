@@ -86,7 +86,7 @@ class ApiService {
     required List<Map<String, dynamic>> profiles,
   }) async {
     final body = {
-      "user_id": int.tryParse(userId) ?? userId,
+      "id": userId, // ✅ FIXED
       "profiles": profiles,
     };
 
@@ -95,6 +95,15 @@ class ApiService {
     return await _postJson("save_user_profiles", body);
   }
 
+  // -------------------------------------------------------------
+  // 🔥 GET PROFILES (FOR QR TOKEN)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> getProfiles(String id) async {
+    return await _postJson("get_profiles", {
+      "id": id, // ✅ FIXED
+    });
+  }
+  
   // -------------------------------------------------------------
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
@@ -412,15 +421,14 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔥 SYNC USER PROFILES (UNCHANGED)
+  // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> syncProfilesToServer() async {
     try {
       final store = SecureStore();
       final repo = DataRepository(store);
 
-      final userIdStr = await store.getString("userId");
-      final userId = int.tryParse(userIdStr ?? "");
+      final userId = await store.getString("userId");
 
       if (userId == null) {
         debugPrint("❌ No userId found — skipping profile sync");
@@ -441,7 +449,7 @@ class ApiService {
       }).toList();
 
       final body = {
-        "user_id": userId,
+        "id": userId, // ✅ FIXED
         "profiles": fixedProfiles,
       };
 

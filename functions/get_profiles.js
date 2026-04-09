@@ -38,24 +38,26 @@ exports.handler = async (event) => {
       };
     }
 
-    const { user_id } = body;
+    // 🔥 FIXED — use id (UUID), NOT user_id
+    const { id } = body;
 
-    if (!user_id) {
+    if (!id) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "Missing user_id" }),
+        body: JSON.stringify({ error: "Missing id" }),
       };
     }
 
+    // 🔥 MATCH BY UUID
     const result = await db.query(
       `
       SELECT id, name, qr_token
       FROM profiles
-      WHERE user_id = $1
-      ORDER BY name ASC
+      WHERE id = $1
+      LIMIT 1
       `,
-      [user_id]
+      [id]
     );
 
     return {

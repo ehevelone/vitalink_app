@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/api_service.dart'; // ✅ ADDED
 import 'qr_screen.dart';
 import 'edit_profile.dart';
 
@@ -55,6 +56,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
+  // 🔥 FIXED HERE ONLY
   Future<void> _showQr() async {
     final p = _p;
     if (p == null) return;
@@ -66,24 +68,46 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       return;
     }
 
-    final qrToken = p.qrToken;
+    try {
+      final res = await ApiService.getProfiles(p.id);
 
-    if (qrToken == null || qrToken.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("QR not ready. Try again.")),
-      );
-      return;
-    }
+      if (res["success"] != true) {
+        throw Exception("API failed");
+      }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => QrScreen(
-          qrToken: qrToken,
-          title: "Emergency Info",
+      final profiles = res["profiles"] as List;
+
+      Map<String, dynamic>? match;
+      for (final x in profiles) {
+        if (x["id"] == p.id) {
+          match = x;
+          break;
+        }
+      }
+
+      final qrToken = match?["qr_token"];
+
+      if (qrToken == null || qrToken.isEmpty) {
+        throw Exception("No token");
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QrScreen(
+            qrToken: qrToken,
+            title: "Emergency Info",
+          ),
         ),
-      ),
-    );
+      );
+
+    } catch (e) {
+      debugPrint("❌ QR LOAD FAILED: $e");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to load QR")),
+      );
+    }
   }
 
   @override
