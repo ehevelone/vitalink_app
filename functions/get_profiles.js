@@ -39,14 +39,18 @@ exports.handler = async (event) => {
     // 🔥 MULTIPLE UUIDs (CHECKOUT FLOW)
     if (Array.isArray(body.profiles) && body.profiles.length) {
 
+      const ids = body.profiles.map(id => String(id));
+
+      console.log("PROFILE IDS RECEIVED:", ids);
+
       result = await db.query(
         `
         SELECT id, name, qr_token
         FROM profiles
         WHERE id = ANY($1::uuid[])
-        ORDER BY array_position($1::uuid[], id)
+        ORDER BY id
         `,
-        [body.profiles]
+        [ids]
       );
 
     }
@@ -58,7 +62,7 @@ exports.handler = async (event) => {
         `
         SELECT id, name, qr_token
         FROM profiles
-        WHERE id = $1
+        WHERE id = $1::uuid
         LIMIT 1
         `,
         [body.id]
