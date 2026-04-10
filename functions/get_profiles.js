@@ -41,14 +41,14 @@ exports.handler = async (event) => {
 
       const ids = body.profiles.map(id => String(id));
 
-      console.log("PROFILE IDS RECEIVED:", ids);
+      console.log("PROFILE UUIDS RECEIVED:", ids);
 
       result = await db.query(
         `
-        SELECT id, name, qr_token
+        SELECT id, uuid, name, qr_token
         FROM profiles
-        WHERE id = ANY($1::uuid[])
-        ORDER BY id
+        WHERE uuid = ANY($1::uuid[])
+        ORDER BY name
         `,
         [ids]
       );
@@ -60,9 +60,9 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, name, qr_token
+        SELECT id, uuid, name, qr_token
         FROM profiles
-        WHERE id = $1::uuid
+        WHERE uuid = $1::uuid
         LIMIT 1
         `,
         [body.id]
@@ -75,7 +75,7 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, name, qr_token
+        SELECT id, uuid, name, qr_token
         FROM profiles
         WHERE user_id = $1
         ORDER BY name ASC
