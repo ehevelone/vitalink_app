@@ -43,7 +43,8 @@ exports.handler = async (event) => {
         `
         SELECT id, name, qr_token
         FROM profiles
-        WHERE id = ANY($1)
+        WHERE id = ANY($1::uuid[])
+        ORDER BY array_position($1::uuid[], id)
         `,
         [body.profiles]
       );
