@@ -34,27 +34,60 @@ exports.handler = async (event) => {
       };
     }
 
-    const ids =
-      Array.isArray(body.profiles) ? body.profiles :
-      body.id ? [body.id] :
-      [];
+    let result;
 
-    if (!ids.length) {
+    // 🔥 MULTIPLE UUIDs (CHECKOUT FLOW)
+    if (Array.isArray(body.profiles) && body.profiles.length) {
+
+      result = await db.query(
+        `
+        SELECT id, name, qr_token
+        FROM profiles
+        WHERE id = ANY($1)
+        `,
+        [body.profiles]
+      );
+
+    }
+
+    // 🔥 SINGLE UUID
+    else if (body.id) {
+
+      result = await db.query(
+        `
+        SELECT id, name, qr_token
+        FROM profiles
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [body.id]
+      );
+
+    }
+
+    // 🔥 USER PROFILE LOAD (ORDER PAGE / APP)
+    else if (body.user_id) {
+
+      result = await db.query(
+        `
+        SELECT id, name, qr_token
+        FROM profiles
+        WHERE user_id = $1
+        ORDER BY name ASC
+        `,
+        [body.user_id]
+      );
+
+    }
+
+    // ❌ NOTHING VALID SENT
+    else {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "Missing id(s)" }),
+        body: JSON.stringify({ error: "Missing parameters" }),
       };
     }
-
-    const result = await db.query(
-      `
-      SELECT id, name, qr_token
-      FROM profiles
-      WHERE id = ANY($1)
-      `,
-      [ids]
-    );
 
     return {
       statusCode: 200,
