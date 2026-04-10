@@ -39,7 +39,9 @@ exports.handler = async (event) => {
     // 🔥 MULTIPLE UUIDs (CHECKOUT FLOW)
     if (Array.isArray(body.profiles) && body.profiles.length) {
 
-      const ids = body.profiles.map(id => String(id));
+      const ids = body.profiles
+        .map(id => String(id))
+        .filter(id => id && id.length === 36);
 
       console.log("PROFILE UUIDS RECEIVED:", ids);
 
