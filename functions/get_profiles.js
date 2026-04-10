@@ -47,9 +47,9 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, uuid, name, qr_token
+        SELECT id, name, qr_token
         FROM profiles
-        WHERE uuid = ANY($1::uuid[])
+        WHERE id = ANY($1::uuid[])
         ORDER BY name
         `,
         [ids]
@@ -62,9 +62,9 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, uuid, name, qr_token
+        SELECT id, name, qr_token
         FROM profiles
-        WHERE uuid = $1::uuid
+        WHERE id = $1::uuid
         LIMIT 1
         `,
         [body.id]
@@ -77,7 +77,7 @@ exports.handler = async (event) => {
 
       result = await db.query(
         `
-        SELECT id, uuid, name, qr_token
+        SELECT id, name, qr_token
         FROM profiles
         WHERE user_id = $1
         ORDER BY name ASC
