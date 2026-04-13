@@ -27,12 +27,12 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 GET EXISTING QR TOKENS (DO NOT REGENERATE)
+    // 🔥 FIXED: UUID ARRAY CAST
     const result = await db.query(
       `
       SELECT id, name, qr_token
       FROM profiles
-      WHERE id = ANY($1)
+      WHERE id = ANY($1::uuid[])
       `,
       [profiles]
     );
@@ -76,7 +76,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         success:false,
-        error: "Server error"
+        error: err.message // 👈 IMPORTANT: shows real error now
       }),
     };
   }
