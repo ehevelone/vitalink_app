@@ -16,8 +16,17 @@ exports.handler = async (event) => {
 
     const body = JSON.parse(event.body || "{}");
 
+    const user_id = body.user_id; // 🔥 ADDED
     const profiles = body.profiles;
     const items = body.items || [];
+
+    if (!user_id) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success:false, error: "Missing user_id" })
+      };
+    }
 
     if (!profiles || !Array.isArray(profiles) || profiles.length === 0) {
       return {
@@ -27,7 +36,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 FIXED: UUID ARRAY CAST
+    // 🔥 GET EXISTING QR TOKENS
     const result = await db.query(
       `
       SELECT id, name, qr_token
@@ -43,14 +52,15 @@ exports.handler = async (event) => {
       qr_url: `https://myvitalink.app/emergency.html?token=${p.qr_token}`
     }));
 
-    // 🧾 SAVE ORDER
+    // 🧾 SAVE ORDER (FIXED WITH user_id)
     const orderRes = await db.query(
       `
-      INSERT INTO public.orders (profiles, items, qr, status, created_at)
-      VALUES ($1, $2, $3, 'created', NOW())
+      INSERT INTO public.orders (user_id, profiles, items, qr, status, created_at)
+      VALUES ($1, $2, $3, $4, 'created', NOW())
       RETURNING id
       `,
       [
+        user_id,
         JSON.stringify(profiles),
         JSON.stringify(items),
         JSON.stringify(qr)
@@ -76,7 +86,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         success:false,
-        error: err.message // 👈 IMPORTANT: shows real error now
+        error: err.message
       }),
     };
   }
