@@ -16,7 +16,7 @@ exports.handler = async (event) => {
 
     const body = JSON.parse(event.body || "{}");
 
-    const user_id = body.user_id; // 🔥 ADDED
+    const user_id = body.user_id;
     const profiles = body.profiles;
     const items = body.items || [];
 
@@ -36,15 +36,24 @@ exports.handler = async (event) => {
       };
     }
 
-    // 🔥 GET EXISTING QR TOKENS
+    // 🔥 CRITICAL FIX: ENSURE PROFILES BELONG TO USER
     const result = await db.query(
       `
       SELECT id, name, qr_token
       FROM profiles
-      WHERE id = ANY($1::uuid[])
+      WHERE user_id = $1
+        AND id = ANY($2::uuid[])
       `,
-      [profiles]
+      [user_id, profiles]
     );
+
+    if (!result.rows.length) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success:false, error: "No valid profiles found for user" })
+      };
+    }
 
     const qr = result.rows.map(p => ({
       profile: p.name,
@@ -52,7 +61,7 @@ exports.handler = async (event) => {
       qr_url: `https://myvitalink.app/emergency.html?token=${p.qr_token}`
     }));
 
-    // 🧾 SAVE ORDER (FIXED WITH user_id)
+    // 🧾 SAVE ORDER
     const orderRes = await db.query(
       `
       INSERT INTO public.orders (user_id, profiles, items, qr, status, created_at)
