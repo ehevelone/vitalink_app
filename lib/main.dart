@@ -308,56 +308,37 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'VitaLink',
-      debugShowCheckedModeBanner: false,
-      home: const LandingScreen(),
-      onGenerateRoute: (settings) {
-        if (settings.name == '/insurance_cards') {
-          int index = 0;
-          final args = settings.arguments;
+ @override
+Widget build(BuildContext context) {
+  return MaterialApp(
+    navigatorKey: navigatorKey,
+    title: 'VitaLink',
+    debugShowCheckedModeBanner: false,
+    home: const LandingScreen(),
+    onGenerateRoute: (settings) {
+      if (settings.name == '/insurance_cards') {
+        int index = 0;
+        final args = settings.arguments;
 
-          if (args is int) {
-            index = args;
-          } else if (args is Map) {
-            final v = args['index'];
-            if (v is int) index = v;
-          }
-
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => InsuranceCardsScreen(index: index),
-          );
+        if (args is int) {
+          index = args;
+        } else if (args is Map) {
+          final v = args['index'];
+          if (v is int) index = v;
         }
 
-        if (settings.name == '/orderApproval') {
-          int? requestId;
-          final args = settings.arguments;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => InsuranceCardsScreen(index: index),
+        );
+      }
 
-          if (args is int) {
-            requestId = args;
-          } else if (args is String) {
-            requestId = int.tryParse(args);
-          } else if (args is Map) {
-            final v = args['request_id'] ?? args['requestId'];
-            if (v is int) {
-              requestId = v;
-            } else if (v is String) {
-              requestId = int.tryParse(v);
-            }
-          }
+      // 🔥 ORDER APPROVAL ROUTE REMOVED
 
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => OrderApprovalScreen(requestId: requestId),
-          );
-        }
-
-        return null;
-      },
+      return null;
+    },
+  );
+}
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
