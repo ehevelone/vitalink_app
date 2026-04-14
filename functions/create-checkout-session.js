@@ -1,29 +1,23 @@
 const Stripe = require("stripe");
 
 /* =========================================================
-   🔧 STRIPE KEY SETUP
-   ---------------------------------------------------------
-   👉 FOR TESTING:
-   Replace process.env line with your test key
-
-   const stripe = new Stripe("sk_test_XXXXXXXX");
-
-   👉 FOR LIVE (DEFAULT):
-   Use environment variable below
+   🔧 STRIPE KEY (ENV ONLY — REQUIRED)
    ========================================================= */
 
-const stripe = new Stripe("sk_test_51T9pl92eFONDuxiMC18B8uqUAPhmpS38vnSeWMIzlJLtIpmdBbRoZUph3ppJn5ySMv14bJn2iFMB3ZIOerVbM9Pn006TLgPlck");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 exports.handler = async (event) => {
+
+  const headers = {
+    "Access-Control-Allow-Origin": "https://myvitalink.app",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS"
+  };
 
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "https://myvitalink.app",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS"
-      },
+      headers,
       body: ""
     };
   }
@@ -34,42 +28,30 @@ exports.handler = async (event) => {
 
     const amount = body.amount;
     const order_id = body.order_id;
-    const isTest = body.test === true || body.test === "true";
 
     console.log("CHECKOUT BODY:", body);
 
     if (!order_id) {
       return {
         statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        headers,
         body: JSON.stringify({ success:false, error:"Missing order_id" })
-      };
-    }
-
-    /* =========================================================
-       🔥 TEST MODE (BYPASS STRIPE COMPLETELY)
-       👉 Trigger by sending: { test: true }
-       ========================================================= */
-    if (isTest) {
-      return {
-        statusCode: 200,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
-        body: JSON.stringify({
-          url: `https://myvitalink.app/accessories/checkout-success.html?test=true&request_id=${order_id}`
-        })
       };
     }
 
     if (!amount) {
       return {
         statusCode: 400,
-        headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+        headers,
         body: JSON.stringify({ success:false, error:"Missing amount" })
       };
     }
 
+    // 🔥 REAL STRIPE SESSION (NO TEST BYPASS)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
+      mode: "payment",
+
       line_items: [
         {
           price_data: {
@@ -82,16 +64,10 @@ exports.handler = async (event) => {
           quantity: 1
         }
       ],
-      mode: "payment",
 
-      /* =========================================================
-         🔥 SUCCESS REDIRECT (CRITICAL FIX APPLIED)
-         ========================================================= */
       success_url: `https://myvitalink.app/accessories/checkout-success.html?request_id=${order_id}`,
-
       cancel_url: "https://myvitalink.app/order.html",
 
-      /* Optional but smart for future webhook use */
       metadata: {
         order_id: order_id
       }
@@ -99,18 +75,19 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+      headers,
       body: JSON.stringify({
         url: session.url
       })
     };
 
   } catch (err) {
+
     console.error("Stripe error:", err);
 
     return {
       statusCode: 500,
-      headers: { "Access-Control-Allow-Origin": "https://myvitalink.app" },
+      headers,
       body: JSON.stringify({
         success:false,
         error: err.message
