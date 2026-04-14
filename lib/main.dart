@@ -1,14 +1,13 @@
 // lib/main.dart
 
 import 'dart:async';
-import 'dart:io'; // 🔥 ADDED
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:app_links/app_links.dart';
 
-// 🔥 ADDED
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
 
@@ -30,8 +29,6 @@ import 'screens/my_agent_user.dart';
 import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
-
-// NEW SCREEN
 import 'screens/agent_clients_screen.dart';
 
 // PROFILE
@@ -63,7 +60,7 @@ import 'screens/agent_reset_password_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// 🔥 GLOBAL POPUP (NEW)
+// 🔥 POPUP
 void showGlobalNotificationPopup(RemoteMessage message) {
   final ctx = navigatorKey.currentContext;
   if (ctx == null) return;
@@ -85,7 +82,6 @@ void showGlobalNotificationPopup(RemoteMessage message) {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _handleNotificationNavigation(message);
             },
             child: const Text("Open"),
           ),
@@ -95,63 +91,35 @@ void showGlobalNotificationPopup(RemoteMessage message) {
   );
 }
 
-// 🔥 REQUIRED BACKGROUND HANDLER
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("📩 BACKGROUND MESSAGE: ${message.messageId}");
 }
 
-// 🔥 NOTIFICATION TAP HANDLER
+// 🔥 REMOVED ORDER APPROVAL NAVIGATION
 void _handleNotificationNavigation(RemoteMessage message) {
-  final data = message.data;
-  debugPrint("📩 TAP DATA: $data");
-
-  if (data["type"] == "order_approval") {
-    final requestId = data["request_id"] ?? data["requestId"];
-
-    pendingRoute = "/orderApproval";
-    pendingArgs = {"requestId": requestId};
-
-    navigatorKey.currentState?.pushNamed(
-      "/orderApproval",
-      arguments: {"requestId": requestId},
-    );
-  }
+  debugPrint("📩 TAP DATA: ${message.data}");
 }
 
-// 🔥 GLOBAL NAV QUEUE
-String? pendingRoute;
-dynamic pendingArgs;
-
-// 🔥🔥🔥 NEW GLOBAL FCM SETUP (CRITICAL)
 Future<void> _setupFCMGlobal() async {
   try {
     final messaging = FirebaseMessaging.instance;
 
     final token = await messaging.getToken();
-    print("🔥 GLOBAL FCM TOKEN: $token");
 
     final store = SecureStore();
     final email = await store.getString('userEmail');
     final role = await store.getString('role');
 
     if (token != null && email != null && role != null) {
-      print("📡 GLOBAL TOKEN REGISTER: $email");
-
       await ApiService.registerDeviceToken(
         email: email,
         fcmToken: token,
         role: role,
         platform: Platform.isIOS ? "ios" : "android",
       );
-    } else {
-      print("⚠️ GLOBAL FCM skipped (missing email/role)");
     }
 
-    // 🔄 TOKEN REFRESH LISTENER
     messaging.onTokenRefresh.listen((newToken) async {
-      print("🔄 TOKEN REFRESH: $newToken");
-
       final email = await store.getString('userEmail');
       final role = await store.getString('role');
 
@@ -166,31 +134,7 @@ Future<void> _setupFCMGlobal() async {
     });
 
   } catch (e) {
-    print("❌ FCM GLOBAL ERROR: $e");
-  }
-}
-
-class VitaLinkDeepLink {
-  static String? _code;
-  static String? _lastRawUri;
-
-  static String? get code => _code;
-
-  static void setCode(String? value, {String? rawUri}) {
-    _code = value;
-    if (rawUri != null) {
-      _lastRawUri = rawUri;
-    }
-  }
-
-  static bool shouldIgnore(Uri uri) {
-    final raw = uri.toString();
-    return _lastRawUri == raw;
-  }
-
-  static void clear() {
-    _code = null;
-    _lastRawUri = null;
+    print("❌ FCM ERROR: $e");
   }
 }
 
@@ -198,41 +142,26 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await runZonedGuarded(() async {
+
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
 
-    try {
-      await Firebase.initializeApp();
-    } catch (_) {}
-
-    // 🔥🔥🔥 THIS IS THE FIX
+    await Firebase.initializeApp();
     await _setupFCMGlobal();
 
     FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler,
     );
 
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        _handleNotificationNavigation(message);
-      }
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      _handleNotificationNavigation(message);
-    });
-
-    // 🔥🔥🔥 FOREGROUND (APP OPEN) FIX
     FirebaseMessaging.onMessage.listen((message) {
-      print("📩 FOREGROUND MESSAGE: ${message.data}");
       showGlobalNotificationPopup(message);
     });
 
     runApp(const VitaLinkApp());
+
   }, (error, stack) {
     debugPrint('ZONED ERROR: $error');
-    debugPrint(stack.toString());
   });
 }
 
@@ -244,101 +173,33 @@ class VitaLinkApp extends StatefulWidget {
 }
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
-  late final AppLinks _appLinks;
-  StreamSubscription<Uri>? _sub;
-  bool _linksInitialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    _initDeepLinks();
-  }
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'VitaLink',
+      debugShowCheckedModeBanner: false,
+      home: const LandingScreen(),
 
-  Future<void> _initDeepLinks() async {
-    if (_linksInitialized) return;
-    _linksInitialized = true;
+      onGenerateRoute: (settings) {
+        if (settings.name == '/insurance_cards') {
+          int index = 0;
+          final args = settings.arguments;
 
-    _appLinks = AppLinks();
+          if (args is int) index = args;
+          if (args is Map && args['index'] is int) {
+            index = args['index'];
+          }
 
-    try {
-      final uri = await _appLinks.getInitialLink();
-      if (uri != null) {
-        _storeDeepLink(uri);
-      }
-    } catch (e) {
-      debugPrint('Initial link error: $e');
-    }
-
-    _sub = _appLinks.uriLinkStream.listen(
-      (uri) {
-        _storeDeepLink(uri);
-      },
-      onError: (e) {
-        debugPrint('uriLinkStream error: $e');
-      },
-    );
-  }
-
-  void _storeDeepLink(Uri uri) {
-    if (VitaLinkDeepLink.shouldIgnore(uri)) return;
-
-    debugPrint('Deep link received: $uri');
-
-    String? code;
-
-    final qpCode = uri.queryParameters['code'];
-    if (qpCode != null && qpCode.trim().isNotEmpty) {
-      code = qpCode.trim().toUpperCase();
-    } else if (uri.pathSegments.isNotEmpty) {
-      final last = uri.pathSegments.last.trim();
-      if (last.isNotEmpty) {
-        code = last.toUpperCase();
-      }
-    }
-
-    if (code == null || code.isEmpty) return;
-
-    VitaLinkDeepLink.setCode(code, rawUri: uri.toString());
-    debugPrint('Activation code stored: $code');
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
-
- @override
-Widget build(BuildContext context) {
-  return MaterialApp(
-    navigatorKey: navigatorKey,
-    title: 'VitaLink',
-    debugShowCheckedModeBanner: false,
-    home: const LandingScreen(),
-    onGenerateRoute: (settings) {
-      if (settings.name == '/insurance_cards') {
-        int index = 0;
-        final args = settings.arguments;
-
-        if (args is int) {
-          index = args;
-        } else if (args is Map) {
-          final v = args['index'];
-          if (v is int) index = v;
+          return MaterialPageRoute(
+            builder: (_) => InsuranceCardsScreen(index: index),
+          );
         }
 
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => InsuranceCardsScreen(index: index),
-        );
-      }
+        return null;
+      },
 
-      // 🔥 ORDER APPROVAL ROUTE REMOVED
-
-      return null;
-    },
-  );
-}
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
