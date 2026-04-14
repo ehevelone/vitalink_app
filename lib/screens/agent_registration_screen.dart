@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 

@@ -7,6 +7,7 @@ import '../main.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
+import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -159,7 +160,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
       final lastName =
-          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "User"; // ✅ FIX
+          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "User";
 
       final registerRes = await ApiService.registerUser(
         firstName: firstName,
@@ -168,7 +169,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         phone: _normalizePhone(_phoneCtrl.text),
         password: _passwordCtrl.text.trim(),
         promoCode: code,
-        platform: Platform.isIOS ? "ios" : "android", // ✅ FIX
+        platform: Platform.isIOS ? "ios" : "android",
       );
 
       if (registerRes['success'] != true) {
