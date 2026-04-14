@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -14,7 +13,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
   String? activationCode;
 
-  bool _checkedRoute = false; // 🔥 NEW
+  bool _checkedRoute = false;
 
   @override
   void didChangeDependencies() {
@@ -32,35 +31,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
     activationCode ??= VitaLinkDeepLink.code;
 
-    // 🔥 ADD THIS BLOCK
     if (!_checkedRoute) {
       _checkedRoute = true;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handlePendingRoute();
-      });
-    }
-  }
-
-  // 🔥 NEW FUNCTION
-  void _handlePendingRoute() {
-
-    if (!mounted) return;
-
-    if (pendingRoute != null) {
-
-      final route = pendingRoute!;
-      final args = pendingArgs;
-
-      // clear so it doesn't loop
-      pendingRoute = null;
-      pendingArgs = null;
-
-      Navigator.pushReplacementNamed(
-        context,
-        route,
-        arguments: args,
-      );
     }
   }
 

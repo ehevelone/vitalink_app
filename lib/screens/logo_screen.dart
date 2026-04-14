@@ -6,7 +6,6 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
-import '../main.dart'; // 🔥 ADD THIS
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -96,23 +95,7 @@ class _LogoScreenState extends State<LogoScreen> {
 
       if (!mounted) return;
 
-      // 🔥 FIRST — HANDLE NOTIFICATION ROUTE
-      if (pendingRoute != null) {
-        final route = pendingRoute!;
-        final args = pendingArgs;
-
-        pendingRoute = null;
-        pendingArgs = null;
-
-        Navigator.pushReplacementNamed(
-          context,
-          route,
-          arguments: args,
-        );
-        return;
-      }
-
-      // 🔥 NORMAL FLOW
+      // 🔥 NORMAL FLOW ONLY (approval system removed)
       if (!loggedIn) {
         Navigator.pushReplacementNamed(context, '/landing');
         return;
@@ -181,7 +164,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
               const SizedBox(height: 24),
 
-              // 🔥 ADDED DISCLOSURE (surgical)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 28),
                 child: Text(
