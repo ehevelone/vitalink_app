@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -41,8 +40,7 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
       }
     }
 
-    // Deep-link fallback
-    activationCode ??= VitaLinkDeepLink.code;
+    // 🔥 Deep-link fallback REMOVED (no longer needed)
   }
 
   Future<void> _load() async {
