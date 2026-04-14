@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import '../main.dart';
-
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
@@ -29,7 +27,7 @@ class _MenuScreenState extends State<MenuScreen>
   bool _loading = true;
   String _displayName = "User";
 
-  bool _syncRan = false; // 🔥 prevents duplicate calls
+  bool _syncRan = false;
 
   @override
   void initState() {
@@ -42,11 +40,8 @@ class _MenuScreenState extends State<MenuScreen>
 
     _loadProfile();
     _setupFCM();
-
-    _checkPendingNavigation();
   }
 
-  // 🔥 GUARANTEED SYNC TRIGGER
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -65,7 +60,6 @@ class _MenuScreenState extends State<MenuScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
-      _checkPendingNavigation();
       _registerToken();
     }
   }
@@ -87,21 +81,6 @@ class _MenuScreenState extends State<MenuScreen>
       }
     } catch (e) {
       print("Token registration error: $e");
-    }
-  }
-
-  void _checkPendingNavigation() {
-    if (pendingRoute != null) {
-      final route = pendingRoute!;
-      final args = pendingArgs;
-
-      pendingRoute = null;
-      pendingArgs = null;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.pushNamed(context, route, arguments: args);
-      });
     }
   }
 
@@ -211,30 +190,9 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
+  // 🔥 FIXED — NO MORE ORDER APPROVAL SYSTEM
   void _handleNotificationTap(RemoteMessage message) {
-    final data = message.data;
-
-    final type = data["type"];
-    final requestId = data["request_id"];
-
-    if (requestId == null) return;
-
-    if (type == "order_approval") {
-      pendingRoute = '/orderApproval';
-      pendingArgs = {
-        "request_id": requestId,
-      };
-    } else if (type == "order_approved") {
-      pendingRoute = '/orderApproved';
-      pendingArgs = {
-        "request_id": requestId,
-      };
-    } else if (type == "order_rejected") {
-      pendingRoute = '/orderRejected';
-      pendingArgs = {
-        "request_id": requestId,
-      };
-    }
+    // intentionally empty
   }
 
   Future<void> _logout(BuildContext context) async {
