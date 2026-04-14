@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
