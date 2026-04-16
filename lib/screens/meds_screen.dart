@@ -398,11 +398,29 @@ class _MedsScreenState extends State<MedsScreen> {
         children: [
           Column(
             children: [
-              ElevatedButton.icon(
-                onPressed: _scanning ? null : _scanLabel,
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Scan Medication Label'),
-              ),
+Padding(
+  padding: const EdgeInsets.all(12.0),
+  child: ElevatedButton.icon(
+    onPressed: _scanning ? null : _scanLabel,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.blue.shade700,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      minimumSize: const Size(double.infinity, 0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    icon: const Icon(Icons.camera_alt),
+    label: const Text(
+      'Scan Medication Label',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
+),
               Expanded(
                 child: meds.isEmpty
                     ? const Center(child: Text('No medications yet. Tap + to add.'))

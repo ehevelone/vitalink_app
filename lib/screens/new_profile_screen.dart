@@ -164,17 +164,35 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
               ),
               const SizedBox(height: 26),
 
+              // 🔥 FIXED BUTTON
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: FilledButton(
                   onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                   child: _saving
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white, // 🔥 FIX spinner visibility
+                          ),
                         )
-                      : const Text("Save Household Profile"),
+                      : const Text(
+                          "Save Household Profile",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],

@@ -63,7 +63,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 
     final store = SecureStore();
 
-    // USER profile update — local only
     if (_role == "user") {
       final repo = DataRepository(store);
       final p = await repo.loadProfile();
@@ -77,13 +76,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text("Profile updated")));
-
-        Navigator.pop(context, true); // 🔥 FIX
+        Navigator.pop(context, true);
       }
-    }
-
-    // AGENT profile update — API + local cache
-    else {
+    } else {
       final result = await ApiService.updateAgentProfile(
         email: _email.trim(),
         name: _nameCtrl.text.trim(),
@@ -104,8 +99,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text("Profile updated")));
-
-          Navigator.pop(context, true); // 🔥 FIX
+          Navigator.pop(context, true);
         }
       } else {
         if (mounted) {
@@ -192,9 +186,28 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
               ],
 
               const SizedBox(height: 28),
-              ElevatedButton(
-                onPressed: _save,
-                child: const Text("Save Changes"),
+
+              // 🔥 FIXED BUTTON
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "Save Changes",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

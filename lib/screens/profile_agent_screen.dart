@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../widgets/password_rules.dart';
-import '../utils/phone_formatter.dart'; // ✅ ADDED
+import '../utils/phone_formatter.dart';
 
 class ProfileAgentScreen extends StatefulWidget {
   const ProfileAgentScreen({super.key});
@@ -132,13 +132,10 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ✅ FIXED PHONE FIELD
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  PhoneNumberFormatter(),
-                ],
+                inputFormatters: [PhoneNumberFormatter()],
                 decoration: const InputDecoration(labelText: "Phone"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Required" : null,
@@ -211,12 +208,31 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               ),
 
               const SizedBox(height: 24),
+
+              // 🔥 FIXED BUTTON
               _loading
                   ? const CircularProgressIndicator()
-                  : ElevatedButton.icon(
-                      icon: const Icon(Icons.save),
-                      label: const Text("Save Changes"),
-                      onPressed: _saveProfile,
+                  : SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _saveProfile,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.save),
+                        label: const Text(
+                          "Save Changes",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
             ],
           ),

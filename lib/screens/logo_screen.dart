@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import '../services/secure_store.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -27,12 +28,48 @@ class _LogoScreenState extends State<LogoScreen> {
     super.initState();
 
     _loadProfile();
-
+    _initQR(); // ✅ FIXED
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initPushAndRegister();
     });
 
     _timer = Timer(const Duration(seconds: 3), _openMenu);
+  }
+
+  // 🔥 FIXED QR INIT (USES YOUR REAL API)
+  Future<void> _initQR() async {
+    try {
+      final store = SecureStore();
+      final existing = await store.getString('qr_url');
+
+      if (existing != null && existing.isNotEmpty) {
+        return; // already saved
+      }
+
+      final userId = await store.getString("userId");
+      if (userId == null) return;
+
+      final res = await ApiService.getProfiles(userId);
+
+      if (res["success"] != true) return;
+
+      final profiles = res["profiles"];
+      if (profiles == null || profiles.isEmpty) return;
+
+      // 🔥 THIS IS YOUR TOKEN SOURCE
+      final token = profiles[0]["qr_token"];
+
+      if (token == null || token.toString().isEmpty) return;
+
+      final qrUrl =
+          "https://myvitalink.app/emergency.html?token=$token";
+
+      await store.setString('qr_url', qrUrl);
+
+      debugPrint("✅ QR SAVED: $qrUrl");
+    } catch (e) {
+      debugPrint("❌ QR INIT ERROR: $e");
+    }
   }
 
   Future<void> _initPushAndRegister() async {
@@ -95,7 +132,6 @@ class _LogoScreenState extends State<LogoScreen> {
 
       if (!mounted) return;
 
-      // 🔥 NORMAL FLOW ONLY (approval system removed)
       if (!loggedIn) {
         Navigator.pushReplacementNamed(context, '/landing');
         return;
@@ -107,7 +143,6 @@ class _LogoScreenState extends State<LogoScreen> {
       }
 
       Navigator.pushReplacementNamed(context, '/menu');
-
     } catch (_) {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');

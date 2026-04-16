@@ -33,7 +33,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
         return;
       }
 
-      // ✅ Pull agent directly from backend using user email
       final res = await ApiService.getUserAgent(userEmail);
 
       if (res["success"] == true && res["agent"] != null) {
@@ -160,19 +159,53 @@ class _MyAgentUserState extends State<MyAgentUser> {
                   ),
                 ),
 
-                ElevatedButton.icon(
-                  onPressed: _loadAgent,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("Reload Info"),
+                // 🔥 UPDATED BUTTON (Reload)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _loadAgent,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text(
+                        "Reload Info",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
 
-                const SizedBox(height: 20),
-
+                // 🔥 UPDATED BUTTON (Send)
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: FilledButton.icon(
                     icon: const Icon(Icons.send),
-                    label: const Text("Send My Info to Agent"),
+                    label: const Text(
+                      "Send My Info to Agent",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: _sendToAgent,
                   ),
                 ),

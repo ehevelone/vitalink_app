@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart'; // ✅ ADDED
+
+import 'package:url_launcher/url_launcher.dart'; // ✅ REQUIRED
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -31,7 +34,6 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
 
     final route = ModalRoute.of(context);
 
-    // QR flow
     if (route != null) {
       final args = route.settings.arguments;
 
@@ -39,8 +41,6 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
         _args = args;
       }
     }
-
-    // 🔥 Deep-link fallback REMOVED (no longer needed)
   }
 
   Future<void> _load() async {
@@ -135,36 +135,83 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: SingleChildScrollView(
-                      child: Text(
-                        "Welcome to VitaLink (User).\n\n"
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                              fontSize: 16, color: Colors.black),
+                          children: [
+                            const TextSpan(
+                              text:
+                                  "Welcome to VitaLink (User).\n\n"
 
-                        "By using this app, you agree:\n"
-                        "• This app is provided as-is, without warranties.\n"
-                        "• You are responsible for the accuracy of your data.\n"
-                        "• This app does not replace professional medical advice.\n"
-                        "• Always consult licensed healthcare providers for medical decisions.\n\n"
+                                  "By using this app, you agree:\n"
+                                  "• This app is provided as-is, without warranties.\n"
+                                  "• You are responsible for the accuracy and completeness of all data entered.\n\n"
 
-                        "Activation Requirement\n\n"
-                        "A VitaLink account requires an activation code.\n\n"
+                                  "Medical & Platform Disclaimer\n\n"
+                                  "• VitaLink is a data storage and sharing tool only and does not verify, validate, or guarantee the accuracy, completeness, or timeliness of any information.\n"
+                                  "• VitaLink is not a medical provider, insurer, or licensed advisory service.\n"
+                                  "• This app does not provide medical advice, diagnosis, or treatment.\n"
+                                  "• Always consult licensed healthcare providers for medical decisions.\n\n"
 
-                        "Clients of participating insurance agents will receive an activation code from their agent.\n\n"
+                                  "Emergency Disclaimer\n\n"
+                                  "• VitaLink is not an emergency service.\n"
+                                  "• Information displayed may not be complete, current, or verified.\n"
+                                  "• First responders and medical personnel should not rely solely on this app for treatment decisions.\n"
+                                  "• In an emergency, call 911 or local emergency services immediately.\n\n"
 
-                        "Personal users can obtain an activation code at:\n"
-                        "myvitalink.app\n\n"
+                                  "Insurance Information\n\n"
+                                  "• Insurance cards and documents are user-provided and may not reflect current coverage.\n"
+                                  "• You are responsible for ensuring all insurance information is accurate and up to date.\n\n"
 
-                        "If you do not agree to these terms, you cannot use the app.",
-                        style: TextStyle(fontSize: 16, color: Colors.black),
+                                  "Activation Requirement\n\n"
+                                  "A VitaLink account requires an activation code.\n\n"
+
+                                  "Clients of participating insurance agents will receive an activation code from their agent.\n\n"
+
+                                  "Personal users can obtain an activation code at:\n"
+                                  "myvitalink.app\n\n"
+
+                                  "For full Terms of Service and Privacy Policy, visit:\n",
+                            ),
+
+                            TextSpan(
+                              text:
+                                  "https://myvitalink.app/terms\n\n",
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                decoration:
+                                    TextDecoration.underline,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () async {
+                                  final uri = Uri.parse(
+                                      "https://myvitalink.app/terms");
+                                  await launchUrl(uri,
+                                      mode: LaunchMode
+                                          .externalApplication);
+                                },
+                            ),
+
+                            const TextSpan(
+                              text:
+                                  "If you do not agree to these terms, you cannot use the app.",
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 32),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceEvenly,
                     children: [
                       OutlinedButton(
-                        onPressed: () => _handleDecline(context),
+                        onPressed: () =>
+                            _handleDecline(context),
                         child: const Text("Decline"),
                       ),
                       ElevatedButton(

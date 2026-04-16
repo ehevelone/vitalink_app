@@ -56,7 +56,6 @@ class _IOSCardScanScreenState
     await _repo.saveProfile(_p!);
   }
 
-  // 🔥 MULTI IMAGE CARD SCAN (FRONT + BACK)
   Future<void> _scanCard() async {
     try {
       final status = await Permission.camera.request();
@@ -113,7 +112,6 @@ class _IOSCardScanScreenState
 
       if (images.isEmpty) return;
 
-      // 🔥 FRONT + BACK ASSIGNMENT
       final front = images[0];
       final back = images.length > 1 ? images[1] : null;
 
@@ -191,10 +189,27 @@ class _IOSCardScanScreenState
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: ElevatedButton.icon(
-              onPressed: _scanCard,
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text("Scan Insurance Card"),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _scanCard,
+style: FilledButton.styleFrom(
+  backgroundColor: Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
+  foregroundColor: Colors.white,
+  padding: const EdgeInsets.symmetric(vertical: 16),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+  ),
+),
+                icon: const Icon(Icons.camera_alt),
+                label: const Text(
+                  "Scan Insurance Card",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
           ),
           Expanded(

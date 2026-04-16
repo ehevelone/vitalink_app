@@ -397,12 +397,28 @@ try {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: canSubmit ? _openSignaturePopup : null,
-                icon: const Icon(Icons.send),
-                label: const Text("Sign & Send My Information"),
-              ),
+SizedBox(
+  width: double.infinity,
+  child: FilledButton.icon(
+    onPressed: canSubmit ? _openSignaturePopup : null,
+    style: FilledButton.styleFrom(
+      backgroundColor: Colors.blue.shade700,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    icon: const Icon(Icons.send),
+    label: const Text(
+      "Sign & Send My Information",
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
+),
             ],
           ),
         ),

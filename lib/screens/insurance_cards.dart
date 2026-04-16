@@ -88,55 +88,87 @@ class _InsuranceCardsScreenState
               : "Insurance Cards",
         ),
       ),
-      body: ins.cards.isEmpty
-          ? const Center(
-              child:
-                  Text("No cards for this policy"))
-          : ListView.builder(
-              itemCount: ins.cards.length,
-              itemBuilder:
-                  (context, index) {
-                final card = ins.cards[index];
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  // 🔥 future scan logic goes here
+                },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.camera_alt),
+                label: const Text(
+                  'Scan Insurance Card',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
 
-                final path =
-                    card.frontImagePath;
+          Expanded(
+            child: ins.cards.isEmpty
+                ? const Center(
+                    child:
+                        Text("No cards for this policy"))
+                : ListView.builder(
+                    itemCount: ins.cards.length,
+                    itemBuilder:
+                        (context, index) {
+                      final card = ins.cards[index];
 
-                final hasImage =
-                    path != null &&
-                        path.isNotEmpty &&
-                        File(path)
-                            .existsSync();
+                      final path =
+                          card.frontImagePath;
 
-                return Card(
-                  child: ListTile(
-                    leading: hasImage
-                        ? Image.file(
-                            File(path),
-                            width: 60,
-                            fit: BoxFit.cover,
-                          )
-                        : const Icon(
-                            Icons.credit_card,
-                            size: 40,
-                          ),
-                    title:
-                        Text("Card ${index + 1}"),
-                    subtitle:
-                        Text("Source: ${card.source}"),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CardDetailViewer(
-                                  card: card),
+                      final hasImage =
+                          path != null &&
+                              path.isNotEmpty &&
+                              File(path)
+                                  .existsSync();
+
+                      return Card(
+                        child: ListTile(
+                          leading: hasImage
+                              ? Image.file(
+                                  File(path),
+                                  width: 60,
+                                  fit: BoxFit.cover,
+                                )
+                              : const Icon(
+                                  Icons.credit_card,
+                                  size: 40,
+                                ),
+                          title:
+                              Text("Card ${index + 1}"),
+                          subtitle:
+                              Text("Source: ${card.source}"),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CardDetailViewer(
+                                        card: card),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },
                   ),
-                );
-              },
-            ),
+          ),
+        ],
+      ),
     );
   }
 }

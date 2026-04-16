@@ -279,13 +279,29 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           AppBar(title: const Text("Insurance Policies")),
       body: Column(
         children: [
-          ElevatedButton.icon(
-            onPressed: _scanPolicy,
-            icon:
-                const Icon(Icons.camera_alt_outlined),
-            label: const Text(
-                "Scan Insurance Policy"),
-          ),
+Padding(
+  padding: const EdgeInsets.all(12.0),
+  child: ElevatedButton.icon(
+    onPressed: _scanPolicy,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.blue.shade700,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      minimumSize: const Size(double.infinity, 0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    icon: const Icon(Icons.camera_alt),
+    label: const Text(
+      "Scan Insurance Policy",
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
+),
           Expanded(
             child: insurances.isEmpty
                 ? const Center(

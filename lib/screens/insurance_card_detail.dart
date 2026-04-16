@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart'; // (unused but left per your setup)
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
+import 'package:path_provider/path_provider.dart';    // ✅ ADDED
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -41,6 +45,66 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     if ((widget.card.backImagePath ?? '').isNotEmpty) {
       setState(() => _showFront = !_showFront);
     }
+  }
+
+  // ✅ NEW: SEND AS PDF
+  Future<void> _sendInsuranceEmail() async {
+    final card = widget.card;
+
+    final frontPath = card.frontImagePath;
+    final backPath = card.backImagePath;
+
+    if (frontPath.isEmpty && (backPath == null || backPath.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No card images available")),
+      );
+      return;
+    }
+
+    final pdf = pw.Document();
+
+    final frontImage = File(frontPath).existsSync()
+        ? pw.MemoryImage(File(frontPath).readAsBytesSync())
+        : null;
+
+    final backImage = (backPath != null &&
+            backPath.isNotEmpty &&
+            File(backPath).existsSync())
+        ? pw.MemoryImage(File(backPath).readAsBytesSync())
+        : null;
+
+    if (frontImage != null) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) =>
+              pw.Center(child: pw.Image(frontImage)),
+        ),
+      );
+    }
+
+    if (backImage != null) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) =>
+              pw.Center(child: pw.Image(backImage)),
+        ),
+      );
+    }
+
+    final dir = await getTemporaryDirectory();
+    final file = File(
+        "${dir.path}/insurance_card_${DateTime.now().millisecondsSinceEpoch}.pdf");
+
+    await file.writeAsBytes(await pdf.save());
+
+    final subject =
+        "Insurance Card – ${card.carrier.isNotEmpty ? card.carrier : "Member"}";
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: subject,
+      text: "Please find my insurance card attached for your records.",
+    );
   }
 
   Future<void> _captureBack() async {
@@ -167,27 +231,40 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                         ),
                       ),
                     )
-                  : const Icon(Icons.broken_image,
-                      size: 120),
+                  : const Icon(Icons.broken_image, size: 120),
             ),
           ),
 
-          // ✅ FIXED SAFE AREA (THIS WAS YOUR ISSUE)
           SafeArea(
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _captureBack,
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: Text(
-                    (card.backImagePath ?? '').isEmpty
-                        ? "Add Back of Card"
-                        : "Replace Back of Card",
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _captureBack,
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: Text(
+                        (card.backImagePath ?? '').isEmpty
+                            ? "Add Back of Card"
+                            : "Replace Back of Card",
+                      ),
+                    ),
                   ),
-                ),
+
+                  const SizedBox(height: 10),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _sendInsuranceEmail,
+                      icon: const Icon(Icons.email_outlined),
+                      label: const Text("Share This Card"),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

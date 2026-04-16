@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../services/api_service.dart'; // ✅ ADDED
+import '../services/api_service.dart';
 import 'qr_screen.dart';
 import 'edit_profile.dart';
 
@@ -56,7 +56,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
   }
 
-  // 🔥 FIXED HERE ONLY
+  // 🔥 UPDATED — SAFE QR CACHE + FALLBACK
   Future<void> _showQr() async {
     final p = _p;
     if (p == null) return;
@@ -69,6 +69,27 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     }
 
     try {
+      final store = SecureStore();
+
+      // ✅ STEP 1: LOCAL CACHE
+      final savedUrl = await store.getString('qr_url');
+
+      if (savedUrl != null && savedUrl.isNotEmpty) {
+        final token = savedUrl.split("token=").last;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QrScreen(
+              qrToken: token,
+              title: "Emergency Info",
+            ),
+          ),
+        );
+        return;
+      }
+
+      // 🔥 STEP 2: FALLBACK TO API (ORIGINAL LOGIC)
       final res = await ApiService.getProfiles(p.id);
 
       if (res["success"] != true) {
@@ -91,6 +112,13 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         throw Exception("No token");
       }
 
+      // ✅ STEP 3: SAVE FOR FUTURE USE
+      final qrUrl =
+          "https://myvitalink.app/emergency.html?token=$qrToken";
+
+      await store.setString('qr_url', qrUrl);
+
+      // ✅ STEP 4: NAVIGATE (UNCHANGED)
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -100,7 +128,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           ),
         ),
       );
-
     } catch (e) {
       debugPrint("❌ QR LOAD FAILED: $e");
 

@@ -205,18 +205,10 @@ exports.handler = async (event) => {
         u.last_reviewed IS NULL
         OR u.last_reviewed < $5::timestamptz
       )
-      AND (
-        CASE
-          WHEN $3 = 'PREP' THEN
-            (COALESCE(u.profile_complete, FALSE) = FALSE)
-            OR (COALESCE(u.last_plan_check_year,0) < $4)
-          WHEN $3 = 'AEP' THEN
-            (COALESCE(u.last_review_year,0) < $4)
-          WHEN $3 = 'OEP' THEN
-            (COALESCE(u.last_review_year,0) < $4)
-          ELSE FALSE
-        END
-      )
+AND (
+  u.last_reviewed IS NULL
+  OR u.last_reviewed < $5::timestamptz
+)
     `;
 
     const devicesRes = await db.query(eligibleSql, [

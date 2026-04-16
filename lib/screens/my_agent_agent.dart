@@ -71,16 +71,12 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         final code = res['promoCode'];
         await store.setString("agentPromoCode", code);
         _promoCode = code;
-
-        // ✅ NEW AGENT QR LANDING PAGE
         _deepLink = "https://myvitalink.app/agent-success.html?code=$code";
       }
 
       final stored = await store.getString("agentPromoCode");
       if (_promoCode == null && stored != null) {
         _promoCode = stored;
-
-        // ✅ fallback
         _deepLink =
             "https://myvitalink.app/agent-success.html?code=$stored";
       }
@@ -262,12 +258,25 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                               const SizedBox(height: 20),
+
+                              // 🔥 FIXED BUTTON
                               SizedBox(
                                 width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.copy),
-                                  label: const Text("Copy Invite Link"),
+                                child: FilledButton.icon(
                                   onPressed: _copyInviteLink,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.copy),
+                                  label: const Text(
+                                    "Copy Invite Link",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             ],
@@ -277,23 +286,47 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
 
                     const SizedBox(height: 28),
 
+                    // 🔥 FIXED BUTTON
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.assignment),
-                        label: const Text("Send My Information"),
+                      child: FilledButton.icon(
                         onPressed: _goToAuthorizationForm,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.assignment),
+                        label: const Text(
+                          "Send My Information",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 18),
 
+                    // 🔥 FIXED BUTTON
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.notifications_active),
-                        label: const Text("Send Notification"),
+                      child: FilledButton.icon(
                         onPressed: _sendNotification,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.notifications_active),
+                        label: const Text(
+                          "Send Notification",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
