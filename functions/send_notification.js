@@ -16,7 +16,6 @@ if (!admin.apps.length) {
 
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    // only convert if escaped
     if (privateKey.includes("\\n")) {
       privateKey = privateKey.replace(/\\n/g, "\n");
     }
@@ -99,14 +98,20 @@ function campaignText(campaign, agentName) {
   };
 }
 
-/* APRIL CYCLE START */
-function getCycleStartApr1(now = new Date()) {
+/* 🔥 UPDATED SEASON LOGIC */
+function getCycleStart(now = new Date()) {
   const y = now.getFullYear();
-  const apr1 = new Date(y, 3, 1, 0, 0, 0, 0);
+  const m = now.getMonth() + 1;
 
-  if (now >= apr1) return apr1;
+  if (m >= 9) {
+    return new Date(y, 8, 1);
+  }
 
-  return new Date(y - 1, 3, 1, 0, 0, 0, 0);
+  if (m <= 3) {
+    return new Date(y - 1, 8, 1);
+  }
+
+  return new Date(y, 3, 1);
 }
 
 /* HANDLER */
@@ -175,16 +180,9 @@ exports.handler = async (event) => {
 
     console.log("Campaign:", campaign);
 
-    if (campaign === "OFF") {
-      return reply(200, {
-        success: true,
-        message: "Outside campaign window",
-      });
-    }
+    // 🔥 REMOVED "OFF" BLOCK — now sends year-round
 
-    const year = now.getFullYear();
-
-    const cycleStart = getCycleStartApr1(now);
+    const cycleStart = getCycleStart(now);
 
     const eligibleSql = `
       SELECT
@@ -211,7 +209,7 @@ exports.handler = async (event) => {
       agent.id,
       String(cooldownDays),
       campaign,
-      year,
+      now.getFullYear(),
       cycleStart.toISOString(),
     ]);
 
