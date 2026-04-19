@@ -205,10 +205,6 @@ exports.handler = async (event) => {
         u.last_reviewed IS NULL
         OR u.last_reviewed < $5::timestamptz
       )
-AND (
-  u.last_reviewed IS NULL
-  OR u.last_reviewed < $5::timestamptz
-)
     `;
 
     const devicesRes = await db.query(eligibleSql, [
