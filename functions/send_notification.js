@@ -64,41 +64,52 @@ function isInvalidTokenError(err) {
   );
 }
 
-/* CAMPAIGN SELECTION */
+/* 🔥 FIXED CAMPAIGN TIMING (ONLY CHANGE HERE) */
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
   const d = now.getDate();
 
-  const inPrep = (m === 9) || (m === 10 && d <= 14);
-  const inAep = (m === 10 && d >= 15) || (m === 11) || (m === 12 && d <= 7);
-  const inOep = (m === 1) || (m === 2) || (m === 3);
+  if (m === 9) return "PREP";
 
-  if (inAep) return "AEP";
-  if (inOep) return "OEP";
-  if (inPrep) return "PREP";
+  if ((m === 10) || (m === 11) || (m === 12 && d <= 7)) return "AEP";
 
-  return "OFF";
+  if ((m === 12 && d >= 8) || m === 1 || m === 2 || m === 3) return "OEP";
+
+  return "GENERAL";
 }
 
-/* MESSAGE TEXT */
+/* 🔥 FIXED CAMPAIGN MESSAGES (ONLY CHANGE HERE) */
 function campaignText(campaign, agentName) {
   const name = agentName || "Your Agent";
 
   if (campaign === "PREP") {
     return {
       title: `Message from ${name}`,
-      body:
-        "Please complete your profile and send your Medicare information so we can check plans before your appointment.",
+      body: "Medicare enrollment is approaching. Please tap here to securely send your information before your upcoming appointment.",
+    };
+  }
+
+  if (campaign === "AEP") {
+    return {
+      title: `Message from ${name}`,
+      body: "It's time for your Medicare Enrollment Review! Please tap here to securely send your updated information to your agent.",
+    };
+  }
+
+  if (campaign === "OEP") {
+    return {
+      title: `Message from ${name}`,
+      body: "There’s still time to review your Medicare coverage. Tap here to securely send your updated information to your agent.",
     };
   }
 
   return {
     title: `Message from ${name}`,
-    body: "It's time for your Medicare Enrollment Review! Please tap here to securely send your updated information to your agent.",
+    body: "Tap here to securely send your Medicare information so your agent can keep your coverage up to date.",
   };
 }
 
-/* 🔥 UPDATED SEASON LOGIC */
+/* SEASON LOGIC (UNCHANGED) */
 function getCycleStart(now = new Date()) {
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
@@ -122,12 +133,10 @@ exports.handler = async (event) => {
   try {
 
     if (event.httpMethod === "OPTIONS") {
-      console.log("OPTIONS request");
       return reply(200, {});
     }
 
     if (event.httpMethod !== "POST") {
-      console.log("Invalid method:", event.httpMethod);
       return reply(405, { success: false, error: "Method Not Allowed" });
     }
 
@@ -138,13 +147,10 @@ exports.handler = async (event) => {
         ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
         : JSON.parse(event.body || "{}");
     } catch (err) {
-      console.error("Body parse error", err);
       return reply(400, { success: false, error: "Invalid request body" });
     }
 
     const { agentEmail } = body;
-
-    console.log("Agent email:", agentEmail);
 
     if (!agentEmail) {
       return reply(400, { success: false, error: "Missing agentEmail" });
@@ -166,21 +172,14 @@ exports.handler = async (event) => {
     );
 
     if (!agentRes.rows.length) {
-      console.log("Agent not found");
       return reply(404, { success: false, error: "Agent not found" });
     }
 
     const agent = agentRes.rows[0];
 
-    console.log("Agent ID:", agent.id);
-
     const now = new Date();
 
     const campaign = forcedCampaign || pickCampaign(now);
-
-    console.log("Campaign:", campaign);
-
-    // 🔥 REMOVED "OFF" BLOCK — now sends year-round
 
     const cycleStart = getCycleStart(now);
 
@@ -201,25 +200,19 @@ exports.handler = async (event) => {
       )
       AND (
         u.last_reviewed IS NULL
-        OR u.last_reviewed < $5::timestamptz
+        OR u.last_reviewed < $3::timestamptz
       )
     `;
 
+    /* 🔥 FIXED PARAMS (THIS WAS THE CRASH) */
     const devicesRes = await db.query(eligibleSql, [
       agent.id,
       String(cooldownDays),
-      campaign,
-      now.getFullYear(),
       cycleStart.toISOString(),
     ]);
 
-    console.log("Devices found:", devicesRes.rows.length);
-
     if (!devicesRes.rows.length) {
-      return reply(200, {
-        success: true,
-        message: "No eligible devices",
-      });
+      return reply(200, { success: true, message: "No eligible devices" });
     }
 
     const seen = new Set();
@@ -241,8 +234,6 @@ exports.handler = async (event) => {
 
     const tokens = devices.map(d => d.token);
 
-    console.log("Tokens to send:", tokens.length);
-
     const notif = campaignText(campaign, agent.name);
 
     const message = {
@@ -263,9 +254,6 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    console.log("Success:", response.successCount);
-    console.log("Failures:", response.failureCount);
-
     return reply(200, {
       success: true,
       successCount: response.successCount,
@@ -273,14 +261,11 @@ exports.handler = async (event) => {
     });
 
   } catch (err) {
-
     console.error("SEND NOTIFICATION ERROR", err);
 
     return reply(500, {
       success: false,
       error: "Server error while sending notifications",
     });
-
   }
-
 };
