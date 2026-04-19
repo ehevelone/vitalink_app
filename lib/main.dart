@@ -1,7 +1,6 @@
 // lib/main.dart
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -107,28 +106,27 @@ Future<void> _setupFCMGlobal() async {
     final token = await messaging.getToken();
 
     final store = SecureStore();
-    final email = await store.getString('userEmail');
-    final role = await store.getString('role');
 
-    if (token != null && email != null && role != null) {
-      await ApiService.registerDeviceToken(
-        email: email,
-        fcmToken: token,
-        role: role,
-        platform: Platform.isIOS ? "ios" : "android",
-      );
+    if (token != null) {
+      final userId = await store.getString("userId");
+
+      print("USER ID FOR DEVICE: $userId");
+
+      if (userId != null) {
+        await ApiService.registerDeviceToken(
+          userId: userId,
+          fcmToken: token,
+        );
+      }
     }
 
     messaging.onTokenRefresh.listen((newToken) async {
-      final email = await store.getString('userEmail');
-      final role = await store.getString('role');
+      final userId = await store.getString("userId");
 
-      if (email != null && role != null) {
+      if (userId != null) {
         await ApiService.registerDeviceToken(
-          email: email,
+          userId: userId,
           fcmToken: newToken,
-          role: role,
-          platform: Platform.isIOS ? "ios" : "android",
         );
       }
     });

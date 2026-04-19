@@ -308,19 +308,17 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔹 Register device token
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> registerDeviceToken({
-    required String email,
-    required String fcmToken,
-    required String role,
-    String? platform,
-  }) {
-    return _postJson("register_device_v2", {
-      "email": email,
-      "role": role,
-      "deviceToken": fcmToken,
-      "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
-    });
-  }
+static Future<Map<String, dynamic>> registerDeviceToken({
+  required String userId,
+  required String fcmToken,
+  String? platform,
+}) {
+  return _postJson("register_device_v2", {
+    "user_id": int.parse(userId),   // 🔥 THIS FIXES IT
+    "deviceToken": fcmToken,
+    "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+  });
+}
 
   // -------------------------------------------------------------
   // 🔔 Send notification

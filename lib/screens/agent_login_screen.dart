@@ -136,11 +136,13 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       try {
         final fcm = await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
-          await ApiService.registerDeviceToken(
-            email: agent["email"].toString(),
-            fcmToken: fcm,
-            role: "agent",
-          );
+          final userId = await store.getString("userId");
+          if (userId != null) {
+            await ApiService.registerDeviceToken(
+              userId: userId,
+              fcmToken: fcm,
+            );
+          }
         }
       } catch (_) {}
 

@@ -75,23 +75,30 @@ exports.handler = async (event) => {
 
     const agent = agentResult.rows[0];
 
-    // ---------------- GET CLIENTS
+    // ---------------- GET CLIENTS (🔥 UPDATED)
     const clientsResult = await db.query(
       `
       SELECT 
-        id,
-        first_name,
-        last_name,
-        email,
-        phone,
-        active,
-        profile_complete,
-        last_notified_at,
-        last_notified_campaign,
-        last_reviewed
-      FROM users
-      WHERE agent_id = $1
-      ORDER BY created_at DESC
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone,
+        u.active,
+        u.profile_complete,
+        u.last_notified_at,
+        u.last_notified_campaign,
+        u.last_reviewed,
+        CASE 
+          WHEN ud.device_token IS NOT NULL 
+            AND TRIM(ud.device_token) <> '' 
+          THEN TRUE 
+          ELSE FALSE 
+        END AS has_device
+      FROM users u
+      LEFT JOIN user_devices ud ON ud.user_id = u.id
+      WHERE u.agent_id = $1
+      ORDER BY u.created_at DESC
       `,
       [agent.id]
     );
@@ -102,7 +109,7 @@ exports.handler = async (event) => {
     return reply(200, {
       success: true,
       agent: {
-        id: agent.id,        // 🔥 ADDED (helps debugging + frontend)
+        id: agent.id,
         name: agent.name,
       },
       clients: clientsResult.rows,

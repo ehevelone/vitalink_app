@@ -160,11 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
       try {
         final fcm = await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
-          await ApiService.registerDeviceToken(
-            email: user["email"],
-            fcmToken: fcm,
-            role: "user",
-          );
+          final userId = await store.getString("userId");
+          if (userId != null) {
+            await ApiService.registerDeviceToken(
+              userId: userId,
+              fcmToken: fcm,
+            );
+          }
         }
       } catch (_) {}
 

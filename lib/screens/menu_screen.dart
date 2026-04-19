@@ -69,12 +69,13 @@ class _MenuScreenState extends State<MenuScreen>
       final token = await FirebaseMessaging.instance.getToken();
 
       if (token != null && token.isNotEmpty) {
-        final email = await _store.getString("userEmail");
+        final userId = await _store.getString("userId"); // 🔥 FIX
+
+        if (userId == null) return;
 
         await ApiService.registerDeviceToken(
-          email: email ?? "",
+          userId: userId, // 🔥 FIX
           fcmToken: token,
-          role: "user",
         );
 
         print("✅ FCM TOKEN REGISTERED: $token");
@@ -148,12 +149,13 @@ class _MenuScreenState extends State<MenuScreen>
       await _registerToken();
 
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        final email = await _store.getString("userEmail");
+        final userId = await _store.getString("userId"); // 🔥 FIX
+
+        if (userId == null) return;
 
         await ApiService.registerDeviceToken(
-          email: email ?? "",
+          userId: userId, // 🔥 FIX
           fcmToken: newToken,
-          role: "user",
         );
 
         print("🔁 TOKEN REFRESHED: $newToken");
@@ -190,10 +192,7 @@ class _MenuScreenState extends State<MenuScreen>
     }
   }
 
-  // 🔥 FIXED — NO MORE ORDER APPROVAL SYSTEM
-  void _handleNotificationTap(RemoteMessage message) {
-    // intentionally empty
-  }
+  void _handleNotificationTap(RemoteMessage message) {}
 
   Future<void> _logout(BuildContext context) async {
     await _store.remove('userLoggedIn');

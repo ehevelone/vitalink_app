@@ -87,15 +87,13 @@ class _LogoScreenState extends State<LogoScreen> {
       final token = await messaging.getToken();
       if (token == null) return;
 
-      final email = await AppState.getEmail();
-      final role = await AppState.getRole();
+      final userId = await SecureStore().getString("userId");
 
-      if (email == null || role == null) return;
+      if (userId == null) return;
 
       await ApiService.registerDeviceToken(
-        email: email,
+        userId: userId,
         fcmToken: token,
-        role: role,
       );
 
       _deviceRegistered = true;

@@ -7,34 +7,28 @@ class NotificationService {
   // Called on app launch AND on token refresh
   static Future<void> initFCM() async {
     final store = SecureStore();
-    final role = await store.getString("role");
-    final email = await store.getString(
-      role == "agent" ? "agentEmail" : "userEmail",
-    );
+    final userId = await store.getString("userId");
 
-    if (email == null || email.isEmpty || role == null) {
-      debugPrint("⚠ FCM skipped — no logged-in user/agent");
+    if (userId == null || userId.isEmpty) {
+      debugPrint("⚠ FCM skipped — no logged-in user");
       return;
     }
 
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
-      await _sendToBackend(email, token, role);
+      await _sendToBackend(userId, token);
     }
 
-    // LISTEN for token updates (this is the fix)
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       debugPrint("🔄 FCM REFRESH → $newToken");
-      await _sendToBackend(email, newToken, role);
+      await _sendToBackend(userId, newToken);
     });
   }
 
-  static Future<void> _sendToBackend(
-      String email, String token, String role) async {
+  static Future<void> _sendToBackend(String userId, String token) async {
     final res = await ApiService.registerDeviceToken(
-      email: email,
+      userId: userId,
       fcmToken: token,
-      role: role,
     );
     debugPrint("📌 registerDeviceToken result: $res");
   }
