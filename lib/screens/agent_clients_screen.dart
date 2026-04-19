@@ -101,6 +101,9 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                         final phone = client["phone"] ?? "";
                         final active = client["active"] == true;
 
+                        // 🔥 NEW (SAFE ADD)
+                        final hasDevice = client["has_device"] == true;
+
                         return Card(
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -120,25 +123,42 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                   ),
                                 ),
 
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: active
-                                        ? Colors.green.shade100
-                                        : Colors.red.shade100,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    active ? "Active" : "Inactive",
-                                    style: TextStyle(
-                                      color: active
-                                          ? Colors.green.shade800
-                                          : Colors.red.shade800,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                                // 🔥 UPDATED (Active + Device Icon)
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: active
+                                            ? Colors.green.shade100
+                                            : Colors.red.shade100,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        active ? "Active" : "Inactive",
+                                        style: TextStyle(
+                                          color: active
+                                              ? Colors.green.shade800
+                                              : Colors.red.shade800,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+
+                                    const SizedBox(width: 8),
+
+                                    Icon(
+                                      hasDevice
+                                          ? Icons.phone_android
+                                          : Icons.phone_disabled,
+                                      size: 18,
+                                      color: hasDevice
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -148,6 +168,17 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                               children: [
                                 Text(email),
                                 Text(phone),
+
+                                // 🔥 OPTIONAL DEBUG LINE (safe)
+                                Text(
+                                  "Device: ${hasDevice ? "YES" : "NO"}",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: hasDevice
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                                ),
                               ],
                             ),
                           ),

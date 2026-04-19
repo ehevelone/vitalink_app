@@ -32,26 +32,27 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid JSON body" });
     }
 
-    // 🔥 FIX: support BOTH deviceToken AND fcmToken
-    const { email, deviceToken, fcmToken, platform } = body;
+    // 🔥 CHANGED: email → user_id
+    const { user_id, deviceToken, fcmToken, platform } = body;
     const token = deviceToken || fcmToken;
 
-    if (!email || !token) {
+    if (!user_id || !token) {
       return reply(400, {
         success: false,
-        error: "Missing email or token",
+        error: "Missing user_id or token",
       });
     }
 
     console.log("📲 Device registration attempt:", {
-      email,
+      user_id,
       token: token.slice(0, 10) + "...",
       platform,
     });
 
+    // 🔥 CHANGED: lookup by user_id instead of email
     const userRes = await db.query(
-      `SELECT id, agent_id FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`,
-      [email.trim()]
+      `SELECT id, agent_id FROM users WHERE id = $1 LIMIT 1`,
+      [user_id]
     );
 
     if (!userRes.rows.length) {
