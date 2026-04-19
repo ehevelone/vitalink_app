@@ -183,27 +183,26 @@ exports.handler = async (event) => {
 
     const cycleStart = getCycleStart(now);
 
-    const eligibleSql = `
-      SELECT
-        ud.id AS device_row_id,
-        ud.device_token AS device_token,
-        ud.user_id AS user_id
-      FROM user_devices ud
-      JOIN users u ON u.id = ud.user_id
-      WHERE u.agent_id = $1
-      AND ud.device_token IS NOT NULL
-      AND TRIM(ud.device_token) <> ''
-      AND TRIM(ud.device_token) <> 'NO_TOKEN'
-      AND (
-        u.last_notified_at IS NULL
-        OR u.last_notified_at < NOW() - ($2::text || ' days')::interval
-      )
-      AND (
-        u.last_reviewed IS NULL
-        OR u.last_reviewed < $3::timestamptz
-      )
-    `;
-
+ const eligibleSql = `
+  SELECT
+    ud.id AS device_row_id,
+    ud.device_token AS device_token,
+    ud.user_id AS user_id
+  FROM user_devices ud
+  JOIN users u ON u.id = ud.user_id
+  WHERE u.agent_id = $1
+  AND ud.device_token IS NOT NULL
+  AND TRIM(ud.device_token) <> ''
+  AND TRIM(ud.device_token) <> 'NO_TOKEN'
+  -- AND (
+  --   u.last_notified_at IS NULL
+  --   OR u.last_notified_at < NOW() - ($2::text || ' days')::interval
+  -- )
+  AND (
+    u.last_reviewed IS NULL
+    OR u.last_reviewed < $3::timestamptz
+  )
+`;
     /* 🔥 FIXED PARAMS (THIS WAS THE CRASH) */
     const devicesRes = await db.query(eligibleSql, [
       agent.id,
