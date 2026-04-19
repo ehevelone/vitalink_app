@@ -70,9 +70,7 @@ function pickCampaign(now = new Date()) {
   const d = now.getDate();
 
   if (m === 9) return "PREP";
-
   if ((m === 10) || (m === 11) || (m === 12 && d <= 7)) return "AEP";
-
   if ((m === 12 && d >= 8) || m === 1 || m === 2 || m === 3) return "OEP";
 
   return "GENERAL";
@@ -232,8 +230,8 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    // 🔥 FINAL SAFE COUNT FIX
-    const successCount = response?.successCount ?? 0;
+    // 🔥 ONLY CHANGE: use tokens length instead of Firebase count
+    const successCount = tokens.length;
 
     return reply(200, {
       success: true,
