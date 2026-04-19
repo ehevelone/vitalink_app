@@ -229,13 +229,10 @@ exports.handler = async (event) => {
     const message = {
       tokens,
       notification: notif,
-      android: {
+      
+        android: {
         priority: "high",
-        notification: {
-          channelId: "high_importance_channel",
-          sound: "default",
         },
-      },
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/authorization_form",
