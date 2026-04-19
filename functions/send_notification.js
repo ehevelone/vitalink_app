@@ -64,7 +64,7 @@ function isInvalidTokenError(err) {
   );
 }
 
-/* CAMPAIGN TIMING (YOUR VERSION) */
+/* CAMPAIGN TIMING */
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
   const d = now.getDate();
@@ -151,11 +151,6 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Missing agentEmail" });
     }
 
-    const cooldownDays =
-      Number.isFinite(Number(body.cooldownDays))
-        ? Number(body.cooldownDays)
-        : 14;
-
     const forcedCampaign =
       typeof body.campaign === "string"
         ? body.campaign.trim().toUpperCase()
@@ -173,9 +168,7 @@ exports.handler = async (event) => {
     const agent = agentRes.rows[0];
 
     const now = new Date();
-
     const campaign = forcedCampaign || pickCampaign(now);
-
     const cycleStart = getCycleStart(now);
 
     const eligibleSql = `
@@ -189,7 +182,6 @@ exports.handler = async (event) => {
       AND ud.device_token IS NOT NULL
       AND TRIM(ud.device_token) <> ''
       AND TRIM(ud.device_token) <> 'NO_TOKEN'
-      -- cooldown removed for testing
       AND (
         u.last_reviewed IS NULL
         OR u.last_reviewed < $2::timestamptz
@@ -229,10 +221,9 @@ exports.handler = async (event) => {
     const message = {
       tokens,
       notification: notif,
-      
-        android: {
+      android: {
         priority: "high",
-        },
+      },
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/authorization_form",
@@ -241,10 +232,14 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
+    // 🔥 FINAL SAFE COUNT FIX
+    const successCount = response?.successCount ?? 0;
+
     return reply(200, {
       success: true,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
+      devicesTargeted: tokens.length,
+      successCount,
+      failureCount: response?.failureCount ?? 0,
     });
 
   } catch (err) {

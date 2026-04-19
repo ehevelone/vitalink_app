@@ -81,6 +81,11 @@ void showGlobalNotificationPopup(RemoteMessage message) {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+
+              final route = data["route"];
+              if (route != null) {
+                navigatorKey.currentState?.pushNamed(route);
+              }
             },
             child: const Text("Open"),
           ),
@@ -94,7 +99,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 }
 
-// 🔥 REMOVED ORDER APPROVAL NAVIGATION
+// 🔥 TAP HANDLER
 void _handleNotificationNavigation(RemoteMessage message) {
   debugPrint("📩 TAP DATA: ${message.data}");
 }
@@ -148,12 +153,36 @@ Future<void> main() async {
     await Firebase.initializeApp();
     await _setupFCMGlobal();
 
+    // 🔥 ADDED: HANDLE TAP WHEN APP IS CLOSED
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
+
+    if (initialMessage != null) {
+      final route = initialMessage.data["route"];
+
+      if (route != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          navigatorKey.currentState?.pushNamed(route);
+        });
+      }
+    }
+
     FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler,
     );
 
     FirebaseMessaging.onMessage.listen((message) {
       showGlobalNotificationPopup(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationNavigation(message);
+
+      final route = message.data["route"];
+
+      if (route != null) {
+        navigatorKey.currentState?.pushNamed(route);
+      }
     });
 
     runApp(const VitaLinkApp());
