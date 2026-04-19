@@ -95,7 +95,7 @@ function campaignText(campaign, agentName) {
 
   return {
     title: `Message from ${name}`,
-    body: "Time to send your Medicare information!",
+    body: "It's time for your Medicare Enrollment Review! Please tap here to securely send your updated information to your agent.",
   };
 }
 
