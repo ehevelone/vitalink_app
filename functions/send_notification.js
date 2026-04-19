@@ -64,7 +64,7 @@ function isInvalidTokenError(err) {
   );
 }
 
-/* 🔥 FIXED CAMPAIGN TIMING (ONLY CHANGE HERE) */
+/* CAMPAIGN TIMING (YOUR VERSION) */
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
   const d = now.getDate();
@@ -78,7 +78,7 @@ function pickCampaign(now = new Date()) {
   return "GENERAL";
 }
 
-/* 🔥 FIXED CAMPAIGN MESSAGES (ONLY CHANGE HERE) */
+/* CAMPAIGN MESSAGES */
 function campaignText(campaign, agentName) {
   const name = agentName || "Your Agent";
 
@@ -109,18 +109,13 @@ function campaignText(campaign, agentName) {
   };
 }
 
-/* SEASON LOGIC (UNCHANGED) */
+/* SEASON LOGIC */
 function getCycleStart(now = new Date()) {
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
 
-  if (m >= 9) {
-    return new Date(y, 8, 1);
-  }
-
-  if (m <= 3) {
-    return new Date(y - 1, 8, 1);
-  }
+  if (m >= 9) return new Date(y, 8, 1);
+  if (m <= 3) return new Date(y - 1, 8, 1);
 
   return new Date(y, 3, 1);
 }
@@ -183,30 +178,26 @@ exports.handler = async (event) => {
 
     const cycleStart = getCycleStart(now);
 
- const eligibleSql = `
-  SELECT
-    ud.id AS device_row_id,
-    ud.device_token AS device_token,
-    ud.user_id AS user_id
-  FROM user_devices ud
-  JOIN users u ON u.id = ud.user_id
-  WHERE u.agent_id = $1
-  AND ud.device_token IS NOT NULL
-  AND TRIM(ud.device_token) <> ''
-  AND TRIM(ud.device_token) <> 'NO_TOKEN'
-  -- AND (
-  --   u.last_notified_at IS NULL
-  --   OR u.last_notified_at < NOW() - ($2::text || ' days')::interval
-  -- )
-  AND (
-    u.last_reviewed IS NULL
-    OR u.last_reviewed < $3::timestamptz
-  )
-`;
-    /* 🔥 FIXED PARAMS (THIS WAS THE CRASH) */
+    const eligibleSql = `
+      SELECT
+        ud.id AS device_row_id,
+        ud.device_token AS device_token,
+        ud.user_id AS user_id
+      FROM user_devices ud
+      JOIN users u ON u.id = ud.user_id
+      WHERE u.agent_id = $1
+      AND ud.device_token IS NOT NULL
+      AND TRIM(ud.device_token) <> ''
+      AND TRIM(ud.device_token) <> 'NO_TOKEN'
+      -- cooldown removed for testing
+      AND (
+        u.last_reviewed IS NULL
+        OR u.last_reviewed < $2::timestamptz
+      )
+    `;
+
     const devicesRes = await db.query(eligibleSql, [
       agent.id,
-      String(cooldownDays),
       cycleStart.toISOString(),
     ]);
 
