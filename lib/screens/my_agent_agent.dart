@@ -110,16 +110,15 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     final res =
         await ApiService.sendNotification(agentEmail: _agentEmail!);
 
-    if (!mounted) return;
-    setState(() => _loading = false);
+  if (!mounted) return;
+setState(() => _loading = false);
 
-    final success = res["success"] == true;
-    final campaign = res["campaign"] ?? "";
-    final total = res["totalDevices"] ?? 0;
-    final notified = res["notifiedUsers"] ?? 0;
-    final failures = res["failureCount"] ?? 0;
-    final message = res["message"];
-
+final success = res["success"] == true;
+final campaign = res["campaign"] ?? "";
+final total = res["devicesTargeted"] ?? 0;
+final notified = res["successCount"] ?? 0;
+final failures = res["failureCount"] ?? 0;
+final message = res["message"];
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
