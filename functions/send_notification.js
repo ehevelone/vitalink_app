@@ -180,15 +180,10 @@ exports.handler = async (event) => {
       AND ud.device_token IS NOT NULL
       AND TRIM(ud.device_token) <> ''
       AND TRIM(ud.device_token) <> 'NO_TOKEN'
-      AND (
-        u.last_reviewed IS NULL
-        OR u.last_reviewed < $2::timestamptz
-      )
     `;
 
     const devicesRes = await db.query(eligibleSql, [
       agent.id,
-      cycleStart.toISOString(),
     ]);
 
     if (!devicesRes.rows.length) {
@@ -230,13 +225,10 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    // 🔥 ONLY CHANGE: use tokens length instead of Firebase count
-    const successCount = tokens.length;
-
     return reply(200, {
       success: true,
       devicesTargeted: tokens.length,
-      successCount,
+      successCount: tokens.length,
       failureCount: response?.failureCount ?? 0,
     });
 
