@@ -110,40 +110,65 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     final res =
         await ApiService.sendNotification(agentEmail: _agentEmail!);
 
-  if (!mounted) return;
-setState(() => _loading = false);
+    if (!mounted) return;
+    setState(() => _loading = false);
 
-final success = res["success"] == true;
-final campaign = res["campaign"] ?? "";
-final total = res["devicesTargeted"] ?? 0;
-final notified = res["successCount"] ?? 0;
-final failures = res["failureCount"] ?? 0;
-final message = res["message"];
+    final success = res["success"] == true;
+    final campaign = res["campaign"] ?? "";
+    final total = res["devicesTargeted"] ?? 0;
+    final notified = res["successCount"] ?? 0;
+    final failures = res["failureCount"] ?? 0;
+    final message = res["message"];
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(success ? "Notification Results" : "Error"),
+        backgroundColor: const Color(0xFF111111), // 🔥 dark card style
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          success ? "Notification Results" : "Error",
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!success)
-              Text(res["error"] ?? "Unknown error")
+              Text(
+                res["error"] ?? "Unknown error",
+                style: const TextStyle(color: Colors.redAccent),
+              )
             else ...[
-              if (message != null) Text(message),
+              if (message != null)
+                Text(message, style: const TextStyle(color: Colors.white70)),
               if (campaign.isNotEmpty)
-                Text("Campaign: $campaign"),
-              const SizedBox(height: 8),
-              Text("Devices targeted: $total"),
-              Text("Users notified: $notified"),
-              Text("Failures: $failures"),
+                Text("Campaign: $campaign",
+                    style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 10),
+              Text("Devices targeted: $total",
+                  style: const TextStyle(color: Colors.white)),
+              Text("Users notified: $notified",
+                  style: const TextStyle(color: Colors.white)),
+              Text("Failures: $failures",
+                  style: const TextStyle(color: Colors.white)),
             ],
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.blue.shade400,
+            ),
+            child: const Text(
+              "OK",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -258,7 +283,6 @@ final message = res["message"];
                               ),
                               const SizedBox(height: 20),
 
-                              // 🔥 FIXED BUTTON
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton.icon(
@@ -285,7 +309,6 @@ final message = res["message"];
 
                     const SizedBox(height: 28),
 
-                    // 🔥 FIXED BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
@@ -308,7 +331,6 @@ final message = res["message"];
 
                     const SizedBox(height: 18),
 
-                    // 🔥 FIXED BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(

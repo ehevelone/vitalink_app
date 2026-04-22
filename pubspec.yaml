@@ -2,7 +2,7 @@ name: vitalink
 description: A health records and insurance policy manager app
 publish_to: 'none'
 
-version: 1.0.5+81   # ✅ bumped
+version: 1.0.6+85   # ✅ bumped
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -31,6 +31,9 @@ dependencies:
   # 🔥 ADD THIS
   uuid: 4.4.0
 
+  # ✅ NEW (for sending card attachments)
+  share_plus: ^7.2.1
+
   # ---- Camera + Scanning (iOS Only) ----
   camera: ^0.11.0
   cunning_document_scanner: ^1.1.3
@@ -48,7 +51,6 @@ dependencies:
   firebase_analytics: 10.10.7
 
   flutter_local_notifications: 17.2.4
-  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

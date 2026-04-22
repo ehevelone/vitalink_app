@@ -28,6 +28,7 @@ class _MenuScreenState extends State<MenuScreen>
   String _displayName = "User";
 
   bool _syncRan = false;
+  bool _notificationDialogOpen = false;
 
   @override
   void initState() {
@@ -69,12 +70,12 @@ class _MenuScreenState extends State<MenuScreen>
       final token = await FirebaseMessaging.instance.getToken();
 
       if (token != null && token.isNotEmpty) {
-        final userId = await _store.getString("userId"); // 🔥 FIX
+        final userId = await _store.getString("userId");
 
         if (userId == null) return;
 
         await ApiService.registerDeviceToken(
-          userId: userId, // 🔥 FIX
+          userId: userId,
           fcmToken: token,
         );
 
@@ -149,12 +150,12 @@ class _MenuScreenState extends State<MenuScreen>
       await _registerToken();
 
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        final userId = await _store.getString("userId"); // 🔥 FIX
+        final userId = await _store.getString("userId");
 
         if (userId == null) return;
 
         await ApiService.registerDeviceToken(
-          userId: userId, // 🔥 FIX
+          userId: userId,
           fcmToken: newToken,
         );
 
@@ -163,18 +164,67 @@ class _MenuScreenState extends State<MenuScreen>
 
       FirebaseMessaging.onMessage.listen((message) {
         print("📩 FOREGROUND MESSAGE: ${message.data}");
-
-        final data = message.data;
+        print(
+          "📩 FOREGROUND NOTIFICATION: "
+          "${message.notification?.title} / ${message.notification?.body}",
+        );
 
         _handleNotificationTap(message);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(data["title"] ?? "New Notification"),
+        if (!mounted || _notificationDialogOpen) return;
+
+        final title =
+            message.notification?.title ??
+            message.data["title"] ??
+            "New Notification";
+
+        final body =
+            message.notification?.body ??
+            message.data["body"] ??
+            "You have a new notification";
+
+        _notificationDialogOpen = true;
+
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF111111),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-          );
-        }
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              body,
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                  _notificationDialogOpen = false;
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.greenAccent,
+                ),
+                child: const Text(
+                  "OK",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ).then((_) {
+          _notificationDialogOpen = false;
+        });
       });
 
       FirebaseMessaging.instance.getInitialMessage().then((message) {
