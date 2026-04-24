@@ -62,6 +62,45 @@ class _MenuScreenState extends State<MenuScreen>
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
       _registerToken();
+
+      // 🔥 ADDED — refresh QR on resume
+      _refreshQr();
+    }
+  }
+
+  // 🔥 ADDED — QR REFRESH FUNCTION
+  Future<void> _refreshQr() async {
+    try {
+      if (_p == null || _p!.id.isEmpty) return;
+
+      final res = await ApiService.getProfiles(_p!.id);
+
+      if (res["success"] != true) return;
+
+      final profiles = res["profiles"] as List;
+
+      Map<String, dynamic>? match;
+      for (final x in profiles) {
+        if (x["id"].toString() == _p!.id.toString()) {
+          match = x;
+          break;
+        }
+      }
+
+      match ??= profiles.isNotEmpty ? profiles.first : null;
+
+      final qrToken = match?["qr_token"]?.toString();
+
+      if (qrToken == null || qrToken.isEmpty) return;
+
+      final qrUrl =
+          "https://myvitalink.app/emergency.html?token=$qrToken";
+
+      await _store.setString("qr_url", qrUrl);
+
+      print("✅ QR UPDATED: $qrUrl");
+    } catch (e) {
+      print("❌ QR REFRESH FAILED: $e");
     }
   }
 
@@ -109,6 +148,10 @@ class _MenuScreenState extends State<MenuScreen>
         _displayName = name;
         _loading = false;
       });
+
+      // 🔥 ADDED — refresh QR AFTER profile loads
+      await _refreshQr();
+
     } catch (e) {
       print("Profile load error: $e");
 

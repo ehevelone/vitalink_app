@@ -1,4 +1,3 @@
-// lib/screens/new_profile_screen.dart
 import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -24,6 +23,11 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   final _allergiesCtrl = TextEditingController();
   final _conditionsCtrl = TextEditingController();
   final _bloodCtrl = TextEditingController();
+
+  // 🔥 ADDED
+  final _implantsCtrl = TextEditingController();
+  final _proceduresCtrl = TextEditingController();
+  bool _organDonor = false;
 
   bool _saving = false;
 
@@ -67,6 +71,11 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
         allergies: _allergiesCtrl.text.trim(),
         conditions: _conditionsCtrl.text.trim(),
         bloodType: _bloodCtrl.text.trim(),
+
+        // 🔥 ADDED
+        implants: _implantsCtrl.text.trim(),
+        procedures: _proceduresCtrl.text.trim(),
+        organDonor: _organDonor,
       ),
     );
 
@@ -118,13 +127,15 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
 
               TextField(
                 controller: _bloodCtrl,
-                decoration: const InputDecoration(labelText: "Blood Type (optional)"),
+                decoration:
+                    const InputDecoration(labelText: "Blood Type (optional)"),
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _contactCtrl,
-                decoration: const InputDecoration(labelText: "Emergency Contact"),
+                decoration:
+                    const InputDecoration(labelText: "Emergency Contact"),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return "Required";
@@ -141,9 +152,11 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                decoration: const InputDecoration(labelText: "Emergency Phone"),
+                decoration:
+                    const InputDecoration(labelText: "Emergency Phone"),
                 validator: (v) {
-                  final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
+                  final digits =
+                      v?.replaceAll(RegExp(r'\D'), '') ?? "";
                   if (digits.length != 10) {
                     return "Enter valid phone";
                   }
@@ -154,17 +167,41 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
 
               TextField(
                 controller: _allergiesCtrl,
-                decoration: const InputDecoration(labelText: "Allergies"),
+                decoration:
+                    const InputDecoration(labelText: "Allergies"),
               ),
               const SizedBox(height: 12),
 
               TextField(
                 controller: _conditionsCtrl,
-                decoration: const InputDecoration(labelText: "Medical Conditions"),
+                decoration: const InputDecoration(
+                    labelText: "Medical Conditions"),
+              ),
+              const SizedBox(height: 12),
+
+              // 🔥 ADDED
+              TextField(
+                controller: _implantsCtrl,
+                decoration: const InputDecoration(
+                    labelText: "Implanted Devices"),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: _proceduresCtrl,
+                decoration:
+                    const InputDecoration(labelText: "Major Procedures"),
+              ),
+              const SizedBox(height: 12),
+
+              SwitchListTile(
+                value: _organDonor,
+                onChanged: (v) => setState(() => _organDonor = v),
+                title: const Text("Organ Donor"),
+                activeColor: Colors.red,
               ),
               const SizedBox(height: 26),
 
-              // 🔥 FIXED BUTTON
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -172,7 +209,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -183,7 +221,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white, // 🔥 FIX spinner visibility
+                            color: Colors.white,
                           ),
                         )
                       : const Text(

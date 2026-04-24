@@ -100,13 +100,17 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
       Map<String, dynamic>? match;
       for (final x in profiles) {
-        if (x["id"] == p.id) {
-          match = x;
+        if (x["id"].toString() == p.id.toString()) {
+          match = Map<String, dynamic>.from(x);
           break;
         }
       }
 
-      final qrToken = match?["qr_token"];
+      match ??= profiles.isNotEmpty
+          ? Map<String, dynamic>.from(profiles.first)
+          : null;
+
+      final qrToken = match?["qr_token"]?.toString();
 
       if (qrToken == null || qrToken.isEmpty) {
         throw Exception("No token");

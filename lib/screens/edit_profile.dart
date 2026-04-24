@@ -31,6 +31,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _allergiesCtrl = TextEditingController();
   final _conditionsCtrl = TextEditingController();
 
+  final _implantsCtrl = TextEditingController();
+  final _proceduresCtrl = TextEditingController();
+
   bool _organDonor = false;
 
   @override
@@ -57,6 +60,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _phoneCtrl.text = e.phone;
         _allergiesCtrl.text = e.allergies;
         _conditionsCtrl.text = e.conditions;
+
+        _implantsCtrl.text = e.implants;
+        _proceduresCtrl.text = e.procedures;
+
         _organDonor = e.organDonor;
       }
     });
@@ -72,8 +79,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (!_formKey.currentState!.validate()) return;
 
-    final oldPhone = _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
+    // 🔥 FIX: capture ORIGINAL values BEFORE mutation
+    final originalPhone =
+        _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
+    final originalContact = _p!.emergency.contact;
+
     final newPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+    final newContact = _contactCtrl.text.trim();
 
     setState(() => _loading = true);
 
@@ -86,6 +98,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         phone: _phoneCtrl.text.trim(),
         allergies: _allergiesCtrl.text.trim(),
         conditions: _conditionsCtrl.text.trim(),
+        implants: _implantsCtrl.text.trim(),
+        procedures: _proceduresCtrl.text.trim(),
         organDonor: _organDonor,
       ),
     );
@@ -94,7 +108,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (!mounted) return;
 
-    if (newPhone.length == 10 && newPhone != oldPhone) {
+    // 🔥 FIXED CONDITION
+    if (newPhone.length == 10 &&
+        (newPhone != originalPhone ||
+         newContact != originalContact)) {
+
       String agentName = "";
       String agentPhone = "";
 
@@ -157,7 +175,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text("Edit Profile")),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+  24,
+  24,
+  24,
+  MediaQuery.of(context).viewInsets.bottom + 40,
+),
         child: Form(
           key: _formKey,
           child: Column(
@@ -241,6 +264,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextField(
                 controller: _conditionsCtrl,
                 decoration: const InputDecoration(labelText: "Conditions"),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: _implantsCtrl,
+                decoration: const InputDecoration(labelText: "Implanted Devices"),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: _proceduresCtrl,
+                decoration: const InputDecoration(labelText: "Major Procedures"),
               ),
               const SizedBox(height: 24),
 

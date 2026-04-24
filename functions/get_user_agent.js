@@ -46,7 +46,7 @@ exports.handler = async (event) => {
       return fail("Missing user email");
     }
 
-    // 1️⃣ Always normalize email
+    // 1️⃣ Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
     // 2️⃣ Fetch user and agent_id
@@ -61,12 +61,12 @@ exports.handler = async (event) => {
 
     const agentId = userResult.rows[0].agent_id;
 
-    // 3️⃣ If no agent assigned → return clean null
+    // 3️⃣ If no agent assigned
     if (!agentId) {
       return ok({ agent: null });
     }
 
-    // 4️⃣ Fetch agent details
+    // 4️⃣ Fetch agent details (🔥 ADDED active)
     const agentResult = await db.query(
       `
       SELECT
@@ -74,7 +74,8 @@ exports.handler = async (event) => {
         email,
         phone,
         agency_name,
-        agency_address
+        agency_address,
+        active
       FROM agents
       WHERE id = $1
       LIMIT 1

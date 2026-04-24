@@ -107,7 +107,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       await AppState.clearAuth();
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
-      await AppState.setEmail(agent["email"].toString());
+      // 🔥 CLEAR USER PROFILE DATA (prevents cross-role bleed)
+await store.remove("profile");
+await store.remove("profiles");
 
       await store.setString("agentId", agent["id"].toString());
       await store.setString("agentEmail", agent["email"]?.toString() ?? "");
