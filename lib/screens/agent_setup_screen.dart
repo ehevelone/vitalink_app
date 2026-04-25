@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
-import '../utils/phone_formatter.dart'; // ✅ ADDED
+import '../utils/phone_formatter.dart';
 
 class AgentSetupScreen extends StatefulWidget {
   const AgentSetupScreen({super.key});
@@ -15,6 +15,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
+  final _agencyPhoneCtrl = TextEditingController(); // 🔥 ADDED
   final _licenseCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -32,12 +33,49 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     _nameCtrl.text = await store.getString('agentName') ?? '';
     _phoneCtrl.text = await store.getString('agentPhone') ?? '';
     _agencyCtrl.text = await store.getString('agencyName') ?? '';
+    _agencyPhoneCtrl.text = await store.getString('agencyPhone') ?? ''; // 🔥 ADDED
     _licenseCtrl.text = await store.getString('agentId') ?? '';
     setState(() {});
   }
 
+  // 🔥 CLEAN PHONE FOR COMPARISON
+  String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final agentPhone = _phoneCtrl.text.trim();
+    final agencyPhone = _agencyPhoneCtrl.text.trim();
+
+    // 🔥 VALIDATION
+    if (agencyPhone.isNotEmpty &&
+        clean(agentPhone) == clean(agencyPhone)) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "Invalid Phone Number",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Agency phone number cannot match your personal phone number.",
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     final store = SecureStore();
@@ -46,6 +84,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     await store.setString('agentName', _nameCtrl.text.trim());
     await store.setString('agentPhone', _phoneCtrl.text.trim());
     await store.setString('agencyName', _agencyCtrl.text.trim());
+    await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim()); // 🔥 ADDED
     await store.setString('agencyAddress', "");
     await store.setString('agentId', _licenseCtrl.text.trim());
 
@@ -77,7 +116,6 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ✅ FIXED PHONE FIELD
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
@@ -96,9 +134,22 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                 ),
                 const SizedBox(height: 12),
 
+                // 🔥 NEW FIELD
+                TextFormField(
+                  controller: _agencyPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    PhoneNumberFormatter(),
+                  ],
+                  decoration:
+                      const InputDecoration(labelText: "Agency Phone Number"),
+                ),
+                const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _licenseCtrl,
-                  decoration: const InputDecoration(labelText: "NPN / License #"),
+                  decoration:
+                      const InputDecoration(labelText: "NPN / License #"),
                   validator: (v) =>
                       v == null || v.isEmpty ? "Enter your NPN" : null,
                 ),

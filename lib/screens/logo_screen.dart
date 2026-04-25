@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -28,7 +29,7 @@ class _LogoScreenState extends State<LogoScreen> {
     super.initState();
 
     _loadProfile();
-    _initQR(); // ✅ FIXED
+    _initQR();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initPushAndRegister();
     });
@@ -36,29 +37,100 @@ class _LogoScreenState extends State<LogoScreen> {
     _timer = Timer(const Duration(seconds: 3), _openMenu);
   }
 
-  // 🔥 FIXED QR INIT (USES YOUR REAL API)
+  // 🔥 FIXED AGENT STATUS CHECK
+  Future<bool> _checkAgentStatus() async {
+    try {
+      final role = await AppState.getRole();
+      final userId = await SecureStore().getString("userId");
+
+      // 🔥 SAFER CHECK
+      if (role == "agent" && userId == null) {
+        return true;
+      }
+
+      final email = await AppState.getEmail();
+      if (email == null || email.isEmpty) return true;
+
+      final res = await ApiService.getUserAgent(email);
+
+      if (res["success"] != true) return true;
+
+      final agent = res["agent"];
+      if (agent == null) return true;
+
+      if (agent["active"] == false) {
+        if (!mounted) return false;
+
+        final agency = agent["agency_name"] ?? "your agency";
+        final phone = agent["agency_phone"] ?? "";
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF111111),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              "Important Account Update",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              "Your insurance agent is no longer active.\n\n"
+              "Please contact $agency for assistance.",
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              if (phone.isNotEmpty)
+                FilledButton(
+                  onPressed: () async {
+                    final uri = Uri.parse("tel:$phone");
+                    await launchUrl(uri);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text("Call Agency"),
+                ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+
+        return false;
+      }
+
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<void> _initQR() async {
     try {
       final store = SecureStore();
       final existing = await store.getString('qr_url');
 
-      if (existing != null && existing.isNotEmpty) {
-        return; // already saved
-      }
+      if (existing != null && existing.isNotEmpty) return;
 
       final userId = await store.getString("userId");
       if (userId == null) return;
 
       final res = await ApiService.getProfiles(userId);
-
       if (res["success"] != true) return;
 
       final profiles = res["profiles"];
       if (profiles == null || profiles.isEmpty) return;
 
-      // 🔥 THIS IS YOUR TOKEN SOURCE
       final token = profiles[0]["qr_token"];
-
       if (token == null || token.toString().isEmpty) return;
 
       final qrUrl =
@@ -88,7 +160,6 @@ class _LogoScreenState extends State<LogoScreen> {
       if (token == null) return;
 
       final userId = await SecureStore().getString("userId");
-
       if (userId == null) return;
 
       await ApiService.registerDeviceToken(
@@ -134,6 +205,10 @@ class _LogoScreenState extends State<LogoScreen> {
         Navigator.pushReplacementNamed(context, '/landing');
         return;
       }
+
+      // 🔥 CHECK HERE
+      final allowed = await _checkAgentStatus();
+      if (!allowed) return;
 
       if (role == 'agent') {
         Navigator.pushReplacementNamed(context, '/agent_menu');

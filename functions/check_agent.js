@@ -32,19 +32,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: "" };
     }
 
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return fail("Method Not Allowed", 405);
     }
 
@@ -74,9 +62,7 @@ if (event.httpMethod !== "POST") {
       return fail("Invalid password ❌");
     }
 
-    if (!agent.active) {
-      return fail("This account has been disabled.");
-    }
+    // 🔥 DO NOT BLOCK INACTIVE — LET FRONTEND HANDLE IT
 
     return ok({
       agent: {
@@ -86,6 +72,7 @@ if (event.httpMethod !== "POST") {
         phone: agent.phone,
         npn: agent.npn,
         role: agent.role || "agent",
+        active: agent.active, // 🔥 IMPORTANT
       },
     });
 

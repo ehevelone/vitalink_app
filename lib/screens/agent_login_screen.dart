@@ -102,21 +102,31 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
         return;
       }
 
+      // 🔥 BLOCK INACTIVE AGENT LOGIN
+      if (agent["active"] == false) {
+        setState(() {
+          _errorMessage =
+              "Your account is no longer active.\nPlease contact your agency.";
+          _loading = false;
+        });
+        return;
+      }
+
       final store = SecureStore();
 
       await AppState.clearAuth();
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
+
       // 🔥 CLEAR USER PROFILE DATA (prevents cross-role bleed)
-await store.remove("profile");
-await store.remove("profiles");
+      await store.remove("profile");
+      await store.remove("profiles");
 
       await store.setString("agentId", agent["id"].toString());
       await store.setString("agentEmail", agent["email"]?.toString() ?? "");
       await store.setString("agentName", agent["name"]?.toString() ?? "");
       await store.setString("agentPhone", agent["phone"]?.toString() ?? "");
 
-      // 🔥 THIS FIXES YOUR CLIENT LIST
       await store.setString(
         "unlock_code",
         agent["unlock_code"]?.toString() ?? "",
