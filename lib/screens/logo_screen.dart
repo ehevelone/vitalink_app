@@ -64,46 +64,50 @@ class _LogoScreenState extends State<LogoScreen> {
         final agency = agent["agency_name"] ?? "your agency";
         final phone = agent["agency_phone"] ?? "";
 
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF111111),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text(
-              "Important Account Update",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(
-              "Your insurance agent is no longer active.\n\n"
-              "Please contact $agency for assistance.",
-              style: const TextStyle(color: Colors.white70),
-            ),
-            actions: [
-              if (phone.isNotEmpty)
-                FilledButton(
-                  onPressed: () async {
-                    final uri = Uri.parse("tel:$phone");
-                    await launchUrl(uri);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text("Call Agency"),
-                ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
-              ),
-            ],
+await showDialog(
+  context: context,
+  barrierDismissible: false,
+  builder: (_) => AlertDialog(
+    backgroundColor: const Color(0xFF111111),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    title: const Text(
+      "Important Account Update",
+      style: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+    content: Text(
+      phone.isNotEmpty
+          ? "Your insurance agent is no longer active.\n\n"
+            "Please contact $agency at $phone for assistance."
+          : "Your insurance agent is no longer active.\n\n"
+            "Please contact $agency for assistance.",
+      style: const TextStyle(color: Colors.white70),
+    ),
+    actions: [
+      if (phone.isNotEmpty)
+        FilledButton(
+          onPressed: () async {
+            final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+            final uri = Uri.parse("tel:$cleanPhone");
+            await launchUrl(uri);
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.green.shade600,
+            foregroundColor: Colors.white,
           ),
-        );
+          child: const Text("Call Agency"),
+        ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text("OK"),
+      ),
+    ],
+  ),
+);
 
         return false;
       }

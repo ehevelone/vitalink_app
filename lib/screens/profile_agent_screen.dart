@@ -21,6 +21,12 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   final _agencyNameCtrl = TextEditingController();
   final _agencyAddressCtrl = TextEditingController();
   final _agencyPhoneCtrl = TextEditingController(); // 🔥 ADDED
+
+  // 🔥 ADDRESS FIELDS ADDED
+  final _agencyCityCtrl = TextEditingController();
+  final _agencyStateCtrl = TextEditingController();
+  final _agencyZipCtrl = TextEditingController();
+
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
@@ -48,10 +54,18 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         await store.getString('agencyAddress') ?? '';
 
     _agencyPhoneCtrl.text =
-        await store.getString('agencyPhone') ?? ''; // 🔥 ADDED
+        await store.getString('agencyPhone') ?? '';
+
+    // 🔥 LOAD NEW ADDRESS FIELDS
+    _agencyCityCtrl.text =
+        await store.getString('agencyCity') ?? '';
+    _agencyStateCtrl.text =
+        await store.getString('agencyState') ?? '';
+    _agencyZipCtrl.text =
+        await store.getString('agencyZip') ?? '';
   }
 
-  String clean(String p) => p.replaceAll(RegExp(r'\D'), ''); // 🔥 ADDED
+  String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
 
   String? _validatePassword(String? pw) {
     if (pw == null || pw.isEmpty) return null;
@@ -66,7 +80,6 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // 🔥 VALIDATION
     if (_agencyPhoneCtrl.text.isNotEmpty &&
         clean(_agencyPhoneCtrl.text) == clean(_phoneCtrl.text)) {
       showDialog(
@@ -109,7 +122,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         agencyAddress: _agencyAddressCtrl.text.trim().isNotEmpty
             ? _agencyAddressCtrl.text.trim()
             : null,
-        agencyPhone: _agencyPhoneCtrl.text.trim().isNotEmpty // 🔥 ADDED
+        agencyPhone: _agencyPhoneCtrl.text.trim().isNotEmpty
             ? _agencyPhoneCtrl.text.trim()
             : null,
         password:
@@ -128,7 +141,12 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       await store.setString('agentEmail', _emailCtrl.text.trim());
       await store.setString('agencyName', _agencyNameCtrl.text.trim());
       await store.setString('agencyAddress', _agencyAddressCtrl.text.trim());
-      await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim()); // 🔥 ADDED
+      await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim());
+
+      // 🔥 SAVE NEW ADDRESS FIELDS
+      await store.setString('agencyCity', _agencyCityCtrl.text.trim());
+      await store.setString('agencyState', _agencyStateCtrl.text.trim());
+      await store.setString('agencyZip', _agencyZipCtrl.text.trim());
 
       if (_passwordCtrl.text.isNotEmpty) {
         await store.setString('agentPassword', _passwordCtrl.text.trim());
@@ -195,7 +213,34 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
               const SizedBox(height: 12),
 
-              // 🔥 NEW FIELD (SURGICAL ADD)
+              // 🔥 NEW CITY / STATE / ZIP
+              TextFormField(
+                controller: _agencyCityCtrl,
+                decoration: const InputDecoration(labelText: "City"),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _agencyStateCtrl,
+                      decoration: const InputDecoration(labelText: "State"),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _agencyZipCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: "ZIP"),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
               TextFormField(
                 controller: _agencyPhoneCtrl,
                 keyboardType: TextInputType.phone,

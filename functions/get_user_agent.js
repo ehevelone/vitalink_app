@@ -1,3 +1,4 @@
+// functions/get_user_agent.js
 const db = require("./services/db");
 
 function ok(obj) {
@@ -66,7 +67,7 @@ exports.handler = async (event) => {
       return ok({ agent: null });
     }
 
-    // 4️⃣ Fetch agent details (🔥 ADDED active)
+    // 4️⃣ Fetch agent details
     const agentResult = await db.query(
       `
       SELECT
@@ -75,6 +76,7 @@ exports.handler = async (event) => {
         phone,
         agency_name,
         agency_address,
+        agency_phone, -- 🔥 ADDED
         active
       FROM agents
       WHERE id = $1
