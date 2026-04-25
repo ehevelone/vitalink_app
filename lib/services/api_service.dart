@@ -339,6 +339,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     String? npn,
     String? agencyName,
     String? agencyAddress,
+    String? agencyPhone,
     String? password,
   }) {
     final body = {
@@ -348,6 +349,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       "npn": npn,
       "agencyName": agencyName,
       "agencyAddress": agencyAddress,
+      "agencyPhone": agencyPhone,
       "password": password,
     }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
 

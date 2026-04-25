@@ -20,6 +20,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   final _phoneCtrl = TextEditingController();
   final _agencyNameCtrl = TextEditingController();
   final _agencyAddressCtrl = TextEditingController();
+  final _agencyPhoneCtrl = TextEditingController(); // 🔥 ADDED
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
@@ -45,7 +46,12 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         '';
     _agencyAddressCtrl.text =
         await store.getString('agencyAddress') ?? '';
+
+    _agencyPhoneCtrl.text =
+        await store.getString('agencyPhone') ?? ''; // 🔥 ADDED
   }
+
+  String clean(String p) => p.replaceAll(RegExp(r'\D'), ''); // 🔥 ADDED
 
   String? _validatePassword(String? pw) {
     if (pw == null || pw.isEmpty) return null;
@@ -60,6 +66,35 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // 🔥 VALIDATION
+    if (_agencyPhoneCtrl.text.isNotEmpty &&
+        clean(_agencyPhoneCtrl.text) == clean(_phoneCtrl.text)) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "Invalid Phone Number",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Agency phone number cannot match your personal phone number.",
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     final store = SecureStore();
 
@@ -73,6 +108,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
             : null,
         agencyAddress: _agencyAddressCtrl.text.trim().isNotEmpty
             ? _agencyAddressCtrl.text.trim()
+            : null,
+        agencyPhone: _agencyPhoneCtrl.text.trim().isNotEmpty // 🔥 ADDED
+            ? _agencyPhoneCtrl.text.trim()
             : null,
         password:
             _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text.trim() : null,
@@ -90,6 +128,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       await store.setString('agentEmail', _emailCtrl.text.trim());
       await store.setString('agencyName', _agencyNameCtrl.text.trim());
       await store.setString('agencyAddress', _agencyAddressCtrl.text.trim());
+      await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim()); // 🔥 ADDED
 
       if (_passwordCtrl.text.isNotEmpty) {
         await store.setString('agentPassword', _passwordCtrl.text.trim());
@@ -154,6 +193,16 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 maxLines: 2,
               ),
 
+              const SizedBox(height: 12),
+
+              // 🔥 NEW FIELD (SURGICAL ADD)
+              TextFormField(
+                controller: _agencyPhoneCtrl,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [PhoneNumberFormatter()],
+                decoration: const InputDecoration(labelText: "Agency Phone Number"),
+              ),
+
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 12),
@@ -209,7 +258,6 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
               const SizedBox(height: 24),
 
-              // 🔥 FIXED BUTTON
               _loading
                   ? const CircularProgressIndicator()
                   : SizedBox(

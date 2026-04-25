@@ -22,20 +22,7 @@ exports.handler = async (event) => {
       return reply(200, {});
     }
 
-    // ✅ Enforce POST
-    if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
-
-if (event.httpMethod !== "POST") {
+    if (event.httpMethod !== "POST") {
       return reply(405, {
         success: false,
         error: "Method Not Allowed",
@@ -66,6 +53,7 @@ if (event.httpMethod !== "POST") {
       npn,
       agencyName,
       agencyAddress,
+      agencyPhone, // 🔥 ADDED
       password,
     } = body;
 
@@ -101,6 +89,13 @@ if (event.httpMethod !== "POST") {
       updates.push(`agency_address = $${idx++}`);
       values.push(agencyAddress);
     }
+
+    // 🔥 NEW FIELD SAVE
+    if (agencyPhone) {
+      updates.push(`agency_phone = $${idx++}`);
+      values.push(agencyPhone);
+    }
+
     if (password) {
       const hashed = await bcrypt.hash(password, 10);
       updates.push(`password_hash = $${idx++}`);
@@ -128,6 +123,7 @@ if (event.httpMethod !== "POST") {
         npn,
         agency_name,
         agency_address,
+        agency_phone, -- 🔥 ADDED
         active,
         role;
     `;

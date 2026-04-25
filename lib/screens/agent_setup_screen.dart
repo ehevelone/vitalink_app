@@ -15,7 +15,15 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
-  final _agencyPhoneCtrl = TextEditingController(); // 🔥 ADDED
+
+  final _agencyPhoneCtrl = TextEditingController(); // 🔥 NEW
+
+  // 🔥 ADDRESS FIELDS (REPLACES SINGLE ADDRESS)
+  final _addressCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  final _zipCtrl = TextEditingController();
+
   final _licenseCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -33,12 +41,18 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     _nameCtrl.text = await store.getString('agentName') ?? '';
     _phoneCtrl.text = await store.getString('agentPhone') ?? '';
     _agencyCtrl.text = await store.getString('agencyName') ?? '';
-    _agencyPhoneCtrl.text = await store.getString('agencyPhone') ?? ''; // 🔥 ADDED
+    _agencyPhoneCtrl.text = await store.getString('agencyPhone') ?? '';
+
+    // 🔥 LOAD ADDRESS FIELDS
+    _addressCtrl.text = await store.getString('agencyAddress') ?? '';
+    _cityCtrl.text = await store.getString('agencyCity') ?? '';
+    _stateCtrl.text = await store.getString('agencyState') ?? '';
+    _zipCtrl.text = await store.getString('agencyZip') ?? '';
+
     _licenseCtrl.text = await store.getString('agentId') ?? '';
     setState(() {});
   }
 
-  // 🔥 CLEAN PHONE FOR COMPARISON
   String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
 
   Future<void> _save() async {
@@ -81,11 +95,19 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     final store = SecureStore();
     await store.setBool('agentSetupDone', true);
     await store.setString('role', 'agent');
+
     await store.setString('agentName', _nameCtrl.text.trim());
     await store.setString('agentPhone', _phoneCtrl.text.trim());
+
     await store.setString('agencyName', _agencyCtrl.text.trim());
-    await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim()); // 🔥 ADDED
-    await store.setString('agencyAddress', "");
+    await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim());
+
+    // 🔥 SAVE ADDRESS FIELDS
+    await store.setString('agencyAddress', _addressCtrl.text.trim());
+    await store.setString('agencyCity', _cityCtrl.text.trim());
+    await store.setString('agencyState', _stateCtrl.text.trim());
+    await store.setString('agencyZip', _zipCtrl.text.trim());
+
     await store.setString('agentId', _licenseCtrl.text.trim());
 
     if (_passwordCtrl.text.isNotEmpty) {
@@ -100,7 +122,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Agent Setup")),
+      appBar: AppBar(title: const Text("Agent Profile")),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -119,9 +141,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    PhoneNumberFormatter(),
-                  ],
+                  inputFormatters: [PhoneNumberFormatter()],
                   decoration: const InputDecoration(labelText: "Phone"),
                   validator: (v) =>
                       v == null || v.isEmpty ? "Enter your phone" : null,
@@ -134,17 +154,52 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // 🔥 NEW FIELD
+                // 🔥 NEW AGENCY PHONE
                 TextFormField(
                   controller: _agencyPhoneCtrl,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    PhoneNumberFormatter(),
-                  ],
+                  inputFormatters: [PhoneNumberFormatter()],
                   decoration:
                       const InputDecoration(labelText: "Agency Phone Number"),
                 ),
                 const SizedBox(height: 12),
+
+                // 🔥 ADDRESS BLOCK
+                TextFormField(
+                  controller: _addressCtrl,
+                  decoration:
+                      const InputDecoration(labelText: "Street Address"),
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _cityCtrl,
+                  decoration: const InputDecoration(labelText: "City"),
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stateCtrl,
+                        decoration:
+                            const InputDecoration(labelText: "State"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _zipCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration:
+                            const InputDecoration(labelText: "ZIP"),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
 
                 TextFormField(
                   controller: _licenseCtrl,
@@ -153,10 +208,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                   validator: (v) =>
                       v == null || v.isEmpty ? "Enter your NPN" : null,
                 ),
-                const SizedBox(height: 24),
 
+                const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 12),
+
                 const Text(
                   "Update Password (optional)",
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -183,13 +239,14 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     return null;
                   },
                 ),
+
                 const SizedBox(height: 24),
 
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
                         onPressed: _save,
-                        child: const Text("Finish Setup"),
+                        child: const Text("Save Profile"),
                       ),
               ],
             ),
