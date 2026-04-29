@@ -27,7 +27,7 @@ void initState() {
   super.initState();
 
   // 🔥 Listen for deep links (fixes iOS issue)
-  DeepLinkService().init((link) {
+  VitaLinkDeepLink().init((link) {
     final uri = Uri.parse(link);
     if (uri == null) return;
 

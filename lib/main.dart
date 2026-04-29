@@ -226,7 +226,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
     ),
   ),
 
-  dialogTheme: const DialogTheme(
+  dialogTheme: const DialogThemeData(
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(12)),
     ),
