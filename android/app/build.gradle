@@ -12,7 +12,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.etenterprises.vitalink"
+    namespace = "com.etnaturals.vitalinkapp"
 
     compileSdk = 36
     ndkVersion = "27.0.12077973"
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.etenterprises.vitalink"
+        applicationId = "com.etnaturals.vitalinkapp"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -57,7 +57,7 @@ android {
         }
     }
 
-    // 🔥 ADD THIS ONLY
+    // 🔥 KEEP THIS
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true

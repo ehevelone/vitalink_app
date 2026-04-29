@@ -1,4 +1,5 @@
-import 'dart:io'; // ✅ ADDED
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,7 @@ import '../main.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
-import '../services/deep_link_service.dart'; // ✅ FIX ADDED
+import '../services/deep_link_service.dart';
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -21,11 +22,39 @@ class RegistrationScreen extends StatefulWidget {
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
+  @override
+void initState() {
+  super.initState();
+
+  // 🔥 Listen for deep links (fixes iOS issue)
+  DeepLinkService().init((link) {
+    final uri = Uri.parse(link);
+    if (uri == null) return;
+
+    final code = uri.queryParameters['code']?.toUpperCase();
+
+    if (code != null && code.isNotEmpty) {
+      setState(() {
+        _activationCodeCtrl.text = code;
+        _activationLoaded = false;
+      });
+
+      _lookupActivation();
+    }
+  });
+}
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+
+  // ✅ NEW ADDRESS FIELDS
+  final _addressCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  final _zipCtrl = TextEditingController();
+
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _activationCodeCtrl = TextEditingController();
@@ -71,6 +100,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+
+    // ✅ dispose new fields
+    _addressCtrl.dispose();
+    _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _zipCtrl.dispose();
+
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _activationCodeCtrl.dispose();
@@ -181,6 +217,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
+          profile.userPhone = _phoneCtrl.text.trim();
+          
+
+      // ✅ SAVE ADDRESS DATA
+      profile.address = _addressCtrl.text.trim();
+      profile.city = _cityCtrl.text.trim();
+      profile.state = _stateCtrl.text.trim();
+      profile.zip = _zipCtrl.text.trim();
+
       profile.registered = true;
       profile.updatedAt = DateTime.now();
 
@@ -218,12 +263,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             children: [
               const Text(
                 "ENTER YOUR ACTIVATION CODE",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
+
               TextFormField(
                 controller: _activationCodeCtrl,
                 textCapitalization: TextCapitalization.characters,
@@ -238,47 +281,87 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? "Activation code required" : null,
               ),
+
               const SizedBox(height: 20),
+
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? "Name required" : null,
               ),
+
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return "Email required";
-                  }
-                  if (!v.contains("@")) {
-                    return "Enter a valid email";
-                  }
+                  if (v == null || v.trim().isEmpty) return "Email required";
+                  if (!v.contains("@")) return "Enter a valid email";
                   return null;
                 },
               ),
+
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone"),
                 keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  PhoneNumberFormatter(),
-                ],
+                inputFormatters: [PhoneNumberFormatter()],
               ),
+
               const SizedBox(height: 12),
+
+              // ✅ ADDRESS BLOCK
+              TextFormField(
+                controller: _addressCtrl,
+                decoration: const InputDecoration(labelText: "Address Line 1"),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? "Address required" : null,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _cityCtrl,
+                decoration: const InputDecoration(labelText: "City"),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? "City required" : null,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _stateCtrl,
+                decoration: const InputDecoration(labelText: "State"),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? "State required" : null,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _zipCtrl,
+                decoration: const InputDecoration(labelText: "Zip Code"),
+                keyboardType: TextInputType.number,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? "Zip required" : null,
+              ),
+
+              const SizedBox(height: 12),
+
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _showPassword ? Icons.visibility : Icons.visibility_off,
-                    ),
+                    icon: Icon(_showPassword
+                        ? Icons.visibility
+                        : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _showPassword = !_showPassword;
@@ -288,20 +371,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 validator: (v) => v == null || v.isEmpty ? "Required" : null,
               ),
+
               const SizedBox(height: 8),
               PasswordRules(controller: _passwordCtrl),
+
               const SizedBox(height: 12),
+
               TextFormField(
                 controller: _confirmCtrl,
                 obscureText: !_showConfirmPassword,
                 decoration: InputDecoration(
                   labelText: "Confirm Password",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _showConfirmPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
+                    icon: Icon(_showConfirmPassword
+                        ? Icons.visibility
+                        : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _showConfirmPassword = !_showConfirmPassword;
@@ -311,16 +395,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: _recoverCode,
-                  child: const Text(
-                    "Lost your activation code?",
-                    style: TextStyle(color: Colors.blueAccent),
-                  ),
-                ),
               ),
             ],
           ),

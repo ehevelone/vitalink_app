@@ -71,109 +71,134 @@ I understand:
 • This Scope of Appointment remains valid for twelve (12) months unless revoked.
 """;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
+ @override
+void initState() {
+  super.initState();
+  _loadData();
 
-    _scrollCtrl.addListener(() {
-      final atBottom =
-          _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
-              !_scrollCtrl.position.outOfRange;
-      if (atBottom && !_canScroll) {
-        setState(() => _canScroll = true);
-      }
-    });
+  _scrollCtrl.addListener(() {
+    final atBottom =
+        _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
+            !_scrollCtrl.position.outOfRange;
+    if (atBottom && !_canScroll) {
+      setState(() => _canScroll = true);
+    }
+  });
+}
+
+Future<void> _loadData() async {
+  final store = SecureStore();
+  final repo = DataRepository(store);
+  final p = await repo.loadProfile();
+
+  String? agentEmail;
+  String? agentName;
+  String? agentPhone;
+
+  final userEmail = await store.getString('userEmail');
+
+  if (userEmail != null && userEmail.isNotEmpty) {
+    final res = await ApiService.getUserAgent(userEmail);
+    if (res["success"] == true && res["agent"] != null) {
+      final agent = res["agent"];
+      agentEmail = agent["email"];
+      agentName = agent["name"];
+      agentPhone = agent["phone"];
+    }
   }
 
-  Future<void> _loadData() async {
-    final store = SecureStore();
-    final repo = DataRepository(store);
-    final p = await repo.loadProfile();
+  if (!mounted) return;
 
-    String? agentEmail;
-    String? agentName;
-    String? agentPhone;
+  setState(() {
+    _profile = p;
+    _agentEmail = agentEmail;
+    _agentName = agentName;
+    _agentPhone = agentPhone;
+  });
+}
 
-    final userEmail = await store.getString('userEmail');
+Future<File> _buildCsv(Profile p) async {
+  final buffer = StringBuffer();
 
-    if (userEmail != null && userEmail.isNotEmpty) {
-      final res = await ApiService.getUserAgent(userEmail);
-      if (res["success"] == true && res["agent"] != null) {
-        final agent = res["agent"];
-        agentEmail = agent["email"];
-        agentName = agent["name"];
-        agentPhone = agent["phone"];
-      }
-    }
+  final userEmail = await SecureStore().getString('userEmail') ?? "";
 
-    if (!mounted) return;
+  final parts = (p.fullName ?? "").trim().split(' ');
+  final firstName = parts.isNotEmpty ? parts.first : "";
+  final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
 
-    setState(() {
-      _profile = p;
-      _agentEmail = agentEmail;
-      _agentName = agentName;
-      _agentPhone = agentPhone;
-    });
-  }
+  // 🔥 Medications field
+  final medsStr = p.meds
+      .map((m) =>
+          "${m.name}${m.dose != null ? " (${m.dose})" : ""}${m.frequency != null ? " ${m.frequency}" : ""}")
+      .join(" | ");
 
-  Future<File> _buildCsv(Profile p) async {
-    final buffer = StringBuffer();
-    buffer.writeln("TYPE,NAME,DETAILS");
+  // 🔥 Doctors field
+  final docsStr = p.doctors
+      .map((d) =>
+          "${d.name}${d.specialty != null ? " (${d.specialty})" : ""}")
+      .join(" | ");
 
-    for (final m in p.meds) {
-      buffer.writeln(
-        "Medication,${m.name},${m.dose ?? ''} ${m.frequency ?? ''}",
-      );
-    }
+  // ✅ HEADER
+  buffer.writeln(
+    "First Name,Last Name,DOB,Address,City,State,Zip Code,Phone,Email,Medications,Doctors"
+  );
 
-    for (final d in p.doctors) {
-      buffer.writeln(
-        "Doctor,${d.name},${d.specialty ?? ''} ${d.phone ?? ''}",
-      );
-    }
+  // ✅ SINGLE ROW
+  buffer.writeln(
+    "$firstName,"
+    "$lastName,"
+    "${p.dob ?? ''},"
+    "${p.address ?? ''},"
+    "${p.city ?? ''},"
+    "${p.state ?? ''},"
+    "${p.zip ?? ''},"
+    "${p.userPhone ?? ''},"
+    "$userEmail,"
+    "$medsStr,"
+    "$docsStr"
+  );
 
-    final dir = await getTemporaryDirectory();
-    final file = File("${dir.path}/vitalink_user_info.csv");
-    await file.writeAsString(buffer.toString());
-    return file;
-  }
+  final dir = await getTemporaryDirectory();
+  final file = File("${dir.path}/vitalink_user_info.csv");
+  await file.writeAsString(buffer.toString());
+  return file;
+}
 
-  Future<void> _openSignaturePopup() async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text("Sign Authorization"),
-        content: SizedBox(
-          height: 200,
-          width: 300,
-          child: Signature(
-            controller: _sigCtrl,
-            backgroundColor: Colors.grey[200]!,
-          ),
+Future<void> _openSignaturePopup() async {
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => AlertDialog(
+      title: const Text("Sign Authorization"),
+      content: SizedBox(
+        height: 200,
+        width: 300,
+        child: Signature(
+          controller: _sigCtrl,
+          backgroundColor: Colors.grey[200]!,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => _sigCtrl.clear(),
-            child: const Text("Clear"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (_sigCtrl.isEmpty) return;
-              Navigator.pop(context);
-              _saveAndSend();
-            },
-            child: const Text("Submit"),
-          ),
-        ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => _sigCtrl.clear(),
+          child: const Text("Clear"),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_sigCtrl.isEmpty) return;
+            Navigator.pop(context);
+            _saveAndSend();
+          },
+          child: const Text("Submit"),
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> _saveAndSend() async {
     if (_sigCtrl.isEmpty || _profile == null) return;
@@ -292,7 +317,7 @@ I understand:
           },
           "user": _profile!.fullName ?? "",
           "user_email": userEmail,
-          "user_phone": "",
+          "user_phone": _profile!.userPhone ?? "",
           "user_dob": _profile!.dob ?? "",
           "medications": meds.map((m) => {
                 "name": m.name,

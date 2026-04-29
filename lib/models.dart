@@ -288,6 +288,10 @@ class Profile {
   String? dob;
   DateTime updatedAt;
   String userPhone;
+  String? address;
+  String? city;
+  String? state;
+  String? zip;
 
   List<Medication> meds;
   List<Doctor> doctors;
@@ -320,6 +324,10 @@ class Profile {
     this.dob,
     DateTime? updatedAt,
     this.userPhone = '',
+    this.address,
+    this.city,
+    this.state,
+    this.zip,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -354,6 +362,10 @@ class Profile {
     String? dob,
     DateTime? updatedAt,
     String? userPhone,
+    String? address,
+    String? city,
+    String? state,
+    String? zip,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<Insurance>? insurances,
@@ -381,6 +393,10 @@ class Profile {
       dob: dob ?? this.dob,
       updatedAt: updatedAt ?? this.updatedAt,
       userPhone: userPhone ?? this.userPhone,
+      address: address ?? this.address,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      zip: zip ?? this.zip,
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
       insurances: insurances ?? this.insurances,
@@ -410,6 +426,10 @@ class Profile {
         'dob': dob,
         'updatedAt': updatedAt.toIso8601String(),
         'userPhone': userPhone,
+        'address': address,
+        'city': city,
+        'state': state,
+        'zip': zip,
         'meds': meds.map((m) => m.toJson()).toList(),
         'doctors': doctors.map((d) => d.toJson()).toList(),
         'insurances': insurances.map((i) => i.toJson()).toList(),
@@ -439,6 +459,10 @@ class Profile {
         updatedAt:
             DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
         userPhone: json['userPhone'] ?? '',
+        address: json['address'],
+        city: json['city'],
+        state: json['state'],
+        zip: json['zip'],
         meds: (json['meds'] as List<dynamic>? ?? [])
             .map((m) => Medication.fromJson(m))
             .toList(),

@@ -204,6 +204,34 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(
+  useMaterial3: false, // 🔥 IMPORTANT (keeps consistent look)
+
+  primaryColor: Colors.blue,
+
+  inputDecorationTheme: const InputDecorationTheme(
+    border: OutlineInputBorder(),
+    enabledBorder: OutlineInputBorder(),
+    focusedBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: Colors.blue, width: 2),
+    ),
+  ),
+
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  ),
+
+  dialogTheme: const DialogTheme(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+    ),
+  ),
+),
       navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,

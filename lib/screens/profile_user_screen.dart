@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/data_repository.dart';
+import '../models.dart';
 import '../utils/phone_formatter.dart';
 
 class ProfileUserScreen extends StatefulWidget {
@@ -17,6 +19,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _dobCtrl = TextEditingController(); // ✅ already present
+
+  final _addressCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  final _zipCtrl = TextEditingController();
+
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
@@ -36,6 +45,16 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final name = await store.getString('profileName') ?? "";
     final phone = await store.getString('profilePhone') ?? "";
 
+    final address = await store.getString('profileAddress') ?? "";
+    final city = await store.getString('profileCity') ?? "";
+    final state = await store.getString('profileState') ?? "";
+    final zip = await store.getString('profileZip') ?? "";
+
+    // ✅ LOAD DOB FROM PROFILE MODEL (ONLY ONCE)
+    final repo = DataRepository();
+    final profile = await repo.loadProfile();
+    final dob = profile?.dob ?? "";
+
     if (!mounted) return;
 
     setState(() {
@@ -43,6 +62,12 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       _emailCtrl.text = email;
       _nameCtrl.text = name;
       _phoneCtrl.text = phone;
+      _dobCtrl.text = dob; // ✅ FIXED
+
+      _addressCtrl.text = address;
+      _cityCtrl.text = city;
+      _stateCtrl.text = state;
+      _zipCtrl.text = zip;
     });
   }
 
@@ -51,9 +76,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
     if (_currentEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Session error. Please log in again."),
-        ),
+        const SnackBar(content: Text("Session error. Please log in again.")),
       );
       return;
     }
@@ -65,6 +88,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final newName = _nameCtrl.text.trim();
     final newEmail = _emailCtrl.text.trim();
     final newPhone = _phoneCtrl.text.trim();
+    final newDob = _dobCtrl.text.trim(); // ✅ ADDED
+
+    final newAddress = _addressCtrl.text.trim();
+    final newCity = _cityCtrl.text.trim();
+    final newState = _stateCtrl.text.trim();
+    final newZip = _zipCtrl.text.trim();
+
     final newPassword = _passwordCtrl.text.trim();
 
     try {
@@ -78,9 +108,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
       if (res['success'] != true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['error'] ?? "Failed to update profile ❌"),
-          ),
+          SnackBar(content: Text(res['error'] ?? "Failed to update profile ❌")),
         );
         return;
       }
@@ -88,6 +116,25 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       await store.setString('profileName', newName);
       await store.setString('profilePhone', newPhone);
       await store.setString('userEmail', newEmail);
+
+      await store.setString('profileAddress', newAddress);
+      await store.setString('profileCity', newCity);
+      await store.setString('profileState', newState);
+      await store.setString('profileZip', newZip);
+
+      final repo = DataRepository();
+      final profile = await repo.loadProfile() ?? Profile();
+
+      profile.fullName = newName;
+      profile.userPhone = newPhone;
+      profile.dob = newDob; // ✅ FIXED
+      profile.address = newAddress;
+      profile.city = newCity;
+      profile.state = newState;
+      profile.zip = newZip;
+      profile.updatedAt = DateTime.now();
+
+      await repo.saveProfile(profile);
 
       if (newPassword.isNotEmpty) {
         await store.setString('userPassword', newPassword);
@@ -113,6 +160,23 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   }
 
   @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _dobCtrl.dispose(); // ✅ FIXED
+
+    _addressCtrl.dispose();
+    _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _zipCtrl.dispose();
+
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("My Profile")),
@@ -125,10 +189,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
               children: [
                 const Text(
                   "User Profile",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
@@ -136,75 +197,73 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
                     labelText: "Full Name (First & Last)",
-                    hintText: "First and Last Name",
-                    helperText: "Required for emergency identification",
                   ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return "Enter your name";
-                    }
-                    if (!_validFullName(v)) {
-                      return "Enter first & last name";
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _emailCtrl,
                   decoration: const InputDecoration(labelText: "Email"),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your email" : null,
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    PhoneNumberFormatter(),
-                  ],
+                  inputFormatters: [PhoneNumberFormatter()],
                   decoration: const InputDecoration(labelText: "Phone"),
                 ),
-
-                const SizedBox(height: 24),
-                const Divider(),
                 const SizedBox(height: 12),
 
-                const Text(
-                  "Change Password (optional)",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                // ✅ DOB FIELD ADDED
+                TextFormField(
+                  controller: _dobCtrl,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: "DOB",
+                    hintText: "mm/dd/yyyy",
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime(1970),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _dobCtrl.text =
+                            "${picked.month.toString().padLeft(2, '0')}/"
+                            "${picked.day.toString().padLeft(2, '0')}/"
+                            "${picked.year}";
+                      });
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _addressCtrl,
+                  decoration: const InputDecoration(labelText: "Address Line 1"),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
-                  controller: _passwordCtrl,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: "New Password"),
-                  validator: (v) {
-                    if (v != null && v.isNotEmpty && v.length < 6) {
-                      return "Min 6 characters";
-                    }
-                    return null;
-                  },
+                  controller: _cityCtrl,
+                  decoration: const InputDecoration(labelText: "City"),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
-                  controller: _confirmCtrl,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: "Confirm Password"),
-                  validator: (v) {
-                    if (_passwordCtrl.text.isNotEmpty &&
-                        v != _passwordCtrl.text) {
-                      return "Passwords don’t match";
-                    }
-                    return null;
-                  },
+                  controller: _stateCtrl,
+                  decoration: const InputDecoration(labelText: "State"),
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _zipCtrl,
+                  decoration: const InputDecoration(labelText: "Zip Code"),
                 ),
 
                 const SizedBox(height: 24),

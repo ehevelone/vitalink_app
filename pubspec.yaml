@@ -2,7 +2,7 @@ name: vitalink
 description: A health records and insurance policy manager app
 publish_to: 'none'
 
-version: 1.0.6+85   # ✅ bumped
+version: 2.0.0+91 # ✅ bumped
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
