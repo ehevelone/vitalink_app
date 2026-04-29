@@ -9,6 +9,7 @@ import 'package:app_links/app_links.dart';
 
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
+import 'services/deep_link_service.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -57,7 +58,10 @@ import 'screens/reset_password_screen.dart';
 import 'screens/agent_request_reset_screen.dart';
 import 'screens/agent_reset_password_screen.dart';
 
+// GLOBALS
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final AppLinks _appLinks = AppLinks();
+StreamSubscription<Uri>? _linkSub;
 
 // 🔥 POPUP
 void showGlobalNotificationPopup(RemoteMessage message) {
@@ -109,13 +113,10 @@ Future<void> _setupFCMGlobal() async {
     final messaging = FirebaseMessaging.instance;
 
     final token = await messaging.getToken();
-
     final store = SecureStore();
 
     if (token != null) {
       final userId = await store.getString("userId");
-
-      print("USER ID FOR DEVICE: $userId");
 
       if (userId != null) {
         await ApiService.registerDeviceToken(
@@ -153,7 +154,17 @@ Future<void> main() async {
     await Firebase.initializeApp();
     await _setupFCMGlobal();
 
-    // 🔥 ADDED: HANDLE TAP WHEN APP IS CLOSED
+    // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
+    _linkSub = _appLinks.uriLinkStream.listen((uri) {
+      final code = uri.queryParameters['code']?.toUpperCase();
+
+      if (code != null && code.isNotEmpty) {
+        VitaLinkDeepLink.code = code;
+        print("🔥 Deep link code received: $code");
+      }
+    });
+
+    // 🔥 HANDLE TAP WHEN APP IS CLOSED
     RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
 
@@ -200,38 +211,38 @@ class VitaLinkApp extends StatefulWidget {
 }
 
 class _VitaLinkAppState extends State<VitaLinkApp> {
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
-  useMaterial3: false, // 🔥 IMPORTANT (keeps consistent look)
+        useMaterial3: false,
 
-  primaryColor: Colors.blue,
+        primaryColor: Colors.blue,
 
-  inputDecorationTheme: const InputDecorationTheme(
-    border: OutlineInputBorder(),
-    enabledBorder: OutlineInputBorder(),
-    focusedBorder: OutlineInputBorder(
-      borderSide: BorderSide(color: Colors.blue, width: 2),
-    ),
-  ),
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+          enabledBorder: OutlineInputBorder(),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.blue, width: 2),
+          ),
+        ),
 
-  elevatedButtonTheme: ElevatedButtonThemeData(
-    style: ElevatedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+
+        dialogTheme: const DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
       ),
-    ),
-  ),
 
-  dialogTheme: const DialogThemeData(
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
-    ),
-  ),
-),
       navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,

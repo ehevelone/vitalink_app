@@ -26,22 +26,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 void initState() {
   super.initState();
 
-  // 🔥 Listen for deep links (fixes iOS issue)
-  VitaLinkDeepLink().init((link) {
-    final uri = Uri.parse(link);
-    if (uri == null) return;
-
-    final code = uri.queryParameters['code']?.toUpperCase();
-
-    if (code != null && code.isNotEmpty) {
-      setState(() {
-        _activationCodeCtrl.text = code;
-        _activationLoaded = false;
-      });
-
-      _lookupActivation();
-    }
-  });
 }
   final _formKey = GlobalKey<FormState>();
 
