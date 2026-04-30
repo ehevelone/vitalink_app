@@ -110,7 +110,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       // 🔥 UPDATED ACCESS LOGIC
       final billingOwner = agent["billing_owner"];
 
-      if (agent["active"] == false && billingOwner != "agent") {
+        if (agent["active"] == false && billingOwner == null) {
         setState(() {
           _errorMessage =
               "Your agency no longer covers your access.\n\n"
