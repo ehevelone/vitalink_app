@@ -61,21 +61,34 @@ exports.handler = async function (event) {
 
     const rsm = rsmCheck.rows[0];
 
-    /* TOGGLE AGENT STATUS */
+    /* GET CURRENT AGENT STATE */
 
-    const update = await client.query(
-      `UPDATE agents
-       SET active = NOT active
-       WHERE id = $1
-       AND rsm_id = $2
-       RETURNING id, active`,
+    const current = await client.query(
+      `SELECT active FROM agents WHERE id = $1 AND rsm_id = $2`,
       [agentId, rsm.id]
     );
 
-    if (update.rows.length === 0) {
+    if (current.rows.length === 0) {
       client.release();
       return { statusCode: 404, headers: corsHeaders, body: "Agent not found" };
     }
+
+    const currentlyActive = current.rows[0].active;
+    const newActive = !currentlyActive;
+
+    /* UPDATE AGENT WITH FULL BILLING LOGIC */
+
+    const update = await client.query(
+      `UPDATE agents
+       SET
+         active = $1,
+         billing_owner = CASE WHEN $1 = false THEN NULL ELSE 'rsm' END,
+         subscription_status = CASE WHEN $1 = false THEN 'inactive' ELSE 'active' END
+       WHERE id = $2
+       AND rsm_id = $3
+       RETURNING id, active, billing_owner, subscription_status`,
+      [newActive, agentId, rsm.id]
+    );
 
     const newStatus = update.rows[0].active ? "activated" : "deactivated";
 
@@ -101,8 +114,6 @@ exports.handler = async function (event) {
 
         if (activeCount === 0) {
 
-          /* CANCEL STRIPE SUBSCRIPTION */
-
           const subItem = await stripe.subscriptionItems.retrieve(
             rsm.stripe_subscription_item_id
           );
@@ -120,8 +131,6 @@ exports.handler = async function (event) {
           console.log("Stripe subscription cancelled");
 
         } else {
-
-          /* UPDATE SEAT COUNT */
 
           await stripe.subscriptionItems.update(
             rsm.stripe_subscription_item_id,
