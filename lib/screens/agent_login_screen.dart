@@ -23,6 +23,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
 
   String? _errorMessage;
 
+  // 🔥 NEW: controls payment button visibility
+  bool _showPaymentButton = false;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +53,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (_errorMessage != null) {
       setState(() {
         _errorMessage = null;
+        _showPaymentButton = false; // 🔥 reset button
       });
     }
   }
@@ -61,6 +65,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     setState(() {
       _loading = true;
       _errorMessage = null;
+      _showPaymentButton = false;
     });
 
     try {
@@ -102,12 +107,16 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
         return;
       }
 
-      // 🔥 BLOCK INACTIVE AGENT LOGIN
-      if (agent["active"] == false) {
+      // 🔥 UPDATED ACCESS LOGIC
+      final billingOwner = agent["billing_owner"];
+
+      if (agent["active"] == false && billingOwner != "agent") {
         setState(() {
           _errorMessage =
-              "Your account is no longer active.\nPlease contact your agency.";
+              "Your agency no longer covers your access.\n\n"
+              "You can continue by activating your personal plan.";
           _loading = false;
+          _showPaymentButton = true; // 🔥 SHOW BUTTON
         });
         return;
       }
@@ -118,7 +127,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
 
-      // 🔥 CLEAR USER PROFILE DATA (prevents cross-role bleed)
+      // 🔥 CLEAR USER PROFILE DATA
       await store.remove("profile");
       await store.remove("profiles");
 
@@ -180,6 +189,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     Navigator.pushNamed(context, "/agent_request_reset");
   }
 
+  // 🔥 NEW: payment navigation
+  void _goToPayment() {
+    Navigator.pushNamed(context, "/payment"); // adjust if needed
+  }
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -229,11 +243,20 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                 const SizedBox(height: 10),
                 Text(
                   _errorMessage!,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.red,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+
+                if (_showPaymentButton) ...[
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _goToPayment,
+                    child: const Text("Continue with Personal Plan"),
+                  ),
+                ],
               ],
 
               Align(
