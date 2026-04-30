@@ -37,8 +37,15 @@ exports.handler = async function (event) {
 
     const { agentId } = JSON.parse(event.body || "{}");
 
-    if (!agentId) {
-      return { statusCode: 400, headers: corsHeaders, body: "Missing agentId" };
+    // 🔥 FIX: FORCE NUMERIC ID (PREVENTS CRASH)
+    const agentIdNum = Number(agentId);
+
+    if (!agentId || isNaN(agentIdNum)) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: "Invalid agentId (must be numeric)"
+      };
     }
 
     const client = await pool.connect();
@@ -65,7 +72,7 @@ exports.handler = async function (event) {
 
     const current = await client.query(
       `SELECT active FROM agents WHERE id = $1 AND rsm_id = $2`,
-      [agentId, rsm.id]
+      [agentIdNum, rsm.id]
     );
 
     if (current.rows.length === 0) {
@@ -87,7 +94,7 @@ exports.handler = async function (event) {
        WHERE id = $2
        AND rsm_id = $3
        RETURNING id, active, billing_owner, subscription_status`,
-      [newActive, agentId, rsm.id]
+      [newActive, agentIdNum, rsm.id]
     );
 
     const newStatus = update.rows[0].active ? "activated" : "deactivated";
@@ -108,7 +115,7 @@ exports.handler = async function (event) {
 
     /* UPDATE STRIPE BILLING */
 
-    if (rsm.billing_active && rsm.stripe_subscription_item_id) {
+    if (rsm.billing_active && rsm.stripe_subscription_item_id?.startsWith("si_")) {
 
       try {
 
@@ -144,11 +151,8 @@ exports.handler = async function (event) {
         }
 
       } catch (stripeErr) {
-
         console.error("Stripe billing update failed:", stripeErr.message);
-
       }
-
     }
 
     /* LOG ACTION */
@@ -159,7 +163,7 @@ exports.handler = async function (event) {
       [
         rsm.id,
         "toggle_agent",
-        `agent:${agentId}:${newStatus}`,
+        `agent:${agentIdNum}:${newStatus}`,
         ip
       ]
     );
