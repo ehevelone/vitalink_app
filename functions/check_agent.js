@@ -17,17 +17,17 @@ function ok(obj) {
   };
 }
 
-function fail(msg, code = 400) {
+function fail(msg, code = 400, extra = {}) {
   return {
     statusCode: code,
     headers,
-    body: JSON.stringify({ success: false, error: msg }),
+    body: JSON.stringify({ success: false, error: msg, ...extra }),
   };
 }
 
 exports.handler = async (event) => {
   try {
-    // ✅ HANDLE PREFLIGHT
+    // ✅ PREFLIGHT
     if (event.httpMethod === "OPTIONS") {
       return { statusCode: 200, headers, body: "" };
     }
@@ -62,8 +62,28 @@ exports.handler = async (event) => {
       return fail("Invalid password ❌");
     }
 
-    // 🔥 DO NOT BLOCK INACTIVE — LET FRONTEND HANDLE IT
+    // 🔥 FINAL ACCESS CONTROL (THIS IS THE IMPORTANT PART)
 
+    const hasValidSubscription =
+      agent.billing_owner !== null &&
+      agent.subscription_status === "active";
+
+    const isAllowed =
+      agent.active === true || hasValidSubscription;
+
+    if (!isAllowed) {
+      return fail(
+        "Access disabled",
+        403,
+        {
+          requires_payment: true,
+          message:
+            "Your agency no longer covers your access. Activate your personal plan to continue.",
+        }
+      );
+    }
+
+    // ✅ SUCCESS
     return ok({
       agent: {
         id: agent.id,
@@ -72,7 +92,9 @@ exports.handler = async (event) => {
         phone: agent.phone,
         npn: agent.npn,
         role: agent.role || "agent",
-        active: agent.active, // 🔥 IMPORTANT
+        active: agent.active,
+        billing_owner: agent.billing_owner || null,
+        subscription_status: agent.subscription_status || null,
       },
     });
 
