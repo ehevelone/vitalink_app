@@ -97,14 +97,16 @@ exports.handler = async (event) => {
             'active',
             true
           )
-          ON CONFLICT (email)
-          DO UPDATE SET
-            stripe_customer_id = EXCLUDED.stripe_customer_id,
-            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-            promo_code = EXCLUDED.promo_code,
-            unlock_code = EXCLUDED.unlock_code,
-            subscription_status = 'active',
-            subscription_valid = true
+ON CONFLICT (email)
+DO UPDATE SET
+  stripe_customer_id = EXCLUDED.stripe_customer_id,
+  stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+  promo_code = EXCLUDED.promo_code,
+  unlock_code = EXCLUDED.unlock_code,
+  subscription_status = 'active',
+  subscription_valid = true,
+  billing_owner = 'agent',
+  active = true
           `,
           [
             email,

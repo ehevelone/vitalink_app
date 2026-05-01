@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AgentLoginScreen extends StatefulWidget {
   const AgentLoginScreen({super.key});
@@ -23,8 +24,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
 
   String? _errorMessage;
 
-  // 🔥 NEW: controls payment button visibility
-  bool _showPaymentButton = false;
+  // 🔥 Overlay (popup)
+  bool _showAccessOverlay = false;
+  String _overlayMessage = "";
 
   @override
   void initState() {
@@ -53,73 +55,90 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     if (_errorMessage != null) {
       setState(() {
         _errorMessage = null;
-        _showPaymentButton = false; // 🔥 reset button
       });
     }
   }
 
-  Future<void> _login() async {
-    final form = _formKey.currentState;
-    if (form == null || !form.validate()) return;
+// 🔥 NEW: clean close handler
+void _closeOverlay() {
+  setState(() {
+    _showAccessOverlay = false;
+  });
+}
 
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-      _showPaymentButton = false;
-    });
+// 🔥 FIXED: call backend instead of hardcoded Stripe link
+Future<void> _goToPayment() async {
+  final email = _emailCtrl.text.trim();
 
-    try {
-      final email = _emailCtrl.text.trim();
+  final res = await ApiService.createAgentCheckout(
+    email: email,
+  );
 
-      final res = await ApiService.loginAgent(
-        email: email,
-        password: _passwordCtrl.text.trim(),
-      );
+  if (res["url"] == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Could not start checkout")),
+    );
+    return;
+  }
 
-      if (!mounted) return;
+  final url = Uri.parse(res["url"]);
 
-      if (res["success"] != true) {
-        String msg = "Login failed";
+  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Could not open payment page")),
+    );
+  }
+}
 
-        if (res["status"] == 401) {
-          msg = "Incorrect password";
-        } else if (res["status"] == 404) {
-          msg = "Agent account not found";
-        } else if (res["error"] != null) {
-          msg = res["error"].toString();
-        }
+Future<void> _login() async {
+  final form = _formKey.currentState;
+  if (form == null || !form.validate()) return;
 
+  setState(() {
+    _loading = true;
+    _errorMessage = null;
+  });
+
+  try {
+    final res = await ApiService.loginAgent(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (res["success"] != true) {
+      setState(() {
+        _loading = false;
+      });
+
+      // ✅ ONLY SHOW POPUP WHEN PAYMENT REQUIRED
+      if (res["requires_payment"] == true) {
         setState(() {
-          _errorMessage = msg;
-          _loading = false;
+          _showAccessOverlay = true;
+          _overlayMessage = res["message"] ??
+              "Your agency no longer covers your access.\n\nActivate your personal plan to continue.";
         });
-
         return;
       }
 
-      final agent = res["agent"];
+      // ❌ Normal error
+      setState(() {
+        _errorMessage = res["error"] ?? "Login failed";
+      });
 
-      if (agent == null || agent["email"] == null || agent["id"] == null) {
-        setState(() {
-          _errorMessage = "Invalid agent response from server";
-          _loading = false;
-        });
-        return;
-      }
+      return;
+    }
 
-      // 🔥 UPDATED ACCESS LOGIC
-      final billingOwner = agent["billing_owner"];
+    final agent = res["agent"];
 
-        if (agent["active"] == false && billingOwner == null) {
-        setState(() {
-          _errorMessage =
-              "Your agency no longer covers your access.\n\n"
-              "You can continue by activating your personal plan.";
-          _loading = false;
-          _showPaymentButton = true; // 🔥 SHOW BUTTON
-        });
-        return;
-      }
+    if (agent == null) {
+      setState(() {
+        _errorMessage = "Invalid response";
+        _loading = false;
+      });
+      return;
+    }
 
       final store = SecureStore();
 
@@ -127,27 +146,14 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       await AppState.setLoggedIn(true);
       await AppState.setRole("agent");
 
-      // 🔥 CLEAR USER PROFILE DATA
-      await store.remove("profile");
-      await store.remove("profiles");
-
       await store.setString("agentId", agent["id"].toString());
-      await store.setString("agentEmail", agent["email"]?.toString() ?? "");
-      await store.setString("agentName", agent["name"]?.toString() ?? "");
-      await store.setString("agentPhone", agent["phone"]?.toString() ?? "");
-
-      await store.setString(
-        "unlock_code",
-        agent["unlock_code"]?.toString() ?? "",
-      );
+      await store.setString("agentEmail", agent["email"] ?? "");
+      await store.setString("agentName", agent["name"] ?? "");
 
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
-        await store.setString("savedAgentEmail", email);
-        await store.setString(
-          "savedAgentPassword",
-          _passwordCtrl.text.trim(),
-        );
+        await store.setString("savedAgentEmail", _emailCtrl.text.trim());
+        await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
       } else {
         await store.setBool("rememberMeAgent", false);
         await store.remove("savedAgentEmail");
@@ -174,24 +180,14 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = "Login error: $e";
+        _errorMessage = "Login error";
+        _loading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
     }
   }
 
   void _goToReset() {
     Navigator.pushNamed(context, "/agent_request_reset");
-  }
-
-  // 🔥 NEW: payment navigation
-  void _goToPayment() {
-    Navigator.pushNamed(context, "/payment"); // adjust if needed
   }
 
   @override
@@ -205,87 +201,151 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Agent Login")),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _emailCtrl,
-                onChanged: (_) => _clearError(),
-                decoration: const InputDecoration(labelText: "Agent Email"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email" : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordCtrl,
-                onChanged: (_) => _clearError(),
-                obscureText: !_showPassword,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+      body: Stack(
+        children: [
+
+          // 🔹 MAIN UI
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                children: [
+
+                  TextFormField(
+                    controller: _emailCtrl,
+                    onChanged: (_) => _clearError(),
+                    decoration: const InputDecoration(labelText: "Agent Email"),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? "Enter your email" : null,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    onChanged: (_) => _clearError(),
+                    obscureText: !_showPassword,
+                    decoration: InputDecoration(
+                      labelText: "Password",
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _showPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _showPassword = !_showPassword),
+                      ),
                     ),
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? "Enter password" : null,
                   ),
-                ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter password" : null,
-              ),
 
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _errorMessage!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ],
 
-                if (_showPaymentButton) ...[
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _goToPayment,
-                    child: const Text("Continue with Personal Plan"),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _goToReset,
+                      child: const Text("Forgot Password?"),
+                    ),
                   ),
+
+                  CheckboxListTile(
+                    value: _rememberMe,
+                    onChanged: (v) =>
+                        setState(() => _rememberMe = v ?? false),
+                    title: const Text("Remember me"),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
+                          onPressed: _login,
+                          child: const Text("Login as Agent"),
+                        ),
                 ],
-              ],
+              ),
+            ),
+          ),
 
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _goToReset,
-                  child: const Text("Forgot Password?"),
+          // 🔥 FINAL POPUP OVERLAY
+          if (_showAccessOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.55),
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 12,
+                        )
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+
+                        const Text(
+                          "Access Not Active",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Text(
+                          _overlayMessage,
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _closeOverlay,
+                                child: const Text("Contact Agency"),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  _closeOverlay();
+                                  _goToPayment();
+                                },
+                                child: const Text("Continue"),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-
-              CheckboxListTile(
-                value: _rememberMe,
-                onChanged: (v) =>
-                    setState(() => _rememberMe = v ?? false),
-                title: const Text("Remember me"),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-
-              const SizedBox(height: 24),
-
-              _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _login,
-                      child: const Text("Login as Agent"),
-                    ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

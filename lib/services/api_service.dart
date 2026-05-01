@@ -25,62 +25,54 @@ class ApiService {
     return const Uuid().v5(Uuid.NAMESPACE_URL, id);
   }
 
-  // -------------------------------------------------------------
-  // 🔧 Internal POST helper (SAFE)
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> _postJson(
-    String path,
-    Map<String, dynamic> body,
-  ) async {
-    try {
-      final url = Uri.parse("$_baseUrl/$path");
-      debugPrint("🌐 FULL URL → $url");
+ // -------------------------------------------------------------
+// 🔧 Internal POST helper (SAFE)
+// -------------------------------------------------------------
+static Future<Map<String, dynamic>> _postJson(
+  String path,
+  Map<String, dynamic> body,
+) async {
+  try {
+    final url = Uri.parse("$_baseUrl/$path");
+    debugPrint("🌐 FULL URL → $url");
 
-      debugPrint("📡 POST → $url");
-      debugPrint("📦 BODY → $body");
+    debugPrint("📡 POST → $url");
+    debugPrint("📦 BODY → $body");
 
-      final res = await http.post(
-        url,
-        headers: const {"Content-Type": "application/json"},
-        body: jsonEncode(body),
-      );
+    final res = await http.post(
+      url,
+      headers: const {"Content-Type": "application/json"},
+      body: jsonEncode(body),
+    );
 
-      debugPrint("📥 STATUS ($path): ${res.statusCode}");
-      debugPrint("📥 RAW BODY ($path): ${res.body}");
+    debugPrint("📥 STATUS ($path): ${res.statusCode}");
+    debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-      if (res.statusCode != 200) {
-        return {
-          "success": false,
-          "error": "Server returned ${res.statusCode}"
-        };
+    // 🔥 CRITICAL FIX:
+    // Always return backend JSON — even on 403
+    if (res.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(res.body);
+
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      } catch (e) {
+        debugPrint("⚠️ JSON decode failed: $e");
       }
-
-      if (res.body.isEmpty) {
-        return {
-          "success": false,
-          "error": "Empty server response"
-        };
-      }
-
-      final decoded = jsonDecode(res.body);
-
-      if (decoded == null || decoded is! Map<String, dynamic>) {
-        return {
-          "success": false,
-          "error": "Invalid server response"
-        };
-      }
-
-      return decoded;
-    } catch (e, st) {
-      debugPrint("❌ API ERROR ($path): $e\n$st");
-      return {"success": false, "error": e.toString()};
     }
-  }
 
-  // -------------------------------------------------------------
-  // 🔥 NEW — SAVE USER PROFILES (PRIMARY SYSTEM)
-  // -------------------------------------------------------------
+    // fallback only if response is unusable
+    return {
+      "success": false,
+      "error": "Server returned ${res.statusCode}"
+    };
+
+  } catch (e, st) {
+    debugPrint("❌ API ERROR ($path): $e\n$st");
+    return {"success": false, "error": e.toString()};
+  }
+}
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
     required List<Map<String, dynamic>> profiles,
@@ -150,45 +142,46 @@ class ApiService {
     });
   }
 
-  // -------------------------------------------------------------
-  // 🔹 Agent login
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> loginAgent({
-    required String email,
-    required String password,
-    String? deviceId,
-    bool replace = false,
-  }) async {
-    final body = {
-      "email": email,
-      "password": password,
-      "replace": replace,
-    };
+ // -------------------------------------------------------------
+// 🔹 Agent login
+// -------------------------------------------------------------
+static Future<Map<String, dynamic>> loginAgent({
+  required String email,
+  required String password,
+  String? deviceId,
+  bool replace = false,
+}) async {
+  final body = {
+    "email": email,
+    "password": password,
+    "replace": replace,
+  };
 
-    if (deviceId != null) {
-      body["device_id"] = deviceId;
-    }
-
-    final res = await _postJson("check_agent", body);
-
-    if (res["success"] != true) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials"
-      };
-    }
-
-    if (res["agent"] == null) {
-      return {
-        "success": false,
-        "error": "Agent data missing"
-      };
-    }
-
-    return {"success": true, "agent": res["agent"]};
+  if (deviceId != null) {
+    body["device_id"] = deviceId;
   }
 
-  // -------------------------------------------------------------
+  final res = await _postJson("check_agent", body);
+
+  return res; // 🔥 DO NOT MODIFY RESPONSE
+}
+
+// -------------------------------------------------------------
+// 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
+// -------------------------------------------------------------
+static Future<Map<String, dynamic>> createAgentCheckout({
+  required String email,
+}) async {
+  final body = {
+    "email": email,
+  };
+
+  final res = await _postJson("vl-agent-checkout", body);
+
+  return res;
+}
+
+// -------------------------------------------------------------
   // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
