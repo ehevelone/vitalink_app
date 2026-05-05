@@ -1,4 +1,3 @@
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -23,10 +22,10 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
+  }
 
-}
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
@@ -118,7 +117,8 @@ void initState() {
           _activationLoaded = true;
         });
       }
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       _lookupRunning = false;
     }
   }
@@ -201,8 +201,7 @@ void initState() {
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
-          profile.userPhone = _phoneCtrl.text.trim();
-          
+      profile.userPhone = _phoneCtrl.text.trim();
 
       // ✅ SAVE ADDRESS DATA
       profile.address = _addressCtrl.text.trim();
@@ -256,14 +255,15 @@ void initState() {
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: "Activation Code",
-                  border: const OutlineInputBorder(),
+                  border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.paste),
                     onPressed: _pasteCode,
                   ),
                 ),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Activation code required" : null,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? "Activation code required"
+                    : null,
               ),
 
               const SizedBox(height: 20),

@@ -18,8 +18,7 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen>
-    with WidgetsBindingObserver {
+class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   late final DataRepository _repo;
   final SecureStore _store = SecureStore();
 
@@ -93,8 +92,7 @@ class _MenuScreenState extends State<MenuScreen>
 
       if (qrToken == null || qrToken.isEmpty) return;
 
-      final qrUrl =
-          "https://myvitalink.app/emergency.html?token=$qrToken";
+      final qrUrl = "https://myvitalink.app/emergency.html?token=$qrToken";
 
       await _store.setString("qr_url", qrUrl);
 
@@ -151,7 +149,6 @@ class _MenuScreenState extends State<MenuScreen>
 
       // 🔥 ADDED — refresh QR AFTER profile loads
       await _refreshQr();
-
     } catch (e) {
       print("Profile load error: $e");
 
@@ -166,11 +163,9 @@ class _MenuScreenState extends State<MenuScreen>
 
   Future<void> _setupFCM() async {
     try {
-      final settings =
-          await FirebaseMessaging.instance.requestPermission();
+      final settings = await FirebaseMessaging.instance.requestPermission();
 
-      if (settings.authorizationStatus !=
-          AuthorizationStatus.authorized) {
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
         return;
       }
 
@@ -183,8 +178,7 @@ class _MenuScreenState extends State<MenuScreen>
 
       if (Platform.isIOS) {
         for (int i = 0; i < 10; i++) {
-          final apns =
-              await FirebaseMessaging.instance.getAPNSToken();
+          final apns = await FirebaseMessaging.instance.getAPNSToken();
           if (apns != null) break;
           await Future.delayed(const Duration(milliseconds: 500));
         }
@@ -216,13 +210,11 @@ class _MenuScreenState extends State<MenuScreen>
 
         if (!mounted || _notificationDialogOpen) return;
 
-        final title =
-            message.notification?.title ??
+        final title = message.notification?.title ??
             message.data["title"] ??
             "New Notification";
 
-        final body =
-            message.notification?.body ??
+        final body = message.notification?.body ??
             message.data["body"] ??
             "You have a new notification";
 
@@ -279,7 +271,6 @@ class _MenuScreenState extends State<MenuScreen>
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
         _handleNotificationTap(message);
       });
-
     } catch (e) {
       print("FCM error: $e");
     }
@@ -359,8 +350,8 @@ class _MenuScreenState extends State<MenuScreen>
                                 '/insurance_cards_menu'),
                             _item(Icons.policy, "Insurance Policies",
                                 '/insurance_policies'),
-                            _item(Icons.person, "My Profile",
-                                '/my_profile_user'),
+                            _item(
+                                Icons.person, "My Profile", '/my_profile_user'),
                           ],
                         ),
                       ),
@@ -404,12 +395,14 @@ class _MenuScreenState extends State<MenuScreen>
   }
 
   Widget _item(IconData icon, String text, String route) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: Colors.green),
-        title: Text(text),
-        onTap: () => Navigator.pushNamed(context, route),
+    return ListTile(
+      tileColor: Colors.transparent,
+      shape: const Border(
+        bottom: BorderSide(color: Colors.black12),
       ),
+      leading: Icon(icon, color: Colors.green),
+      title: Text(text),
+      onTap: () => Navigator.pushNamed(context, route),
     );
   }
 }

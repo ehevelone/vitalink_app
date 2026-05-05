@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
-import '../services/secure_store.dart';   // ✅ needed for SecureStore
+import '../services/secure_store.dart'; // ✅ needed for SecureStore
 
 class DoctorsView extends StatefulWidget {
   const DoctorsView({super.key});
@@ -60,6 +60,10 @@ class _DoctorsViewState extends State<DoctorsView> {
               itemBuilder: (_, i) {
                 final d = docs[i];
                 return ListTile(
+                  tileColor: Colors.transparent,
+                  shape: const Border(
+                    bottom: BorderSide(color: Colors.black12),
+                  ),
                   title: Text(
                     d.name.isNotEmpty ? d.name : "Unnamed Doctor",
                   ),

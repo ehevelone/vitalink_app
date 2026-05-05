@@ -80,8 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     // 🔥 FIX: capture ORIGINAL values BEFORE mutation
-    final originalPhone =
-        _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
+    final originalPhone = _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
     final originalContact = _p!.emergency.contact;
 
     final newPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
@@ -110,9 +109,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // 🔥 FIXED CONDITION
     if (newPhone.length == 10 &&
-        (newPhone != originalPhone ||
-         newContact != originalContact)) {
-
+        (newPhone != originalPhone || newContact != originalContact)) {
       String agentName = "";
       String agentPhone = "";
 
@@ -157,8 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
 
     if (date != null) {
-      _dobCtrl.text =
-          "${date.month.toString().padLeft(2, '0')}/"
+      _dobCtrl.text = "${date.month.toString().padLeft(2, '0')}/"
           "${date.day.toString().padLeft(2, '0')}/"
           "${date.year}";
     }
@@ -176,11 +172,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(title: const Text("Edit Profile")),
       body: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-  24,
-  24,
-  24,
-  MediaQuery.of(context).viewInsets.bottom + 40,
-),
+          24,
+          24,
+          24,
+          MediaQuery.of(context).viewInsets.bottom + 40,
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -203,27 +199,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _dobCtrl,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: "Date of Birth (MM/DD/YYYY)",
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: _pickDob,
+              Column(
+                children: [
+                  TextField(
+                    controller: _dobCtrl,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: "Date of Birth (MM/DD/YYYY)",
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    onTap: _pickDob,
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _bloodCtrl,
-                decoration: const InputDecoration(labelText: "Blood Type"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _bloodCtrl,
+                    decoration: const InputDecoration(labelText: "Blood Type"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _contactCtrl,
-                decoration: const InputDecoration(labelText: "Emergency Contact"),
+                decoration:
+                    const InputDecoration(labelText: "Emergency Contact"),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return "Required";
@@ -235,7 +239,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
@@ -254,31 +257,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _allergiesCtrl,
-                decoration: const InputDecoration(labelText: "Allergies"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _allergiesCtrl,
+                    decoration: const InputDecoration(labelText: "Allergies"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _conditionsCtrl,
-                decoration: const InputDecoration(labelText: "Conditions"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _conditionsCtrl,
+                    decoration: const InputDecoration(labelText: "Conditions"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _implantsCtrl,
-                decoration: const InputDecoration(labelText: "Implanted Devices"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _implantsCtrl,
+                    decoration:
+                        const InputDecoration(labelText: "Implanted Devices"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
-
-              TextField(
-                controller: _proceduresCtrl,
-                decoration: const InputDecoration(labelText: "Major Procedures"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _proceduresCtrl,
+                    decoration:
+                        const InputDecoration(labelText: "Major Procedures"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 24),
-
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
@@ -286,7 +306,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 activeColor: Colors.red,
               ),
               const SizedBox(height: 20),
-
               ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(

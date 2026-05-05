@@ -1,15 +1,23 @@
-// functions/export_agent_clients_csv.js
 const db = require("./services/db");
 
+// 🔥 FORCE single-line + safe CSV
 function csvEscape(value) {
   if (value == null) return "";
-  const s = String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+
+  let s = String(value)
+    .replace(/[\r\n]+/g, " ")   // remove ALL line breaks
+    .replace(/\s+/g, " ")       // collapse spaces
+    .trim();
+
+  s = s.replace(/"/g, '""');    // escape quotes
+
+  return `"${s}"`;              // always wrap
 }
 
 exports.handler = async (event) => {
   try {
     const agentId = event.queryStringParameters?.agent_id;
+
     if (!agentId) {
       return {
         statusCode: 400,
@@ -18,33 +26,90 @@ exports.handler = async (event) => {
       };
     }
 
+    // 🔹 MAIN CLIENT QUERY
     const result = await db.query(
       `
       SELECT
         a.email AS agent_email,
+        u.id AS user_id,
         u.email AS client_email,
-        ARRAY_AGG(DISTINCT ud.platform) AS devices
+        p.first_name,
+        p.last_name,
+        p.phone,
+        p.address,
+        p.city,
+        p.state,
+        p.zip,
+        p.dob,
+        p.gender
       FROM agents a
       JOIN agent_users au ON au.agent_id = a.id
       JOIN users u ON u.id = au.user_id
-      LEFT JOIN user_devices ud
-        ON ud.user_id = u.id
-       AND ud.agent_id = a.id
+      LEFT JOIN profiles p ON p.user_id = u.id
       WHERE a.id = $1
-      GROUP BY a.email, u.email
       ORDER BY u.email;
       `,
       [agentId]
     );
 
-    // CSV header
-    let csv = "agent_email,client_email,devices\n";
+    // 🔹 MEDICATIONS
+    const medsRes = await db.query(`
+      SELECT user_id, name, dosage
+      FROM medications
+    `);
 
+    // 🔹 DOCTORS
+    const doctorsRes = await db.query(`
+      SELECT user_id, name, specialty, phone
+      FROM doctors
+    `);
+
+    // 🔹 Build lookup maps
+    const medsMap = {};
+    for (const row of medsRes.rows) {
+      if (!medsMap[row.user_id]) medsMap[row.user_id] = [];
+      medsMap[row.user_id].push(
+        `${row.name || ""} ${row.dosage || ""}`.trim()
+      );
+    }
+
+    const doctorsMap = {};
+    for (const row of doctorsRes.rows) {
+      if (!doctorsMap[row.user_id]) doctorsMap[row.user_id] = [];
+      doctorsMap[row.user_id].push(
+        `${row.name || ""}${row.specialty ? " - " + row.specialty : ""}${
+          row.phone ? " - " + row.phone : ""
+        }`
+      );
+    }
+
+    // 🔥 CSV HEADER (CRM SAFE)
+    let csv =
+      "first_name,last_name,phone,email,address,city,state,zip,dob,gender,medications,doctors,notes,source\n";
+
+    // 🔹 Build rows
     for (const row of result.rows) {
+      const meds = (medsMap[row.user_id] || []).join("; ");
+      const doctors = (doctorsMap[row.user_id] || []).join("; ");
+
+      // 🔥 SINGLE LINE NOTES (NO BREAKS)
+      const notes = `VitaLink Client | Meds: ${meds} | Doctors: ${doctors}`;
+
       csv += [
-        csvEscape(row.agent_email),
+        csvEscape(row.first_name),
+        csvEscape(row.last_name),
+        csvEscape(row.phone),
         csvEscape(row.client_email),
-        csvEscape((row.devices || []).join("|")),
+        csvEscape(row.address),
+        csvEscape(row.city),
+        csvEscape(row.state),
+        csvEscape(row.zip),
+        csvEscape(row.dob),
+        csvEscape(row.gender),
+        csvEscape(meds),
+        csvEscape(doctors),
+        csvEscape(notes),
+        "VitaLink",
       ].join(",") + "\n";
     }
 
@@ -52,7 +117,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="agent_clients_${agentId}.csv"`,
+        "Content-Disposition": `attachment; filename="clients_${agentId}.csv"`,
       },
       body: csv,
     };

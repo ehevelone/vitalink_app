@@ -81,9 +81,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                 final p = _profiles[index];
                 final isActive = index == _active;
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
+                    tileColor: Colors.transparent,
+                    shape: const Border(
+                      bottom: BorderSide(color: Colors.black12),
+                    ),
                     leading: Icon(
                       Icons.person,
                       color: isActive ? Colors.green : Colors.grey,

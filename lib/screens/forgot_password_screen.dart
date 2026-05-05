@@ -60,12 +60,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            TextField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-              ),
+            Column(
+              children: [
+                TextField(
+                  controller: _emailCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Email",
+                    border: InputBorder.none,
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
             ),
             const SizedBox(height: 24),
             _loading

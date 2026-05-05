@@ -16,6 +16,9 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
   Profile? _p;
   bool _loading = true;
 
+  // 🔥 NEW
+  bool _isParsing = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,9 +36,9 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
 
   Future<void> _save() async {
     if (_p == null) return;
+
     _p!.updatedAt = DateTime.now();
     await _repo.saveProfile(_p!);
-    setState(() {});
   }
 
   Future<void> _addOrEdit({Insurance? existing, int? index}) async {
@@ -47,24 +50,62 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(existing == null ? "Add Insurance Policy" : "Edit Insurance Policy"),
+        title: Text(existing == null
+            ? "Add Insurance Policy"
+            : "Edit Insurance Policy"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: carrier, decoration: const InputDecoration(labelText: "Carrier")),
-            TextField(controller: policy, decoration: const InputDecoration(labelText: "Policy #")),
-            TextField(controller: memberId, decoration: const InputDecoration(labelText: "Member ID")),
-            TextField(controller: policyType, decoration: const InputDecoration(labelText: "Policy Type")),
+            Column(
+              children: [
+                TextField(
+                    controller: carrier,
+                    decoration: const InputDecoration(labelText: "Carrier")),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                    controller: policy,
+                    decoration: const InputDecoration(labelText: "Policy #")),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                    controller: memberId,
+                    decoration: const InputDecoration(labelText: "Member ID")),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                    controller: policyType,
+                    decoration:
+                        const InputDecoration(labelText: "Policy Type")),
+                const Divider(height: 1),
+              ],
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("Save")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Save")),
         ],
       ),
     );
 
     if (ok != true) return;
+
+    // 🔥 START SPINNER EARLY (covers parsing + save)
+    setState(() => _isParsing = true);
 
     final ins = Insurance(
       carrier: carrier.text,
@@ -82,6 +123,11 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
     });
 
     await _save();
+
+    if (!mounted) return;
+
+    // 🔥 STOP SPINNER AFTER EVERYTHING
+    setState(() => _isParsing = false);
   }
 
   Future<void> _delete(int i) async {
@@ -91,8 +137,12 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
         title: const Text("Remove insurance policy?"),
         content: Text(_p!.insurances[i].carrier),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          FilledButton.tonal(onPressed: () => Navigator.pop(context, true), child: const Text("Remove")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          FilledButton.tonal(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Remove")),
         ],
       ),
     );
@@ -105,39 +155,71 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_p == null) return const Scaffold(body: Center(child: Text("No profile found")));
+    if (_loading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_p == null)
+      return const Scaffold(body: Center(child: Text("No profile found")));
 
     final insurances = _p!.insurances;
 
     return Scaffold(
       appBar: AppBar(title: const Text("Insurance Policies")),
-      body: Column(
+      body: Stack(
         children: [
-          ElevatedButton.icon(
-            onPressed: () => _addOrEdit(),
-            icon: const Icon(Icons.add_card),
-            label: const Text("Add Insurance Policy"),
+          Column(
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _addOrEdit(),
+                icon: const Icon(Icons.add_card),
+                label: const Text("Add Insurance Policy"),
+              ),
+              Expanded(
+                child: insurances.isEmpty
+                    ? const Center(
+                        child: Text("No insurance policies yet. Tap + to add."))
+                    : ListView.builder(
+                        itemCount: insurances.length,
+                        itemBuilder: (_, i) {
+                          final ins = insurances[i];
+                          return ListTile(
+                            tileColor: Colors.transparent,
+                            shape: const Border(
+                              bottom: BorderSide(color: Colors.black12),
+                            ),
+                            title: Text(ins.carrier.isNotEmpty
+                                ? ins.carrier
+                                : "Unnamed Policy"),
+                            subtitle: Text("${ins.policyType} – ${ins.policy}"),
+                            onTap: () => _addOrEdit(existing: ins, index: i),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _delete(i),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-          Expanded(
-            child: insurances.isEmpty
-                ? const Center(child: Text("No insurance policies yet. Tap + to add."))
-                : ListView.builder(
-                    itemCount: insurances.length,
-                    itemBuilder: (_, i) {
-                      final ins = insurances[i];
-                      return ListTile(
-                        title: Text(ins.carrier.isNotEmpty ? ins.carrier : "Unnamed Policy"),
-                        subtitle: Text("${ins.policyType} – ${ins.policy}"),
-                        onTap: () => _addOrEdit(existing: ins, index: i),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(i),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+
+          // 🔥 LOADING OVERLAY
+          if (_isParsing)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      "Processing insurance...",
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

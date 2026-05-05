@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../utils/phone_formatter.dart';   // ← NEW
+import '../utils/phone_formatter.dart'; // ← NEW
 
 class DoctorsScreen extends StatefulWidget {
   const DoctorsScreen({super.key});
@@ -51,21 +51,56 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         content: SingleChildScrollView(
           child: Column(
             children: [
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-              TextField(controller: specialty, decoration: const InputDecoration(labelText: 'Specialty')),
-              TextField(controller: clinic, decoration: const InputDecoration(labelText: 'Clinic')),
-              TextField(
-                controller: phone,
-                decoration: const InputDecoration(labelText: 'Phone'),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [PhoneNumberFormatter()],   // ← PHONE FORMATTING ADDED
+              Column(
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ),
+              Column(
+                children: [
+                  TextField(
+                    controller: specialty,
+                    decoration: const InputDecoration(labelText: 'Specialty'),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ),
+              Column(
+                children: [
+                  TextField(
+                    controller: clinic,
+                    decoration: const InputDecoration(labelText: 'Clinic'),
+                  ),
+                  const Divider(height: 1),
+                ],
+              ),
+              Column(
+                children: [
+                  TextField(
+                    controller: phone,
+                    decoration: const InputDecoration(labelText: 'Phone'),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      PhoneNumberFormatter()
+                    ], // ← PHONE FORMATTING ADDED
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save')),
         ],
       ),
     );
@@ -76,7 +111,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       name: name.text.trim(),
       specialty: specialty.text.trim(),
       clinic: clinic.text.trim(),
-      phone: phone.text.trim(),   // ← formatted before save
+      phone: phone.text.trim(), // ← formatted before save
     );
 
     setState(() {
@@ -97,8 +132,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         title: const Text('Remove doctor?'),
         content: Text(_p!.doctors[i].name),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton.tonal(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton.tonal(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove')),
         ],
       ),
     );
@@ -127,6 +166,10 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
               itemBuilder: (_, i) {
                 final d = docs[i];
                 return ListTile(
+                  tileColor: Colors.transparent,
+                  shape: const Border(
+                    bottom: BorderSide(color: Colors.black12),
+                  ),
                   title: Text(d.name),
                   subtitle: Text([
                     if (d.specialty.isNotEmpty) d.specialty,

@@ -57,8 +57,12 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
           "This cannot be undone.",
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete")),
         ],
       ),
     );
@@ -83,31 +87,33 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
           final p = _profiles[i];
           final isActive = i == _activeIndex;
 
-          return Card(
-            child: ListTile(
-              leading: Icon(
-                isActive ? Icons.check_circle : Icons.person,
-                color: isActive ? Colors.green : Colors.grey,
-              ),
-              title: Text(p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile"),
-              subtitle: Text(isActive ? "ACTIVE PROFILE" : "HOUSEHOLD MEMBER"),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!isActive)
-                    IconButton(
-                      icon: const Icon(Icons.swap_horiz, color: Colors.blue),
-                      tooltip: "Switch to this profile",
-                      onPressed: () => _switch(i),
-                    ),
-                  if (!isActive)
-                    IconButton(
-                      icon: const Icon(Icons.delete_forever, color: Colors.red),
-                      tooltip: "Delete Profile",
-                      onPressed: () => _delete(i),
-                    ),
-                ],
-              ),
+          return ListTile(
+            tileColor: Colors.transparent,
+            shape: const Border(
+              bottom: BorderSide(color: Colors.black12),
+            ),
+            leading: Icon(
+              isActive ? Icons.check_circle : Icons.person,
+              color: isActive ? Colors.green : Colors.grey,
+            ),
+            title: Text(p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile"),
+            subtitle: Text(isActive ? "ACTIVE PROFILE" : "HOUSEHOLD MEMBER"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isActive)
+                  IconButton(
+                    icon: const Icon(Icons.swap_horiz, color: Colors.blue),
+                    tooltip: "Switch to this profile",
+                    onPressed: () => _switch(i),
+                  ),
+                if (!isActive)
+                  IconButton(
+                    icon: const Icon(Icons.delete_forever, color: Colors.red),
+                    tooltip: "Delete Profile",
+                    onPressed: () => _delete(i),
+                  ),
+              ],
             ),
           );
         },

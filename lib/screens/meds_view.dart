@@ -61,8 +61,13 @@ class _MedsViewState extends State<MedsView> {
               itemBuilder: (_, i) {
                 final m = meds[i];
                 return ListTile(
+                  tileColor: Colors.transparent,
+                  shape: const Border(
+                    bottom: BorderSide(color: Colors.black12),
+                  ),
                   leading: const Icon(Icons.medication_outlined),
-                  title: Text(m.name.isNotEmpty ? m.name : "Unnamed Medication"),
+                  title:
+                      Text(m.name.isNotEmpty ? m.name : "Unnamed Medication"),
                   subtitle: Text(
                     [m.dose, m.frequency, m.prescriber]
                         .where((s) => s.isNotEmpty)

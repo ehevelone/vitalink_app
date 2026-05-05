@@ -113,8 +113,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                 '/my_profile_agent'),
 
                             // NEW BUTTON
-                            _item(Icons.groups, "My Clients",
-                                '/agent_clients'),
+                            _item(Icons.groups, "My Clients", '/agent_clients'),
 
                             _item(Icons.medical_information, "Medications",
                                 '/meds'),
@@ -130,34 +129,28 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                         top: false,
                         minimum: const EdgeInsets.only(bottom: 16),
                         child: Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Colors.red.shade900,
+                                    backgroundColor: Colors.red.shade900,
                                     foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(
-                                            vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(30),
+                                      borderRadius: BorderRadius.circular(30),
                                     ),
                                   ),
-                                  icon: const Icon(
-                                      Icons.warning_amber_rounded),
+                                  icon: const Icon(Icons.warning_amber_rounded),
                                   label: const Text(
                                     "Emergency Info",
                                     style: TextStyle(fontSize: 17),
                                   ),
-                                  onPressed: () =>
-                                      Navigator.pushNamed(
-                                          context, '/emergency'),
+                                  onPressed: () => Navigator.pushNamed(
+                                      context, '/emergency'),
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -165,16 +158,12 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Colors.red.shade100,
-                                    foregroundColor:
-                                        Colors.red.shade700,
-                                    padding:
-                                        const EdgeInsets.symmetric(
-                                            vertical: 16),
+                                    backgroundColor: Colors.red.shade100,
+                                    foregroundColor: Colors.red.shade700,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(30),
+                                      borderRadius: BorderRadius.circular(30),
                                     ),
                                   ),
                                   icon: const Icon(Icons.logout),
@@ -198,17 +187,14 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
   }
 
   Widget _item(IconData icon, String text, String route) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+    return ListTile(
+      tileColor: Colors.transparent,
+      shape: const Border(
+        bottom: BorderSide(color: Colors.black12),
       ),
-      color: const Color(0xFFF7F1FF),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.blue),
-        title: Text(text, style: const TextStyle(fontSize: 18)),
-        onTap: () => Navigator.pushNamed(context, route),
-      ),
+      leading: Icon(icon, color: Colors.blue),
+      title: Text(text, style: const TextStyle(fontSize: 18)),
+      onTap: () => Navigator.pushNamed(context, route),
     );
   }
 }

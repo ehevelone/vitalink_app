@@ -76,13 +76,23 @@ class _PolicyFormPageState extends State<PolicyFormPage> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            TextField(
-              controller: companyController,
-              decoration: const InputDecoration(labelText: "Company"),
+            Column(
+              children: [
+                TextField(
+                  controller: companyController,
+                  decoration: const InputDecoration(labelText: "Company"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: planController,
-              decoration: const InputDecoration(labelText: "Plan"),
+            Column(
+              children: [
+                TextField(
+                  controller: planController,
+                  decoration: const InputDecoration(labelText: "Plan"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
             const SizedBox(height: 24),
             Row(

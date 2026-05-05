@@ -158,44 +158,81 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            TextField(
-              controller: carrier,
-              decoration: const InputDecoration(labelText: "Carrier"),
+            Column(
+              children: [
+                TextField(
+                  controller: carrier,
+                  decoration: const InputDecoration(labelText: "Carrier"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: policyNo,
-              decoration: const InputDecoration(labelText: "Policy #"),
+            Column(
+              children: [
+                TextField(
+                  controller: policyNo,
+                  decoration: const InputDecoration(labelText: "Policy #"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: groupNo,
-              decoration: const InputDecoration(labelText: "Group #"),
+            Column(
+              children: [
+                TextField(
+                  controller: groupNo,
+                  decoration: const InputDecoration(labelText: "Group #"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: memberId,
-              decoration: const InputDecoration(labelText: "Member ID"),
+            Column(
+              children: [
+                TextField(
+                  controller: memberId,
+                  decoration: const InputDecoration(labelText: "Member ID"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
 
             // 🔥 NEW FIELDS (THIS FIXES YOUR ISSUE)
-            TextField(
-              controller: insuredName,
-              decoration:
-                  const InputDecoration(labelText: "Insured Name"),
+            Column(
+              children: [
+                TextField(
+                  controller: insuredName,
+                  decoration: const InputDecoration(labelText: "Insured Name"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: beneficiary,
-              decoration:
-                  const InputDecoration(labelText: "Beneficiary"),
+            Column(
+              children: [
+                TextField(
+                  controller: beneficiary,
+                  decoration: const InputDecoration(labelText: "Beneficiary"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
-
-            TextField(
-              controller: phone,
-              decoration: const InputDecoration(labelText: "Phone"),
-              keyboardType: TextInputType.phone,
-              inputFormatters: [PhoneNumberFormatter()],
+            Column(
+              children: [
+                TextField(
+                  controller: phone,
+                  decoration: const InputDecoration(labelText: "Phone"),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [PhoneNumberFormatter()],
+                ),
+                const Divider(height: 1),
+              ],
             ),
-            TextField(
-              controller: policyType,
-              decoration: const InputDecoration(labelText: "Policy Type"),
+            Column(
+              children: [
+                TextField(
+                  controller: policyType,
+                  decoration: const InputDecoration(labelText: "Policy Type"),
+                ),
+                const Divider(height: 1),
+              ],
             ),
             const SizedBox(height: 24),
             Row(

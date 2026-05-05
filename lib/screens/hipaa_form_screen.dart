@@ -24,6 +24,14 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   final SignatureController _sigCtrl = SignatureController(penStrokeWidth: 3);
   final ScrollController _scrollCtrl = ScrollController();
 
+  String clean(String? value) {
+  if (value == null) return "";
+  return value
+      .replaceAll(RegExp(r'[\r\n]+'), ' ') // remove line breaks
+      .replaceAll('"', '""')               // escape quotes
+      .trim();
+}
+
   bool _saving = false;
   bool _acknowledged = false;
   bool _canScroll = false;
@@ -130,13 +138,13 @@ Future<File> _buildCsv(Profile p) async {
   final medsStr = p.meds
       .map((m) =>
           "${m.name}${m.dose != null ? " (${m.dose})" : ""}${m.frequency != null ? " ${m.frequency}" : ""}")
-      .join(" | ");
+      .join("; ");
 
   // 🔥 Doctors field
   final docsStr = p.doctors
       .map((d) =>
           "${d.name}${d.specialty != null ? " (${d.specialty})" : ""}")
-      .join(" | ");
+      .join("; ");
 
   // ✅ HEADER
   buffer.writeln(
@@ -144,19 +152,19 @@ Future<File> _buildCsv(Profile p) async {
   );
 
   // ✅ SINGLE ROW
-  buffer.writeln(
-    "$firstName,"
-    "$lastName,"
-    "${p.dob ?? ''},"
-    "${p.address ?? ''},"
-    "${p.city ?? ''},"
-    "${p.state ?? ''},"
-    "${p.zip ?? ''},"
-    "${p.userPhone ?? ''},"
-    "$userEmail,"
-    "$medsStr,"
-    "$docsStr"
-  );
+buffer.writeln(
+  "${clean(firstName)},"
+  "${clean(lastName)},"
+  "${clean(p.dob)},"
+  "${clean(p.address)},"
+  "${clean(p.city)},"
+  "${clean(p.state)},"
+  "${clean(p.zip)},"
+  "${clean(p.userPhone)},"
+  "${clean(userEmail)},"
+  "${clean(medsStr)},"
+  "${clean(docsStr)}"
+);
 
   final dir = await getTemporaryDirectory();
   final file = File("${dir.path}/vitalink_user_info.csv");

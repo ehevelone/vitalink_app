@@ -38,8 +38,7 @@ class _EmergencyViewState extends State<EmergencyView> {
   Profile? _p;
   bool _loading = true;
 
-  static const String _baseUrl =
-      "https://myvitalink.app/emergency.html";
+  static const String _baseUrl = "https://myvitalink.app/emergency.html";
 
   @override
   void initState() {
@@ -108,62 +107,101 @@ class _EmergencyViewState extends State<EmergencyView> {
         padding: const EdgeInsets.all(16),
         children: [
           if (p.fullName.isNotEmpty)
-            ListTile(title: const Text("Name"), subtitle: Text(p.fullName)),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("Name"),
+                subtitle: Text(p.fullName)),
           if (p.dob?.isNotEmpty == true)
-            ListTile(title: const Text("DOB"), subtitle: Text(Formatters.dob(p.dob!))),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("DOB"),
+                subtitle: Text(Formatters.dob(p.dob!))),
           if (e.allergies.isNotEmpty)
-            ListTile(title: const Text("Allergies"), subtitle: Text(e.allergies)),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("Allergies"),
+                subtitle: Text(e.allergies)),
           if (e.conditions.isNotEmpty)
-            ListTile(title: const Text("Conditions"), subtitle: Text(e.conditions)),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("Conditions"),
+                subtitle: Text(e.conditions)),
           if (e.implants.isNotEmpty)
-            ListTile(title: const Text("Implants"), subtitle: Text(e.implants)),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("Implants"),
+                subtitle: Text(e.implants)),
           if (e.procedures.isNotEmpty)
-            ListTile(title: const Text("Procedures"), subtitle: Text(e.procedures)),
-
+            ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(
+                  bottom: BorderSide(color: Colors.black12),
+                ),
+                title: const Text("Procedures"),
+                subtitle: Text(e.procedures)),
           if (e.contact.isNotEmpty || e.phone.isNotEmpty)
             ListTile(
+              tileColor: Colors.transparent,
+              shape: const Border(
+                bottom: BorderSide(color: Colors.black12),
+              ),
               title: const Text("Emergency Contact"),
               subtitle: Text([
                 if (e.contact.isNotEmpty) e.contact,
                 if (e.phone.isNotEmpty) Formatters.phone(e.phone),
               ].join(" • ")),
             ),
-
           const Divider(height: 32),
-
           if (p.meds.isNotEmpty)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Medications", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text("Medications",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 ...p.meds.map((m) => ListTile(
+                      tileColor: Colors.transparent,
+                      shape: const Border(
+                        bottom: BorderSide(color: Colors.black12),
+                      ),
                       dense: true,
                       title: Text(m.name),
                       subtitle: Text("${m.dose} • ${m.frequency}"),
                     )),
               ],
             ),
-
           if (p.doctors.isNotEmpty)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Doctors", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text("Doctors",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 ...p.doctors.map((d) => ListTile(
+                      tileColor: Colors.transparent,
+                      shape: const Border(
+                        bottom: BorderSide(color: Colors.black12),
+                      ),
                       dense: true,
                       title: Text(d.name),
                       subtitle: Text(d.phone),
                     )),
               ],
             ),
-
           const SizedBox(height: 20),
-
           Center(
             child: QrImageView(
               data: qrUrl,

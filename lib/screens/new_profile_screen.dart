@@ -50,8 +50,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
       initialDate: DateTime(1990),
     );
     if (date != null) {
-      _dobCtrl.text =
-          "${date.month.toString().padLeft(2, '0')}/"
+      _dobCtrl.text = "${date.month.toString().padLeft(2, '0')}/"
           "${date.day.toString().padLeft(2, '0')}/"
           "${date.year}";
     }
@@ -114,21 +113,31 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _dobCtrl,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: "Date of Birth (MM/DD/YYYY)",
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: _pickDob,
+              Column(
+                children: [
+                  TextField(
+                    controller: _dobCtrl,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: "Date of Birth (MM/DD/YYYY)",
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    onTap: _pickDob,
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _bloodCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Blood Type (optional)"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _bloodCtrl,
+                    decoration: const InputDecoration(
+                        labelText: "Blood Type (optional)"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
@@ -152,11 +161,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                decoration:
-                    const InputDecoration(labelText: "Emergency Phone"),
+                decoration: const InputDecoration(labelText: "Emergency Phone"),
                 validator: (v) {
-                  final digits =
-                      v?.replaceAll(RegExp(r'\D'), '') ?? "";
+                  final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
                   if (digits.length != 10) {
                     return "Enter valid phone";
                   }
@@ -165,32 +172,51 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _allergiesCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Allergies"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _allergiesCtrl,
+                    decoration: const InputDecoration(labelText: "Allergies"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _conditionsCtrl,
-                decoration: const InputDecoration(
-                    labelText: "Medical Conditions"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _conditionsCtrl,
+                    decoration:
+                        const InputDecoration(labelText: "Medical Conditions"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
               // 🔥 ADDED
-              TextField(
-                controller: _implantsCtrl,
-                decoration: const InputDecoration(
-                    labelText: "Implanted Devices"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _implantsCtrl,
+                    decoration:
+                        const InputDecoration(labelText: "Implanted Devices"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _proceduresCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Major Procedures"),
+              Column(
+                children: [
+                  TextField(
+                    controller: _proceduresCtrl,
+                    decoration:
+                        const InputDecoration(labelText: "Major Procedures"),
+                  ),
+                  const Divider(height: 1),
+                ],
               ),
               const SizedBox(height: 12),
 
@@ -209,8 +235,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

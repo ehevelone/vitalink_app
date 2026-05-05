@@ -11,7 +11,6 @@ class AgentClientsScreen extends StatefulWidget {
 }
 
 class _AgentClientsScreenState extends State<AgentClientsScreen> {
-
   List clients = [];
   bool loading = true;
   String? error;
@@ -23,9 +22,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
   }
 
   Future<void> _loadClients() async {
-
     try {
-
       final store = SecureStore();
       final agentIdStr = await store.getString("agentId");
 
@@ -61,27 +58,21 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
         clients = res["clients"] ?? [];
         loading = false;
       });
-
     } catch (e) {
-
       setState(() {
         error = "Failed to load clients";
         loading = false;
       });
-
     }
-
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Clients"),
         backgroundColor: Colors.blue.shade700,
       ),
-
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -92,7 +83,6 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: clients.length,
                       itemBuilder: (context, index) {
-
                         final client = clients[index];
 
                         final first = client["first_name"] ?? "";
@@ -104,16 +94,15 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                         // 🔥 NEW (SAFE ADD)
                         final hasDevice = client["has_device"] == true;
 
-                        return Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          color: const Color(0xFFF7F1FF),
-                          margin: const EdgeInsets.only(bottom: 12),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
-                            leading: const Icon(Icons.person, color: Colors.blue),
-
+                            tileColor: Colors.transparent,
+                            shape: const Border(
+                              bottom: BorderSide(color: Colors.black12),
+                            ),
+                            leading:
+                                const Icon(Icons.person, color: Colors.blue),
                             title: Row(
                               children: [
                                 Expanded(
@@ -146,23 +135,19 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                         ),
                                       ),
                                     ),
-
                                     const SizedBox(width: 8),
-
                                     Icon(
                                       hasDevice
                                           ? Icons.phone_android
                                           : Icons.phone_disabled,
                                       size: 18,
-                                      color: hasDevice
-                                          ? Colors.green
-                                          : Colors.red,
+                                      color:
+                                          hasDevice ? Colors.green : Colors.red,
                                     ),
                                   ],
                                 ),
                               ],
                             ),
-
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -174,9 +159,8 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                   "Device: ${hasDevice ? "YES" : "NO"}",
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: hasDevice
-                                        ? Colors.green
-                                        : Colors.red,
+                                    color:
+                                        hasDevice ? Colors.green : Colors.red,
                                   ),
                                 ),
                               ],

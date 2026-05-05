@@ -73,10 +73,8 @@ class _MedsScreenState extends State<MedsScreen> {
   }
 
   String _toLastFirstFormat(String name) {
-    final cleaned = name
-        .replaceAll(",", " ")
-        .replaceAll(RegExp(r'\s+'), " ")
-        .trim();
+    final cleaned =
+        name.replaceAll(",", " ").replaceAll(RegExp(r'\s+'), " ").trim();
 
     final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
     if (parts.length < 2) return cleaned;
@@ -145,84 +143,96 @@ class _MedsScreenState extends State<MedsScreen> {
         text: prefill?['prescriber'] ?? existing?.prescriber ?? '');
 
     final ok = await showDialog<bool>(
-  context: context,
-  builder: (_) => AlertDialog(
-    backgroundColor: const Color(0xFF111111),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-
-    title: Text(
-      existing == null ? 'Add Medication' : 'Edit Medication',
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          existing == null ? 'Add Medication' : 'Edit Medication',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Column(
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                  controller: doseCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Dose / Strength',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                  controller: freqCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Frequency',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
+            ),
+            Column(
+              children: [
+                TextField(
+                  controller: pharmacyCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Pharmacy (and phone)',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                  maxLines: 2,
+                ),
+                const Divider(height: 1),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.redAccent,
+            ),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
       ),
-    ),
-
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-
-        TextField(
-          controller: nameCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Name',
-            labelStyle: TextStyle(color: Colors.white70),
-          ),
-        ),
-
-        TextField(
-          controller: doseCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Dose / Strength',
-            labelStyle: TextStyle(color: Colors.white70),
-          ),
-        ),
-
-        TextField(
-          controller: freqCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Frequency',
-            labelStyle: TextStyle(color: Colors.white70),
-          ),
-        ),
-
-        TextField(
-          controller: pharmacyCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Pharmacy (and phone)',
-            labelStyle: TextStyle(color: Colors.white70),
-          ),
-          maxLines: 2,
-        ),
-      ],
-    ),
-
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context, false),
-        style: TextButton.styleFrom(
-          foregroundColor: Colors.redAccent,
-        ),
-        child: const Text('Cancel'),
-      ),
-
-      FilledButton(
-        onPressed: () => Navigator.pop(context, true),
-        style: FilledButton.styleFrom(
-          backgroundColor: Colors.blueAccent,
-          foregroundColor: Colors.white,
-        ),
-        child: const Text('Save'),
-      ),
-    ],
-  ),
-);
+    );
 
     if (ok != true) return;
 
@@ -258,72 +268,66 @@ class _MedsScreenState extends State<MedsScreen> {
       final List<String> base64Images = [];
       bool keepScanning = true;
 
-   while (keepScanning) {
-  final img = await _picker.pickImage(source: ImageSource.camera);
-  if (img == null) break;
+      while (keepScanning) {
+        final img = await _picker.pickImage(source: ImageSource.camera);
+        if (img == null) break;
 
-  final base64Image = base64Encode(await File(img.path).readAsBytes());
-  base64Images.add(base64Image);
+        final base64Image = base64Encode(await File(img.path).readAsBytes());
+        base64Images.add(base64Image);
 
-  keepScanning = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-
-          title: const Text(
-            "Did we get all sides of the bottle?",
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          content: Text(
-            "You have taken ${base64Images.length} photo(s).\n\nIf the label wraps around the bottle, take another photo.",
-            style: const TextStyle(color: Colors.white70),
-          ),
-
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-
-          actions: [
-            Row(
-              children: [
-
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(44),
-                    ),
-                    child: const Text("Done"),
+        keepScanning = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                backgroundColor: const Color(0xFF111111),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Text(
+                  "Did we get all sides of the bottle?",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(44),
-                    ),
-                    child: const Text("Take Another"),
-                  ),
+                content: Text(
+                  "You have taken ${base64Images.length} photo(s).\n\nIf the label wraps around the bottle, take another photo.",
+                  style: const TextStyle(color: Colors.white70),
                 ),
-              ],
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
+                actionsPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                actions: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                          child: const Text("Done"),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                          child: const Text("Take Another"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
 
       if (base64Images.isEmpty) return;
 
@@ -357,115 +361,103 @@ class _MedsScreenState extends State<MedsScreen> {
       if (existingIndex != -1) {
         final existing = _p!.meds[existingIndex];
 
-      final choice = await showDialog<String>(
-  context: context,
-  builder: (_) => AlertDialog(
-    backgroundColor: const Color(0xFF111111),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-
-    title: const Text(
-      "This Medication Is Already Saved",
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-    ),
-
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "You already have:",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white70,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          "${existing.name} ${existing.dose}".trim(),
-          style: const TextStyle(color: Colors.white),
-        ),
-
-        const SizedBox(height: 12),
-
-        const Text(
-          "The bottle says:",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white70,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          "$scannedName $scannedDose".trim(),
-          style: const TextStyle(color: Colors.white),
-        ),
-
-        const SizedBox(height: 16),
-
-        const Text(
-          "What would you like to do?",
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    ),
-
-    actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-
-    actions: [
-      Column(
-        children: [
-
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.pop(context, "replace"),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF111111),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              "This Medication Is Already Saved",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              child: const Text("Update This Medication"),
             ),
-          ),
-
-          const SizedBox(height: 8),
-
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.pop(context, "add"),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "You already have:",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "${existing.name} ${existing.dose}".trim(),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "The bottle says:",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "$scannedName $scannedDose".trim(),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "What would you like to do?",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            actions: [
+              Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, "replace"),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text("Update This Medication"),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, "add"),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text("Keep Both"),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, "cancel"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                    ),
+                    child: const Text("Cancel"),
+                  ),
+                ],
               ),
-              child: const Text("Keep Both"),
-            ),
+            ],
           ),
-
-          const SizedBox(height: 8),
-
-          TextButton(
-            onPressed: () => Navigator.pop(context, "cancel"),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.redAccent,
-            ),
-            child: const Text("Cancel"),
-          ),
-        ],
-      ),
-    ],
-  ),
-);
+        );
 
         if (choice == "replace") {
           setState(() {
@@ -536,8 +528,12 @@ class _MedsScreenState extends State<MedsScreen> {
         title: const Text("Remove medication?"),
         content: Text(_p!.meds[i].name),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          FilledButton.tonal(onPressed: () => Navigator.pop(context, true), child: const Text("Remove")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
+          FilledButton.tonal(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Remove")),
         ],
       ),
     );
@@ -562,37 +558,42 @@ class _MedsScreenState extends State<MedsScreen> {
         children: [
           Column(
             children: [
-Padding(
-  padding: const EdgeInsets.all(12.0),
-  child: ElevatedButton.icon(
-    onPressed: _scanning ? null : _scanLabel,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.blue.shade700,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      minimumSize: const Size(double.infinity, 0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    ),
-    icon: const Icon(Icons.camera_alt),
-    label: const Text(
-      'Scan Medication Label',
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: ElevatedButton.icon(
+                  onPressed: _scanning ? null : _scanLabel,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    minimumSize: const Size(double.infinity, 0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text(
+                    'Scan Medication Label',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
               Expanded(
                 child: meds.isEmpty
-                    ? const Center(child: Text('No medications yet. Tap + to add.'))
+                    ? const Center(
+                        child: Text('No medications yet. Tap + to add.'))
                     : ListView.builder(
                         itemCount: meds.length,
                         itemBuilder: (_, i) {
                           final m = meds[i];
                           return ListTile(
+                            tileColor: Colors.transparent,
+                            shape: const Border(
+                              bottom: BorderSide(color: Colors.black12),
+                            ),
                             title: Text(m.name),
                             subtitle: Text("${m.dose} ${m.frequency}".trim()),
                             onTap: () => _addOrEdit(existing: m, index: i),
