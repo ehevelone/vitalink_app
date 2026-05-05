@@ -7,6 +7,34 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// 🔥 NEW: merge insurance entries BEFORE save
+function mergeInsuranceEntries(profile) {
+  if (!profile.insurance || !Array.isArray(profile.insurance)) return profile;
+
+  const merged = [];
+
+  for (const incoming of profile.insurance) {
+    if (!incoming) continue;
+
+    const matchIndex = merged.findIndex(i =>
+      (i.memberId && incoming.memberId && i.memberId === incoming.memberId) ||
+      (i.policy && incoming.policy && i.policy === incoming.policy)
+    );
+
+    if (matchIndex !== -1) {
+      merged[matchIndex] = {
+        ...merged[matchIndex],
+        ...incoming,
+      };
+    } else {
+      merged.push(incoming);
+    }
+  }
+
+  profile.insurance = merged;
+  return profile;
+}
+
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
@@ -35,7 +63,11 @@ exports.handler = async (event) => {
 
       try {
         const profileId = p.id || crypto.randomUUID();
-        const encrypted_data = encrypt(JSON.stringify(p));
+
+        // 🔥 FIX: merge insurance BEFORE encrypting
+        const cleanedProfile = mergeInsuranceEntries(p);
+
+        const encrypted_data = encrypt(JSON.stringify(cleanedProfile));
 
         const existing = await pool.query(
           `SELECT id, qr_token FROM profiles WHERE id = $1 LIMIT 1`,
