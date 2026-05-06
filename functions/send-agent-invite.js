@@ -3,6 +3,20 @@ const nodemailer = require("nodemailer");
 const db = require("./services/db");
 
 exports.handler = async (event) => {
+
+  // 🔥 CORS PREFLIGHT (REQUIRED)
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS"
+      },
+      body: ""
+    };
+  }
+
   try {
     const body = JSON.parse(event.body || "{}");
 
@@ -11,6 +25,10 @@ exports.handler = async (event) => {
     if (!body.email || !body.agent_id || !body.agent_name) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ success: false, error: "Missing required fields" }),
       };
     }
@@ -32,7 +50,7 @@ exports.handler = async (event) => {
        RETURNING id`,
       [
         body.email.trim().toLowerCase(),
-        body.agent_id, // must be UUID string
+        body.agent_id,
         token_hash,
         expiresAt
       ]
@@ -40,7 +58,7 @@ exports.handler = async (event) => {
 
     console.log("✅ INSERT RESULT:", insert.rows);
 
-    // 🔗 Build link (Netlify function)
+    // 🔗 Build link
     const link = `https://vitalink-app.netlify.app/.netlify/functions/accept-agent-invite?token=${token}`;
 
     // 📧 Email setup
@@ -74,6 +92,10 @@ This link will expire in 24 hours.
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         success: true,
         message: "Invite sent",
@@ -86,6 +108,10 @@ This link will expire in 24 hours.
 
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         success: false,
         error: err.message,
