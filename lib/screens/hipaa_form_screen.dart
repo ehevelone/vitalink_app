@@ -166,7 +166,9 @@ buffer.writeln(
   "${clean(p.userPhone)},"
   "${clean(userEmail)},"
   "${clean(medsStr)},"
-  "${clean(docsStr)}"
+  "${clean(docsStr)},"
+  "${clean("VitaLink Client | Meds: $medsStr | Doctors: $docsStr")},"
+  "${clean("VitaLink")}"
 );
 
   final dir = await getTemporaryDirectory();
