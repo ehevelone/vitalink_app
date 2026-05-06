@@ -33,7 +33,7 @@ exports.handler = async (event) => {
     console.log("✅ INSERT RESULT:", insert.rows);
 
     // 🔗 Build link
-    const link = `https://myvitalink.app/.netlify/functions/accept-agent-invite?token=${token}`;
+    const link = `https://vitalink-app.netlify.app/.netlify/functions/accept-agent-invite?token=${token}`;
 
     // 📧 Email setup
     const transporter = nodemailer.createTransport({
