@@ -24,12 +24,15 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   final SignatureController _sigCtrl = SignatureController(penStrokeWidth: 3);
   final ScrollController _scrollCtrl = ScrollController();
 
-  String clean(String? value) {
+String clean(String? value) {
   if (value == null) return "";
-  return value
+
+  String s = value
       .replaceAll(RegExp(r'[\r\n]+'), ' ') // remove line breaks
       .replaceAll('"', '""')               // escape quotes
       .trim();
+
+  return '"$s"'; // 🔥 wrap everything in quotes
 }
 
   bool _saving = false;
@@ -148,7 +151,7 @@ Future<File> _buildCsv(Profile p) async {
 
   // ✅ HEADER
   buffer.writeln(
-    "First Name,Last Name,DOB,Address,City,State,Zip Code,Phone,Email,Medications,Doctors"
+    "First Name,Last Name,DOB,Address,City,State,Zip Code,Phone,Email,Medications,Doctors,Notes,Source"
   );
 
   // ✅ SINGLE ROW
@@ -173,6 +176,7 @@ buffer.writeln(
 }
 
 Future<void> _openSignaturePopup() async {
+
   await showDialog(
     context: context,
     barrierDismissible: false,
