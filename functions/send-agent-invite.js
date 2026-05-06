@@ -20,14 +20,19 @@ exports.handler = async (event) => {
     // ⏳ Expiration (24 hours)
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+    console.log("🔎 INSERTING INVITE:", body.email, body.agent_id);
+
     // 💾 Store invite
-    await db.query(
+    const insert = await db.query(
       `INSERT INTO agent_invites (client_email, new_agent_id, token_hash, expires_at)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
       [body.email, body.agent_id, token_hash, expiresAt]
     );
 
-    // 🔗 Build link (FIXED)
+    console.log("✅ INSERT RESULT:", insert.rows);
+
+    // 🔗 Build link
     const link = `https://myvitalink.app/.netlify/functions/accept-agent-invite?token=${token}`;
 
     // 📧 Email setup
@@ -70,6 +75,7 @@ This link will expire in 24 hours.
 
   } catch (err) {
     console.error("❌ send-agent-invite error", err);
+
     return {
       statusCode: 500,
       body: JSON.stringify({
