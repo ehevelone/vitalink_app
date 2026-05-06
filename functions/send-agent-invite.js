@@ -46,7 +46,7 @@ exports.handler = async (event) => {
     // 💾 Store invite
     const insert = await db.query(
       `INSERT INTO agent_invites (client_email, new_agent_id, token_hash, expires_at)
-       VALUES ($1, $2::uuid, $3, $4)
+       VALUES ($1, $2, $3, $4)
        RETURNING id`,
       [
         body.email.trim().toLowerCase(),
