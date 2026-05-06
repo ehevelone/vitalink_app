@@ -43,7 +43,7 @@ exports.handler = async (event) => {
     console.log("🔎 INSERTING INVITE:", body.email);
     console.log("AGENT ID:", body.agent_id, typeof body.agent_id);
 
-    // 💾 Store invite (NO UUID CAST)
+    // 💾 Store invite
     const insert = await db.query(
       `INSERT INTO agent_invites (client_email, new_agent_id, token_hash, expires_at)
        VALUES ($1, $2, $3, $4)
@@ -78,15 +78,20 @@ exports.handler = async (event) => {
       subject: "Connect with your VitaLink Agent",
       text: `Hi,
 
-${body.agent_name} has invited you to connect through VitaLink — a secure way to store and access your important health and insurance information.
+${body.agent_name} has invited you to VitaLink — your secure health & insurance ID.
 
-This gives you:
-• Instant access to your medications, doctors, and insurance
+This gives you and your family:
+
+• Instant access to medications, doctors, and insurance
 • Emergency contact notifications when it matters most
-• Direct connection to your agent for help anytime
+• A direct connection to your agent for help anytime
 
-Click below to get started:
+Your VitaLink keeps ${body.agent_name} connected with you — so when questions come up, you're never on your own.
+
+Get started here:
 ${link}
+
+When your family or emergency contacts are notified, they’ll know exactly who to reach.
 
 (This link expires in 24 hours)
 
