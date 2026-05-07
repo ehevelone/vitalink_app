@@ -63,6 +63,7 @@ exports.handler = async function (event) {
     }
 
     const user = result.rows[0];
+    console.log("LOGIN USER:", user.id, user.name);
 
     const valid = await bcrypt.compare(password, user.password_hash);
 
