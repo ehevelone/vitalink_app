@@ -1,4 +1,4 @@
-// @ts-nocheck
+// gotta change something 
 
 const bcrypt = require("bcryptjs");
 const { Pool } = require("pg");
@@ -45,13 +45,16 @@ exports.handler = async function (event) {
     // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
       `
-      SELECT id, password_hash, name, phone
-      FROM agents
-      WHERE email = $1 AND active = true
-      LIMIT 1
+       SELECT id, password_hash, TRIM(name) AS name, phone
+       FROM agents
+       WHERE LOWER(email) = LOWER($1)
+       AND active = true
+       ORDER BY id DESC
+       LIMIT 1
       `,
       [email]
     );
+
 
     if (result.rows.length === 0) {
       client.release();
