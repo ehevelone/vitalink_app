@@ -132,21 +132,23 @@ exports.handler = async function (event) {
     // ---------------------------------------
     if (step === "verify") {
 
-      client.release();
+  client.release();
 
-      return {
-        statusCode: 200,
-        headers: corsHeaders(),
-        body: JSON.stringify({
-          step: "login_success",
-          token: "dev-token",
-          agent: {
-            id: user.id,
-            name: user.name || ""
-          }
-        })
-      };
-    }
+  return {
+    statusCode: 200,
+    headers: corsHeaders(),
+    body: JSON.stringify({
+      step: "login_success",
+      token: "dev-token",
+      agent: {
+        id: user.id,
+        crm_uuid: user.crm_uuid,
+        name: user.name || ""
+      }
+    })
+  };
+}
+
 
     client.release();
 
