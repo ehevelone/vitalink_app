@@ -84,6 +84,7 @@ function campaignText(campaign, agentName) {
     return {
       title: `Message from ${name}`,
       body: "Medicare enrollment is approaching. Please tap here to securely send your information before your upcoming appointment.",
+      route: "/authorization_form",
     };
   }
 
@@ -91,6 +92,7 @@ function campaignText(campaign, agentName) {
     return {
       title: `Message from ${name}`,
       body: "It's time for your Medicare Enrollment Review! Please tap here to securely send your updated information to your agent.",
+      route: "/authorization_form",
     };
   }
 
@@ -98,12 +100,23 @@ function campaignText(campaign, agentName) {
     return {
       title: `Message from ${name}`,
       body: "There’s still time to review your Medicare coverage. Tap here to securely send your updated information to your agent.",
+      route: "/authorization_form",
+    };
+  }
+
+  // 🔥 NEW UPDATE NOTIFICATION
+  if (campaign === "UPDATE") {
+    return {
+      title: "VitaLink Updated",
+      body: "VitaLink has been updated with improvements and new features. Open the app to see what's new.",
+      route: "/menu",
     };
   }
 
   return {
     title: `Message from ${name}`,
     body: "Tap here to securely send your Medicare information so your agent can keep your coverage up to date.",
+    route: "/authorization_form",
   };
 }
 
@@ -213,13 +226,16 @@ exports.handler = async (event) => {
 
     const message = {
       tokens,
-      notification: notif,
+      notification: {
+        title: notif.title,
+        body: notif.body,
+      },
       android: {
         priority: "high",
       },
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
-        route: "/authorization_form",
+        route: notif.route,
       },
     };
 
@@ -228,7 +244,7 @@ exports.handler = async (event) => {
     return reply(200, {
       success: true,
       devicesTargeted: tokens.length,
-      successCount: tokens.length,
+      successCount: response?.successCount ?? 0,
       failureCount: response?.failureCount ?? 0,
     });
 
