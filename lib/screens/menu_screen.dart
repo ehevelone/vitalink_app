@@ -109,6 +109,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       if (token != null && token.isNotEmpty) {
         final userId = await _store.getString("userId");
 
+        print("🔥 REGISTER TOKEN USERID: $userId");
+        print("🔥 REGISTER TOKEN FCM: $token");
+
         if (userId == null) return;
 
         await ApiService.registerDeviceToken(
