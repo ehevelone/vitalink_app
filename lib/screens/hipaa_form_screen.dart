@@ -106,7 +106,7 @@ Future<void> _loadData() async {
   String? agentName;
   String? agentPhone;
 
-  final userEmail = await store.getString('userEmail');
+  final userEmail = await AppState.getEmail();
 
   if (userEmail != null && userEmail.isNotEmpty) {
     final res = await ApiService.getUserAgent(userEmail);
