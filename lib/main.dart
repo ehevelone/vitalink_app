@@ -31,6 +31,7 @@ import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
 import 'screens/agent_clients_screen.dart';
 import 'screens/insurance_cards_menu_ios.dart';
+import 'screens/update_app_screen.dart';
 
 // PROFILE
 import 'screens/profile_user_screen.dart';
@@ -302,6 +303,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/reset_password': (context) => const ResetPasswordScreen(),
         '/agent_request_reset': (context) => const AgentRequestResetScreen(),
         '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
+        '/update_app': (context) => const UpdateAppScreen(),
       },
     );
   }
