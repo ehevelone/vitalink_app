@@ -45,7 +45,7 @@ exports.handler = async function (event) {
     // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
       `
-       SELECT id, password_hash, TRIM(name) AS name, phone
+       SELECT id, crm_uuid, password_hash, TRIM(name) AS name, phone
        FROM agents
        WHERE LOWER(email) = LOWER($1)
        AND active = true
@@ -96,6 +96,7 @@ exports.handler = async function (event) {
             token: "dev-token",
             agent: {
               id: user.id,
+              crm_uuid: user.crm_uuid,
               name: user.name || ""
             }
           })
