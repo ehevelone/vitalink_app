@@ -109,7 +109,7 @@ function campaignText(campaign, agentName) {
     return {
       title: "VitaLink Updated",
       body: "VitaLink has been updated with improvements and new features. Open the app to see what's new.",
-      route: "/menu",
+      route: "/update_app",
     };
   }
 
