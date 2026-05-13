@@ -55,28 +55,43 @@ exports.handler = async function (event) {
       [email]
     );
 
-
     if (result.rows.length === 0) {
+
       client.release();
+
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: JSON.stringify({ success:false, error:"Unauthorized" })
+        body: JSON.stringify({
+          success:false,
+          error:"Unauthorized"
+        })
       };
+
     }
 
     const user = result.rows[0];
+
     console.log("LOGIN USER:", user.id, user.name);
 
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(
+      password,
+      user.password_hash
+    );
 
     if (!valid) {
+
       client.release();
+
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: JSON.stringify({ success:false, error:"Unauthorized" })
+        body: JSON.stringify({
+          success:false,
+          error:"Unauthorized"
+        })
       };
+
     }
 
     // ---------------------------------------
@@ -84,10 +99,11 @@ exports.handler = async function (event) {
     // ---------------------------------------
     if (!step || step === "login") {
 
+      // ✅ NO PHONE → BYPASS 2FA
       if (!user.phone) {
+
         client.release();
 
-        // fallback → allow login WITHOUT 2FA if no phone
         return {
           statusCode: 200,
           headers: corsHeaders(),
@@ -101,14 +117,19 @@ exports.handler = async function (event) {
             }
           })
         };
+
       }
 
       let phone = user.phone.replace(/\D/g, "");
 
       if (phone.length === 10) {
+
         phone = "+1" + phone;
+
       } else if (!phone.startsWith("+")) {
+
         phone = "+" + phone;
+
       }
 
       client.release();
@@ -121,10 +142,12 @@ exports.handler = async function (event) {
           phone,
           agent: {
             id: user.id,
+            crm_uuid: user.crm_uuid,
             name: user.name || ""
           }
         })
       };
+
     }
 
     // ---------------------------------------
@@ -132,46 +155,58 @@ exports.handler = async function (event) {
     // ---------------------------------------
     if (step === "verify") {
 
-  client.release();
+      client.release();
 
-  return {
-    statusCode: 200,
-    headers: corsHeaders(),
-    body: JSON.stringify({
-      step: "login_success",
-      token: "dev-token",
-      agent: {
-        id: user.id,
-        crm_uuid: user.crm_uuid,
-        name: user.name || ""
-      }
-    })
-  };
-}
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "login_success",
+          token: "dev-token",
+          agent: {
+            id: user.id,
+            crm_uuid: user.crm_uuid,
+            name: user.name || ""
+          }
+        })
+      };
 
+    }
 
     client.release();
 
     return {
       statusCode: 400,
       headers: corsHeaders(),
-      body: JSON.stringify({ success:false, error:"Invalid step" })
+      body: JSON.stringify({
+        success:false,
+        error:"Invalid step"
+      })
     };
 
   } catch (err) {
+
     console.error("agent-login error:", err);
+
     return {
       statusCode: 500,
       headers: corsHeaders(),
-      body: JSON.stringify({ success:false, error:"Server error" })
+      body: JSON.stringify({
+        success:false,
+        error:"Server error"
+      })
     };
+
   }
+
 };
 
 function corsHeaders() {
+
   return {
     "Access-Control-Allow-Origin": "https://myvitalink.app",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, OPTIONS"
   };
+
 }

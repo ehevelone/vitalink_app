@@ -23,7 +23,7 @@ function generateRsmEnrollCode(prefix = "RSM", length = 8) {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-session",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
