@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart'; // (unused but left per your setup)
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
@@ -114,67 +112,39 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
       if (image == null) return;
 
       File file = File(image.path);
-      final bytes = await file.readAsBytes();
-      final base64Image = base64Encode(bytes);
 
-      const url =
-          "https://vitalink-app.netlify.app/.netlify/functions/parse_cards";
+      if (!mounted) return;
 
-      final resp = await http.post(
-        Uri.parse(url),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"imageBase64": base64Image}),
-      );
+      setState(() {
+        widget.card.backImagePath = file.path;
+        _showFront = false;
+      });
 
-      if (resp.statusCode == 200) {
-        final parsed = jsonDecode(resp.body);
+      final profile = await _repo.loadProfile();
+      if (profile != null) {
+        bool updated = false;
 
-        String finalPath = file.path;
-
-        if (parsed['card_image_base64'] != null) {
-          try {
-            final croppedBytes =
-                base64Decode(parsed['card_image_base64']);
-            final croppedFile =
-                await File('${file.path}_back_cropped.png')
-                    .writeAsBytes(croppedBytes);
-            finalPath = croppedFile.path;
-          } catch (_) {}
+        for (var i = 0; i < profile.orphanCards.length; i++) {
+          if (profile.orphanCards[i] == widget.card) {
+            profile.orphanCards[i] = widget.card;
+            updated = true;
+            break;
+          }
         }
 
-        if (!mounted) return;
-
-        setState(() {
-          widget.card.backImagePath = finalPath;
-          _showFront = false;
-        });
-
-        final profile = await _repo.loadProfile();
-        if (profile != null) {
-          bool updated = false;
-
-          for (var i = 0; i < profile.orphanCards.length; i++) {
-            if (profile.orphanCards[i] == widget.card) {
-              profile.orphanCards[i] = widget.card;
+        for (var ins in profile.insurances) {
+          for (var i = 0; i < ins.cards.length; i++) {
+            if (ins.cards[i] == widget.card) {
+              ins.cards[i] = widget.card;
               updated = true;
               break;
             }
           }
+        }
 
-          for (var ins in profile.insurances) {
-            for (var i = 0; i < ins.cards.length; i++) {
-              if (ins.cards[i] == widget.card) {
-                ins.cards[i] = widget.card;
-                updated = true;
-                break;
-              }
-            }
-          }
-
-          if (updated) {
-            profile.updatedAt = DateTime.now();
-            await _repo.saveProfile(profile);
-          }
+        if (updated) {
+          profile.updatedAt = DateTime.now();
+          await _repo.saveProfile(profile);
         }
       }
     } catch (_) {}

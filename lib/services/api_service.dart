@@ -243,7 +243,7 @@ static Future<Map<String, dynamic>> createAgentCheckout({
   // 🔎 Activation lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> lookupActivation(String code) {
-    return _postJson("lookup_activation", {
+    return _postJson("vl-get-activation-details", {
       "code": code,
     });
   }
@@ -251,16 +251,6 @@ static Future<Map<String, dynamic>> createAgentCheckout({
   // -------------------------------------------------------------
   // 🔹 Promo lookup
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> verifyPromo({
-    required String username,
-    required String promoCode,
-  }) {
-    return _postJson("vpc", {
-      "username": username,
-      "promoCode": promoCode,
-    });
-  }
-
   // -------------------------------------------------------------
   // 🔹 Request password reset
   // -------------------------------------------------------------
