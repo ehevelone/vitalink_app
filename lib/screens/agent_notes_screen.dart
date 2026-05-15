@@ -173,6 +173,60 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     }
   }
 
+  Future<void> _deleteItem(Map<String, dynamic> item) async {
+    final agentId = _agentId;
+    final itemId = _asInt(item["id"]);
+    final isTask = item["item_type"] == "task";
+
+    if (agentId == null || itemId == null) {
+      _showMessage("Could not delete this item");
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete ${isTask ? "task" : "note"}?"),
+        content: Text(
+          "This will remove it from the app and CRM.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      final res = await ApiService.deleteAgentItem(
+        agentId: agentId,
+        itemId: itemId,
+      );
+
+      if (!mounted) return;
+
+      if (res["success"] == true) {
+        await _loadItems();
+        _showMessage(isTask ? "Task deleted" : "Note deleted");
+      } else {
+        _showMessage(res["error"] ?? "Failed to delete");
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage("Failed to delete");
+    }
+  }
+
   Future<void> _toggleVoice() async {
     if (_listening) {
       await _speech.stop();
@@ -505,6 +559,14 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: "Delete",
+                  onPressed: () => _deleteItem(item),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Colors.red.shade700,
                   ),
                 ),
               ],

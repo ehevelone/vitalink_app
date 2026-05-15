@@ -439,6 +439,16 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     });
   }
 
+  static Future<Map<String, dynamic>> deleteAgentItem({
+    required int agentId,
+    required int itemId,
+  }) {
+    return _postJson("delete_agent_item", {
+      "agentId": agentId,
+      "itemId": itemId,
+    });
+  }
+
   static Future<Map<String, dynamic>> syncAppClientToCrm({
     required int agentId,
     required int clientId,
