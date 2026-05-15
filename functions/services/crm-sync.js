@@ -106,7 +106,7 @@ async function ensureCrmSyncSchema() {
     CREATE TABLE IF NOT EXISTS crm_client_notes (
       id BIGSERIAL PRIMARY KEY,
       agent_id TEXT NOT NULL,
-      client_id BIGINT NOT NULL,
+      client_id TEXT NOT NULL,
       note TEXT NOT NULL,
       source TEXT,
       source_app_item_id BIGINT,
@@ -120,8 +120,28 @@ async function ensureCrmSyncSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE crm_client_notes
+    ALTER COLUMN client_id TYPE TEXT
+    USING client_id::TEXT
+  `);
+
+  await db.query(`
     ALTER TABLE crm_tasks
+    ADD COLUMN IF NOT EXISTS client_id TEXT,
+    ADD COLUMN IF NOT EXISTS title TEXT,
+    ADD COLUMN IF NOT EXISTS notes TEXT,
+    ADD COLUMN IF NOT EXISTS due_date DATE,
+    ADD COLUMN IF NOT EXISTS priority TEXT,
+    ADD COLUMN IF NOT EXISTS status TEXT,
+    ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS source_app_item_id BIGINT
+  `);
+
+  await db.query(`
+    ALTER TABLE crm_tasks
+    ALTER COLUMN client_id TYPE TEXT
+    USING client_id::TEXT
   `);
 
   await db.query(`
