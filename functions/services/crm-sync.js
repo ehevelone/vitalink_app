@@ -127,7 +127,6 @@ async function ensureCrmSyncSchema() {
 
   await db.query(`
     ALTER TABLE crm_tasks
-    ADD COLUMN IF NOT EXISTS client_id UUID,
     ADD COLUMN IF NOT EXISTS title TEXT,
     ADD COLUMN IF NOT EXISTS notes TEXT,
     ADD COLUMN IF NOT EXISTS due_date DATE,
