@@ -114,7 +114,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
                             // NEW BUTTON
                             _item(Icons.groups, "My Clients", '/agent_clients'),
-
+                            _item(Icons.task_alt, "Notes / Tasks", '/agent_notes'),
                             _item(Icons.medical_information, "Medications",
                                 '/meds'),
                             _item(Icons.people, "Doctors", '/doctors'),

@@ -32,6 +32,7 @@ import 'screens/emergency_view.dart';
 import 'screens/agent_clients_screen.dart';
 import 'screens/insurance_cards_menu_ios.dart';
 import 'screens/update_app_screen.dart';
+import 'screens/agent_notes_screen.dart';
 
 // PROFILE
 import 'screens/profile_user_screen.dart';
@@ -283,6 +284,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),
         '/agent_clients': (context) => const AgentClientsScreen(),
+        '/agent_notes': (context) => const AgentNotesScreen(),
         '/my_agent_user': (context) => const MyAgentUser(),
         '/my_agent_agent': (context) => const MyAgentAgent(),
         '/emergency': (context) => const EmergencyScreen(),

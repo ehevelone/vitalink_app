@@ -344,7 +344,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       "agencyAddress": agencyAddress,
       "agencyPhone": agencyPhone,
       "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
+    }..removeWhere((k, v) => v == null || v.trim().isEmpty);
 
     return _postJson("update_agent_profile", body);
   }
@@ -365,7 +365,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       "name": name,
       "phone": phone,
       "password": password,
-    }..removeWhere((k, v) => v == null || (v is String && v.trim().isEmpty));
+    }..removeWhere((k, v) => v == null || v.trim().isEmpty);
 
     return _postJson("update_user_profile", body);
   }
@@ -410,6 +410,32 @@ static Future<Map<String, dynamic>> registerDeviceToken({
   }) {
     return _postJson("get_agent_clients", {
       "agentId": agentId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getAgentItems({
+    required int agentId,
+    int? clientId,
+  }) {
+    final body = {
+      "agentId": agentId,
+      if (clientId != null) "clientId": clientId,
+    };
+
+    return _postJson("get_agent_items", body);
+  }
+
+  static Future<Map<String, dynamic>> saveAgentItem({
+    required int agentId,
+    required int clientId,
+    required String itemType,
+    required String text,
+  }) {
+    return _postJson("save_agent_item", {
+      "agentId": agentId,
+      "clientId": clientId,
+      "itemType": itemType,
+      "text": text,
     });
   }
 

@@ -75,6 +75,13 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>VitaLink may save scanned images to your photo library when needed.</string>
 
+	<!-- Voice Notes Permission -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VitaLink uses the microphone to dictate notes and tasks.</string>
+
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>VitaLink uses speech recognition to turn dictated notes and tasks into text.</string>
+
 	<!-- Export Compliance Encryption Declaration -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
