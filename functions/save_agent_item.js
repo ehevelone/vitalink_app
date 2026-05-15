@@ -165,6 +165,31 @@ exports.handler = async (event) => {
       appItemId: result.rows[0].id,
     });
 
+    if (!crmSync.success) {
+      console.error("save_agent_item CRM sync failed:", crmSync);
+
+      await db.query(
+        `
+        DELETE FROM agent_client_items
+        WHERE id = $1
+        `,
+        [result.rows[0].id]
+      );
+
+      return reply(500, {
+        success: false,
+        error: crmSync.error || "CRM sync failed",
+        crm_sync: crmSync,
+      });
+    }
+
+    console.log("save_agent_item CRM sync complete:", {
+      itemType,
+      appItemId: result.rows[0].id,
+      crmClientId: crmSync.clientId,
+      clientAction: crmSync.clientAction,
+    });
+
     return reply(200, {
       success: true,
       item: result.rows[0],
