@@ -127,7 +127,7 @@ async function ensureCrmSyncSchema() {
 
   await db.query(`
     ALTER TABLE crm_tasks
-    ADD COLUMN IF NOT EXISTS client_id TEXT,
+    ADD COLUMN IF NOT EXISTS client_id UUID,
     ADD COLUMN IF NOT EXISTS title TEXT,
     ADD COLUMN IF NOT EXISTS notes TEXT,
     ADD COLUMN IF NOT EXISTS due_date DATE,
@@ -136,12 +136,6 @@ async function ensureCrmSyncSchema() {
     ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS source_app_item_id BIGINT
-  `);
-
-  await db.query(`
-    ALTER TABLE crm_tasks
-    ALTER COLUMN client_id TYPE TEXT
-    USING client_id::TEXT
   `);
 
   await db.query(`
