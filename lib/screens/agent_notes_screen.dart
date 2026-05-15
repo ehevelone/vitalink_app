@@ -29,6 +29,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
   bool _saving = false;
   bool _listLoading = false;
   bool _listening = false;
+  String _dictationBaseText = "";
   String? _error;
 
   @override
@@ -256,6 +257,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
       return;
     }
 
+    _dictationBaseText = _textController.text.trim();
+
     setState(() => _listening = true);
 
     await _speech.listen(
@@ -265,8 +268,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
         final words = result.recognizedWords.trim();
         if (words.isEmpty) return;
 
-        final current = _textController.text.trim();
-        _textController.text = current.isEmpty ? words : "$current $words";
+        _textController.text = _dictationBaseText.isEmpty
+            ? words
+            : "$_dictationBaseText $words";
         _textController.selection = TextSelection.fromPosition(
           TextPosition(offset: _textController.text.length),
         );
