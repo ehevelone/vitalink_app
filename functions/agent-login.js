@@ -45,7 +45,7 @@ exports.handler = async function (event) {
     // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
       `
-       SELECT id, crm_uuid, password_hash, TRIM(name) AS name, phone
+       SELECT id, crm_uuid, email, password_hash, TRIM(name) AS name, phone
        FROM agents
        WHERE LOWER(email) = LOWER($1)
        AND active = true
@@ -113,6 +113,7 @@ exports.handler = async function (event) {
             agent: {
               id: user.id,
               crm_uuid: user.crm_uuid,
+              email: user.email,
               name: user.name || ""
             }
           })
@@ -143,6 +144,7 @@ exports.handler = async function (event) {
           agent: {
             id: user.id,
             crm_uuid: user.crm_uuid,
+            email: user.email,
             name: user.name || ""
           }
         })
@@ -166,6 +168,7 @@ exports.handler = async function (event) {
           agent: {
             id: user.id,
             crm_uuid: user.crm_uuid,
+            email: user.email,
             name: user.name || ""
           }
         })
