@@ -15,6 +15,17 @@ function reply(statusCode, obj) {
   };
 }
 
+async function ensureDeviceDeliveryColumns() {
+  await db.query(`
+    ALTER TABLE user_devices
+    ADD COLUMN IF NOT EXISTS push_status TEXT,
+    ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_error TEXT
+  `);
+}
+
 exports.handler = async (event) => {
   try {
 
@@ -22,6 +33,8 @@ exports.handler = async (event) => {
     if (event.httpMethod === "OPTIONS") {
       return reply(200, {});
     }
+
+    await ensureDeviceDeliveryColumns();
 
     if (event.httpMethod !== "POST") {
       return reply(405, {
@@ -89,12 +102,33 @@ exports.handler = async (event) => {
         u.last_notified_at,
         u.last_notified_campaign,
         u.last_reviewed,
+        ud.push_status,
+        ud.last_push_at,
+        ud.last_push_success_at,
+        ud.last_push_failure_at,
+        ud.last_push_error,
+        ud.updated_at AS device_updated_at,
         CASE 
           WHEN ud.device_token IS NOT NULL 
             AND TRIM(ud.device_token) <> '' 
+            AND TRIM(ud.device_token) <> 'NO_TOKEN'
           THEN TRUE 
           ELSE FALSE 
-        END AS has_device
+        END AS has_device,
+        CASE
+          WHEN ud.push_status IN ('invalid','failed')
+            THEN 'Needs Contact'
+          WHEN ud.id IS NULL
+            OR ud.device_token IS NULL
+            OR TRIM(ud.device_token) = ''
+            OR TRIM(ud.device_token) = 'NO_TOKEN'
+            THEN 'No Device'
+          WHEN ud.updated_at < NOW() - INTERVAL '90 days'
+            THEN 'Stale'
+          WHEN ud.push_status = 'delivered'
+            THEN 'OK'
+          ELSE 'Registered'
+        END AS push_health
       FROM users u
       LEFT JOIN user_devices ud ON ud.user_id = u.id
       WHERE u.agent_id = $1

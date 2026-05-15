@@ -13,6 +13,17 @@ function reply(statusCode, obj) {
   };
 }
 
+async function ensureDeviceDeliveryColumns() {
+  await db.query(`
+    ALTER TABLE user_devices
+    ADD COLUMN IF NOT EXISTS push_status TEXT,
+    ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_error TEXT
+  `);
+}
+
 exports.handler = async (event) => {
   console.log("🚀 register_device_v2 active");
 
@@ -24,6 +35,8 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") {
       return reply(405, { success: false, error: "Method Not Allowed" });
     }
+
+    await ensureDeviceDeliveryColumns();
 
     let body;
     try {
@@ -75,6 +88,8 @@ exports.handler = async (event) => {
         SET device_token=$1,
             platform=$2,
             agent_id=$3,
+            push_status='registered',
+            last_push_error=NULL,
             updated_at=NOW()
         WHERE user_id=$4
         RETURNING *;
@@ -89,8 +104,8 @@ exports.handler = async (event) => {
     const inserted = await db.query(
       `
       INSERT INTO user_devices
-        (user_id, agent_id, device_token, platform, created_at, updated_at)
-      VALUES ($1,$2,$3,$4,NOW(),NOW())
+        (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,'registered',NOW(),NOW())
       RETURNING *;
       `,
       [userId, agentId || null, token, platform || "unknown"]

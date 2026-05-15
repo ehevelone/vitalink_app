@@ -18,21 +18,37 @@ function fail(msg, code = 400) {
   };
 }
 
+function normalizeUsPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  return value || null;
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
-  return {
-    statusCode: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: "",
-  };
-}
+      return {
+        statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+        body: "",
+      };
+    }
 
-if (event.httpMethod !== "POST") return fail("Method not allowed", 405);
+    if (event.httpMethod !== "POST") {
+      return fail("Method not allowed", 405);
+    }
 
     const {
       unlockCode,
@@ -47,47 +63,71 @@ if (event.httpMethod !== "POST") return fail("Method not allowed", 405);
       agencyZip,
     } = JSON.parse(event.body || "{}");
 
-    if (!unlockCode || !email || !password || !npn)
-      return fail("Unlock code, email, password, and NPN are required.");
+    const registrationCode =
+      String(unlockCode || "").trim().toUpperCase();
 
-    // 1️⃣ Validate unlock code
+    if (!registrationCode || !email || !password || !npn) {
+      return fail(
+        "Agent registration code, email, password, and NPN are required."
+      );
+    }
+
     const existing = await db.query(
-      `SELECT id, active FROM agents WHERE unlock_code = $1`,
-      [unlockCode]
+      `
+      SELECT id, active, password_hash, promo_code, unlock_code,
+        CASE WHEN promo_code = $1 THEN 'promo' ELSE 'unlock' END AS code_match
+      FROM agents
+      WHERE promo_code = $1
+         OR (
+           unlock_code = $1
+           AND active = FALSE
+           AND password_hash IS NULL
+         )
+      ORDER BY CASE WHEN promo_code = $1 THEN 0 ELSE 1 END
+      LIMIT 1
+      `,
+      [registrationCode]
     );
-    if (existing.rows.length === 0) return fail("Invalid unlock code ❌", 404);
+
+    if (existing.rows.length === 0) {
+      return fail("Invalid agent registration code", 404);
+    }
 
     const agent = existing.rows[0];
-    if (agent.active) return fail("Unlock code already used ❌");
 
-    // 2️⃣ Hash password
+    if (agent.password_hash) {
+      return fail("Agent registration code already used");
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3️⃣ Generate permanent promo code
     const promoCode =
+      agent.promo_code ||
       "AG-" + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // 4️⃣ Update agent fully (including address now ✅)
     const result = await db.query(
-      `UPDATE agents
-         SET email = $1,
-             password_hash = $2,
-             npn = $3,
-             phone = $4,
-             name = $5,
-             agency_street = $6,
-             agency_city = $7,
-             agency_state = $8,
-             agency_zip = $9,
-             active = TRUE,
-             promo_code = $10
-       WHERE id = $11
-       RETURNING id, name, email, phone, npn, agency_street, agency_city, agency_state, agency_zip, promo_code, active, role`,
+      `
+      UPDATE agents
+      SET email = $1,
+          password_hash = $2,
+          npn = $3,
+          phone = $4,
+          name = $5,
+          agency_street = $6,
+          agency_city = $7,
+          agency_state = $8,
+          agency_zip = $9,
+          active = TRUE,
+          promo_code = $10
+      WHERE id = $11
+      RETURNING id, name, email, phone, npn, agency_street, agency_city,
+        agency_state, agency_zip, promo_code, active, role
+      `,
       [
         email,
         hashedPassword,
         npn,
-        phone,
+        normalizeUsPhone(phone),
         name,
         agencyStreet,
         agencyCity,
@@ -101,7 +141,7 @@ if (event.httpMethod !== "POST") return fail("Method not allowed", 405);
     const row = result.rows[0];
 
     return ok({
-      message: "Agent registration complete ✅",
+      message: "Agent registration complete",
       agentId: row.id,
       promoCode: row.promo_code,
       name: row.name,
@@ -116,7 +156,7 @@ if (event.httpMethod !== "POST") return fail("Method not allowed", 405);
       role: row.role,
     });
   } catch (err) {
-    console.error("❌ claim_agent_unlock error:", err);
+    console.error("claim_agent_unlock error:", err);
     return fail("Server error: " + err.message, 500);
   }
 };

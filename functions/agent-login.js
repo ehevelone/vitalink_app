@@ -1,12 +1,38 @@
 // gotta change something 
 
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
+
+async function ensureAgentSessionColumns(client) {
+  await client.query(`
+    ALTER TABLE agents
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+}
+
+async function createAgentSession(client, agentId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
+  await client.query(
+    `
+    UPDATE agents
+    SET session_token = $1,
+        session_expires = $2
+    WHERE id = $3
+    `,
+    [token, expires, agentId]
+  );
+
+  return token;
+}
 
 exports.handler = async function (event) {
 
@@ -41,6 +67,7 @@ exports.handler = async function (event) {
     }
 
     const client = await pool.connect();
+    await ensureAgentSessionColumns(client);
 
     // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
@@ -102,6 +129,8 @@ exports.handler = async function (event) {
       // ✅ NO PHONE → BYPASS 2FA
       if (!user.phone) {
 
+        const token = await createAgentSession(client, user.id);
+
         client.release();
 
         return {
@@ -109,7 +138,7 @@ exports.handler = async function (event) {
           headers: corsHeaders(),
           body: JSON.stringify({
             step: "login_success",
-            token: "dev-token",
+            token,
             agent: {
               id: user.id,
               crm_uuid: user.crm_uuid,
@@ -157,6 +186,8 @@ exports.handler = async function (event) {
     // ---------------------------------------
     if (step === "verify") {
 
+      const token = await createAgentSession(client, user.id);
+
       client.release();
 
       return {
@@ -164,7 +195,7 @@ exports.handler = async function (event) {
         headers: corsHeaders(),
         body: JSON.stringify({
           step: "login_success",
-          token: "dev-token",
+          token,
           agent: {
             id: user.id,
             crm_uuid: user.crm_uuid,

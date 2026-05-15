@@ -9,10 +9,30 @@ import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 
 class PhoneNumberFormatter extends TextInputFormatter {
+  static String digitsForUsPhone(String value) {
+    var digits = value.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length == 11 && digits.startsWith('1')) {
+      digits = digits.substring(1);
+    }
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    return digits;
+  }
+
+  static String normalizedForApi(String value) {
+    final digits = digitsForUsPhone(value);
+
+    return digits.isEmpty ? "" : "+1$digits";
+  }
+
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final digits = digitsForUsPhone(newValue.text);
     final b = StringBuffer();
     for (int i = 0; i < digits.length; i++) {
       if (i == 0) b.write('(');
@@ -115,7 +135,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
         npn: _npnCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim(),
+        phone: PhoneNumberFormatter.normalizedForApi(_phoneCtrl.text),
         name: _nameCtrl.text.trim(),
       );
 
@@ -297,9 +317,12 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
 
               TextFormField(
                 controller: _codeCtrl,
-                decoration: const InputDecoration(labelText: "Unlock Code"),
+                decoration:
+                    const InputDecoration(labelText: "Agent Registration Code"),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter unlock code" : null,
+                    v == null || v.isEmpty
+                        ? "Enter agent registration code"
+                        : null,
               ),
 
               const SizedBox(height: 24),

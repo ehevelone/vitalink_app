@@ -64,6 +64,68 @@ function isInvalidTokenError(err) {
   );
 }
 
+async function ensureDeviceDeliveryColumns() {
+  await db.query(`
+    ALTER TABLE user_devices
+    ADD COLUMN IF NOT EXISTS push_status TEXT,
+    ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_error TEXT
+  `);
+}
+
+async function recordDeliveryResults(devices, response) {
+  const results = response?.responses || [];
+
+  for (let i = 0; i < devices.length; i++) {
+    const device = devices[i];
+    const result = results[i];
+
+    if (!result) continue;
+
+    if (result.success) {
+      await db.query(
+        `
+        UPDATE user_devices
+        SET push_status='delivered',
+            last_push_at=NOW(),
+            last_push_success_at=NOW(),
+            last_push_error=NULL
+        WHERE id=$1
+        `,
+        [device.deviceRowId]
+      );
+      continue;
+    }
+
+    const errorText =
+      result.error?.code ||
+      result.error?.message ||
+      "Push failed";
+
+    const invalidToken = isInvalidTokenError(result.error);
+
+    await db.query(
+      `
+      UPDATE user_devices
+      SET push_status=$1,
+          last_push_at=NOW(),
+          last_push_failure_at=NOW(),
+          last_push_error=$2,
+          device_token=CASE WHEN $3 THEN 'NO_TOKEN' ELSE device_token END
+      WHERE id=$4
+      `,
+      [
+        invalidToken ? "invalid" : "failed",
+        errorText,
+        invalidToken,
+        device.deviceRowId,
+      ]
+    );
+  }
+}
+
 /* CAMPAIGN TIMING */
 function pickCampaign(now = new Date()) {
   const m = now.getMonth() + 1;
@@ -145,6 +207,8 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") {
       return reply(405, { success: false, error: "Method Not Allowed" });
     }
+
+    await ensureDeviceDeliveryColumns();
 
     let body = {};
 
@@ -241,11 +305,14 @@ exports.handler = async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
+    await recordDeliveryResults(devices, response);
+
     return reply(200, {
       success: true,
       devicesTargeted: tokens.length,
       successCount: response?.successCount ?? 0,
       failureCount: response?.failureCount ?? 0,
+      needsContactCount: response?.failureCount ?? 0,
     });
 
   } catch (err) {
