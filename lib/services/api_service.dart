@@ -439,6 +439,22 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     });
   }
 
+  static Future<Map<String, dynamic>> syncAppClientToCrm({
+    required int agentId,
+    required int clientId,
+    Map<String, dynamic>? client,
+    Map<String, dynamic>? profile,
+  }) {
+    final body = {
+      "agentId": agentId,
+      "clientId": clientId,
+      if (client != null) "client": client,
+      if (profile != null) "profile": profile,
+    };
+
+    return _postJson("sync_app_client_to_crm", body);
+  }
+
   // -------------------------------------------------------------
   // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------

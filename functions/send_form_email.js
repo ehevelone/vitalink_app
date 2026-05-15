@@ -1,6 +1,9 @@
 const nodemailer = require("nodemailer");
 const db = require("./services/db");
 const generateClientReportPdf = require("./generate-client-report-pdf");
+const {
+  syncAppClientToCrm,
+} = require("./services/crm-sync");
 
 exports.handler = async (event) => {
   try {
@@ -98,6 +101,28 @@ Attached:
     }
 
     // ✅ Return confirmation details
+    let crmSync = null;
+
+    try {
+      crmSync = await syncAppClientToCrm({
+        agentEmail: body.agent.email,
+        clientData: {
+          name: body.user,
+          email: body.user_email,
+          phone: body.user_phone,
+          dob: body.user_dob,
+          meds: body.medications || [],
+          doctors: body.providers || [],
+        },
+      });
+    } catch (syncErr) {
+      console.error("CRM sync after send failed:", syncErr);
+      crmSync = {
+        success: false,
+        error: syncErr.message || "CRM sync failed",
+      };
+    }
+
     return {
       statusCode: 200,
       body: JSON.stringify({
@@ -105,6 +130,7 @@ Attached:
         message: "Email sent successfully",
         messageId: info.messageId,
         accepted: info.accepted,
+        crm_sync: crmSync,
       }),
     };
 

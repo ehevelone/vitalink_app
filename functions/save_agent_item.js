@@ -1,6 +1,9 @@
 // @ts-nocheck
 
 const db = require("./services/db");
+const {
+  syncAppClientToCrm,
+} = require("./services/crm-sync");
 
 function reply(statusCode, obj) {
   return {
@@ -31,6 +34,73 @@ async function ensureTable() {
     CREATE INDEX IF NOT EXISTS idx_agent_client_items_agent_user_created
     ON agent_client_items (agent_id, user_id, created_at DESC)
   `);
+}
+
+function buildTaskTitle(text) {
+  const firstLine = text.split(/\r?\n/).find(line => line.trim()) || text;
+  const trimmed = firstLine.trim();
+  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
+}
+
+async function syncToCrm({ agentId, clientId, itemType, text, appItemId }) {
+  const crm = await syncAppClientToCrm({ agentId, clientId });
+
+  if (!crm.success) {
+    return crm;
+  }
+
+  if (itemType === "task") {
+    const task = await db.query(
+      `
+      INSERT INTO crm_tasks (
+        agent_id,
+        client_id,
+        title,
+        notes,
+        due_date,
+        priority,
+        status,
+        source_app_item_id
+      )
+      VALUES ($1,$2,$3,$4,NULL,'Medium','Open',$5)
+      RETURNING *
+      `,
+      [
+        crm.crmAgentId,
+        crm.crmClientId,
+        buildTaskTitle(text),
+        text,
+        appItemId,
+      ]
+    );
+
+    return {
+      success: true,
+      type: "task",
+      clientId: crm.crmClientId,
+      task: task.rows[0],
+      clientMatched: crm.action === "updated",
+      clientAction: crm.action,
+    };
+  }
+
+  const note = await db.query(
+    `
+    INSERT INTO crm_client_notes (agent_id, client_id, note, source, source_app_item_id)
+    VALUES ($1,$2,$3,'VitaLink App',$4)
+    RETURNING *
+    `,
+    [crm.crmAgentId, crm.crmClientId, text, appItemId]
+  );
+
+  return {
+    success: true,
+    type: "note",
+    clientId: crm.crmClientId,
+    note: note.rows[0],
+    clientMatched: crm.action === "updated",
+    clientAction: crm.action,
+  };
 }
 
 exports.handler = async (event) => {
@@ -87,9 +157,18 @@ exports.handler = async (event) => {
       [agentId, clientId, itemType, text]
     );
 
+    const crmSync = await syncToCrm({
+      agentId,
+      clientId,
+      itemType,
+      text,
+      appItemId: result.rows[0].id,
+    });
+
     return reply(200, {
       success: true,
       item: result.rows[0],
+      crm_sync: crmSync,
     });
   } catch (err) {
     console.error("save_agent_item error:", err);
