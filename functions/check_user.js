@@ -1,6 +1,7 @@
 // functions/check_user.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const headers = {
   "Content-Type": "application/json",
@@ -17,6 +18,31 @@ function reply(success, obj = {}, code = 200) {
   };
 }
 
+async function ensureUserSessionColumns() {
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+}
+
+async function createUserSession(userId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
+  await db.query(
+    `
+    UPDATE users
+    SET session_token = $1,
+        session_expires = $2
+    WHERE id = $3
+    `,
+    [token, expires, userId]
+  );
+
+  return token;
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -26,6 +52,8 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") {
       return reply(false, { error: "Method Not Allowed" }, 405);
     }
+
+    await ensureUserSessionColumns();
 
     const { email, password, device_id, replace } =
       JSON.parse(event.body || "{}");
@@ -98,6 +126,8 @@ exports.handler = async (event) => {
 
     // ✅ Agent users skip device enforcement completely
 
+    const sessionToken = await createUserSession(user.id);
+
     return reply(true, {
       user: {
         id: user.id,
@@ -105,6 +135,7 @@ exports.handler = async (event) => {
         firstName: user.first_name,
         lastName: user.last_name,
         agent_id: user.agent_id,
+        session_token: sessionToken,
       },
     });
 

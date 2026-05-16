@@ -7,6 +7,30 @@ const headers = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+async function verifyUserSession(userId, token) {
+  if (!userId || !token) return false;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+
+  const result = await db.query(
+    `
+    SELECT id
+    FROM users
+    WHERE id = $1
+      AND session_token = $2
+      AND session_expires > NOW()
+    LIMIT 1
+    `,
+    [userId, token]
+  );
+
+  return result.rows.length > 0;
+}
+
 exports.handler = async (event) => {
 
   if (event.httpMethod === "OPTIONS") {
@@ -74,6 +98,19 @@ exports.handler = async (event) => {
 
     // 🔥 USER PROFILE LOAD (ORDER PAGE / APP)
     else if (body.user_id) {
+      const authorized =
+        await verifyUserSession(body.user_id, body.sessionToken);
+
+      if (!authorized) {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            error: "Unauthorized",
+          }),
+        };
+      }
 
       result = await db.query(
         `

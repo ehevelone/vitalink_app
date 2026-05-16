@@ -49,6 +49,7 @@ exports.handler = async (event) => {
       SELECT id,email,stripe_customer_id
       FROM rsms
       WHERE admin_session_token = $1
+      AND role = 'rsm'
       AND admin_session_expires > NOW()
       LIMIT 1
       `,

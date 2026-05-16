@@ -1,5 +1,6 @@
 // functions/report_usage.js
 const db = require("./services/db");
+const { requireAdmin } = require("./_adminAuth");
 
 
 function ok(obj) {
@@ -20,12 +21,9 @@ function fail(msg) {
 
 exports.handler = async (event) => {
   try {
-    // 🔑 Accept key from either header OR query string
-    const key =
-      event.headers["x-admin-key"] ||
-      (event.queryStringParameters && event.queryStringParameters.key);
+    const auth = await requireAdmin(event);
 
-    if (!key || key !== process.env.ADMIN_KEY) {
+    if (auth.error) {
       return fail("Unauthorized ❌");
     }
 

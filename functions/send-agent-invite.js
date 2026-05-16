@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const db = require("./services/db");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 exports.handler = async (event) => {
 
@@ -36,6 +37,22 @@ exports.handler = async (event) => {
     }
 
     // 🔐 Create token
+    const sessionAgent = await verifyAgentSession({
+      agentId: body.agent_id,
+      token: body.agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return {
+        statusCode: 403,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ success: false, error: "Unauthorized" }),
+      };
+    }
+
     const token = crypto.randomBytes(32).toString("hex");
     const token_hash = crypto.createHash("sha256").update(token).digest("hex");
 

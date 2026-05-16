@@ -40,8 +40,6 @@ exports.handler = async (event) => {
       } catch (e) {}
     }
 
-    console.log("🔥 TOKEN RECEIVED:", token);
-
     if (!token) {
       return reply(400, {
         success: false,
@@ -75,8 +73,6 @@ exports.handler = async (event) => {
 
     const row = tokenRes.rows[0];
     const encrypted = row.encrypted_data;
-
-    console.log("✅ PROFILE FOUND:", row.id);
 
     if (!encrypted) {
       return reply(404, {

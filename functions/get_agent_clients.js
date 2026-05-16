@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 const db = require("./services/db");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 function reply(statusCode, obj) {
   return {
@@ -55,7 +56,7 @@ exports.handler = async (event) => {
       });
     }
 
-    const { agentId } = body;
+    const { agentId, agentSessionToken } = body;
 
     console.log("📥 Incoming agentId:", agentId);
 
@@ -63,6 +64,18 @@ exports.handler = async (event) => {
       return reply(400, {
         success: false,
         error: "Missing agentId",
+      });
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentId,
+      token: agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 

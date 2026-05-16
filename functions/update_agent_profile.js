@@ -1,6 +1,7 @@
 // functions/update_agent_profile.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 function reply(statusCode, obj) {
   return {
@@ -13,6 +14,20 @@ function reply(statusCode, obj) {
     },
     body: JSON.stringify(obj),
   };
+}
+
+function normalizeUsPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  return value || null;
 }
 
 exports.handler = async (event) => {
@@ -55,12 +70,25 @@ exports.handler = async (event) => {
       agencyAddress,
       agencyPhone, // 🔥 ADDED
       password,
+      agentSessionToken,
     } = body;
 
     if (!email) {
       return reply(400, {
         success: false,
         error: "Email is required",
+      });
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentEmail: email,
+      token: agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 
@@ -75,7 +103,7 @@ exports.handler = async (event) => {
     }
     if (phone) {
       updates.push(`phone = $${idx++}`);
-      values.push(phone);
+      values.push(normalizeUsPhone(phone));
     }
     if (npn) {
       updates.push(`npn = $${idx++}`);
@@ -93,7 +121,7 @@ exports.handler = async (event) => {
     // 🔥 NEW FIELD SAVE
     if (agencyPhone) {
       updates.push(`agency_phone = $${idx++}`);
-      values.push(agencyPhone);
+      values.push(normalizeUsPhone(agencyPhone));
     }
 
     if (password) {

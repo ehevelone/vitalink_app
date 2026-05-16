@@ -1,6 +1,7 @@
 // functions/register_user.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 function reply(success, obj = {}) {
   return {
@@ -8,6 +9,45 @@ function reply(success, obj = {}) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ success, ...obj }),
   };
+}
+
+function normalizeUsPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  return value || null;
+}
+
+async function ensureUserSessionColumns() {
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+}
+
+async function createUserSession(userId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
+  await db.query(
+    `
+    UPDATE users
+    SET session_token = $1,
+        session_expires = $2
+    WHERE id = $3
+    `,
+    [token, expires, userId]
+  );
+
+  return token;
 }
 
 exports.handler = async (event) => {
@@ -33,6 +73,8 @@ if (event.httpMethod !== "POST") {
 
     const body = JSON.parse(event.body || "{}");
     const { firstName, lastName, email, phone, password, promoCode, platform } = body;
+
+    await ensureUserSessionColumns();
 
     if (!firstName || !lastName || !email || !password || !promoCode) {
       return reply(false, { error: "Missing required fields" });
@@ -89,7 +131,7 @@ if (event.httpMethod !== "POST") {
         firstName,
         lastName,
         email.toLowerCase(),
-        phone || null,
+        normalizeUsPhone(phone),
         password_hash,
         agentId,
         purchaseCode,
@@ -97,6 +139,7 @@ if (event.httpMethod !== "POST") {
     );
 
     const user = result.rows[0];
+    const sessionToken = await createUserSession(user.id);
 
     // ✅ Correct device upsert (1 device per user)
     await db.query(
@@ -109,7 +152,10 @@ if (event.httpMethod !== "POST") {
 
     return reply(true, {
       message: "User registered successfully ✅",
-      user,
+      user: {
+        ...user,
+        session_token: sessionToken,
+      },
     });
   } catch (err) {
     console.error("❌ register_user error:", err);

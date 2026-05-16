@@ -1,5 +1,6 @@
 // functions/rsm_list_agents.js
 const db = require("./services/db");
+const { requireRsm } = require("./_adminAuth");
 
 function reply(statusCode, obj) {
   return {
@@ -15,32 +16,12 @@ function reply(statusCode, obj) {
 exports.handler = async (event) => {
   try {
     // 🔐 AUTH CONTEXT (adjust if your auth payload differs)
-    const auth = event.headers.authorization;
-    if (!auth) {
+    const auth = await requireRsm(event);
+    if (auth.error) {
       return reply(401, { success: false, error: "Unauthorized" });
     }
 
     // 🔑 Resolve caller (RSM)
-    const rsmRes = await db.query(
-      `
-      SELECT id, role, agency_id
-      FROM agents
-      WHERE auth_token = $1
-      LIMIT 1
-      `,
-      [auth.replace("Bearer ", "")]
-    );
-
-    if (!rsmRes.rows.length) {
-      return reply(401, { success: false, error: "Invalid user" });
-    }
-
-    const rsm = rsmRes.rows[0];
-
-    if (rsm.role !== "rsm") {
-      return reply(403, { success: false, error: "Access denied" });
-    }
-
     // 🧠 Pull agents for this RSM’s agency only
     const agentsRes = await db.query(
       `
@@ -49,12 +30,12 @@ exports.handler = async (event) => {
         name,
         email
       FROM agents
-      WHERE agency_id = $1
+      WHERE rsm_id = $1
         AND role = 'agent'
         AND active = TRUE
       ORDER BY name, email
       `,
-      [rsm.agency_id]
+      [auth.rsm.id]
     );
 
     return reply(200, {

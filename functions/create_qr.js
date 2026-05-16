@@ -1,22 +1,13 @@
-// make_qr.js
-const QRCode = require("qrcode");
-const fs = require("fs");
-
-async function run() {
-  try {
-    // ✅ The link your QR should point to
-    const url = "https://vitalink-app.netlify.app/.netlify/functions/onboard_agent";
-
-    // ✅ Save QR as PNG
-    await QRCode.toFile("agent-onboard-qr.png", url, {
-      width: 500,
-      margin: 2,
-    });
-
-    console.log("✅ QR saved as agent-onboard-qr.png");
-  } catch (err) {
-    console.error("❌ Error creating QR:", err);
-  }
-}
-
-run();
+exports.handler = async () => {
+  return {
+    statusCode: 410,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "https://myvitalink.app",
+    },
+    body: JSON.stringify({
+      success: false,
+      error: "This legacy QR helper has been disabled.",
+    }),
+  };
+};

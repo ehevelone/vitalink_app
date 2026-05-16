@@ -3,6 +3,7 @@
 const {
   syncAppClientToCrm,
 } = require("./services/crm-sync");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 function reply(statusCode, obj) {
   return {
@@ -54,6 +55,19 @@ exports.handler = async (event) => {
       return reply(400, {
         success: false,
         error: "Missing agent or client",
+      });
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentId,
+      agentEmail,
+      token: body.agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 

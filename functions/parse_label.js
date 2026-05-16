@@ -1,19 +1,59 @@
-import OpenAI from "openai";
+const OpenAI = require("openai");
+const { verifyUserSession } = require("./services/user-auth");
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export default async (req) => {
+function reply(statusCode, obj) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    },
+    body: JSON.stringify(obj),
+  };
+}
+
+exports.handler = async (event) => {
   try {
-    const raw = await req.text();
+    if (event.httpMethod === "OPTIONS") {
+      return reply(200, {});
+    }
+
+    if (event.httpMethod !== "POST") {
+      return reply(405, {
+        success: false,
+        error: "Method Not Allowed",
+      });
+    }
+
     let body = {};
 
     try {
-      body = JSON.parse(raw);
+      body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body || "", "base64").toString("utf8"))
+        : JSON.parse(event.body || "{}");
     } catch {
-      console.error("Invalid JSON body:", raw);
+      return reply(400, {
+        success: false,
+        error: "Invalid JSON body",
+      });
     }
 
-    // ---- MULTI IMAGE SUPPORT ----
+    const authorized = await verifyUserSession(
+      body.userId,
+      body.sessionToken
+    );
+
+    if (!authorized) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
     let imageInputs = [];
 
     if (body.images && Array.isArray(body.images)) {
@@ -36,13 +76,11 @@ export default async (req) => {
         image_url: { url: body.imageUrl },
       }];
     } else {
-      return new Response(
-        JSON.stringify({
-          error: "No image provided",
-          receivedBody: body,
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return reply(400, {
+        success: false,
+        error: "No image provided",
+        receivedBody: body,
+      });
     }
 
     const response = await client.chat.completions.create({
@@ -98,23 +136,16 @@ Rules:
 
     const parsed = JSON.parse(response.choices[0].message.content);
 
-    return new Response(
-      JSON.stringify({
-        version: "v5-multi-image-pharmacy-phone",
-        data: parsed,
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-
+    return reply(200, {
+      version: "v5-multi-image-pharmacy-phone",
+      data: parsed,
+    });
   } catch (err) {
     console.error("Parse-label error:", err);
 
-    return new Response(
-      JSON.stringify({
-        error: err.message,
-        details: err.response?.data || null,
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return reply(500, {
+      error: err.message,
+      details: err.response?.data || null,
+    });
   }
 };

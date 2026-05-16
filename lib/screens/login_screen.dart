@@ -147,6 +147,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await store.setString("userEmail", user["email"]);
 
+      final sessionToken = user["session_token"]?.toString() ?? "";
+      if (sessionToken.isNotEmpty) {
+        await store.setString("userSessionToken", sessionToken);
+      } else {
+        await store.remove("userSessionToken");
+      }
+
       if (_rememberMe) {
         await store.setBool("rememberMeUser", true);
         await store.setString("savedUserEmail", email);

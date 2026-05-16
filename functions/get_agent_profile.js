@@ -1,5 +1,6 @@
 // functions/get_agent_profile.js
 const db = require("./services/db"); // your pg client wrapper
+const { verifyAgentSession } = require("./services/agent-auth");
 
 function ok(obj) {
   return {
@@ -35,9 +36,19 @@ if (event.httpMethod !== "POST") {
       return fail("Method not allowed", 405);
     }
 
-    const { email, id } = JSON.parse(event.body || "{}");
+    const { email, id, agentSessionToken } = JSON.parse(event.body || "{}");
     if (!email && !id) {
       return fail("Missing email or id");
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentId: id,
+      agentEmail: email,
+      token: agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return fail("Unauthorized", 403);
     }
 
     // 🔹 Prefer email, fallback to id

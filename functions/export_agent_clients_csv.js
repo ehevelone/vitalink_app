@@ -1,4 +1,6 @@
 const db = require("./services/db");
+const { requireAdminOrRsm } = require("./_adminAuth");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 // 🔥 FORCE single-line + safe CSV
 function csvEscape(value) {
@@ -23,6 +25,42 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: { "Content-Type": "text/plain" },
         body: "Missing agent_id",
+      };
+    }
+
+    const agentSessionToken =
+      event.headers["x-agent-session"] ||
+      event.headers["X-Agent-Session"];
+
+    let authorized = false;
+
+    if (agentSessionToken) {
+      const agent = await verifyAgentSession({
+        agentId,
+        token: agentSessionToken,
+      });
+      authorized = Boolean(agent);
+    } else {
+      const auth = await requireAdminOrRsm(event);
+
+      if (!auth.error && auth.user.role === "admin") {
+        authorized = true;
+      }
+
+      if (!auth.error && auth.user.role === "rsm") {
+        const owner = await db.query(
+          "SELECT id FROM agents WHERE id = $1 AND rsm_id = $2 LIMIT 1",
+          [agentId, auth.user.id]
+        );
+        authorized = owner.rows.length > 0;
+      }
+    }
+
+    if (!authorized) {
+      return {
+        statusCode: 403,
+        headers: { "Content-Type": "text/plain" },
+        body: "Unauthorized",
       };
     }
 

@@ -1,6 +1,7 @@
 // functions/check_agent.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
+const { createAgentSession } = require("./services/agent-auth");
 
 const headers = {
   "Content-Type": "application/json",
@@ -84,7 +85,10 @@ exports.handler = async (event) => {
     }
 
     // ✅ SUCCESS
+    const token = await createAgentSession(agent.id);
+
     return ok({
+      token,
       agent: {
         id: agent.id,
         email: agent.email,

@@ -1,5 +1,6 @@
 // functions/cleanup_devices.js
 const db = require("./services/db");
+const { requireAdmin } = require("./_adminAuth");
 
 function reply(success, obj = {}) {
   return {
@@ -9,8 +10,18 @@ function reply(success, obj = {}) {
   };
 }
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   try {
+    const auth = await requireAdmin(event);
+
+    if (auth.error) {
+      return {
+        statusCode: 401,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ success: false, error: "Unauthorized" }),
+      };
+    }
+
     console.log("🧹 Starting event-based device cleanup...");
 
     // Count before cleanup

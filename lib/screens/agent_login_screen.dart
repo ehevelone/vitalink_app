@@ -150,6 +150,13 @@ Future<void> _login() async {
       await store.setString("agentEmail", agent["email"] ?? "");
       await store.setString("agentName", agent["name"] ?? "");
 
+      final sessionToken = res["token"]?.toString() ?? "";
+      if (sessionToken.isNotEmpty) {
+        await store.setString("agentSessionToken", sessionToken);
+      } else {
+        await store.remove("agentSessionToken");
+      }
+
       if (_rememberMe) {
         await store.setBool("rememberMeAgent", true);
         await store.setString("savedAgentEmail", _emailCtrl.text.trim());

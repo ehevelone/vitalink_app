@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
 import '../services/deep_link_service.dart';
+import '../services/secure_store.dart';
 import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -156,8 +157,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   String _normalizePhone(String input) {
-    final digits = input.replaceAll(RegExp(r'\D'), '');
-    return digits.isEmpty ? "" : "+1$digits";
+    return PhoneNumberFormatter.normalizedForApi(input);
   }
 
   Future<void> _register() async {
@@ -194,6 +194,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       if (registerRes['success'] != true) {
         throw Exception(registerRes['error'] ?? "Registration failed");
+      }
+
+      final user = registerRes['user'];
+      if (user == null) {
+        throw Exception("Registration returned no user");
+      }
+
+      final store = SecureStore();
+      await store.setString("userId", user["id"].toString());
+      await store.setString("userEmail", user["email"].toString());
+
+      final sessionToken = user["session_token"]?.toString() ?? "";
+      if (sessionToken.isNotEmpty) {
+        await store.setString("userSessionToken", sessionToken);
+      } else {
+        await store.remove("userSessionToken");
       }
 
       final profile = await repo.loadProfile() ?? Profile();

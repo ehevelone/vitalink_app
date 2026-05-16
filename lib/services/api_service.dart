@@ -72,6 +72,37 @@ static Future<Map<String, dynamic>> _postJson(
     debugPrint("❌ API ERROR ($path): $e\n$st");
     return {"success": false, "error": e.toString()};
   }
+
+}
+
+static Future<String?> _userSessionToken() async {
+  return SecureStore().getString("userSessionToken");
+}
+
+static Future<String?> _agentSessionToken() async {
+  return SecureStore().getString("agentSessionToken");
+}
+
+static Future<Map<String, dynamic>> _postJsonWithUserSession(
+  String path,
+  Map<String, dynamic> body,
+) async {
+  final token = await _userSessionToken();
+  return _postJson(path, {
+    ...body,
+    if (token != null && token.isNotEmpty) "sessionToken": token,
+  });
+}
+
+static Future<Map<String, dynamic>> _postJsonWithAgentSession(
+  String path,
+  Map<String, dynamic> body,
+) async {
+  final token = await _agentSessionToken();
+  return _postJson(path, {
+    ...body,
+    if (token != null && token.isNotEmpty) "agentSessionToken": token,
+  });
 }
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
@@ -84,7 +115,7 @@ static Future<Map<String, dynamic>> _postJson(
 
     debugPrint("🚀 SAVE USER PROFILES: $body");
 
-    return await _postJson("save_user_profiles", body);
+    return await _postJsonWithUserSession("save_user_profiles", body);
   }
 
   // -------------------------------------------------------------
@@ -95,7 +126,13 @@ static Future<Map<String, dynamic>> _postJson(
       "id": id, // ✅ FIXED
     });
   }
-  
+
+  static Future<Map<String, dynamic>> getUserProfiles(String userId) async {
+    return await _postJsonWithUserSession("get_profiles", {
+      "user_id": userId,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
@@ -109,7 +146,7 @@ static Future<Map<String, dynamic>> _postJson(
   static Future<Map<String, dynamic>> getAgentProfile({
     required String email,
   }) {
-    return _postJson("get_agent_profile", {"email": email});
+    return _postJsonWithAgentSession("get_agent_profile", {"email": email});
   }
 
   // -------------------------------------------------------------
@@ -118,7 +155,13 @@ static Future<Map<String, dynamic>> _postJson(
   static Future<Map<String, dynamic>> parseInsurance(File image) async {
     final bytes = await image.readAsBytes();
     final base64 = base64Encode(bytes);
-    return _postJson("parse_insurance", {"imageBase64": base64});
+    final store = SecureStore();
+    final userId = await store.getString("userId");
+
+    return _postJsonWithUserSession("parse_insurance", {
+      "imageBase64": base64,
+      if (userId != null && userId.isNotEmpty) "userId": userId,
+    });
   }
 
   // -------------------------------------------------------------
@@ -285,7 +328,7 @@ static Future<Map<String, dynamic>> createAgentCheckout({
   // 🔥 Get agent promo code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentPromoCode(String email) {
-    return _postJson("get_agent_promo", {"email": email});
+    return _postJsonWithAgentSession("get_agent_promo", {"email": email});
   }
 
   // -------------------------------------------------------------
@@ -296,7 +339,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
   required String fcmToken,
   String? platform,
 }) {
-  return _postJson("register_device_v2", {
+  return _postJsonWithUserSession("register_device_v2", {
     "user_id": int.parse(userId),   // 🔥 THIS FIXES IT
     "deviceToken": fcmToken,
     "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
@@ -336,7 +379,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       "password": password,
     }..removeWhere((k, v) => v == null || v.trim().isEmpty);
 
-    return _postJson("update_agent_profile", body);
+    return _postJsonWithAgentSession("update_agent_profile", body);
   }
 
   // -------------------------------------------------------------
@@ -398,7 +441,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
   static Future<Map<String, dynamic>> getAgentClients({
     required int agentId,
   }) {
-    return _postJson("get_agent_clients", {
+    return _postJsonWithAgentSession("get_agent_clients", {
       "agentId": agentId,
     });
   }
@@ -412,7 +455,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       if (clientId != null) "clientId": clientId,
     };
 
-    return _postJson("get_agent_items", body);
+    return _postJsonWithAgentSession("get_agent_items", body);
   }
 
   static Future<Map<String, dynamic>> saveAgentItem({
@@ -421,7 +464,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     required String itemType,
     required String text,
   }) {
-    return _postJson("save_agent_item", {
+    return _postJsonWithAgentSession("save_agent_item", {
       "agentId": agentId,
       "clientId": clientId,
       "itemType": itemType,
@@ -433,7 +476,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     required int agentId,
     required int itemId,
   }) {
-    return _postJson("delete_agent_item", {
+    return _postJsonWithAgentSession("delete_agent_item", {
       "agentId": agentId,
       "itemId": itemId,
     });
@@ -452,7 +495,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       if (profile != null) "profile": profile,
     };
 
-    return _postJson("sync_app_client_to_crm", body);
+    return _postJsonWithAgentSession("sync_app_client_to_crm", body);
   }
 
   // -------------------------------------------------------------
@@ -490,7 +533,7 @@ static Future<Map<String, dynamic>> registerDeviceToken({
 
       debugPrint("🚀 SENDING PROFILES: $body");
 
-      return await _postJson("save_user_profiles", body);
+      return await _postJsonWithUserSession("save_user_profiles", body);
     } catch (e, st) {
       debugPrint("❌ Profile Sync Error: $e\n$st");
       return {"success": false, "error": e.toString()};

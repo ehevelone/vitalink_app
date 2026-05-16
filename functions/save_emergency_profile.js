@@ -1,105 +1,117 @@
-const db = require("./services/db"); 
 const crypto = require("crypto");
+const db = require("./services/db");
+const { encrypt } = require("./encrypt.js");
+const { verifyUserSession } = require("./services/user-auth");
 
-// 🔐 SAFE KEY (NO INIT CRASH)
-function getKey() {
-  const raw = process.env.ENCRYPTION_KEY;
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "https://myvitalink.app",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-  if (!raw) {
-    console.warn("⚠️ ENCRYPTION_KEY missing");
-    return null;
-  }
-
-  try {
-    const k = Buffer.from(raw, "hex");
-
-    if (k.length !== 32) {
-      console.warn("⚠️ ENCRYPTION_KEY wrong length");
-      return null;
-    }
-
-    return k;
-
-  } catch (e) {
-    console.warn("⚠️ ENCRYPTION_KEY invalid format");
-    return null;
-  }
+function reply(statusCode, obj) {
+  return {
+    statusCode,
+    headers,
+    body: JSON.stringify(obj),
+  };
 }
 
-// 🔐 ENCRYPT
-function encrypt(text) {
-  const key = getKey();
+function isUuid(value) {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 
-  if (!key) {
-    return text;
-  }
-
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-
-  let encrypted = cipher.update(text, "utf8", "hex");
-  encrypted += cipher.final("hex");
-
-  return iv.toString("hex") + ":" + encrypted;
+function hashToken(token) {
+  return crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
 }
 
 exports.handler = async (event) => {
-
-  const headers = {
-    "Access-Control-Allow-Origin": "https://myvitalink.app",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS"
-  };
-
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers, body: "" };
   }
 
-  try {
+  if (event.httpMethod !== "POST") {
+    return reply(405, {
+      success: false,
+      error: "Method Not Allowed",
+    });
+  }
 
+  try {
     let body = {};
 
     try {
       body = JSON.parse(event.body || "{}");
     } catch {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: "Invalid JSON" })
-      };
+      return reply(400, {
+        success: false,
+        error: "Invalid JSON",
+      });
     }
 
-    const { profile_id, data } = body;
+    const profileId = body.profile_id || body.profileId;
+    const data = body.data;
+    const userId = body.userId || body.user_id;
+    const sessionToken = body.sessionToken;
 
-    if (!profile_id || !data) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: "Missing profile_id or data" })
-      };
+    if (!profileId || !data) {
+      return reply(400, {
+        success: false,
+        error: "Missing profile_id or data",
+      });
     }
 
-    // 🔥 UUID VALIDATION
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (typeof profile_id !== "string" || !uuidRegex.test(profile_id)) {
-      console.error("❌ INVALID PROFILE ID:", profile_id);
-
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: "Invalid profile_id format"
-        })
-      };
+    if (!isUuid(profileId)) {
+      return reply(400, {
+        success: false,
+        error: "Invalid profile_id format",
+      });
     }
 
-    // 🔐 ENCRYPT DATA
-    const encrypted = encrypt(JSON.stringify(data));
+    const authorized = await verifyUserSession(userId, sessionToken);
 
-    // 🔥 SAVE EMERGENCY DATA
+    if (!authorized) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    const encryptedData = encrypt(JSON.stringify(data));
+
+    const existing = await db.query(
+      `
+      SELECT id, user_id, qr_token
+      FROM profiles
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [profileId]
+    );
+
+    if (
+      existing.rows.length &&
+      existing.rows[0].user_id &&
+      String(existing.rows[0].user_id) !== String(userId)
+    ) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized profile",
+      });
+    }
+
+    const token = existing.rows[0]?.qr_token ||
+      crypto.randomBytes(16).toString("hex");
+    const tokenHash = hashToken(token);
+    const name = (data.fullName || data.name || "Emergency Profile")
+      .toString()
+      .trim();
+
     await db.query(
       `
       INSERT INTO emergency_profiles (id, encrypted_data, updated_at)
@@ -109,64 +121,50 @@ exports.handler = async (event) => {
         encrypted_data = EXCLUDED.encrypted_data,
         updated_at = NOW()
       `,
-      [profile_id, encrypted]
+      [profileId, encryptedData]
     );
 
-    // 🔥 CHECK PROFILE / TOKEN
-    let tokenRes = await db.query(
+    await db.query(
       `
-      SELECT qr_token
-      FROM profiles
-      WHERE id = $1
-      LIMIT 1
+      INSERT INTO profiles (
+        id,
+        user_id,
+        name,
+        encrypted_data,
+        qr_token,
+        token_hash,
+        qr_revoked,
+        created_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,false,NOW())
+      ON CONFLICT (id)
+      DO UPDATE SET
+        user_id = COALESCE(profiles.user_id, EXCLUDED.user_id),
+        name = EXCLUDED.name,
+        encrypted_data = EXCLUDED.encrypted_data,
+        token_hash = EXCLUDED.token_hash
       `,
-      [profile_id]
+      [
+        profileId,
+        userId,
+        name || "Emergency Profile",
+        encryptedData,
+        token,
+        tokenHash,
+      ]
     );
 
-    let qr_token = tokenRes.rows[0]?.qr_token;
-
-    // 🔥 AUTO-CREATE PROFILE IF MISSING (FIX)
-    if (!qr_token) {
-      console.warn("⚠️ PROFILE NOT FOUND — CREATING:", profile_id);
-
-      const newToken = crypto.randomBytes(16).toString("hex");
-
-      await db.query(
-        `
-        INSERT INTO profiles (id, qr_token, created_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (id) DO NOTHING
-        `,
-        [profile_id, newToken]
-      );
-
-      qr_token = newToken;
-
-      console.log("✅ NEW TOKEN CREATED:", qr_token);
-    }
-
-    console.log("✅ USING TOKEN:", qr_token);
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        qr_token
-      })
-    };
-
+    return reply(200, {
+      success: true,
+      qr_token: token,
+    });
   } catch (err) {
-    console.error("❌ save_emergency_profile error:", err);
+    console.error("save_emergency_profile error:", err);
 
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        success: false,
-        error: "Server error",
-        details: err.message
-      })
-    };
+    return reply(500, {
+      success: false,
+      error: "Server error",
+      details: err.message,
+    });
   }
 };

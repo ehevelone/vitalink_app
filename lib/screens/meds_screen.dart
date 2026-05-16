@@ -334,10 +334,25 @@ class _MedsScreenState extends State<MedsScreen> {
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_label";
 
+      final store = SecureStore();
+      final userId = await store.getString("userId");
+      final sessionToken = await store.getString("userSessionToken");
+
+      if (userId == null ||
+          userId.isEmpty ||
+          sessionToken == null ||
+          sessionToken.isEmpty) {
+        throw Exception("Please log in again before scanning.");
+      }
+
       final resp = await http.post(
         Uri.parse(url),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"images": base64Images}),
+        body: jsonEncode({
+          "images": base64Images,
+          "userId": userId,
+          "sessionToken": sessionToken,
+        }),
       );
 
       if (resp.statusCode != 200) return;

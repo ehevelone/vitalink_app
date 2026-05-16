@@ -24,6 +24,30 @@ async function ensureDeviceDeliveryColumns() {
   `);
 }
 
+async function verifyUserSession(userId, token) {
+  if (!userId || !token) return false;
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+
+  const result = await db.query(
+    `
+    SELECT id
+    FROM users
+    WHERE id = $1
+      AND session_token = $2
+      AND session_expires > NOW()
+    LIMIT 1
+    `,
+    [userId, token]
+  );
+
+  return result.rows.length > 0;
+}
+
 exports.handler = async (event) => {
   console.log("🚀 register_device_v2 active");
 
@@ -46,13 +70,22 @@ exports.handler = async (event) => {
     }
 
     // 🔥 CHANGED: email → user_id
-    const { user_id, deviceToken, fcmToken, platform } = body;
+    const { user_id, deviceToken, fcmToken, platform, sessionToken } = body;
     const token = deviceToken || fcmToken;
 
     if (!user_id || !token) {
       return reply(400, {
         success: false,
         error: "Missing user_id or token",
+      });
+    }
+
+    const authorized = await verifyUserSession(user_id, sessionToken);
+
+    if (!authorized) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 

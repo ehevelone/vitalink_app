@@ -1,8 +1,18 @@
 // functions/generateMasterAgentQR.js
 const QRCode = require("qrcode");
+const { requireAdmin } = require("./_adminAuth");
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   try {
+    const auth = await requireAdmin(event);
+
+    if (auth.error) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ success: false, error: "Unauthorized" }),
+      };
+    }
+
     // 🔑 This is the static payload the app looks for when scanning
     const masterPayload = "agent_master";
 

@@ -8,6 +8,43 @@ const pool = new Pool({
 });
 
 // 🔥 NEW: merge insurance entries BEFORE save
+function reply(statusCode, obj) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    },
+    body: JSON.stringify(obj),
+  };
+}
+
+async function verifyUserSession(userId, token) {
+  if (!userId || !token) return false;
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `);
+
+  const result = await pool.query(
+    `
+    SELECT id
+    FROM users
+    WHERE id = $1
+      AND session_token = $2
+      AND session_expires > NOW()
+    LIMIT 1
+    `,
+    [userId, token]
+  );
+
+  return result.rows.length > 0;
+}
+
 function mergeInsuranceEntries(profile) {
   if (!profile.insurance || !Array.isArray(profile.insurance)) return profile;
 
@@ -37,19 +74,36 @@ function mergeInsuranceEntries(profile) {
 
 exports.handler = async (event) => {
   try {
+    if (event.httpMethod === "OPTIONS") {
+      return reply(200, {});
+    }
+
+    if (event.httpMethod !== "POST") {
+      return reply(405, {
+        success: false,
+        error: "Method Not Allowed",
+      });
+    }
+
     const body = JSON.parse(event.body || "{}");
 
     // 🔥 CHANGED: use UUID id instead of user_id
-    const { id, profiles } = body;
+    const { id, profiles, sessionToken } = body;
 
     if (!id || !profiles || !Array.isArray(profiles)) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          success: false,
-          error: "Missing or invalid id / profiles",
-        }),
-      };
+      return reply(400, {
+        success: false,
+        error: "Missing or invalid id / profiles",
+      });
+    }
+
+    const authorized = await verifyUserSession(id, sessionToken);
+
+    if (!authorized) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
+      });
     }
 
     console.log("🔥 Saving profiles for UUID:", id);
@@ -130,23 +184,17 @@ exports.handler = async (event) => {
       }
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        count: saved,
-      }),
-    };
+    return reply(200, {
+      success: true,
+      count: saved,
+    });
 
   } catch (err) {
     console.error("🔥 save_user_profiles error:", err);
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        success: false,
-        error: err.message || "Server error",
-      }),
-    };
+    return reply(500, {
+      success: false,
+      error: err.message || "Server error",
+    });
   }
 };

@@ -1,4 +1,5 @@
 const OpenAI = require("openai");
+const { verifyUserSession } = require("./services/user-auth");
 
 // ✅ OpenAI client
 const client = new OpenAI({
@@ -108,6 +109,18 @@ exports.handler = async (event) => {
       return reply(400, {
         success: false,
         error: "Invalid JSON body",
+      });
+    }
+
+    const authorized = await verifyUserSession(
+      body.userId,
+      body.sessionToken
+    );
+
+    if (!authorized) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 

@@ -1,5 +1,6 @@
 // functions/get_agent_promo.js
 const db = require("./services/db");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 function reply(statusCode, obj) {
   return {
@@ -39,12 +40,24 @@ exports.handler = async (event) => {
       });
     }
 
-    const { email } = body;
+    const { email, agentSessionToken } = body;
 
     if (!email) {
       return reply(400, {
         success: false,
         error: "Email required",
+      });
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentEmail: email,
+      token: agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      return reply(403, {
+        success: false,
+        error: "Unauthorized",
       });
     }
 

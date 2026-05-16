@@ -129,7 +129,7 @@ class _LogoScreenState extends State<LogoScreen> {
       final userId = await store.getString("userId");
       if (userId == null) return;
 
-      final res = await ApiService.getProfiles(userId);
+      final res = await ApiService.getUserProfiles(userId);
       if (res["success"] != true) return;
 
       final profiles = res["profiles"];
@@ -204,11 +204,19 @@ class _LogoScreenState extends State<LogoScreen> {
     try {
       final loggedIn = await AppState.isLoggedIn();
       final role = await AppState.getRole();
+      final userSessionToken =
+          await SecureStore().getString("userSessionToken");
 
       if (!mounted) return;
 
       if (!loggedIn) {
         Navigator.pushReplacementNamed(context, '/landing');
+        return;
+      }
+
+      if (role == 'user' &&
+          (userSessionToken == null || userSessionToken.isEmpty)) {
+        Navigator.pushReplacementNamed(context, '/login');
         return;
       }
 

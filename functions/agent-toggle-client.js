@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 const { Pool } = require("pg");
+const { verifyAgentSession } = require("./services/agent-auth");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -41,6 +42,7 @@ exports.handler = async (event) => {
 
     const userId = body.clientId || body.userId;
     const agentId = body.agentId; // 🔥 NOW USED INSTEAD OF BROKEN TOKEN
+    const agentSessionToken = body.agentSessionToken;
 
     if (!userId || !agentId) {
       client.release();
@@ -48,6 +50,20 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers: corsHeaders,
         body: "Missing userId or agentId"
+      };
+    }
+
+    const sessionAgent = await verifyAgentSession({
+      agentId,
+      token: agentSessionToken,
+    });
+
+    if (!sessionAgent) {
+      client.release();
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: "Unauthorized"
       };
     }
 

@@ -63,7 +63,12 @@ class SecureStore {
     await remove('role');
     await remove('userEmail');
     await remove('userId');
+    await remove('userSessionToken');
     await remove('agent_id');
+    await remove('agentId');
+    await remove('agentEmail');
+    await remove('agentName');
+    await remove('agentSessionToken');
     await remove('device_token');
   }
 }
