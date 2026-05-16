@@ -1,13 +1,31 @@
 import 'package:flutter/services.dart';
 
 class PhoneNumberFormatter extends TextInputFormatter {
+  static String digitsForUsPhone(String value) {
+    var digits = value.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length == 11 && digits.startsWith('1')) {
+      digits = digits.substring(1);
+    }
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    return digits;
+  }
+
+  static String normalizedForApi(String value) {
+    final digits = digitsForUsPhone(value);
+
+    return digits.isEmpty ? "" : "+1$digits";
+  }
+
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue,
       TextEditingValue newValue) {
-    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    if (digits.length > 10) digits = digits.substring(0, 10);
+    final digits = digitsForUsPhone(newValue.text);
 
     String formatted = digits;
     if (digits.length >= 1) {
