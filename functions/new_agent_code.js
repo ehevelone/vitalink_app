@@ -62,7 +62,7 @@ exports.handler = async (event) => {
     // ✅ Your current logic: rsms table stores admin_session_token/expiry
     const rsmResult = await client.query(
       `
-      SELECT id
+      SELECT id, billing_active
       FROM rsms
       WHERE admin_session_token = $1
         AND role = 'rsm'
@@ -82,7 +82,21 @@ exports.handler = async (event) => {
       };
     }
 
-    const rsmId = rsmResult.rows[0].id;
+    const rsm = rsmResult.rows[0];
+
+    if (rsm.billing_active !== true) {
+      return {
+        statusCode: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success: false,
+          requires_billing: true,
+          error: "Office billing must be active before enrolling agents."
+        })
+      };
+    }
+
+    const rsmId = rsm.id;
 
     const unlockCode = generateUnlockCode();
 

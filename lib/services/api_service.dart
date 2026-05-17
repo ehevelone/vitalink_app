@@ -217,6 +217,7 @@ static Future<Map<String, dynamic>> createAgentCheckout({
 }) async {
   final body = {
     "email": email,
+    "plan": "app_crm",
   };
 
   final res = await _postJson("vl-agent-checkout", body);

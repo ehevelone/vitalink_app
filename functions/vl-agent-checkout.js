@@ -8,6 +8,30 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
+function getPlan(body = {}) {
+  const plan =
+    (body.plan || body.product || body.subscription || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  if (["app_crm", "app-crm", "combo", "appcrm"].includes(plan)) {
+    return {
+      priceId:
+        process.env.STRIPE_FOUNDERS_APP_CRM_PRICE_ID ||
+        process.env.STRIPE_APP_CRM_PRICE_ID,
+      type: "app_crm_subscription"
+    };
+  }
+
+  return {
+    priceId:
+      process.env.STRIPE_FOUNDERS_AGENT_PRICE_ID ||
+      process.env.STRIPE_AGENT_PRICE_ID,
+    type: "agent_subscription"
+  };
+}
+
 exports.handler = async (event) => {
 
   if (event.httpMethod === "OPTIONS") {
@@ -28,6 +52,15 @@ exports.handler = async (event) => {
 
     const agentId = body.agentId || "";
     const email = body.email || "";
+    const plan = getPlan(body);
+
+    if (!plan.priceId) {
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Stripe price is not configured" })
+      };
+    }
 
     const session = await stripe.checkout.sessions.create({
 
@@ -45,7 +78,7 @@ exports.handler = async (event) => {
 
       line_items: [
         {
-          price: process.env.STRIPE_AGENT_PRICE_ID,
+          price: plan.priceId,
           quantity: 1
         }
       ],
@@ -56,7 +89,14 @@ exports.handler = async (event) => {
       // 🔥 CRITICAL FOR WEBHOOK MATCHING
       metadata: {
         agentId: String(agentId),
-        type: "agent_subscription"
+        type: plan.type
+      },
+
+      subscription_data: {
+        metadata: {
+          agentId: String(agentId),
+          type: plan.type
+        }
       },
 
       success_url:

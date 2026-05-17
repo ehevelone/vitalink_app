@@ -13,7 +13,11 @@ async function ensureAgentSessionColumns(client) {
   await client.query(`
     ALTER TABLE agents
     ADD COLUMN IF NOT EXISTS session_token TEXT,
-    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS crm_subscription_status TEXT,
+    ADD COLUMN IF NOT EXISTS crm_subscription_valid BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS crm_stripe_customer_id TEXT,
+    ADD COLUMN IF NOT EXISTS crm_stripe_subscription_id TEXT
   `);
 }
 
@@ -56,7 +60,7 @@ exports.handler = async function (event) {
 
     const body = JSON.parse(event.body || "{}");
 
-    const { email, password, step } = body;
+    const { email, password, step, product } = body;
 
     if (!email || !password) {
       return {
@@ -72,7 +76,15 @@ exports.handler = async function (event) {
     // ✅ ALWAYS USE agents TABLE
     const result = await client.query(
       `
-       SELECT id, crm_uuid, email, password_hash, TRIM(name) AS name, phone
+       SELECT
+         id,
+         crm_uuid,
+         email,
+         password_hash,
+         TRIM(name) AS name,
+         phone,
+         crm_subscription_status,
+         crm_subscription_valid
        FROM agents
        WHERE LOWER(email) = LOWER($1)
        AND active = true
@@ -133,12 +145,20 @@ exports.handler = async function (event) {
 
         client.release();
 
+        const crmActive =
+          user.crm_subscription_valid === true ||
+          user.crm_subscription_status === "active" ||
+          user.crm_subscription_status === "trialing";
+
         return {
           statusCode: 200,
           headers: corsHeaders(),
           body: JSON.stringify({
             step: "login_success",
             token,
+            crm_access: product === "crm" ? crmActive : undefined,
+            requires_crm_payment:
+              product === "crm" ? !crmActive : undefined,
             agent: {
               id: user.id,
               crm_uuid: user.crm_uuid,
@@ -190,12 +210,20 @@ exports.handler = async function (event) {
 
       client.release();
 
+      const crmActive =
+        user.crm_subscription_valid === true ||
+        user.crm_subscription_status === "active" ||
+        user.crm_subscription_status === "trialing";
+
       return {
         statusCode: 200,
         headers: corsHeaders(),
         body: JSON.stringify({
           step: "login_success",
           token,
+          crm_access: product === "crm" ? crmActive : undefined,
+          requires_crm_payment:
+            product === "crm" ? !crmActive : undefined,
           agent: {
             id: user.id,
             crm_uuid: user.crm_uuid,

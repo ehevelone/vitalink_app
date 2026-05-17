@@ -13,6 +13,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS"
 };
 
+async function ensureBillingColumns(client) {
+  await client.query(`
+    ALTER TABLE rsms
+    ADD COLUMN IF NOT EXISTS billing_active BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS subscription_status TEXT,
+    ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ
+  `);
+}
+
 exports.handler = async function (event) {
 
   if (event.httpMethod === "OPTIONS") {
@@ -33,9 +42,11 @@ exports.handler = async function (event) {
 
     const client = await pool.connect();
 
+    await ensureBillingColumns(client);
+
     // 🔐 Validate session + get billing status + invite code
     const rsmResult = await client.query(`
-      SELECT id, billing_active, invite_code
+      SELECT id, billing_active, invite_code, subscription_status, current_period_end
       FROM rsms
       WHERE admin_session_token = $1
       AND role = 'rsm'
@@ -51,6 +62,8 @@ exports.handler = async function (event) {
     const rsmId = rsmResult.rows[0].id;
     const billingActive = rsmResult.rows[0].billing_active;
     const inviteCode = rsmResult.rows[0].invite_code;
+    const subscriptionStatus = rsmResult.rows[0].subscription_status;
+    const currentPeriodEnd = rsmResult.rows[0].current_period_end;
 
     const { search, download, id } = event.queryStringParameters || {};
 
@@ -180,6 +193,8 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         billing_active: billingActive,
+        subscription_status: subscriptionStatus,
+        current_period_end: currentPeriodEnd,
         invite_code: inviteCode,
         active_agents: Number(count.rows[0].count),
         agents: agents.rows
