@@ -18,6 +18,13 @@ function reply(statusCode, body) {
   };
 }
 
+function getResetTable(role) {
+  if (role === "users") return "users";
+  if (role === "agents") return "agents";
+  if (role === "rsms") return "rsms";
+  return null;
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -46,7 +53,9 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Missing required fields" });
     }
 
-    if (role !== "users" && role !== "agents") {
+    const resetTable = getResetTable(role);
+
+    if (!resetTable) {
       console.log("❌ Invalid role:", role);
       return reply(400, { success: false, error: "Invalid role" });
     }
@@ -56,7 +65,7 @@ exports.handler = async (event) => {
     const result = await db.query(
       `
       SELECT id, email, reset_code, reset_expires
-      FROM ${role}
+      FROM ${resetTable}
       WHERE LOWER(email) = $1
       LIMIT 1
       `,
@@ -102,7 +111,7 @@ exports.handler = async (event) => {
 
     const update = await db.query(
       `
-      UPDATE ${role}
+      UPDATE ${resetTable}
       SET password_hash = $1,
           reset_code = NULL,
           reset_expires = NULL
