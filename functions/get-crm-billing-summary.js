@@ -199,6 +199,19 @@ exports.handler = async (event) => {
       });
     }
 
+    if (!String(agent.crm_stripe_subscription_id).startsWith("sub_")) {
+      return reply(200, {
+        success: true,
+        billing: {
+          status: prettyStatus(agent.crm_subscription_status || "active"),
+          plan: "VitaLink CRM Access",
+          payment_method: "Manual admin access",
+          next_billing_date: null,
+          active: agent.crm_subscription_valid === true
+        }
+      });
+    }
+
     const subscription =
       await stripe.subscriptions.retrieve(
         agent.crm_stripe_subscription_id,
