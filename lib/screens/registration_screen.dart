@@ -3,13 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
 import '../services/deep_link_service.dart';
 import '../services/secure_store.dart';
-import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../utils/phone_formatter.dart';
@@ -138,24 +136,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     await _lookupActivation();
   }
 
-  void _recoverCode() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Recover Activation Code"),
-        content: const Text(
-          "If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _normalizePhone(String input) {
     return PhoneNumberFormatter.normalizedForApi(input);
   }
@@ -204,6 +184,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final store = SecureStore();
       await store.setString("userId", user["id"].toString());
       await store.setString("userEmail", user["email"].toString());
+      await store.setString("profileName", _nameCtrl.text.trim());
+      await store.setString("profilePhone", _phoneCtrl.text.trim());
+      await store.setString("profileAddress", _addressCtrl.text.trim());
+      await store.setString("profileCity", _cityCtrl.text.trim());
+      await store.setString("profileState", _stateCtrl.text.trim());
+      await store.setString("profileZip", _zipCtrl.text.trim());
 
       final sessionToken = user["session_token"]?.toString() ?? "";
       if (sessionToken.isNotEmpty) {
@@ -212,7 +198,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         await store.remove("userSessionToken");
       }
 
-      final profile = await repo.loadProfile() ?? Profile();
+      final profile = await repo.loadProfile();
 
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =

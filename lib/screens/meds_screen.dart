@@ -34,7 +34,7 @@ class _MedsScreenState extends State<MedsScreen> {
     final p = await _repo.loadProfile();
     if (!mounted) return;
     setState(() {
-      _p = p ?? Profile(meds: [], doctors: []);
+      _p = p;
       _loading = false;
     });
   }
@@ -269,12 +269,18 @@ class _MedsScreenState extends State<MedsScreen> {
       bool keepScanning = true;
 
       while (keepScanning) {
-        final img = await _picker.pickImage(source: ImageSource.camera);
+        final img = await _picker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 72,
+        );
         if (img == null) break;
 
         final base64Image = base64Encode(await File(img.path).readAsBytes());
         base64Images.add(base64Image);
 
+        if (!mounted) return;
         keepScanning = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
@@ -355,7 +361,9 @@ class _MedsScreenState extends State<MedsScreen> {
         }),
       );
 
-      if (resp.statusCode != 200) return;
+      if (resp.statusCode != 200) {
+        throw Exception("Label scan failed. Please try one photo at a time.");
+      }
 
       final parsed = jsonDecode(resp.body);
       final data = _normalizeParsed(parsed['data'] ?? parsed);
@@ -365,7 +373,9 @@ class _MedsScreenState extends State<MedsScreen> {
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
 
-      if (scannedName.isEmpty) return;
+      if (scannedName.isEmpty) {
+        throw Exception("No medication name found. Try a clearer label photo.");
+      }
 
       final normalizedScannedName = _normalizeMed(scannedName);
 
@@ -376,6 +386,7 @@ class _MedsScreenState extends State<MedsScreen> {
       if (existingIndex != -1) {
         final existing = _p!.meds[existingIndex];
 
+        if (!mounted) return;
         final choice = await showDialog<String>(
           context: context,
           builder: (_) => AlertDialog(
@@ -531,6 +542,10 @@ class _MedsScreenState extends State<MedsScreen> {
       }
     } catch (e) {
       debugPrint("Scan error: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
     } finally {
       if (mounted) setState(() => _scanning = false);
     }

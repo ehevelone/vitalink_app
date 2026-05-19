@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
-import '../models.dart';
 import '../utils/phone_formatter.dart';
 
 class ProfileUserScreen extends StatefulWidget {
@@ -40,6 +39,8 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   Future<void> _loadLocalProfile() async {
     final store = SecureStore();
+    final repo = DataRepository();
+    final profile = await repo.loadProfile();
 
     final email = await store.getString('userEmail') ?? "";
     final name = await store.getString('profileName') ?? "";
@@ -51,23 +52,30 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final zip = await store.getString('profileZip') ?? "";
 
     // ✅ LOAD DOB FROM PROFILE MODEL (ONLY ONCE)
-    final repo = DataRepository();
-    final profile = await repo.loadProfile();
-    final dob = profile?.dob ?? "";
+    final dob = profile.dob ?? "";
 
     if (!mounted) return;
 
     setState(() {
       _currentEmail = email;
       _emailCtrl.text = email;
-      _nameCtrl.text = name;
-      _phoneCtrl.text = phone;
+      _nameCtrl.text = profile.fullName.trim().isNotEmpty
+          ? profile.fullName
+          : name;
+      _phoneCtrl.text = profile.userPhone.trim().isNotEmpty
+          ? profile.userPhone
+          : phone;
       _dobCtrl.text = dob; // ✅ FIXED
 
-      _addressCtrl.text = address;
-      _cityCtrl.text = city;
-      _stateCtrl.text = state;
-      _zipCtrl.text = zip;
+      _addressCtrl.text = profile.address?.trim().isNotEmpty == true
+          ? profile.address!
+          : address;
+      _cityCtrl.text =
+          profile.city?.trim().isNotEmpty == true ? profile.city! : city;
+      _stateCtrl.text =
+          profile.state?.trim().isNotEmpty == true ? profile.state! : state;
+      _zipCtrl.text =
+          profile.zip?.trim().isNotEmpty == true ? profile.zip! : zip;
     });
   }
 
@@ -107,6 +115,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       );
 
       if (res['success'] != true) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['error'] ?? "Failed to update profile ❌")),
         );
@@ -123,7 +132,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       await store.setString('profileZip', newZip);
 
       final repo = DataRepository();
-      final profile = await repo.loadProfile() ?? Profile();
+      final profile = await repo.loadProfile();
 
       profile.fullName = newName;
       profile.userPhone = newPhone;
@@ -152,11 +161,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  bool _validFullName(String v) {
-    final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
-    return parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2;
   }
 
   @override
@@ -198,6 +202,16 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   decoration: const InputDecoration(
                     labelText: "Full Name (First & Last)",
                   ),
+                  validator: (v) {
+                    final parts = (v ?? "")
+                        .trim()
+                        .split(" ")
+                        .where((p) => p.isNotEmpty)
+                        .toList();
+                    return parts.length >= 2
+                        ? null
+                        : "First and last name required";
+                  },
                 ),
                 const SizedBox(height: 12),
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart'; // (unused but left per your setup)
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
 import 'package:path_provider/path_provider.dart';    // ✅ ADDED
@@ -95,13 +94,24 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
     await file.writeAsBytes(await pdf.save());
 
+    if (!mounted) return;
     final subject =
         "Insurance Card – ${card.carrier.isNotEmpty ? card.carrier : "Member"}";
 
+    final box = context.findRenderObject() as RenderBox?;
+
     await Share.shareXFiles(
-      [XFile(file.path)],
+      [
+        XFile(
+          file.path,
+          mimeType: "application/pdf",
+          name: "insurance_card.pdf",
+        ),
+      ],
       subject: subject,
       text: "Please find my insurance card attached for your records.",
+      sharePositionOrigin:
+          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
     );
   }
 
@@ -121,31 +131,29 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
       });
 
       final profile = await _repo.loadProfile();
-      if (profile != null) {
-        bool updated = false;
+      bool updated = false;
 
-        for (var i = 0; i < profile.orphanCards.length; i++) {
-          if (profile.orphanCards[i] == widget.card) {
-            profile.orphanCards[i] = widget.card;
+      for (var i = 0; i < profile.orphanCards.length; i++) {
+        if (profile.orphanCards[i] == widget.card) {
+          profile.orphanCards[i] = widget.card;
+          updated = true;
+          break;
+        }
+      }
+
+      for (var ins in profile.insurances) {
+        for (var i = 0; i < ins.cards.length; i++) {
+          if (ins.cards[i] == widget.card) {
+            ins.cards[i] = widget.card;
             updated = true;
             break;
           }
         }
+      }
 
-        for (var ins in profile.insurances) {
-          for (var i = 0; i < ins.cards.length; i++) {
-            if (ins.cards[i] == widget.card) {
-              ins.cards[i] = widget.card;
-              updated = true;
-              break;
-            }
-          }
-        }
-
-        if (updated) {
-          profile.updatedAt = DateTime.now();
-          await _repo.saveProfile(profile);
-        }
+      if (updated) {
+        profile.updatedAt = DateTime.now();
+        await _repo.saveProfile(profile);
       }
     } catch (_) {}
   }

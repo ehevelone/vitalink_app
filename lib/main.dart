@@ -47,7 +47,6 @@ import 'screens/doctors_screen.dart';
 import 'screens/doctors_view.dart';
 import 'screens/insurance_policies.dart';
 import 'screens/insurance_cards.dart';
-import 'screens/insurance_cards_menu_ios.dart';
 
 // HIPAA
 import 'screens/hipaa_form_screen.dart';
@@ -64,7 +63,6 @@ import 'screens/agent_reset_password_screen.dart';
 // GLOBALS
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final AppLinks _appLinks = AppLinks();
-StreamSubscription<Uri>? _linkSub;
 
 // 🔥 POPUP
 void showGlobalNotificationPopup(RemoteMessage message) {
@@ -141,7 +139,7 @@ Future<void> _setupFCMGlobal() async {
     });
 
   } catch (e) {
-    print("❌ FCM ERROR: $e");
+    debugPrint("❌ FCM ERROR: $e");
   }
 }
 
@@ -158,12 +156,12 @@ Future<void> main() async {
     await _setupFCMGlobal();
 
     // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
-    _linkSub = _appLinks.uriLinkStream.listen((uri) {
+    _appLinks.uriLinkStream.listen((uri) {
       final code = uri.queryParameters['code']?.toUpperCase();
 
       if (code != null && code.isNotEmpty) {
         VitaLinkDeepLink.code = code;
-        print("🔥 Deep link code received: $code");
+        debugPrint("🔥 Deep link code received: $code");
       }
     });
 
@@ -250,6 +248,18 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       home: const LandingScreen(),
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final clampedTextScaler = media.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.15,
+        );
+
+        return MediaQuery(
+          data: media.copyWith(textScaler: clampedTextScaler),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
 
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
@@ -298,7 +308,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),
         '/insurance_policies': (context) => const InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (context) => IOSCardScanScreen(),
+        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
         '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) => const HipaaFormScreen(),
         '/request_reset': (context) => const RequestResetScreen(),
