@@ -53,10 +53,10 @@ exports.handler = async function (event) {
   try {
     const rsmRes = await client.query(
       `
-      SELECT id, email, password_hash, role, active
+      SELECT id, email, password_hash, role, active, phone
       FROM rsms
-      WHERE LOWER(email) = LOWER($1)
-      AND role = 'rsm'
+      WHERE LOWER(TRIM(email)) = LOWER($1)
+        AND LOWER(role) IN ('admin', 'rsm')
       LIMIT 1
       `,
       [email]
@@ -67,6 +67,7 @@ exports.handler = async function (event) {
     }
 
     const rsm = rsmRes.rows[0];
+    const role = String(rsm.role || "").toLowerCase();
 
     if (!rsm.password_hash || rsm.password_hash === "PENDING_SETUP") {
       return reply(403, {
@@ -78,6 +79,29 @@ exports.handler = async function (event) {
     const ok = await bcrypt.compare(password, rsm.password_hash);
     if (!ok) {
       return reply(401, { success: false, error: "Invalid credentials" });
+    }
+
+    if (role === "admin") {
+      if (rsm.active !== true) {
+        return reply(403, {
+          success: false,
+          error: "Admin account is inactive",
+        });
+      }
+
+      if (!rsm.phone) {
+        return reply(400, {
+          success: false,
+          error: "Admin phone not configured",
+        });
+      }
+
+      return reply(200, {
+        success: true,
+        step: "firebase_2fa",
+        phone: rsm.phone,
+        role: "admin",
+      });
     }
 
     const token = crypto.randomBytes(24).toString("hex");
@@ -95,6 +119,8 @@ exports.handler = async function (event) {
 
     return reply(200, {
       success: true,
+      step: "login_success",
+      role: "rsm",
       token,
       rsm: {
         id: rsm.id,
