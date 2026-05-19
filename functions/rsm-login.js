@@ -63,6 +63,9 @@ exports.handler = async function (event) {
     );
 
     if (rsmRes.rows.length === 0) {
+      console.warn("rsm-login rejected: email not found", {
+        email,
+      });
       return reply(401, { success: false, error: "Invalid credentials" });
     }
 
@@ -70,6 +73,11 @@ exports.handler = async function (event) {
     const role = String(rsm.role || "").toLowerCase();
 
     if (!rsm.password_hash || rsm.password_hash === "PENDING_SETUP") {
+      console.warn("rsm-login rejected: account setup incomplete", {
+        id: rsm.id,
+        email: rsm.email,
+        role,
+      });
       return reply(403, {
         success: false,
         error: "Account not set up yet.",
@@ -78,11 +86,21 @@ exports.handler = async function (event) {
 
     const ok = await bcrypt.compare(password, rsm.password_hash);
     if (!ok) {
+      console.warn("rsm-login rejected: password mismatch", {
+        id: rsm.id,
+        email: rsm.email,
+        role,
+        active: rsm.active,
+      });
       return reply(401, { success: false, error: "Invalid credentials" });
     }
 
     if (role === "admin") {
       if (rsm.active !== true) {
+        console.warn("rsm-login rejected: inactive admin", {
+          id: rsm.id,
+          email: rsm.email,
+        });
         return reply(403, {
           success: false,
           error: "Admin account is inactive",
@@ -90,6 +108,10 @@ exports.handler = async function (event) {
       }
 
       if (!rsm.phone) {
+        console.warn("rsm-login rejected: admin phone missing", {
+          id: rsm.id,
+          email: rsm.email,
+        });
         return reply(400, {
           success: false,
           error: "Admin phone not configured",
@@ -103,6 +125,13 @@ exports.handler = async function (event) {
         role: "admin",
       });
     }
+
+    console.log("rsm-login success", {
+      id: rsm.id,
+      email: rsm.email,
+      role,
+      active: rsm.active,
+    });
 
     const token = crypto.randomBytes(24).toString("hex");
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
