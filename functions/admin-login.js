@@ -43,7 +43,8 @@ exports.handler = async function (event) {
       };
     }
 
-    const { email, password } = parsed;
+    const email = (parsed.email || "").trim().toLowerCase();
+    const password = parsed.password || "";
 
     if (!email || !password) {
       return {
@@ -56,7 +57,13 @@ exports.handler = async function (event) {
     client = await pool.connect();
 
     const result = await client.query(
-      "SELECT id, password_hash, phone, role FROM rsms WHERE email = $1 AND active = true LIMIT 1",
+      `
+      SELECT id, email, password_hash, phone, role, active
+      FROM rsms
+      WHERE LOWER(email) = LOWER($1)
+        AND role IN ('admin', 'rsm')
+      LIMIT 1
+      `,
       [email]
     );
 
@@ -65,11 +72,29 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: JSON.stringify({ success:false, error:"Unauthorized" })
+        body: JSON.stringify({ success:false, error:"Invalid credentials" })
       };
     }
 
     const user = result.rows[0];
+
+    if (user.role === "admin" && user.active !== true) {
+      client.release();
+      return {
+        statusCode: 403,
+        headers: corsHeaders(),
+        body: JSON.stringify({ success:false, error:"Account inactive or setup incomplete" })
+      };
+    }
+
+    if (!user.password_hash || user.password_hash === "PENDING_SETUP") {
+      client.release();
+      return {
+        statusCode: 403,
+        headers: corsHeaders(),
+        body: JSON.stringify({ success:false, error:"Account setup incomplete" })
+      };
+    }
 
     const valid = await bcrypt.compare(password, user.password_hash);
 
@@ -78,7 +103,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 403,
         headers: corsHeaders(),
-        body: JSON.stringify({ success:false, error:"Unauthorized" })
+        body: JSON.stringify({ success:false, error:"Invalid credentials" })
       };
     }
 
