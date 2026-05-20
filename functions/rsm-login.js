@@ -89,13 +89,21 @@ exports.handler = async function (event) {
       });
     }
 
-    const ok = await bcrypt.compare(password, rsm.password_hash);
+    let ok = await bcrypt.compare(password, rsm.password_hash);
+    const trimmedPassword = String(password).trim();
+
+    if (!ok && trimmedPassword && trimmedPassword !== password) {
+      ok = await bcrypt.compare(trimmedPassword, rsm.password_hash);
+    }
+
     if (!ok) {
       console.log("rsm-login rejected: password mismatch", {
         id: rsm.id,
         email: rsm.email,
         role,
         active: rsm.active,
+        passwordLength: String(password).length,
+        trimmedPasswordLength: trimmedPassword.length,
       });
       return reply(401, {
         success: false,
