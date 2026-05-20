@@ -76,6 +76,29 @@ exports.handler = async (event) => {
       LIMIT 10
     `);
 
+    const keyPages = await client.query(`
+      SELECT
+        CASE
+          WHEN COALESCE(page_path, '/') IN ('/', '/index.html') THEN 'Index'
+          WHEN COALESCE(page_path, '') IN ('/activate.html', '/activate') THEN 'Activate'
+          WHEN COALESCE(page_path, '') IN ('/agents.html', '/agents') THEN 'Agents'
+          WHEN COALESCE(page_path, '') IN ('/quick_start.html', '/quick_start') THEN 'Agent Quick Start'
+        END AS page_name,
+        COUNT(*)::INT AS views,
+        COUNT(DISTINCT visitor_hash)::INT AS visitors,
+        COUNT(DISTINCT session_hash)::INT AS sessions
+      FROM site_traffic_events
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+        AND (
+          COALESCE(page_path, '/') IN ('/', '/index.html')
+          OR COALESCE(page_path, '') IN ('/activate.html', '/activate')
+          OR COALESCE(page_path, '') IN ('/agents.html', '/agents')
+          OR COALESCE(page_path, '') IN ('/quick_start.html', '/quick_start')
+        )
+      GROUP BY page_name
+      ORDER BY views DESC
+    `);
+
     const daily = await client.query(`
       SELECT
         TO_CHAR(created_at::DATE, 'YYYY-MM-DD') AS day,
@@ -101,6 +124,7 @@ exports.handler = async (event) => {
     return reply(200, {
       success: true,
       summary: summary.rows[0],
+      key_pages: keyPages.rows,
       top_pages: topPages.rows,
       daily: daily.rows,
       referrers: referrers.rows
