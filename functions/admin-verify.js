@@ -88,8 +88,15 @@ exports.handler = async function (event) {
     const client = await pool.connect();
 
     const result = await client.query(
-      "SELECT id, phone, role FROM rsms WHERE email=$1 AND active=true LIMIT 1",
-      [email]
+      `
+      SELECT id, phone, role
+      FROM rsms
+      WHERE LOWER(TRIM(email)) = LOWER($1)
+        AND LOWER(role) IN ('admin', 'rsm')
+        AND active = true
+      LIMIT 1
+      `,
+      [String(email || "").trim()]
     );
 
     if (result.rows.length === 0) {
