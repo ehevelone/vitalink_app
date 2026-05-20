@@ -72,6 +72,45 @@ class Doctor {
 }
 
 // =========================
+// Appointment Model
+// =========================
+class UserAppointment {
+  String doctorName;
+  String specialty;
+  DateTime appointmentAt;
+  String notes;
+  DateTime updatedAt;
+
+  UserAppointment({
+    this.doctorName = '',
+    this.specialty = '',
+    DateTime? appointmentAt,
+    this.notes = '',
+    DateTime? updatedAt,
+  })  : appointmentAt = appointmentAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+        'doctorName': doctorName,
+        'specialty': specialty,
+        'appointmentAt': appointmentAt.toIso8601String(),
+        'notes': notes,
+        'updatedAt': updatedAt.toIso8601String(),
+      };
+
+  factory UserAppointment.fromJson(Map<String, dynamic> json) =>
+      UserAppointment(
+        doctorName: json['doctorName'] ?? '',
+        specialty: json['specialty'] ?? '',
+        appointmentAt:
+            DateTime.tryParse(json['appointmentAt'] ?? '') ?? DateTime.now(),
+        notes: json['notes'] ?? '',
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+      );
+}
+
+// =========================
 // Insurance Card Model
 // =========================
 class InsuranceCard {
@@ -295,6 +334,7 @@ class Profile {
 
   List<Medication> meds;
   List<Doctor> doctors;
+  List<UserAppointment> appointments;
   List<Insurance> insurances;
   List<InsuranceCard> orphanCards;
   EmergencyInfo emergency;
@@ -330,6 +370,7 @@ class Profile {
     this.zip,
     List<Medication>? meds,
     List<Doctor>? doctors,
+    List<UserAppointment>? appointments,
     List<Insurance>? insurances,
     List<InsuranceCard>? orphanCards,
     EmergencyInfo? emergency,
@@ -352,6 +393,7 @@ class Profile {
         updatedAt = updatedAt ?? DateTime.now(),
         meds = meds ?? [],
         doctors = doctors ?? [],
+        appointments = appointments ?? [],
         insurances = insurances ?? [],
         orphanCards = orphanCards ?? [],
         emergency = emergency ?? EmergencyInfo();
@@ -368,6 +410,7 @@ class Profile {
     String? zip,
     List<Medication>? meds,
     List<Doctor>? doctors,
+    List<UserAppointment>? appointments,
     List<Insurance>? insurances,
     List<InsuranceCard>? orphanCards,
     EmergencyInfo? emergency,
@@ -399,6 +442,7 @@ class Profile {
       zip: zip ?? this.zip,
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
+      appointments: appointments ?? this.appointments,
       insurances: insurances ?? this.insurances,
       orphanCards: orphanCards ?? this.orphanCards,
       emergency: emergency ?? this.emergency,
@@ -432,6 +476,7 @@ class Profile {
         'zip': zip,
         'meds': meds.map((m) => m.toJson()).toList(),
         'doctors': doctors.map((d) => d.toJson()).toList(),
+        'appointments': appointments.map((a) => a.toJson()).toList(),
         'insurances': insurances.map((i) => i.toJson()).toList(),
         'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
         'emergency': emergency.toJson(),
@@ -468,6 +513,9 @@ class Profile {
             .toList(),
         doctors: (json['doctors'] as List<dynamic>? ?? [])
             .map((d) => Doctor.fromJson(d))
+            .toList(),
+        appointments: (json['appointments'] as List<dynamic>? ?? [])
+            .map((a) => UserAppointment.fromJson(a))
             .toList(),
         insurances: (json['insurances'] as List<dynamic>? ?? [])
             .map((i) => Insurance.fromJson(i))

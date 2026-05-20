@@ -349,6 +349,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                             _item(Icons.medical_information, "Medications",
                                 '/meds'),
                             _item(Icons.people, "Doctors", '/doctors'),
+                            _item(Icons.event_available, "Appointments",
+                                '/appointments'),
                             _item(Icons.credit_card, "Insurance Cards",
                                 '/insurance_cards_menu'),
                             _item(Icons.policy, "Insurance Policies",
