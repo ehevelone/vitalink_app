@@ -77,26 +77,31 @@ exports.handler = async (event) => {
     `);
 
     const keyPages = await client.query(`
+      WITH key_pages(page_name, paths) AS (
+        VALUES
+          ('Index', ARRAY['/', '/index.html']),
+          ('Activate', ARRAY['/activate', '/activate.html']),
+          ('Agents', ARRAY['/agents', '/agents.html']),
+          ('Agent Quick Start', ARRAY['/quick_start', '/quick_start.html'])
+      )
       SELECT
-        CASE
-          WHEN COALESCE(page_path, '/') IN ('/', '/index.html') THEN 'Index'
-          WHEN COALESCE(page_path, '') IN ('/activate.html', '/activate') THEN 'Activate'
-          WHEN COALESCE(page_path, '') IN ('/agents.html', '/agents') THEN 'Agents'
-          WHEN COALESCE(page_path, '') IN ('/quick_start.html', '/quick_start') THEN 'Agent Quick Start'
-        END AS page_name,
-        COUNT(*)::INT AS views,
-        COUNT(DISTINCT visitor_hash)::INT AS visitors,
-        COUNT(DISTINCT session_hash)::INT AS sessions
-      FROM site_traffic_events
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-        AND (
-          COALESCE(page_path, '/') IN ('/', '/index.html')
-          OR COALESCE(page_path, '') IN ('/activate.html', '/activate')
-          OR COALESCE(page_path, '') IN ('/agents.html', '/agents')
-          OR COALESCE(page_path, '') IN ('/quick_start.html', '/quick_start')
-        )
-      GROUP BY page_name
-      ORDER BY views DESC
+        key_pages.page_name,
+        COUNT(site_traffic_events.id)::INT AS views,
+        COUNT(DISTINCT site_traffic_events.visitor_hash)::INT AS unique_hits,
+        COUNT(DISTINCT site_traffic_events.session_hash)::INT AS sessions
+      FROM key_pages
+      LEFT JOIN site_traffic_events
+        ON COALESCE(site_traffic_events.page_path, '') = ANY(key_pages.paths)
+       AND site_traffic_events.created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY key_pages.page_name
+      ORDER BY
+        CASE key_pages.page_name
+          WHEN 'Index' THEN 1
+          WHEN 'Activate' THEN 2
+          WHEN 'Agents' THEN 3
+          WHEN 'Agent Quick Start' THEN 4
+          ELSE 5
+        END
     `);
 
     const daily = await client.query(`
