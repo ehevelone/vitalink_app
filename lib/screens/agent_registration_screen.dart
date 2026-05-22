@@ -131,7 +131,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
 
     try {
       final data = await ApiService.claimAgentUnlock(
-        unlockCode: _codeCtrl.text.trim(),
+        unlockCode: _codeCtrl.text.trim().toUpperCase(),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
         npn: _npnCtrl.text.trim(),

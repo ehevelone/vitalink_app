@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -28,6 +27,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bloodCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final List<TextEditingController> _extraContactCtrls = [];
+  final List<TextEditingController> _extraPhoneCtrls = [];
   final _allergiesCtrl = TextEditingController();
   final _conditionsCtrl = TextEditingController();
 
@@ -35,6 +36,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _proceduresCtrl = TextEditingController();
 
   bool _organDonor = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _dobCtrl.dispose();
+    _bloodCtrl.dispose();
+    _contactCtrl.dispose();
+    _phoneCtrl.dispose();
+    _allergiesCtrl.dispose();
+    _conditionsCtrl.dispose();
+    _implantsCtrl.dispose();
+    _proceduresCtrl.dispose();
+    for (final controller in _extraContactCtrls) {
+      controller.dispose();
+    }
+    for (final controller in _extraPhoneCtrls) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -48,24 +69,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
 
     setState(() {
-      _p = profile ?? Profile();
+      _p = profile;
       _loading = false;
 
-      if (_p != null) {
-        final e = _p!.emergency;
-        _nameCtrl.text = _p!.fullName;
-        _dobCtrl.text = _p!.dob ?? '';
-        _bloodCtrl.text = e.bloodType;
-        _contactCtrl.text = e.contact;
-        _phoneCtrl.text = e.phone;
-        _allergiesCtrl.text = e.allergies;
-        _conditionsCtrl.text = e.conditions;
-
-        _implantsCtrl.text = e.implants;
-        _proceduresCtrl.text = e.procedures;
-
-        _organDonor = e.organDonor;
+      final e = _p!.emergency;
+      _nameCtrl.text = _p!.fullName;
+      _dobCtrl.text = _p!.dob ?? '';
+      _bloodCtrl.text = e.bloodType;
+      final contacts = e.effectiveContacts;
+      _contactCtrl.text =
+          contacts.isNotEmpty ? contacts.first.name : e.contact;
+      _phoneCtrl.text =
+          contacts.isNotEmpty ? contacts.first.phone : e.phone;
+      _extraContactCtrls.clear();
+      _extraPhoneCtrls.clear();
+      for (final contact in contacts.skip(1)) {
+        _extraContactCtrls.add(TextEditingController(text: contact.name));
+        _extraPhoneCtrls.add(TextEditingController(text: contact.phone));
       }
+      _allergiesCtrl.text = e.allergies;
+      _conditionsCtrl.text = e.conditions;
+
+      _implantsCtrl.text = e.implants;
+      _proceduresCtrl.text = e.procedures;
+
+      _organDonor = e.organDonor;
     });
   }
 
@@ -80,11 +108,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     // 🔥 FIX: capture ORIGINAL values BEFORE mutation
-    final originalPhone = _p!.emergency.phone.replaceAll(RegExp(r'\D'), '');
-    final originalContact = _p!.emergency.contact;
-
-    final newPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
-    final newContact = _contactCtrl.text.trim();
+    final originalContacts = _p!.emergency.effectiveContacts;
+    final emergencyContacts = _buildEmergencyContacts();
+    final contactsToText = _contactsNeedingText(
+      originalContacts,
+      emergencyContacts,
+    );
 
     setState(() => _loading = true);
 
@@ -95,6 +124,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         bloodType: _bloodCtrl.text.trim(),
         contact: _contactCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
+        contacts: emergencyContacts,
         allergies: _allergiesCtrl.text.trim(),
         conditions: _conditionsCtrl.text.trim(),
         implants: _implantsCtrl.text.trim(),
@@ -108,8 +138,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
 
     // 🔥 FIXED CONDITION
-    if (newPhone.length == 10 &&
-        (newPhone != originalPhone || newContact != originalContact)) {
+    if (contactsToText.isNotEmpty) {
       String agentName = "";
       String agentPhone = "";
 
@@ -124,25 +153,96 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       } catch (_) {}
 
+      final contact = contactsToText.first;
       final agentLine = (agentName.isNotEmpty && agentPhone.isNotEmpty)
-          ? "\n\nTheir insurance agent is $agentName at $agentPhone."
-          : "\n\nOR contact — their insurance agent _______________.";
+          ? "\n\nVitaLink was provided through ${_p!.fullName}'s insurance agent:\n"
+              "$agentName\n"
+              "$agentPhone\n"
+              "Contact the agent if you have questions or would like more information."
+          : "";
 
       final message =
-          "You have been added as ${_p!.fullName}'s emergency contact in the VitaLink app. "
-          "Learn more at https://myvitalink.app — OR contact — their insurance agent.$agentLine";
+          "Hi ${contact.name},\n\n"
+          "${_p!.fullName} selected you as an emergency contact in VitaLink.\n\n"
+          "VitaLink stores important health information that can help in an emergency if someone is unconscious or unable to communicate."
+          "$agentLine\n\n"
+          "More information: https://myvitalink.app";
 
-      final smsUri = Uri.parse(
-        "sms:$newPhone?body=${Uri.encodeComponent(message)}",
-      );
-
-      await launchUrl(
-        smsUri,
-        mode: LaunchMode.externalApplication,
-      );
+      await _openEmergencyContactText(contact, message);
     }
 
+    if (!mounted) return;
     Navigator.pop(context);
+  }
+
+  List<EmergencyContact> _buildEmergencyContacts() {
+    final contacts = [
+      EmergencyContact(
+        name: _contactCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+      ),
+      for (var i = 0; i < _extraContactCtrls.length; i++)
+        EmergencyContact(
+          name: _extraContactCtrls[i].text.trim(),
+          phone: _extraPhoneCtrls[i].text.trim(),
+        ),
+    ];
+
+    return contacts.where((contact) => contact.hasDetails).toList();
+  }
+
+  List<EmergencyContact> _contactsNeedingText(
+    List<EmergencyContact> originalContacts,
+    List<EmergencyContact> savedContacts,
+  ) {
+    final changedContacts = <EmergencyContact>[];
+
+    for (var i = 0; i < savedContacts.length; i++) {
+      final saved = savedContacts[i];
+      final savedPhone = _phoneDigits(saved.phone);
+      if (savedPhone.length != 10) continue;
+
+      final original = i < originalContacts.length
+          ? originalContacts[i]
+          : EmergencyContact();
+
+      if (savedPhone != _phoneDigits(original.phone) ||
+          saved.name.trim() != original.name.trim()) {
+        changedContacts.add(saved);
+      }
+    }
+
+    return changedContacts;
+  }
+
+  String _phoneDigits(String phone) => phone.replaceAll(RegExp(r'\D'), '');
+
+  Future<void> _openEmergencyContactText(
+    EmergencyContact contact,
+    String message,
+  ) async {
+    final smsUri = Uri.parse(
+      "sms:${_phoneDigits(contact.phone)}?body=${Uri.encodeComponent(message)}",
+    );
+
+    await launchUrl(
+      smsUri,
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  void _addEmergencyContact() {
+    setState(() {
+      _extraContactCtrls.add(TextEditingController());
+      _extraPhoneCtrls.add(TextEditingController());
+    });
+  }
+
+  void _removeEmergencyContact(int index) {
+    setState(() {
+      _extraContactCtrls.removeAt(index).dispose();
+      _extraPhoneCtrls.removeAt(index).dispose();
+    });
   }
 
   Future<void> _pickDob() async {
@@ -256,6 +356,65 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   return null;
                 },
               ),
+              for (var i = 0; i < _extraContactCtrls.length; i++) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Emergency Contact ${i + 2}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: "Remove emergency contact",
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _removeEmergencyContact(i),
+                    ),
+                  ],
+                ),
+                TextFormField(
+                  controller: _extraContactCtrls[i],
+                  decoration:
+                      const InputDecoration(labelText: "Emergency Contact"),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return "Required";
+                    }
+                    if (!_validFullName(v)) {
+                      return "Enter full name";
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _extraPhoneCtrls[i],
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    PhoneNumberFormatter(),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: "Emergency Phone",
+                  ),
+                  validator: (v) {
+                    final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
+                    if (digits.length != 10) {
+                      return "Enter valid phone";
+                    }
+                    return null;
+                  },
+                ),
+              ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _addEmergencyContact,
+                  icon: const Icon(Icons.add_circle_outline),
+                  label: const Text("Add Another Emergency Contact"),
+                ),
+              ),
               const SizedBox(height: 12),
               Column(
                 children: [
@@ -303,7 +462,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
                 title: const Text("Organ Donor"),
-                activeColor: Colors.red,
+                activeThumbColor: Colors.red,
               ),
               const SizedBox(height: 20),
               ElevatedButton(

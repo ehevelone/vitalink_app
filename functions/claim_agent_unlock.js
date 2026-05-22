@@ -75,15 +75,15 @@ exports.handler = async (event) => {
     const existing = await db.query(
       `
       SELECT id, active, password_hash, promo_code, unlock_code,
-        CASE WHEN promo_code = $1 THEN 'promo' ELSE 'unlock' END AS code_match
+        CASE WHEN UPPER(promo_code) = $1 THEN 'promo' ELSE 'unlock' END AS code_match
       FROM agents
-      WHERE promo_code = $1
+      WHERE UPPER(promo_code) = $1
          OR (
-           unlock_code = $1
+           UPPER(unlock_code) = $1
            AND active = FALSE
            AND password_hash IS NULL
          )
-      ORDER BY CASE WHEN promo_code = $1 THEN 0 ELSE 1 END
+      ORDER BY CASE WHEN UPPER(promo_code) = $1 THEN 0 ELSE 1 END
       LIMIT 1
       `,
       [registrationCode]

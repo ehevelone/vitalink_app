@@ -116,6 +116,16 @@ exports.handler = async (event) => {
       data.phone ||
       "";
 
+    const contacts =
+      Array.isArray(emergency.contacts) && emergency.contacts.length
+        ? emergency.contacts
+        : [
+            {
+              name: contactName,
+              phone: contactPhone,
+            },
+          ].filter(contact => contact.name || contact.phone);
+
     return reply(200, {
       success: true,
       emergency: {
@@ -126,6 +136,7 @@ exports.handler = async (event) => {
 
         emergencyContactName: contactName,
         emergencyContactPhone: contactPhone,
+        emergencyContacts: contacts,
 
         allergies: emergency.allergies || data.allergies || "",
         conditions: emergency.conditions || data.conditions || "",

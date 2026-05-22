@@ -154,18 +154,24 @@ class _EmergencyViewState extends State<EmergencyView> {
                 ),
                 title: const Text("Procedures"),
                 subtitle: Text(e.procedures)),
-          if (e.contact.isNotEmpty || e.phone.isNotEmpty)
-            ListTile(
-              tileColor: Colors.transparent,
-              shape: const Border(
-                bottom: BorderSide(color: Colors.black12),
+          ...e.effectiveContacts.asMap().entries.map(
+                (entry) => ListTile(
+                  tileColor: Colors.transparent,
+                  shape: const Border(
+                    bottom: BorderSide(color: Colors.black12),
+                  ),
+                  title: Text(
+                    entry.key == 0
+                        ? "Emergency Contact"
+                        : "Emergency Contact ${entry.key + 1}",
+                  ),
+                  subtitle: Text([
+                    if (entry.value.name.isNotEmpty) entry.value.name,
+                    if (entry.value.phone.isNotEmpty)
+                      Formatters.phone(entry.value.phone),
+                  ].join(" - ")),
+                ),
               ),
-              title: const Text("Emergency Contact"),
-              subtitle: Text([
-                if (e.contact.isNotEmpty) e.contact,
-                if (e.phone.isNotEmpty) Formatters.phone(e.phone),
-              ].join(" • ")),
-            ),
           const Divider(height: 32),
           if (p.meds.isNotEmpty)
             Column(

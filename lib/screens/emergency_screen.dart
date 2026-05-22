@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -51,7 +50,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     final p = await _repo.loadProfile();
     if (!mounted) return;
     setState(() {
-      _p = p ?? Profile();
+      _p = p;
       _loading = false;
     });
   }
@@ -62,6 +61,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     if (p == null) return;
 
     if (p.id.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile not ready. Please try again.")),
       );
@@ -75,6 +75,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       final savedUrl = await store.getString('qr_url');
 
       if (savedUrl != null && savedUrl.isNotEmpty) {
+        if (!mounted) return;
         final token = savedUrl.split("token=").last;
 
         Navigator.push(
@@ -120,6 +121,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       final qrUrl = "https://myvitalink.app/emergency.html?token=$qrToken";
 
       await store.setString('qr_url', qrUrl);
+      if (!mounted) return;
 
       // ✅ STEP 4: NAVIGATE (UNCHANGED)
       Navigator.push(
@@ -134,6 +136,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     } catch (e) {
       debugPrint("❌ QR LOAD FAILED: $e");
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Failed to load QR")),
       );
@@ -194,24 +197,33 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   title: const Text("Date of Birth"),
                   subtitle: Text(Formatters.dob(p.dob!)),
                 ),
-              ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
+              if (e.effectiveContacts.isEmpty)
+                const ListTile(
+                  tileColor: Colors.transparent,
+                  shape: Border(
+                    bottom: BorderSide(color: Colors.black12),
+                  ),
+                  title: Text("Emergency Contacts"),
+                  subtitle: Text("N/A"),
                 ),
-                title: const Text("Emergency Contact"),
-                subtitle: Text(e.contact.isNotEmpty ? e.contact : "N/A"),
-              ),
-              ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Phone"),
-                subtitle: Text(
-                  e.phone.isNotEmpty ? Formatters.phone(e.phone) : "N/A",
-                ),
-              ),
+              ...e.effectiveContacts.asMap().entries.map(
+                    (entry) => ListTile(
+                      tileColor: Colors.transparent,
+                      shape: const Border(
+                        bottom: BorderSide(color: Colors.black12),
+                      ),
+                      title: Text(
+                        entry.key == 0
+                            ? "Emergency Contact"
+                            : "Emergency Contact ${entry.key + 1}",
+                      ),
+                      subtitle: Text([
+                        if (entry.value.name.isNotEmpty) entry.value.name,
+                        if (entry.value.phone.isNotEmpty)
+                          Formatters.phone(entry.value.phone),
+                      ].join(" - ")),
+                    ),
+                  ),
               ListTile(
                 tileColor: Colors.transparent,
                 shape: const Border(

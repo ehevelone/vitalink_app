@@ -248,11 +248,38 @@ class Insurance {
 }
 
 // =========================
+// Emergency Contact Model
+// =========================
+class EmergencyContact {
+  String name;
+  String phone;
+
+  EmergencyContact({
+    this.name = '',
+    this.phone = '',
+  });
+
+  bool get hasDetails => name.trim().isNotEmpty || phone.trim().isNotEmpty;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'phone': phone,
+      };
+
+  factory EmergencyContact.fromJson(Map<String, dynamic> json) =>
+      EmergencyContact(
+        name: json['name'] ?? json['contact'] ?? '',
+        phone: json['phone'] ?? '',
+      );
+}
+
+// =========================
 // Emergency Info Model
 // =========================
 class EmergencyInfo {
   String contact;
   String phone;
+  List<EmergencyContact> contacts;
   String allergies;
   String conditions;
   String bloodType;
@@ -263,17 +290,27 @@ class EmergencyInfo {
   EmergencyInfo({
     this.contact = '',
     this.phone = '',
+    List<EmergencyContact>? contacts,
     this.allergies = '',
     this.conditions = '',
     this.bloodType = '',
     this.implants = '',
     this.procedures = '',
     this.organDonor = false,
-  });
+  }) : contacts = contacts ?? [];
+
+  List<EmergencyContact> get effectiveContacts {
+    final saved = contacts.where((c) => c.hasDetails).toList();
+    if (saved.isNotEmpty) return saved;
+
+    final legacy = EmergencyContact(name: contact, phone: phone);
+    return legacy.hasDetails ? [legacy] : [];
+  }
 
   EmergencyInfo copyWith({
     String? contact,
     String? phone,
+    List<EmergencyContact>? contacts,
     String? allergies,
     String? conditions,
     String? bloodType,
@@ -284,6 +321,7 @@ class EmergencyInfo {
     return EmergencyInfo(
       contact: contact ?? this.contact,
       phone: phone ?? this.phone,
+      contacts: contacts ?? this.contacts,
       allergies: allergies ?? this.allergies,
       conditions: conditions ?? this.conditions,
       bloodType: bloodType ?? this.bloodType,
@@ -296,6 +334,7 @@ class EmergencyInfo {
   Map<String, dynamic> toJson() => {
         'contact': contact,
         'phone': phone,
+        'contacts': effectiveContacts.map((c) => c.toJson()).toList(),
         'allergies': allergies,
         'conditions': conditions,
         'bloodType': bloodType,
@@ -304,10 +343,26 @@ class EmergencyInfo {
         'organDonor': organDonor,
       };
 
-  factory EmergencyInfo.fromJson(Map<String, dynamic> json) =>
-      EmergencyInfo(
-        contact: json['contact'] ?? '',
-        phone: json['phone'] ?? '',
+  factory EmergencyInfo.fromJson(Map<String, dynamic> json) {
+    final parsedContacts = (json['contacts'] as List<dynamic>? ??
+            json['emergencyContacts'] as List<dynamic>? ??
+            [])
+        .whereType<Map>()
+        .map((c) => EmergencyContact.fromJson(Map<String, dynamic>.from(c)))
+        .where((c) => c.hasDetails)
+        .toList();
+
+    final legacyContact = json['contact'] ?? '';
+    final legacyPhone = json['phone'] ?? '';
+    final firstContact =
+        parsedContacts.isNotEmpty ? parsedContacts.first.name : legacyContact;
+    final firstPhone =
+        parsedContacts.isNotEmpty ? parsedContacts.first.phone : legacyPhone;
+
+    return EmergencyInfo(
+        contact: firstContact,
+        phone: firstPhone,
+        contacts: parsedContacts,
         allergies: json['allergies'] ?? '',
         conditions: json['conditions'] ?? '',
         bloodType: json['bloodType'] ?? '',
@@ -315,6 +370,7 @@ class EmergencyInfo {
         procedures: json['procedures'] ?? '',
         organDonor: json['organDonor'] ?? false,
       );
+  }
 }
 
 // =========================
