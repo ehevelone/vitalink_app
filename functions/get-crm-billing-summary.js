@@ -72,6 +72,36 @@ function paymentMethodLabel(paymentMethod) {
   return "Payment method on file";
 }
 
+function billingOwnerLabel(agent) {
+  if (!agent.crm_stripe_subscription_id) {
+    return "Not assigned";
+  }
+
+  if (!String(agent.crm_stripe_subscription_id).startsWith("sub_")) {
+    return "Manual admin access";
+  }
+
+  if (agent.billing_owner === "agency") {
+    return "Agency";
+  }
+
+  return "Agent";
+}
+
+function paymentStatusLabel(subscription) {
+  const invoice = subscription?.latest_invoice;
+
+  if (typeof invoice === "object" && invoice?.status) {
+    return prettyStatus(invoice.status);
+  }
+
+  if (subscription?.status) {
+    return prettyStatus(subscription.status);
+  }
+
+  return "Not available";
+}
+
 async function getPlanName(subscription) {
   const price =
     subscription?.items?.data?.[0]?.price;
@@ -172,7 +202,8 @@ exports.handler = async (event) => {
         crm_subscription_status,
         crm_subscription_valid,
         crm_stripe_customer_id,
-        crm_stripe_subscription_id
+        crm_stripe_subscription_id,
+        billing_owner
       FROM agents
       WHERE id = $1
       LIMIT 1
@@ -194,6 +225,8 @@ exports.handler = async (event) => {
           plan: "CRM Access",
           payment_method: "No payment method on file",
           next_billing_date: null,
+          billing_owner: billingOwnerLabel(agent),
+          last_payment_status: "Not available",
           active: false
         }
       });
@@ -207,6 +240,8 @@ exports.handler = async (event) => {
           plan: "VitaLink CRM Access",
           payment_method: "Manual admin access",
           next_billing_date: null,
+          billing_owner: billingOwnerLabel(agent),
+          last_payment_status: "Manual admin access",
           active: agent.crm_subscription_valid === true
         }
       });
@@ -218,6 +253,7 @@ exports.handler = async (event) => {
         {
           expand: [
             "default_payment_method",
+            "latest_invoice",
             "items.data.price.product"
           ]
         }
@@ -236,6 +272,8 @@ exports.handler = async (event) => {
         plan: await getPlanName(subscription),
         payment_method: paymentMethodLabel(paymentMethod),
         next_billing_date: formatDate(subscription.current_period_end),
+        billing_owner: billingOwnerLabel(agent),
+        last_payment_status: paymentStatusLabel(subscription),
         active: ["active", "trialing"].includes(subscription.status)
       }
     });
