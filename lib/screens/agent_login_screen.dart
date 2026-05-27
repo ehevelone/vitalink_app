@@ -284,8 +284,9 @@ Future<void> _login() async {
                     margin: const EdgeInsets.symmetric(horizontal: 24),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF79CAE3)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.2),
@@ -300,6 +301,7 @@ Future<void> _login() async {
                         const Text(
                           "Access Not Active",
                           style: TextStyle(
+                            color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -310,6 +312,10 @@ Future<void> _login() async {
                         Text(
                           _overlayMessage,
                           textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.35,
+                          ),
                         ),
 
                         const SizedBox(height: 20),
@@ -318,6 +324,12 @@ Future<void> _login() async {
                           children: [
                             Expanded(
                               child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF79CAE3),
+                                  side: const BorderSide(
+                                    color: Color(0xFF79CAE3),
+                                  ),
+                                ),
                                 onPressed: _closeOverlay,
                                 child: const Text("Contact Agency"),
                               ),
@@ -325,6 +337,10 @@ Future<void> _login() async {
                             const SizedBox(width: 10),
                             Expanded(
                               child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF79CAE3),
+                                  foregroundColor: Colors.black,
+                                ),
                                 onPressed: () {
                                   _closeOverlay();
                                   _openActivationPage();

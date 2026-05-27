@@ -4,6 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
+  static const Color vitalinkBlue = Color(0xFF79CAE3);
+  static const Color panelDark = Color(0xFF1A1A1A);
+  static const Color cardDark = Color(0xFF101010);
+
   void _showLoginOptions(BuildContext context) {
     showDialog(
       context: context,
@@ -33,38 +37,60 @@ class WelcomeScreen extends StatelessWidget {
   void _showRegisterOptions(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Create Account"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Choose the account type that matches how you use VitaLink."),
-            const SizedBox(height: 16),
-            _registerOption(
-              context,
-              icon: Icons.family_restroom,
-              title: "Create Client Account",
-              subtitle: "For VitaLink users and families",
-              color: Colors.green,
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/registration');
-              },
-            ),
-            const SizedBox(height: 12),
-            _registerOption(
-              context,
-              icon: Icons.business_center,
-              title: "Activate Agent Portal",
-              subtitle:
-                  "Insurance agents must activate access through myvitalink.app",
-              color: Colors.blue,
-              onPressed: () {
-                Navigator.pop(ctx);
-                _showAgentActivationDialog(context);
-              },
-            ),
-          ],
+      builder: (ctx) => Dialog(
+        backgroundColor: panelDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Create Account",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Choose the account type that matches how you use VitaLink.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _registerOption(
+                context,
+                icon: Icons.family_restroom,
+                title: "Create Client Account",
+                subtitle: "For VitaLink users and families",
+                color: Colors.green,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, '/registration');
+                },
+              ),
+              const SizedBox(height: 12),
+              _registerOption(
+                context,
+                icon: Icons.business_center,
+                title: "Activate Agent Portal",
+                subtitle:
+                    "Insurance agents must activate access through myvitalink.app",
+                color: vitalinkBlue,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showAgentActivationDialog(context);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -85,12 +111,21 @@ class WelcomeScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
+          color: cardDark,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color),
         ),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 30),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: Colors.black, size: 26),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -99,6 +134,7 @@ class WelcomeScreen extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -106,8 +142,8 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    style: const TextStyle(
+                      color: Colors.white70,
                       fontSize: 13,
                     ),
                   ),
@@ -128,32 +164,69 @@ class WelcomeScreen extends StatelessWidget {
   void _showAgentActivationDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Agent Portal Activation"),
-        content: const Text(
-          "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-          "Have you already activated your agent account through myvitalink.app?",
+      builder: (ctx) => Dialog(
+        backgroundColor: panelDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Agent Portal Activation",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
+                "Have you already activated your agent account through myvitalink.app?",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 22),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: vitalinkBlue,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size(double.infinity, 52),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openVitaLinkWebsite();
+                },
+                child: const Text("Open myvitalink.app"),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: vitalinkBlue,
+                  side: const BorderSide(color: vitalinkBlue),
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, '/agent_login');
+                },
+                child: const Text("I Already Activated"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushNamed(context, '/agent_login');
-            },
-            child: const Text("I Already Activated"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openVitaLinkWebsite();
-            },
-            child: const Text("Open myvitalink.app"),
-          ),
-        ],
+        ),
       ),
     );
   }
