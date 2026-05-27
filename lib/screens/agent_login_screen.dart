@@ -66,26 +66,14 @@ void _closeOverlay() {
   });
 }
 
-// 🔥 FIXED: call backend instead of hardcoded Stripe link
-Future<void> _goToPayment() async {
-  final email = _emailCtrl.text.trim();
-
-  final res = await ApiService.createAgentCheckout(
-    email: email,
-  );
-
-  if (res["url"] == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Could not start checkout")),
-    );
-    return;
-  }
-
-  final url = Uri.parse(res["url"]);
+Future<void> _openActivationPage() async {
+  final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
 
   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Could not open payment page")),
+      const SnackBar(content: Text("Could not open activation page")),
     );
   }
 }
@@ -112,12 +100,12 @@ Future<void> _login() async {
         _loading = false;
       });
 
-      // ✅ ONLY SHOW POPUP WHEN PAYMENT REQUIRED
+      // Show the access activation prompt when backend access is not active.
       if (res["requires_payment"] == true) {
         setState(() {
           _showAccessOverlay = true;
-          _overlayMessage = res["message"] ??
-              "Your agency no longer covers your access.\n\nActivate your personal plan to continue.";
+          _overlayMessage =
+              "Your agent portal access is not active.\n\nVisit myvitalink.app to activate access before logging in.";
         });
         return;
       }
@@ -290,7 +278,7 @@ Future<void> _login() async {
           if (_showAccessOverlay)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.55),
+                color: Colors.black.withValues(alpha: 0.55),
                 child: Center(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -300,7 +288,7 @@ Future<void> _login() async {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 12,
                         )
                       ],
@@ -339,7 +327,7 @@ Future<void> _login() async {
                               child: ElevatedButton(
                                 onPressed: () {
                                   _closeOverlay();
-                                  _goToPayment();
+                                  _openActivationPage();
                                 },
                                 child: const Text("Continue"),
                               ),
