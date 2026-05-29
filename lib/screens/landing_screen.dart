@@ -145,12 +145,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 color: Colors.green,
                 onPressed: () {
                   Navigator.pop(ctx);
-
-                  Navigator.pushReplacementNamed(
-                    context,
-                    '/terms_user',
-                    arguments: {"code": activationCode},
-                  );
+                  _showClientActivationDialog();
                 },
               ),
 
@@ -238,44 +233,185 @@ class _LandingScreenState extends State<LandingScreen> {
     await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _openClientActivationPage() async {
+    final url = Uri.parse("https://myvitalink.app/activate");
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  void _continueClientRegistration() {
+    Navigator.pushReplacementNamed(
+      context,
+      '/terms_user',
+      arguments: {"code": activationCode},
+    );
+  }
+
+  Widget _dialogActionButton({
+    required String label,
+    required VoidCallback onPressed,
+    required bool primary,
+  }) {
+    if (primary) {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: vitalinkBlue,
+          foregroundColor: Colors.black,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: vitalinkBlue,
+        side: const BorderSide(color: vitalinkBlue),
+        minimumSize: const Size(double.infinity, 50),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      onPressed: onPressed,
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showClientActivationDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Client Account Activation",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
+                "Do you already have a VitaLink activation code?",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 22),
+              _dialogActionButton(
+                label: "I Have a Code",
+                primary: true,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _continueClientRegistration();
+                },
+              ),
+              const SizedBox(height: 10),
+              _dialogActionButton(
+                label: "Get Activation Code",
+                primary: false,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openClientActivationPage();
+                },
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAgentActivationDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          "Agent Portal Activation",
-          style: TextStyle(color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
         ),
-        content: const Text(
-          "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-          "Have you already activated your agent account through myvitalink.app?",
-          style: TextStyle(color: Colors.white70),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Agent Portal Activation",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
+                "Have you already activated your agent account through myvitalink.app?",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 22),
+              _dialogActionButton(
+                label: "Open myvitalink.app",
+                primary: true,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openVitaLinkWebsite();
+                },
+              ),
+              const SizedBox(height: 10),
+              _dialogActionButton(
+                label: "I Already Activated",
+                primary: false,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(
+                    context,
+                    '/terms_agent',
+                    arguments: {"code": activationCode},
+                  );
+                },
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushNamed(context, '/agent_login');
-            },
-            child: const Text("I Already Activated"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: vitalinkBlue,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openVitaLinkWebsite();
-            },
-            child: const Text("Open myvitalink.app"),
-          ),
-        ],
       ),
     );
   }

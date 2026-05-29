@@ -223,6 +223,7 @@ class _LogoScreenState extends State<LogoScreen> {
       // 🔥 CHECK HERE
       final allowed = await _checkAgentStatus();
       if (!allowed) return;
+      if (!mounted) return;
 
       if (role == 'agent') {
         Navigator.pushReplacementNamed(context, '/agent_menu');
@@ -236,7 +237,14 @@ class _LogoScreenState extends State<LogoScreen> {
     }
   }
 
+  void _handleOpenTap() {
+    _timer?.cancel();
+    _openMenu();
+  }
+
   void _openEmergencyScreen() {
+    if (_navigated) return;
+    _navigated = true;
     _timer?.cancel();
     Navigator.pushReplacementNamed(context, '/emergency');
   }
@@ -248,14 +256,12 @@ class _LogoScreenState extends State<LogoScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: InkWell(
-        onTap: () {
-         _timer?.cancel();      // 🔥 kill timer immediately
-         _navigated = false;    // 🔥 allow manual override
-       _openMenu();           // 🔥 force navigation NOW
-      },
-        child: Center(
-          child: Column(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _handleOpenTap,
+        child: SizedBox.expand(
+          child: Center(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
@@ -313,15 +319,15 @@ class _LogoScreenState extends State<LogoScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.redAccent.withOpacity(0.4),
+                        color: Colors.redAccent.withValues(alpha: 0.4),
                         blurRadius: 18,
                         spreadRadius: 2,
                       ),
                     ],
                   ),
-                  child: Column(
+                  child: const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Icon(
                         Icons.warning_amber_rounded,
                         color: Colors.white,
@@ -352,9 +358,11 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+

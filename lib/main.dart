@@ -30,7 +30,6 @@ import 'screens/my_agent_agent.dart';
 import 'screens/emergency_screen.dart';
 import 'screens/emergency_view.dart';
 import 'screens/agent_clients_screen.dart';
-import 'screens/insurance_cards_menu_ios.dart';
 import 'screens/update_app_screen.dart';
 import 'screens/agent_notes_screen.dart';
 
@@ -65,7 +64,6 @@ import 'screens/agent_reset_password_screen.dart';
 // GLOBALS
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final AppLinks _appLinks = AppLinks();
-StreamSubscription<Uri>? _linkSub;
 
 // 🔥 POPUP
 void showGlobalNotificationPopup(RemoteMessage message) {
@@ -142,7 +140,7 @@ Future<void> _setupFCMGlobal() async {
     });
 
   } catch (e) {
-    print("❌ FCM ERROR: $e");
+    debugPrint("❌ FCM ERROR: $e");
   }
 }
 
@@ -150,6 +148,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await runZonedGuarded(() async {
+
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -159,12 +159,12 @@ Future<void> main() async {
     await _setupFCMGlobal();
 
     // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
-    _linkSub = _appLinks.uriLinkStream.listen((uri) {
+    _appLinks.uriLinkStream.listen((uri) {
       final code = uri.queryParameters['code']?.toUpperCase();
 
       if (code != null && code.isNotEmpty) {
         VitaLinkDeepLink.code = code;
-        print("🔥 Deep link code received: $code");
+        debugPrint("🔥 Deep link code received: $code");
       }
     });
 
@@ -251,6 +251,11 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
       home: const LandingScreen(),
+      builder: (context, child) {
+        return SafeArea(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
 
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
@@ -300,7 +305,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/doctors_view': (context) => const DoctorsView(),
         '/appointments': (context) => const AppointmentsScreen(),
         '/insurance_policies': (context) => const InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (context) => IOSCardScanScreen(),
+        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
         '/scan_card': (context) => const ScanCard(),
         '/authorization_form': (context) => const HipaaFormScreen(),
         '/request_reset': (context) => const RequestResetScreen(),
