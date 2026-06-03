@@ -119,6 +119,9 @@ class InsuranceCard {
   String policy;
   String memberId;
   String policyType;
+  String medicarePlanId;
+  String medicarePlanKind;
+  String ocrText;
   String frontImagePath;
   String? backImagePath;
   String? imagePath;
@@ -131,6 +134,9 @@ class InsuranceCard {
     this.policy = '',
     this.memberId = '',
     this.policyType = '',
+    this.medicarePlanId = '',
+    this.medicarePlanKind = '',
+    this.ocrText = '',
     required this.frontImagePath,
     this.backImagePath,
     this.imagePath,
@@ -145,6 +151,9 @@ class InsuranceCard {
         'policy': policy,
         'memberId': memberId,
         'policyType': policyType,
+        'medicarePlanId': medicarePlanId,
+        'medicarePlanKind': medicarePlanKind,
+        'ocrText': ocrText,
         'frontImagePath': frontImagePath,
         'backImagePath': backImagePath,
         'imagePath': imagePath ?? frontImagePath,
@@ -158,6 +167,9 @@ class InsuranceCard {
         policy: json['policy'] ?? '',
         memberId: json['memberId'] ?? '',
         policyType: json['policyType'] ?? '',
+        medicarePlanId: json['medicarePlanId'] ?? '',
+        medicarePlanKind: json['medicarePlanKind'] ?? '',
+        ocrText: json['ocrText'] ?? '',
         frontImagePath: json['frontImagePath'] ?? '',
         backImagePath: json['backImagePath'],
         imagePath: json['imagePath'],

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import 'insurance_card_detail.dart';
 
 class InsuranceCardsScreen extends StatefulWidget {
   final int index;
@@ -48,14 +49,6 @@ class _InsuranceCardsScreenState
         _error = true;
       });
     }
-  }
-
-  Future<void> _save() async {
-    if (_p == null) return;
-    try {
-      _p!.updatedAt = DateTime.now();
-      await _repo.saveProfile(_p!);
-    } catch (_) {}
   }
 
   @override
@@ -131,8 +124,7 @@ class _InsuranceCardsScreenState
                           card.frontImagePath;
 
                       final hasImage =
-                          path != null &&
-                              path.isNotEmpty &&
+                          path.isNotEmpty &&
                               File(path)
                                   .existsSync();
 
@@ -157,7 +149,7 @@ class _InsuranceCardsScreenState
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    CardDetailViewer(
+                                    InsuranceCardDetail(
                                         card: card),
                               ),
                             );

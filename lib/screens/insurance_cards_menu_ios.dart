@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
+import '../services/api_service.dart';
 import '../services/secure_store.dart';
 import 'insurance_card_detail.dart';
 
@@ -86,6 +87,8 @@ class _IOSCardScanScreenState
 
         images.addAll(result);
 
+        if (!mounted) return;
+
         keepScanning = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
@@ -114,13 +117,29 @@ class _IOSCardScanScreenState
 
       final front = images[0];
       final back = images.length > 1 ? images[1] : null;
+      Map<String, dynamic> parsed = {};
+
+      try {
+        final result = await ApiService.parseInsurance(File(front));
+        if (result['success'] == true && result['data'] is Map) {
+          parsed = Map<String, dynamic>.from(result['data']);
+        }
+      } catch (_) {}
 
       _p?.orphanCards.add(
         InsuranceCard(
           frontImagePath: front,
           backImagePath: back,
-          carrier: "",
-          policy: "",
+          carrier: (parsed['carrier'] ?? '').toString().trim(),
+          policy: (parsed['policy'] ?? '').toString().trim(),
+          memberId: (parsed['memberId'] ?? '').toString().trim(),
+          policyType: (parsed['planType'] ?? '').toString().trim(),
+          medicarePlanId:
+              (parsed['medicarePlanId'] ?? '').toString().trim(),
+          medicarePlanKind:
+              (parsed['medicarePlanKind'] ?? '').toString().trim(),
+          ocrText: (parsed['notes'] ?? '').toString().trim(),
+          source: parsed.isEmpty ? "Scan" : "Scan + AI",
         ),
       );
 
@@ -132,10 +151,7 @@ class _IOSCardScanScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Card saved (front + back)")),
       );
-    } catch (e, stack) {
-      print("SCAN ERROR: $e");
-      print(stack);
-
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
