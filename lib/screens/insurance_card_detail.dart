@@ -188,78 +188,83 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFFF7FAFC),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-        title: const Text(
-          'Medicare Co-pays',
-          style: TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+      builder: (_) {
+        final maxHeight = MediaQuery.of(context).size.height * 0.68;
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF7FAFC),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
           ),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  (plan['plan_name'] ?? 'Medicare Plan').toString(),
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  (plan['carrier_name'] ?? '').toString(),
-                  style: const TextStyle(color: Color(0xFF334155)),
-                ),
-                if ((plan['geography'] ?? '').toString().isNotEmpty)
-                  Text(
-                    (plan['geography'] ?? '').toString(),
-                    style: const TextStyle(color: Color(0xFF334155)),
-                  ),
-                const SizedBox(height: 12),
-                if ((moop['in_network'] ?? '').toString().isNotEmpty)
-                  _benefitRow('MOOP In-Network', moop['in_network']),
-                if ((moop['combined'] ?? '').toString().isNotEmpty)
-                  _benefitRow('MOOP Combined', moop['combined']),
-                const Divider(height: 24),
-                if (copays.isEmpty)
-                  const Text(
-                    'CMS found this plan, but no key co-pay rows were mapped yet.',
-                    style: TextStyle(color: Color(0xFF334155)),
-                  ),
-                for (final copay in copays)
-                  _benefitRow(
-                    (copay['label'] ?? '').toString(),
-                    (copay['value'] ?? '').toString(),
-                  ),
-                const SizedBox(height: 12),
-                Text(
-                  (data['message'] ?? '').toString(),
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          title: const Text(
+            'Medicare Co-pays',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: maxHeight,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    (plan['plan_name'] ?? 'Medicare Plan').toString(),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (plan['carrier_name'] ?? '').toString(),
+                    style: const TextStyle(color: Color(0xFF334155)),
+                  ),
+                  if ((plan['geography'] ?? '').toString().isNotEmpty)
+                    Text(
+                      (plan['geography'] ?? '').toString(),
+                      style: const TextStyle(color: Color(0xFF334155)),
+                    ),
+                  const SizedBox(height: 12),
+                  if ((moop['in_network'] ?? '').toString().isNotEmpty)
+                    _benefitRow('MOOP In-Network', moop['in_network']),
+                  if ((moop['combined'] ?? '').toString().isNotEmpty)
+                    _benefitRow('MOOP Combined', moop['combined']),
+                  const Divider(height: 24),
+                  if (copays.isEmpty)
+                    const Text(
+                      'CMS found this plan, but no key co-pay rows were mapped yet.',
+                      style: TextStyle(color: Color(0xFF334155)),
+                    ),
+                  for (final copay in copays)
+                    _benefitRow(
+                      (copay['label'] ?? '').toString(),
+                      (copay['value'] ?? '').toString(),
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    (data['message'] ?? '').toString(),
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
     );
   }
 

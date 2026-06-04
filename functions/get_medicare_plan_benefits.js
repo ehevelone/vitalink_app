@@ -112,26 +112,18 @@ function keyCopays(plan) {
     new Map(rows.map(row => [String(row.categoryCode), row]));
 
   const selected = wanted
-    .map(code => rowByCode.get(code))
-    .filter(Boolean)
-    .map(row => ({
-      code: row.categoryCode,
-      label: friendlyLabel(String(row.categoryCode)),
-      value: row.costShare,
-    }));
+    .map(code => {
+      const row =
+        rowByCode.get(code);
 
-  if (selected.length) {
-    return selected;
-  }
+      return {
+        code,
+        label: friendlyLabel(code),
+        value: row?.costShare || "Not listed",
+      };
+    });
 
-  return rows
-    .slice(0, 12)
-    .map(row => ({
-      code: row.categoryCode,
-      label: friendlyLabel(String(row.categoryCode)),
-      value: row.costShare,
-    }))
-    .filter(row => row.value);
+  return selected;
 }
 
 exports.handler = async (event) => {
