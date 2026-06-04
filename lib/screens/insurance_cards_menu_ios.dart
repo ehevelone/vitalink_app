@@ -179,6 +179,39 @@ class _IOSCardScanScreenState
     );
   }
 
+  String _detectMedicarePlanId(InsuranceCard card) {
+    final text = [
+      card.medicarePlanId,
+      card.policy,
+      card.memberId,
+      card.policyType,
+      card.carrier,
+      card.ocrText,
+    ].where((value) => value.trim().isNotEmpty).join('\n').toUpperCase();
+
+    final match = RegExp(r'\b([HSR]\d{4})[-\s]?(\d{3})(?:[-\s]?(\d{1,3}))?\b')
+        .firstMatch(text);
+
+    if (match == null) return '';
+
+    final segment = match.group(3);
+    return segment == null
+        ? '${match.group(1)}-${match.group(2)}'
+        : '${match.group(1)}-${match.group(2)}-${int.parse(segment)}';
+  }
+
+  void _openCard(InsuranceCard card, {bool showCopays = false}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InsuranceCardDetail(
+          card: card,
+          showCopaysOnOpen: showCopays,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -241,6 +274,8 @@ style: FilledButton.styleFrom(
                     itemBuilder: (context, index) {
                       final card = allCards[index];
                       final file = File(card.frontImagePath);
+                      final hasMedicarePlan =
+                          _detectMedicarePlanId(card).isNotEmpty;
 
                       return Card(
                         child: ListTile(
@@ -257,22 +292,42 @@ style: FilledButton.styleFrom(
                                 ? card.carrier
                                 : "Insurance Card",
                           ),
-                          subtitle: Text(card.policy),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    InsuranceCardDetail(
-                                        card: card),
+                          subtitle: Text(
+                            card.source.isNotEmpty
+                                ? "Source: ${card.source}"
+                                : "Insurance card",
+                          ),
+                          onTap: () => _openCard(card),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasMedicarePlan)
+                                SizedBox(
+                                  height: 34,
+                                  child: FilledButton(
+                                    onPressed: () => _openCard(
+                                      card,
+                                      showCopays: true,
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.blue.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: const Text("Co-pays"),
+                                  ),
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
+                                onPressed: () => _deleteCard(card),
                               ),
-                            );
-                          },
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete,
-                                color: Colors.red),
-                            onPressed: () =>
-                                _deleteCard(card),
+                            ],
                           ),
                         ),
                       );

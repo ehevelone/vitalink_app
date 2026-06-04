@@ -14,12 +14,14 @@ class InsuranceCardDetail extends StatefulWidget {
   final InsuranceCard card;
   final VoidCallback? onDelete;
   final bool startOnBack;
+  final bool showCopaysOnOpen;
 
   const InsuranceCardDetail({
     super.key,
     required this.card,
     this.onDelete,
     this.startOnBack = false,
+    this.showCopaysOnOpen = false,
   });
 
   @override
@@ -38,6 +40,14 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     super.initState();
     _repo = DataRepository(SecureStore());
     _showFront = !widget.startOnBack;
+
+    if (widget.showCopaysOnOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showCopays();
+        }
+      });
+    }
   }
 
   void _toggleView() {
@@ -452,6 +462,14 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                         onPressed: (_loadingBenefits || !_hasMedicarePlanId)
                             ? null
                             : _showCopays,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         icon: _loadingBenefits
                             ? const SizedBox(
                                 width: 18,
