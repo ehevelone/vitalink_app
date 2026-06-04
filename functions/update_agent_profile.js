@@ -68,6 +68,10 @@ exports.handler = async (event) => {
       npn,
       agencyName,
       agencyAddress,
+      agencyStreet,
+      agencyCity,
+      agencyState,
+      agencyZip,
       agencyPhone, // 🔥 ADDED
       password,
       agentSessionToken,
@@ -118,6 +122,23 @@ exports.handler = async (event) => {
       values.push(agencyAddress);
     }
 
+    if (agencyStreet) {
+      updates.push(`agency_street = $${idx++}`);
+      values.push(agencyStreet);
+    }
+    if (agencyCity) {
+      updates.push(`agency_city = $${idx++}`);
+      values.push(agencyCity);
+    }
+    if (agencyState) {
+      updates.push(`agency_state = $${idx++}`);
+      values.push(String(agencyState).trim().toUpperCase());
+    }
+    if (agencyZip) {
+      updates.push(`agency_zip = $${idx++}`);
+      values.push(agencyZip);
+    }
+
     // 🔥 NEW FIELD SAVE
     if (agencyPhone) {
       updates.push(`agency_phone = $${idx++}`);
@@ -151,6 +172,10 @@ exports.handler = async (event) => {
         npn,
         agency_name,
         agency_address,
+        agency_street,
+        agency_city,
+        agency_state,
+        agency_zip,
         agency_phone, -- 🔥 ADDED
         active,
         role;

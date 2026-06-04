@@ -63,6 +63,34 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         await store.getString('agencyState') ?? '';
     _agencyZipCtrl.text =
         await store.getString('agencyZip') ?? '';
+
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) return;
+
+    final profileRes = await ApiService.getAgentProfile(email: email);
+    if (!mounted || profileRes['success'] != true) return;
+
+    final agent = profileRes['agent'];
+    if (agent is! Map) return;
+
+    _nameCtrl.text = agent['name']?.toString() ?? _nameCtrl.text;
+    _phoneCtrl.text = agent['phone']?.toString() ?? _phoneCtrl.text;
+    _agencyNameCtrl.text =
+        agent['agency_name']?.toString() ?? _agencyNameCtrl.text;
+    _agencyAddressCtrl.text =
+        agent['agency_street']?.toString() ??
+        agent['agency_address']?.toString() ??
+        _agencyAddressCtrl.text;
+    _agencyPhoneCtrl.text =
+        agent['agency_phone']?.toString() ?? _agencyPhoneCtrl.text;
+    _agencyCityCtrl.text =
+        agent['agency_city']?.toString() ?? _agencyCityCtrl.text;
+    _agencyStateCtrl.text =
+        agent['agency_state']?.toString() ?? _agencyStateCtrl.text;
+    _agencyZipCtrl.text =
+        agent['agency_zip']?.toString() ?? _agencyZipCtrl.text;
+
+    setState(() {});
   }
 
   String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
@@ -110,6 +138,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
     setState(() => _loading = true);
     final store = SecureStore();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     try {
       final res = await ApiService.updateAgentProfile(
@@ -122,6 +152,18 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         agencyAddress: _agencyAddressCtrl.text.trim().isNotEmpty
             ? _agencyAddressCtrl.text.trim()
             : null,
+        agencyStreet: _agencyAddressCtrl.text.trim().isNotEmpty
+            ? _agencyAddressCtrl.text.trim()
+            : null,
+        agencyCity: _agencyCityCtrl.text.trim().isNotEmpty
+            ? _agencyCityCtrl.text.trim()
+            : null,
+        agencyState: _agencyStateCtrl.text.trim().isNotEmpty
+            ? _agencyStateCtrl.text.trim()
+            : null,
+        agencyZip: _agencyZipCtrl.text.trim().isNotEmpty
+            ? _agencyZipCtrl.text.trim()
+            : null,
         agencyPhone: _agencyPhoneCtrl.text.trim().isNotEmpty
             ? _agencyPhoneCtrl.text.trim()
             : null,
@@ -130,8 +172,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       );
 
       if (res['success'] != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(res['error'] ?? "Update failed ❌")),
+        messenger.showSnackBar(
+          SnackBar(content: Text(res['error'] ?? "Update failed")),
         );
         return;
       }
@@ -153,10 +195,10 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text("Agent profile updated ✅")),
       );
-      Navigator.pop(context);
+      navigator.pop();
     } finally {
       if (mounted) setState(() => _loading = false);
     }

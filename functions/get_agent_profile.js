@@ -52,7 +52,26 @@ if (event.httpMethod !== "POST") {
     }
 
     // 🔹 Prefer email, fallback to id
-    let query = "SELECT id, name, email, npn, phone, agency_name, agency_address, unlock_code, promo_code, active FROM agents WHERE ";
+    let query = `
+      SELECT
+        id,
+        name,
+        email,
+        npn,
+        phone,
+        agency_name,
+        agency_address,
+        agency_street,
+        agency_city,
+        agency_state,
+        agency_zip,
+        agency_phone,
+        unlock_code,
+        promo_code,
+        active
+      FROM agents
+      WHERE
+    `;
     let values = [];
 
     if (email) {

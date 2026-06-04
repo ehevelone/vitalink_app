@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
@@ -66,7 +66,10 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
   final _confirmCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _agencyNameCtrl = TextEditingController();
-  final _agencyAddressCtrl = TextEditingController();
+  final _agencyStreetCtrl = TextEditingController();
+  final _agencyCityCtrl = TextEditingController();
+  final _agencyStateCtrl = TextEditingController();
+  final _agencyZipCtrl = TextEditingController();
 
   bool _loading = false;
   bool _showPassword = false;
@@ -110,7 +113,10 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     _confirmCtrl.dispose();
     _codeCtrl.dispose();
     _agencyNameCtrl.dispose();
-    _agencyAddressCtrl.dispose();
+    _agencyStreetCtrl.dispose();
+    _agencyCityCtrl.dispose();
+    _agencyStateCtrl.dispose();
+    _agencyZipCtrl.dispose();
     super.dispose();
   }
 
@@ -137,22 +143,39 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         npn: _npnCtrl.text.trim(),
         phone: PhoneNumberFormatter.normalizedForApi(_phoneCtrl.text),
         name: _nameCtrl.text.trim(),
+        agencyName: _agencyNameCtrl.text.trim(),
+        agencyStreet: _agencyStreetCtrl.text.trim(),
+        agencyCity: _agencyCityCtrl.text.trim(),
+        agencyState: _agencyStateCtrl.text.trim(),
+        agencyZip: _agencyZipCtrl.text.trim(),
       );
 
       if (data['success'] == true) {
         final store = SecureStore();
+        final email = _emailCtrl.text.trim();
+        final password = _passwordCtrl.text.trim();
 
         await store.setString("agentName", _nameCtrl.text.trim());
-        await store.setString("agentEmail", _emailCtrl.text.trim());
+        await store.setString("agentEmail", email);
         await store.setString("agentPhone", _phoneCtrl.text.trim());
-        await store.setString("agentId", _npnCtrl.text.trim());
+        await store.setString(
+          "agentId",
+          data["agentId"]?.toString() ?? _npnCtrl.text.trim(),
+        );
         await store.setString("agencyName", _agencyNameCtrl.text.trim());
-        await store.setString("agencyAddress", _agencyAddressCtrl.text.trim());
+        await store.setString("agencyAddress", _agencyStreetCtrl.text.trim());
+        await store.setString("agencyCity", _agencyCityCtrl.text.trim());
+        await store.setString("agencyState", _agencyStateCtrl.text.trim());
+        await store.setString("agencyZip", _agencyZipCtrl.text.trim());
 
         await store.setBool("registered", true);
         await store.setBool("agentRegistered", true);
         await store.setBool("agentLoggedIn", true);
         await store.setString("role", "agent");
+        await AppState.clearAuth();
+        await AppState.setLoggedIn(true);
+        await AppState.setRole("agent");
+        await AppState.setEmail(email);
 
         if (data['promoCode'] != null &&
             data['promoCode'].toString().isNotEmpty) {
@@ -160,8 +183,30 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         }
 
         await store.setBool("rememberMeAgent", true);
-        await store.setString("savedAgentEmail", _emailCtrl.text.trim());
-        await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
+        await store.setString("savedAgentEmail", email);
+        await store.setString("savedAgentPassword", password);
+
+        final loginData = await ApiService.loginAgent(
+          email: email,
+          password: password,
+        );
+
+        if (loginData["success"] == true && loginData["agent"] != null) {
+          final agent = loginData["agent"];
+          await store.setString("agentId", agent["id"].toString());
+          await store.setString("agentEmail", agent["email"] ?? email);
+          await store.setString(
+            "agentName",
+            agent["name"] ?? _nameCtrl.text.trim(),
+          );
+
+          final sessionToken = loginData["token"]?.toString() ?? "";
+          if (sessionToken.isNotEmpty) {
+            await store.setString("agentSessionToken", sessionToken);
+          } else {
+            await store.remove("agentSessionToken");
+          }
+        }
 
         if (!mounted) return;
 
@@ -190,16 +235,6 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _goHome() async {
-    final store = SecureStore();
-    await store.remove('authToken');
-    await store.remove('device_token');
-
-    if (!mounted) return;
-
-    Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
   }
 
   @override
@@ -263,10 +298,46 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               const SizedBox(height: 12),
 
               TextFormField(
-                controller: _agencyAddressCtrl,
-                decoration: const InputDecoration(labelText: "Agency Address"),
+                controller: _agencyStreetCtrl,
+                decoration:
+                    const InputDecoration(labelText: "Agency Street Address"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency address" : null,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _agencyCityCtrl,
+                decoration: const InputDecoration(labelText: "Agency City"),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter your agency city" : null,
+              ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _agencyStateCtrl,
+                      decoration: const InputDecoration(labelText: "State"),
+                      textCapitalization: TextCapitalization.characters,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? "Required" : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _agencyZipCtrl,
+                      decoration: const InputDecoration(labelText: "ZIP"),
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? "Required" : null,
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 12),

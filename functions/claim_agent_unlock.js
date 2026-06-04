@@ -57,6 +57,7 @@ exports.handler = async (event) => {
       npn,
       phone,
       name,
+      agencyName,
       agencyStreet,
       agencyCity,
       agencyState,
@@ -75,15 +76,15 @@ exports.handler = async (event) => {
     const existing = await db.query(
       `
       SELECT id, active, password_hash, promo_code, unlock_code,
-        CASE WHEN UPPER(promo_code) = $1 THEN 'promo' ELSE 'unlock' END AS code_match
+        CASE WHEN promo_code = $1 THEN 'promo' ELSE 'unlock' END AS code_match
       FROM agents
-      WHERE UPPER(promo_code) = $1
+      WHERE promo_code = $1
          OR (
-           UPPER(unlock_code) = $1
+           unlock_code = $1
            AND active = FALSE
            AND password_hash IS NULL
          )
-      ORDER BY CASE WHEN UPPER(promo_code) = $1 THEN 0 ELSE 1 END
+      ORDER BY CASE WHEN promo_code = $1 THEN 0 ELSE 1 END
       LIMIT 1
       `,
       [registrationCode]
@@ -113,14 +114,16 @@ exports.handler = async (event) => {
           npn = $3,
           phone = $4,
           name = $5,
-          agency_street = $6,
-          agency_city = $7,
-          agency_state = $8,
-          agency_zip = $9,
+          agency_name = $6,
+          agency_street = $7,
+          agency_address = $7,
+          agency_city = $8,
+          agency_state = $9,
+          agency_zip = $10,
           active = TRUE,
-          promo_code = $10
-      WHERE id = $11
-      RETURNING id, name, email, phone, npn, agency_street, agency_city,
+          promo_code = $11
+      WHERE id = $12
+      RETURNING id, name, email, phone, npn, agency_name, agency_street, agency_city,
         agency_state, agency_zip, promo_code, active, role
       `,
       [
@@ -129,9 +132,10 @@ exports.handler = async (event) => {
         npn,
         normalizeUsPhone(phone),
         name,
+        agencyName,
         agencyStreet,
         agencyCity,
-        agencyState,
+        String(agencyState || "").trim().toUpperCase() || null,
         agencyZip,
         promoCode,
         agent.id,
@@ -148,6 +152,7 @@ exports.handler = async (event) => {
       email: row.email,
       phone: row.phone,
       npn: row.npn,
+      agencyName: row.agency_name,
       agencyStreet: row.agency_street,
       agencyCity: row.agency_city,
       agencyState: row.agency_state,

@@ -211,6 +211,11 @@ static Future<Map<String, dynamic>> _postJsonWithAgentSession(
     required String npn,
     String? phone,
     String? name,
+    String? agencyName,
+    String? agencyStreet,
+    String? agencyCity,
+    String? agencyState,
+    String? agencyZip,
   }) {
     return _postJson("claim_agent_unlock", {
       "unlockCode": unlockCode,
@@ -219,6 +224,11 @@ static Future<Map<String, dynamic>> _postJsonWithAgentSession(
       "npn": npn,
       "phone": phone,
       "name": name,
+      "agencyName": agencyName,
+      "agencyStreet": agencyStreet,
+      "agencyCity": agencyCity,
+      "agencyState": agencyState,
+      "agencyZip": agencyZip,
     });
   }
 
@@ -403,6 +413,10 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     String? npn,
     String? agencyName,
     String? agencyAddress,
+    String? agencyStreet,
+    String? agencyCity,
+    String? agencyState,
+    String? agencyZip,
     String? agencyPhone,
     String? password,
   }) {
@@ -413,6 +427,10 @@ static Future<Map<String, dynamic>> registerDeviceToken({
       "npn": npn,
       "agencyName": agencyName,
       "agencyAddress": agencyAddress,
+      "agencyStreet": agencyStreet,
+      "agencyCity": agencyCity,
+      "agencyState": agencyState,
+      "agencyZip": agencyZip,
       "agencyPhone": agencyPhone,
       "password": password,
     }..removeWhere((k, v) => v == null || v.trim().isEmpty);
