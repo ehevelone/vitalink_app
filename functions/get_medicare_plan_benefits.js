@@ -58,6 +58,16 @@ function friendlyLabel(categoryCode) {
     "4a": "Emergency Room",
     "5a": "Urgent Care",
     "5b": "Worldwide Emergency/Urgent Care",
+    "8a1": "Diagnostic Tests/Procedures",
+    "8a2": "Lab Services",
+    "8b1": "MRI/CT/Diagnostic Radiology",
+    "8b2": "Therapeutic Radiology",
+    "8b3": "Outpatient X-ray",
+    "9a1": "Outpatient Hospital",
+    "9b": "Ambulatory Surgical Center",
+    "10a": "Ambulance",
+    "11a": "Durable Medical Equipment",
+    "12": "Dialysis",
   };
 
   return labels[categoryCode] || `CMS Category ${categoryCode}`;
@@ -93,7 +103,25 @@ function keyCopays(plan) {
   const rows =
     costShareRows(plan);
   const wanted =
-    new Set(["1a", "2", "3-1", "3-2", "4a", "5a", "5b"]);
+    new Set([
+      "1a",
+      "2",
+      "3-1",
+      "3-2",
+      "4a",
+      "5a",
+      "5b",
+      "8a1",
+      "8a2",
+      "8b1",
+      "8b2",
+      "8b3",
+      "9a1",
+      "9b",
+      "10a",
+      "11a",
+      "12",
+    ]);
 
   const selected = rows
     .filter(row => wanted.has(String(row.categoryCode)))
