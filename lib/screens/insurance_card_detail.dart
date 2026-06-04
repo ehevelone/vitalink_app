@@ -115,8 +115,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
       if (!mounted) return;
 
       if (data['success'] != true) {
-        _showBenefitsError(data['error']?.toString() ??
-            'Unable to load co-pays for this card.');
+        _showBenefitsError(data);
         return;
       }
 
@@ -128,16 +127,37 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     }
   }
 
-  void _showBenefitsError(String message) {
+  void _showBenefitsError(Map<String, dynamic> data) {
+    final message = data['error']?.toString() ??
+        'Unable to load co-pays for this card.';
+    final planId = data['plan_id']?.toString() ?? _detectMedicarePlanId(widget.card);
+    final planYear = data['plan_year']?.toString() ?? '';
+
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFFF7FAFC),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
-        title: const Text('Co-pays Not Found'),
-        content: Text(message),
+        title: const Text(
+          'Co-pays Not Found',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          [
+            message,
+            if (planId.isNotEmpty) 'Plan: $planId',
+            if (planYear.isNotEmpty) 'Year: $planYear',
+          ].join('\n\n'),
+          style: const TextStyle(
+            color: Color(0xFF334155),
+            height: 1.35,
+          ),
+        ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
@@ -159,11 +179,17 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFFF7FAFC),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
-        title: const Text('Medicare Co-pays'),
+        title: const Text(
+          'Medicare Co-pays',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -174,14 +200,21 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                 Text(
                   (plan['plan_name'] ?? 'Medicare Plan').toString(),
                   style: const TextStyle(
+                    color: Color(0xFF0F172A),
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text((plan['carrier_name'] ?? '').toString()),
+                Text(
+                  (plan['carrier_name'] ?? '').toString(),
+                  style: const TextStyle(color: Color(0xFF334155)),
+                ),
                 if ((plan['geography'] ?? '').toString().isNotEmpty)
-                  Text((plan['geography'] ?? '').toString()),
+                  Text(
+                    (plan['geography'] ?? '').toString(),
+                    style: const TextStyle(color: Color(0xFF334155)),
+                  ),
                 const SizedBox(height: 12),
                 if ((moop['in_network'] ?? '').toString().isNotEmpty)
                   _benefitRow('MOOP In-Network', moop['in_network']),
@@ -189,7 +222,10 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                   _benefitRow('MOOP Combined', moop['combined']),
                 const Divider(height: 24),
                 if (copays.isEmpty)
-                  const Text('No key co-pays were found for this plan yet.'),
+                  const Text(
+                    'CMS found this plan, but no key co-pay rows were mapped yet.',
+                    style: TextStyle(color: Color(0xFF334155)),
+                  ),
                 for (final copay in copays)
                   _benefitRow(
                     (copay['label'] ?? '').toString(),
@@ -199,7 +235,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                 Text(
                   (data['message'] ?? '').toString(),
                   style: TextStyle(
-                    color: Colors.grey.shade400,
+                    color: Colors.grey.shade700,
                     fontSize: 12,
                   ),
                 ),
@@ -226,7 +262,10 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -234,6 +273,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
             child: Text(
               value?.toString() ?? '',
               textAlign: TextAlign.right,
+              style: const TextStyle(color: Color(0xFF334155)),
             ),
           ),
         ],
