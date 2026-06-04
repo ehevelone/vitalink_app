@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
 import 'package:path_provider/path_provider.dart';    // ✅ ADDED
 
 import '../models.dart';
+import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 
@@ -30,6 +31,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   final ImagePicker _picker = ImagePicker();
   late final DataRepository _repo;
   double _currentScale = 1.0;
+  bool _loadingBenefits = false;
 
   @override
   void initState() {
@@ -42,6 +44,201 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     if ((widget.card.backImagePath ?? '').isNotEmpty) {
       setState(() => _showFront = !_showFront);
     }
+  }
+
+  String _detectMedicarePlanId(InsuranceCard card) {
+    final text = [
+      card.medicarePlanId,
+      card.policy,
+      card.memberId,
+      card.policyType,
+      card.carrier,
+      card.ocrText,
+    ].where((value) => value.trim().isNotEmpty).join('\n').toUpperCase();
+
+    final match = RegExp(r'\b([HSR]\d{4})[-\s]?(\d{3})(?:[-\s]?(\d{1,3}))?\b')
+        .firstMatch(text);
+
+    if (match == null) return '';
+
+    final segment = match.group(3);
+    return segment == null
+        ? '${match.group(1)}-${match.group(2)}'
+        : '${match.group(1)}-${match.group(2)}-${int.parse(segment)}';
+  }
+
+  bool get _hasMedicarePlanId =>
+      _detectMedicarePlanId(widget.card).isNotEmpty;
+
+  bool get _looksLikeMedicareCard {
+    final text = [
+      widget.card.medicarePlanKind,
+      widget.card.policyType,
+      widget.card.carrier,
+      widget.card.policy,
+      widget.card.memberId,
+      widget.card.ocrText,
+    ].where((value) => value.trim().isNotEmpty).join('\n').toUpperCase();
+
+    return text.contains('MAPD') ||
+        text.contains('MA ONLY') ||
+        text.contains('PDP') ||
+        text.contains('MEDICARE ADVANTAGE') ||
+        text.contains('PRESCRIPTION DRUG PLAN') ||
+        text.contains('MEDICARE') ||
+        (text.contains('HEALTH PLAN') &&
+            (text.contains('AETNA') ||
+                text.contains('UNITED') ||
+                text.contains('HUMANA') ||
+                text.contains('DEVOTED') ||
+                text.contains('WELLCARE') ||
+                text.contains('CIGNA') ||
+                text.contains('ANTHEM') ||
+                text.contains('BCBS')));
+  }
+
+  Future<void> _showCopays() async {
+    final planId = _detectMedicarePlanId(widget.card);
+
+    if (planId.isEmpty || _loadingBenefits) return;
+
+    setState(() => _loadingBenefits = true);
+
+    try {
+      final data = await ApiService.getMedicarePlanBenefits(
+        medicarePlanId: planId,
+        policy: widget.card.policy,
+        carrier: widget.card.carrier,
+        cardText: widget.card.ocrText,
+      );
+
+      if (!mounted) return;
+
+      if (data['success'] != true) {
+        _showBenefitsError(data['error']?.toString() ??
+            'Unable to load co-pays for this card.');
+        return;
+      }
+
+      _showBenefitsDialog(data);
+    } finally {
+      if (mounted) {
+        setState(() => _loadingBenefits = false);
+      }
+    }
+  }
+
+  void _showBenefitsError(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: const Text('Co-pays Not Found'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBenefitsDialog(Map<String, dynamic> data) {
+    final plan = Map<String, dynamic>.from(data['plan'] ?? {});
+    final moop = Map<String, dynamic>.from(plan['moop'] ?? {});
+    final copays = (plan['key_copays'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: const Text('Medicare Co-pays'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  (plan['plan_name'] ?? 'Medicare Plan').toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text((plan['carrier_name'] ?? '').toString()),
+                if ((plan['geography'] ?? '').toString().isNotEmpty)
+                  Text((plan['geography'] ?? '').toString()),
+                const SizedBox(height: 12),
+                if ((moop['in_network'] ?? '').toString().isNotEmpty)
+                  _benefitRow('MOOP In-Network', moop['in_network']),
+                if ((moop['combined'] ?? '').toString().isNotEmpty)
+                  _benefitRow('MOOP Combined', moop['combined']),
+                const Divider(height: 24),
+                if (copays.isEmpty)
+                  const Text('No key co-pays were found for this plan yet.'),
+                for (final copay in copays)
+                  _benefitRow(
+                    (copay['label'] ?? '').toString(),
+                    (copay['value'] ?? '').toString(),
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  (data['message'] ?? '').toString(),
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _benefitRow(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value?.toString() ?? '',
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ✅ NEW: SEND AS PDF
@@ -94,24 +291,13 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
     await file.writeAsBytes(await pdf.save());
 
-    if (!mounted) return;
     final subject =
         "Insurance Card – ${card.carrier.isNotEmpty ? card.carrier : "Member"}";
 
-    final box = context.findRenderObject() as RenderBox?;
-
     await Share.shareXFiles(
-      [
-        XFile(
-          file.path,
-          mimeType: "application/pdf",
-          name: "insurance_card.pdf",
-        ),
-      ],
+      [XFile(file.path)],
       subject: subject,
       text: "Please find my insurance card attached for your records.",
-      sharePositionOrigin:
-          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
     );
   }
 
@@ -219,6 +405,31 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
+                  if (_hasMedicarePlanId || _looksLikeMedicareCard) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: (_loadingBenefits || !_hasMedicarePlanId)
+                            ? null
+                            : _showCopays,
+                        icon: _loadingBenefits
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.medical_information_outlined),
+                        label: Text(
+                          _hasMedicarePlanId
+                              ? "Co-pays"
+                              : "Co-pays unavailable",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(

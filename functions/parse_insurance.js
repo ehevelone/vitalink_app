@@ -83,6 +83,41 @@ function fallbackExtractName(rawText) {
   return "";
 }
 
+function extractMedicarePlanId(...values) {
+  const text = values
+    .filter(Boolean)
+    .join("\n")
+    .toUpperCase();
+
+  const match = text.match(/\b([HSR]\d{4})[-\s]?(\d{3})(?:[-\s]?(\d{1,3}))?\b/);
+
+  if (!match) return "";
+
+  const segment = match[3] !== undefined ? `-${Number(match[3])}` : "";
+  return `${match[1]}-${match[2]}${segment}`;
+}
+
+function extractMedicarePlanKind(...values) {
+  const text = values
+    .filter(Boolean)
+    .join("\n")
+    .toUpperCase();
+
+  if (/\bMAPD\b|MEDICARE ADVANTAGE.*PART D|PART C.*PART D/.test(text)) {
+    return "MAPD";
+  }
+
+  if (/\bPDP\b|PRESCRIPTION DRUG PLAN|PART D\b/.test(text)) {
+    return "PDP";
+  }
+
+  if (/\bMA\s*ONLY\b|MEDICARE ADVANTAGE/.test(text)) {
+    return "MA Only";
+  }
+
+  return "";
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -176,6 +211,15 @@ Combine ALL images before extracting.
 CRITICAL REQUIREMENT:
 You MUST extract the insured person's name.
 
+MEDICARE PLAN REQUIREMENTS:
+- If the card is Medicare Advantage, MAPD, MA Only, or PDP, extract the CMS plan ID.
+- CMS plan IDs look like H9802-001, H2802-001-0, S5601-012, or similar.
+- The plan ID may be labeled CMS, Plan ID, Contract/PBP, PBP, or printed near MAPD/PDP.
+- Do NOT confuse the CMS plan ID with the member ID, RxBIN, RxPCN, group, or issuer number.
+- If the card says MAPD, return medicarePlanKind as "MAPD".
+- If the card says MA Only, return medicarePlanKind as "MA Only".
+- If the card says PDP or Prescription Drug Plan, return medicarePlanKind as "PDP".
+
 The insured name may appear as:
 - Name
 - Insured
@@ -208,6 +252,8 @@ Return ONLY valid JSON with EXACTLY this structure:
   "memberId": "",
   "group": "",
   "planType": "",
+  "medicarePlanId": "",
+  "medicarePlanKind": "",
   "insuredName": "",
   "beneficiary": "",
   "benefits": [
@@ -251,6 +297,21 @@ Return ONLY valid JSON with EXACTLY this structure:
       memberId: (parsed.memberId || "").toString().trim(),
       group: (parsed.group || "").toString().trim(),
       planType: (parsed.planType || "").toString().trim(),
+      medicarePlanId: extractMedicarePlanId(
+        parsed.medicarePlanId,
+        parsed.policy,
+        parsed.memberId,
+        parsed.planType,
+        parsed.notes,
+        rawContent
+      ),
+      medicarePlanKind: extractMedicarePlanKind(
+        parsed.medicarePlanKind,
+        parsed.planType,
+        parsed.policy,
+        parsed.notes,
+        rawContent
+      ),
 
       // 🔥 REPLACED ONLY THIS LINE (still same variable name)
       insuredName: insuredName,

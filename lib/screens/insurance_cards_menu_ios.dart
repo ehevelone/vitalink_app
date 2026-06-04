@@ -120,7 +120,9 @@ class _IOSCardScanScreenState
       Map<String, dynamic> parsed = {};
 
       try {
-        final result = await ApiService.parseInsurance(File(front));
+        final result = await ApiService.parseInsuranceImages(
+          images.map((path) => File(path)).toList(),
+        );
         if (result['success'] == true && result['data'] is Map) {
           parsed = Map<String, dynamic>.from(result['data']);
         }

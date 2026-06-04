@@ -164,6 +164,43 @@ static Future<Map<String, dynamic>> _postJsonWithAgentSession(
     });
   }
 
+  static Future<Map<String, dynamic>> parseInsuranceImages(
+    List<File> images,
+  ) async {
+    final encodedImages = <String>[];
+
+    for (final image in images) {
+      final bytes = await image.readAsBytes();
+      encodedImages.add(base64Encode(bytes));
+    }
+
+    final store = SecureStore();
+    final userId = await store.getString("userId");
+
+    return _postJsonWithUserSession("parse_insurance", {
+      "images": encodedImages,
+      if (userId != null && userId.isNotEmpty) "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getMedicarePlanBenefits({
+    required String medicarePlanId,
+    String? policy,
+    String? carrier,
+    String? cardText,
+  }) async {
+    final store = SecureStore();
+    final userId = await store.getString("userId");
+
+    return _postJsonWithUserSession("get_medicare_plan_benefits", {
+      "medicarePlanId": medicarePlanId,
+      "policy": policy,
+      "carrier": carrier,
+      "cardText": cardText,
+      if (userId != null && userId.isNotEmpty) "userId": userId,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔹 Agent unlock claim
   // -------------------------------------------------------------
