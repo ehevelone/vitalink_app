@@ -282,16 +282,6 @@ class _LogoScreenState extends State<LogoScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
-              const Text(
-                'TAP ANYWHERE TO OPEN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 24),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 28),
                 child: Text(
