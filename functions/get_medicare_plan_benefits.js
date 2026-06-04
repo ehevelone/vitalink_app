@@ -50,24 +50,17 @@ function activePlanYear(now = new Date()) {
 
 function friendlyLabel(categoryCode) {
   const labels = {
-    "1a": "Inpatient Hospital",
-    "1b": "Inpatient Mental Health",
-    "2": "Skilled Nursing Facility",
-    "3-1": "Primary Care Visit",
-    "3-2": "Specialist Visit",
-    "4a": "Emergency Room",
+    "3-1": "Primary Dr",
+    "3-2": "Specialist",
+    "1a": "Inpatient Hospital Stay",
+    "2": "SNF",
+    "7i": "PT",
+    "8b1": "MRI/CT",
+    "8b3": "X-Ray",
+    "10a1": "Ambulance",
+    "4a": "ER",
     "5a": "Urgent Care",
-    "5b": "Worldwide Emergency/Urgent Care",
-    "8a1": "Diagnostic Tests/Procedures",
-    "8a2": "Lab Services",
-    "8b1": "MRI/CT/Diagnostic Radiology",
-    "8b2": "Therapeutic Radiology",
-    "8b3": "Outpatient X-ray",
-    "9a1": "Outpatient Hospital",
-    "9b": "Ambulatory Surgical Center",
-    "10a": "Ambulance",
-    "11a": "Durable Medical Equipment",
-    "12": "Dialysis",
+    "13b": "OTC",
   };
 
   return labels[categoryCode] || `CMS Category ${categoryCode}`;
@@ -102,29 +95,25 @@ function costShareRows(plan) {
 function keyCopays(plan) {
   const rows =
     costShareRows(plan);
-  const wanted =
-    new Set([
-      "1a",
-      "2",
+  const wanted = [
       "3-1",
       "3-2",
+      "1a",
+      "2",
+      "7i",
+      "8b1",
+      "8b3",
+      "10a1",
       "4a",
       "5a",
-      "5b",
-      "8a1",
-      "8a2",
-      "8b1",
-      "8b2",
-      "8b3",
-      "9a1",
-      "9b",
-      "10a",
-      "11a",
-      "12",
-    ]);
+      "13b",
+    ];
+  const rowByCode =
+    new Map(rows.map(row => [String(row.categoryCode), row]));
 
-  const selected = rows
-    .filter(row => wanted.has(String(row.categoryCode)))
+  const selected = wanted
+    .map(code => rowByCode.get(code))
+    .filter(Boolean)
     .map(row => ({
       code: row.categoryCode,
       label: friendlyLabel(String(row.categoryCode)),
