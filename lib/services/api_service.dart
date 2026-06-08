@@ -554,6 +554,96 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     return _postJsonWithAgentSession("sync_app_client_to_crm", body);
   }
 
+  static Future<Map<String, dynamic>> createProfileShareLink({
+    required String userId,
+    required String profileId,
+    required String profileName,
+    String? email,
+    String? phone,
+    List<String> allowedSections = const [
+      "emergency",
+      "medications",
+      "doctors",
+    ],
+  }) {
+    return _postJsonWithUserSession("create_profile_share_link", {
+      "userId": userId,
+      "profileId": profileId,
+      "profileName": profileName,
+      "email": email,
+      "phone": phone,
+      "allowedSections": allowedSections,
+    });
+  }
+
+  static Future<Map<String, dynamic>> acceptProfileShareLink({
+    required String userId,
+    required String inviteCode,
+  }) {
+    return _postJsonWithUserSession("accept_profile_share_link", {
+      "userId": userId,
+      "inviteCode": inviteCode,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getProfileShareLinks({
+    required String userId,
+    String? profileId,
+  }) {
+    return _postJsonWithUserSession("get_profile_share_links", {
+      "userId": userId,
+      "profileId": profileId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> revokeProfileShareLink({
+    required String userId,
+    required String shareId,
+  }) {
+    return _postJsonWithUserSession("revoke_profile_share_link", {
+      "userId": userId,
+      "shareId": shareId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> createProfileUpdatePackage({
+    required String userId,
+    required String profileId,
+    required String profileName,
+    required Map<String, dynamic> payload,
+    List<String> allowedSections = const [
+      "emergency",
+      "medications",
+      "doctors",
+    ],
+  }) {
+    return _postJsonWithUserSession("create_profile_update_package", {
+      "userId": userId,
+      "profileId": profileId,
+      "profileName": profileName,
+      "allowedSections": allowedSections,
+      "payload": payload,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getProfileUpdatePackages({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("get_profile_update_packages", {
+      "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> markProfileUpdateApplied({
+    required String userId,
+    required String packageId,
+  }) {
+    return _postJsonWithUserSession("mark_profile_update_applied", {
+      "userId": userId,
+      "packageId": packageId,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------

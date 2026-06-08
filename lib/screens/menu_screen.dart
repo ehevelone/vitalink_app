@@ -133,8 +133,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
       String name = "";
 
-      if (p?.fullName.trim().isNotEmpty == true) {
-        name = p!.fullName.trim();
+      if (p.fullName.trim().isNotEmpty) {
+        name = p.fullName.trim();
         await _store.setString("userName", name);
       } else if (storedName != null && storedName.trim().isNotEmpty) {
         name = storedName.trim();
@@ -279,7 +279,13 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _handleNotificationTap(RemoteMessage message) {}
+  void _handleNotificationTap(RemoteMessage message) {
+    final route = message.data["route"]?.toString();
+
+    if (route != null && route.isNotEmpty && mounted) {
+      Navigator.pushNamed(context, route);
+    }
+  }
 
   Future<void> _logout(BuildContext context) async {
     await _store.remove('userLoggedIn');
@@ -290,7 +296,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
     await AppState.clearAuth();
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     Navigator.pushNamedAndRemoveUntil(
       context,
@@ -357,6 +363,10 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                                 '/insurance_policies'),
                             _item(
                                 Icons.person, "My Profile", '/my_profile_user'),
+                            _item(Icons.share, "Profile Sharing",
+                                '/profile_sharing'),
+                            _item(Icons.sync, "Profile Updates",
+                                '/profile_updates'),
                           ],
                         ),
                       ),

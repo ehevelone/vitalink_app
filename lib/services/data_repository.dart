@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
+import 'profile_update_sync_service.dart';
 import 'secure_store.dart';
 
 class DataRepository {
@@ -115,7 +117,7 @@ class DataRepository {
       print("🚨 INVALID PROFILE ID DETECTED → RESETTING");
 
       final newProfile = Profile(); // generates proper UUID
-      await saveProfile(newProfile);
+      await saveProfile(newProfile, publishUpdate: false);
 
       await _syncName(newProfile);
       return newProfile;
@@ -127,7 +129,7 @@ class DataRepository {
     final name = p.fullName.trim();
 
     if (name.isNotEmpty) {
-      await saveProfile(p); // forces clean rewrite
+      await saveProfile(p, publishUpdate: false); // forces clean rewrite
     }
 
     // 🔥 always sync name to backup storage
@@ -140,12 +142,18 @@ class DataRepository {
     return _loadProfilesInternal();
   }
 
-  Future<void> saveProfile(Profile profile) async {
+  Future<void> saveProfile(
+    Profile profile, {
+    bool publishUpdate = true,
+  }) async {
     final profiles = await _loadProfilesInternal();
 
     if (profiles.isEmpty) {
       await _saveProfilesInternal([profile], activeIndex: 0);
       await _syncName(profile);
+      if (publishUpdate) {
+        _publishSharedUpdate(profile);
+      }
       return;
     }
 
@@ -157,6 +165,99 @@ class DataRepository {
 
     // 🔥 sync name after save
     await _syncName(profile);
+
+    if (publishUpdate) {
+      _publishSharedUpdate(profile);
+    }
+  }
+
+  void _publishSharedUpdate(Profile profile) {
+    unawaited(
+      ProfileUpdateSyncService()
+          .publishProfileUpdate(profile)
+          .catchError((_) => <String, dynamic>{'success': false}),
+    );
+  }
+
+  Future<void> applySharedProfileUpdate(
+    Map<String, dynamic> updatePayload,
+  ) async {
+    final profileMap =
+        Map<String, dynamic>.from(updatePayload['profile'] as Map? ?? {});
+
+    final profileId = (profileMap['id'] ?? updatePayload['profileId'] ?? '')
+        .toString()
+        .trim();
+
+    if (profileId.isEmpty) return;
+
+    final profiles = await _loadProfilesInternal();
+    final idx = profiles.indexWhere((p) => p.id == profileId);
+
+    final current = idx >= 0
+        ? profiles[idx]
+        : Profile(
+            id: profileId,
+            fullName: (profileMap['fullName'] ??
+                    updatePayload['profileName'] ??
+                    'Shared Profile')
+                .toString(),
+          );
+
+    final updated = current.copyWith(
+      fullName: profileMap['fullName'] ?? current.fullName,
+      dob: profileMap['dob'] ?? current.dob,
+      userPhone: profileMap['userPhone'] ?? current.userPhone,
+      address: profileMap['address'] ?? current.address,
+      city: profileMap['city'] ?? current.city,
+      state: profileMap['state'] ?? current.state,
+      zip: profileMap['zip'] ?? current.zip,
+      updatedAt: DateTime.now(),
+      emergency: updatePayload['emergency'] is Map
+          ? EmergencyInfo.fromJson(
+              Map<String, dynamic>.from(updatePayload['emergency'] as Map),
+            )
+          : current.emergency,
+      meds: updatePayload['meds'] is List
+          ? (updatePayload['meds'] as List)
+              .whereType<Map>()
+              .map((m) => Medication.fromJson(Map<String, dynamic>.from(m)))
+              .toList()
+          : current.meds,
+      doctors: updatePayload['doctors'] is List
+          ? (updatePayload['doctors'] as List)
+              .whereType<Map>()
+              .map((d) => Doctor.fromJson(Map<String, dynamic>.from(d)))
+              .toList()
+          : current.doctors,
+      appointments: updatePayload['appointments'] is List
+          ? (updatePayload['appointments'] as List)
+              .whereType<Map>()
+              .map((a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
+              .toList()
+          : current.appointments,
+      insurances: updatePayload['insurances'] is List
+          ? (updatePayload['insurances'] as List)
+              .whereType<Map>()
+              .map((i) => Insurance.fromJson(Map<String, dynamic>.from(i)))
+              .toList()
+          : current.insurances,
+      orphanCards: updatePayload['orphanCards'] is List
+          ? (updatePayload['orphanCards'] as List)
+              .whereType<Map>()
+              .map((c) => InsuranceCard.fromJson(Map<String, dynamic>.from(c)))
+              .toList()
+          : current.orphanCards,
+    );
+
+    if (idx >= 0) {
+      profiles[idx] = updated;
+      await _saveProfilesInternal(profiles);
+    } else {
+      await _saveProfilesInternal([...profiles, updated]);
+    }
+
+    await _syncName(updated);
   }
 
   Future<void> addProfile(Profile profile) async {

@@ -38,6 +38,8 @@ import 'screens/profile_user_screen.dart';
 import 'screens/profile_agent_screen.dart';
 import 'screens/edit_profile.dart';
 import 'screens/profile_picker.dart';
+import 'screens/profile_sharing_screen.dart';
+import 'screens/profile_updates_screen.dart';
 import 'screens/new_profile_screen.dart';
 
 // MEDICAL
@@ -299,6 +301,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/my_profile_agent': (context) => const ProfileAgentScreen(),
         '/edit_profile': (context) => const EditProfileScreen(),
         '/profile_picker': (context) => const ProfilePickerScreen(),
+        '/profile_sharing': (context) => const ProfileSharingScreen(),
+        '/profile_updates': (context) => const ProfileUpdatesScreen(),
         '/new_profile': (context) => const NewProfileScreen(),
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
