@@ -75,8 +75,8 @@ async function ensureSchema() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS profile_share_links (
       id UUID PRIMARY KEY,
-      owner_user_id UUID NOT NULL,
-      recipient_user_id UUID,
+      owner_user_id TEXT NOT NULL,
+      recipient_user_id TEXT,
       invited_email TEXT,
       invited_phone TEXT,
       profile_id UUID,
@@ -93,7 +93,7 @@ async function ensureSchema() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS profile_update_packages (
       id UUID PRIMARY KEY,
-      owner_user_id UUID NOT NULL,
+      owner_user_id TEXT NOT NULL,
       profile_id UUID,
       profile_name TEXT,
       allowed_sections JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -108,13 +108,29 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS profile_update_recipients (
       id UUID PRIMARY KEY,
       package_id UUID NOT NULL REFERENCES profile_update_packages(id) ON DELETE CASCADE,
-      recipient_user_id UUID NOT NULL,
+      recipient_user_id TEXT NOT NULL,
       share_link_id UUID REFERENCES profile_share_links(id) ON DELETE SET NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       notified_at TIMESTAMPTZ,
       downloaded_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await db.query(`
+    ALTER TABLE profile_share_links
+    ALTER COLUMN owner_user_id TYPE TEXT USING owner_user_id::TEXT,
+    ALTER COLUMN recipient_user_id TYPE TEXT USING recipient_user_id::TEXT
+  `);
+
+  await db.query(`
+    ALTER TABLE profile_update_packages
+    ALTER COLUMN owner_user_id TYPE TEXT USING owner_user_id::TEXT
+  `);
+
+  await db.query(`
+    ALTER TABLE profile_update_recipients
+    ALTER COLUMN recipient_user_id TYPE TEXT USING recipient_user_id::TEXT
   `);
 
   await db.query(`
@@ -182,7 +198,7 @@ async function sendProfileUpdatePush({ recipientUserIds, packageId, profileName 
     `
     SELECT id, user_id, device_token
     FROM user_devices
-    WHERE user_id = ANY($1::uuid[])
+    WHERE user_id::TEXT = ANY($1::TEXT[])
       AND device_token IS NOT NULL
       AND TRIM(device_token) <> ''
       AND TRIM(device_token) <> 'NO_TOKEN'
