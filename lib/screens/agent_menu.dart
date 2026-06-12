@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/secure_store.dart';
-import '../services/data_repository.dart';
 import '../services/app_state.dart';
-import '../models.dart';
 
 class AgentMenuScreen extends StatefulWidget {
   const AgentMenuScreen({super.key});
@@ -13,28 +11,22 @@ class AgentMenuScreen extends StatefulWidget {
 }
 
 class _AgentMenuScreenState extends State<AgentMenuScreen> {
-  late final DataRepository _repo;
-  Profile? _p;
   bool _loading = true;
   String agentName = "Agent";
 
   @override
   void initState() {
     super.initState();
-    _repo = DataRepository(SecureStore());
     _loadData();
   }
 
   Future<void> _loadData() async {
     final store = SecureStore();
-    final p = await _repo.loadProfile();
     final storedName = await store.getString("agentName");
 
     if (!mounted) return;
 
     setState(() {
-      _p = p;
-
       if (storedName != null && storedName.isNotEmpty) {
         agentName = storedName;
       } else {
@@ -60,7 +52,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     await store.remove('lastEmail');
     await store.remove('lastRole');
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     Navigator.of(context).pushNamedAndRemoveUntil(
       '/landing',
@@ -114,6 +106,8 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
                             // NEW BUTTON
                             _item(Icons.groups, "My Clients", '/agent_clients'),
+                            _item(Icons.favorite, "Referral Center",
+                                '/agent_referrals'),
                             _item(Icons.task_alt, "Notes / Tasks", '/agent_notes'),
                             _item(Icons.medical_information, "Medications",
                                 '/meds'),

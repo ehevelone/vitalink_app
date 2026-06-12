@@ -209,6 +209,32 @@ class _MyAgentUserState extends State<MyAgentUser> {
                     onPressed: _sendToAgent,
                   ),
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.favorite),
+                    label: const Text(
+                      "Referral Center",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.lightBlueAccent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pushNamed(
+                      context,
+                      '/referral_center',
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

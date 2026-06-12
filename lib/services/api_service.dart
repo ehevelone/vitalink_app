@@ -394,6 +394,18 @@ static Future<Map<String, dynamic>> registerDeviceToken({
   });
 }
 
+static Future<Map<String, dynamic>> registerAgentDeviceToken({
+  required int agentId,
+  required String fcmToken,
+  String? platform,
+}) {
+  return _postJsonWithAgentSession("register_agent_device", {
+    "agentId": agentId,
+    "deviceToken": fcmToken,
+    "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+  });
+}
+
   // -------------------------------------------------------------
   // 🔔 Send notification
   // -------------------------------------------------------------
@@ -641,6 +653,56 @@ static Future<Map<String, dynamic>> registerDeviceToken({
     return _postJsonWithUserSession("mark_profile_update_applied", {
       "userId": userId,
       "packageId": packageId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> submitAgentReferral({
+    required String userId,
+    required String referralName,
+    String? phone,
+    String? email,
+    String? relationship,
+    String? reason,
+    String? notes,
+    String source = "recommend_my_agent",
+  }) {
+    return _postJsonWithUserSession("submit_agent_referral", {
+      "userId": userId,
+      "referralName": referralName,
+      "phone": phone,
+      "email": email,
+      "relationship": relationship,
+      "reason": reason,
+      "notes": notes,
+      "source": source,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getMyReferrals({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("get_my_referrals", {
+      "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getAgentReferrals({
+    required int agentId,
+  }) {
+    return _postJsonWithAgentSession("get_agent_referrals", {
+      "agentId": agentId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> updateAgentReferralStatus({
+    required int agentId,
+    required String referralId,
+    required String status,
+  }) {
+    return _postJsonWithAgentSession("update_agent_referral_status", {
+      "agentId": agentId,
+      "referralId": referralId,
+      "status": status,
     });
   }
 

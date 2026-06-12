@@ -41,6 +41,8 @@ import 'screens/profile_picker.dart';
 import 'screens/profile_sharing_screen.dart';
 import 'screens/profile_updates_screen.dart';
 import 'screens/new_profile_screen.dart';
+import 'screens/referral_center_screen.dart';
+import 'screens/agent_referrals_screen.dart';
 
 // MEDICAL
 import 'screens/meds_screen.dart';
@@ -90,6 +92,7 @@ void showGlobalNotificationPopup(RemoteMessage message) {
             onPressed: () {
               Navigator.pop(context);
 
+              _captureProfileShareInvite(message);
               final route = data["route"];
               if (route != null) {
                 navigatorKey.currentState?.pushNamed(route);
@@ -110,6 +113,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 // 🔥 TAP HANDLER
 void _handleNotificationNavigation(RemoteMessage message) {
   debugPrint("📩 TAP DATA: ${message.data}");
+}
+
+void _captureProfileShareInvite(RemoteMessage message) {
+  final type = message.data["type"]?.toString();
+  final inviteCode = message.data["inviteCode"]?.toString().toUpperCase();
+
+  if (type == "profile_share_invite" &&
+      inviteCode != null &&
+      inviteCode.isNotEmpty) {
+    VitaLinkDeepLink.shareCode = inviteCode;
+  }
 }
 
 Future<void> _setupFCMGlobal() async {
@@ -164,17 +178,39 @@ Future<void> main() async {
     _appLinks.uriLinkStream.listen((uri) {
       final code = uri.queryParameters['code']?.toUpperCase();
 
-      if (code != null && code.isNotEmpty) {
+      if (uri.host != 'share' && code != null && code.isNotEmpty) {
         VitaLinkDeepLink.code = code;
         debugPrint("🔥 Deep link code received: $code");
       }
     });
 
     // 🔥 HANDLE TAP WHEN APP IS CLOSED
+    Future<void> handleProfileShareLink(Uri uri) async {
+      if (uri.host != 'share') return;
+
+      final shareCode = uri.queryParameters['code']?.toUpperCase();
+      if (shareCode == null || shareCode.isEmpty) return;
+
+      VitaLinkDeepLink.shareCode = shareCode;
+      debugPrint("Profile share link code received: $shareCode");
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushNamed('/profile_sharing');
+      });
+    }
+
+    final initialShareUri = await _appLinks.getInitialLink();
+    if (initialShareUri != null) {
+      await handleProfileShareLink(initialShareUri);
+    }
+
+    _appLinks.uriLinkStream.listen(handleProfileShareLink);
+
     RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
 
     if (initialMessage != null) {
+      _captureProfileShareInvite(initialMessage);
       final route = initialMessage.data["route"];
 
       if (route != null) {
@@ -194,6 +230,7 @@ Future<void> main() async {
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       _handleNotificationNavigation(message);
+      _captureProfileShareInvite(message);
 
       final route = message.data["route"];
 
@@ -304,6 +341,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/profile_sharing': (context) => const ProfileSharingScreen(),
         '/profile_updates': (context) => const ProfileUpdatesScreen(),
         '/new_profile': (context) => const NewProfileScreen(),
+        '/referral_center': (context) => const ReferralCenterScreen(),
+        '/agent_referrals': (context) => const AgentReferralsScreen(),
         '/meds': (context) => const MedsScreen(),
         '/doctors': (context) => const DoctorsScreen(),
         '/doctors_view': (context) => const DoctorsView(),

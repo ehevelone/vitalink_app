@@ -158,10 +158,10 @@ Future<void> _login() async {
       try {
         final fcm = await FirebaseMessaging.instance.getToken();
         if (fcm != null) {
-          final userId = await store.getString("userId");
-          if (userId != null) {
-            await ApiService.registerDeviceToken(
-              userId: userId,
+          final agentId = int.tryParse(agent["id"].toString());
+          if (agentId != null && agentId > 0) {
+            await ApiService.registerAgentDeviceToken(
+              agentId: agentId,
               fcmToken: fcm,
             );
           }

@@ -1,0 +1,116 @@
+const db = require("./services/db");
+const { verifyAgentSession } = require("./services/agent-auth");
+
+function reply(statusCode, obj) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    },
+    body: JSON.stringify(obj),
+  };
+}
+
+async function ensureAgentDeviceSupport() {
+  await db.query(`
+    ALTER TABLE user_devices
+    ALTER COLUMN user_id DROP NOT NULL
+  `);
+
+  await db.query(`
+    ALTER TABLE user_devices
+    ADD COLUMN IF NOT EXISTS push_status TEXT,
+    ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_push_error TEXT
+  `);
+}
+
+exports.handler = async (event) => {
+  try {
+    if (event.httpMethod === "OPTIONS") {
+      return reply(200, {});
+    }
+
+    if (event.httpMethod !== "POST") {
+      return reply(405, { success: false, error: "Method Not Allowed" });
+    }
+
+    let body;
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch {
+      return reply(400, { success: false, error: "Invalid JSON body" });
+    }
+
+    const { agentId, agentSessionToken, deviceToken, fcmToken, platform } = body;
+    const token = deviceToken || fcmToken;
+    const numericAgentId = Number(agentId);
+
+    if (!Number.isInteger(numericAgentId) || numericAgentId <= 0 || !token) {
+      return reply(400, {
+        success: false,
+        error: "Missing agentId or token",
+      });
+    }
+
+    const agent = await verifyAgentSession({
+      agentId: numericAgentId,
+      token: agentSessionToken,
+    });
+
+    if (!agent) {
+      return reply(403, { success: false, error: "Unauthorized" });
+    }
+
+    await ensureAgentDeviceSupport();
+
+    const existing = await db.query(
+      `
+      SELECT id
+      FROM user_devices
+      WHERE agent_id = $1
+        AND user_id IS NULL
+      LIMIT 1
+      `,
+      [numericAgentId]
+    );
+
+    if (existing.rows.length) {
+      const updated = await db.query(
+        `
+        UPDATE user_devices
+        SET device_token = $1,
+            platform = $2,
+            push_status = 'registered',
+            last_push_error = NULL,
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, agent_id, platform, push_status, updated_at
+        `,
+        [token, platform || "unknown", existing.rows[0].id]
+      );
+
+      return reply(200, { success: true, device: updated.rows[0] });
+    }
+
+    const inserted = await db.query(
+      `
+      INSERT INTO user_devices
+        (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+      VALUES (NULL, $1, $2, $3, 'registered', NOW(), NOW())
+      RETURNING id, agent_id, platform, push_status, updated_at
+      `,
+      [numericAgentId, token, platform || "unknown"]
+    );
+
+    return reply(200, { success: true, device: inserted.rows[0] });
+  } catch (err) {
+    console.error("register_agent_device error:", err);
+    return reply(500, { success: false, error: "Server error" });
+  }
+};
