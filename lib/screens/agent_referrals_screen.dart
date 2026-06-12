@@ -15,7 +15,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
     'Introduction Sent',
     'Referral Link Opened',
     'Contact Preference Submitted',
-    'Contacted',
+    'Agent Contacted',
     'Appointment Scheduled',
     'Client Added',
     'Closed',

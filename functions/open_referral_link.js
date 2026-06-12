@@ -29,12 +29,15 @@ exports.handler = async (event) => {
       SELECT
         r.id,
         r.referral_name,
+        r.referral_phone,
+        r.referral_email,
         r.relationship,
         r.reason,
         r.status,
         r.public_token,
         CONCAT_WS(' ', u.first_name, u.last_name) AS referring_client,
         a.name AS agent_name,
+        a.agency_name,
         a.email AS agent_email,
         a.phone AS agent_phone
       FROM agent_referrals r
@@ -70,6 +73,8 @@ exports.handler = async (event) => {
       success: true,
       referral: {
         name: referral.referral_name,
+        phone: referral.referral_phone,
+        email: referral.referral_email,
         relationship: referral.relationship,
         reason: referral.reason,
         status: referral.status,
@@ -77,6 +82,7 @@ exports.handler = async (event) => {
       referringClient: referral.referring_client || "A VitaLink user",
       agent: {
         name: referral.agent_name || "their insurance agent",
+        agencyName: referral.agency_name,
         email: referral.agent_email,
         phone: referral.agent_phone,
       },

@@ -10,14 +10,14 @@ const VALID_STATUSES = new Set([
   "Introduction Sent",
   "Referral Link Opened",
   "Contact Preference Submitted",
-  "Contacted",
+  "Agent Contacted",
   "Appointment Scheduled",
   "Client Added",
   "Closed",
 ]);
 
 function statusTimestampColumn(status) {
-  if (status === "Contacted") return "agent_first_contacted_at";
+  if (status === "Agent Contacted") return "agent_first_contacted_at";
   if (status === "Appointment Scheduled") return "appointment_scheduled_at";
   if (status === "Client Added") return "client_added_at";
   if (status === "Closed") return "closed_at";

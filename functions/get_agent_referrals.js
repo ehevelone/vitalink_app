@@ -68,7 +68,7 @@ exports.handler = async (event) => {
     const rows = result.rows;
     const total = rows.length;
     const contacted = rows.filter((r) =>
-      ["Contacted", "Appointment Scheduled", "Client Added", "Closed"].includes(r.status)
+      ["Agent Contacted", "Appointment Scheduled", "Client Added", "Closed"].includes(r.status)
     ).length;
     const appointments = rows.filter((r) =>
       ["Appointment Scheduled", "Client Added", "Closed"].includes(r.status)

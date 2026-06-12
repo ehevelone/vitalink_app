@@ -6,7 +6,7 @@ const {
   sendReferralPush,
 } = require("./services/referral-center");
 
-const VALID_PREFERENCES = new Set(["Text Me", "Call Me", "Email Me"]);
+const VALID_PREFERENCES = new Set(["Text Message", "Phone Call", "Email"]);
 
 exports.handler = async (event) => {
   try {
@@ -28,14 +28,14 @@ exports.handler = async (event) => {
     }
 
     if (!VALID_PREFERENCES.has(preference)) {
-      return reply(400, { success: false, error: "Choose Text Me, Call Me, or Email Me." });
+      return reply(400, { success: false, error: "Choose Text Message, Phone Call, or Email." });
     }
 
-    if ((preference === "Text Me" || preference === "Call Me") && !phone) {
+    if ((preference === "Text Message" || preference === "Phone Call") && !phone) {
       return reply(400, { success: false, error: "Enter a phone number." });
     }
 
-    if (preference === "Email Me" && !email) {
+    if (preference === "Email" && !email) {
       return reply(400, { success: false, error: "Enter an email address." });
     }
 
@@ -81,7 +81,7 @@ exports.handler = async (event) => {
       recipient: { type: "agent", id: referral.agent_id },
       referral,
       title: "New VitaLink Referral",
-      body: `${referral.referral_name} prefers: ${preference}.`,
+      body: `${referral.referral_name} preferred contact: ${preference}.`,
     });
 
     const clientPush = await sendReferralPush({

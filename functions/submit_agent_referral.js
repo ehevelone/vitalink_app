@@ -15,6 +15,7 @@ const VALID_RELATIONSHIPS = new Set([
   "Friend",
   "Coworker",
   "Neighbor",
+  "Relative",
   "Caregiver",
   "Adult Child",
   "Other",
@@ -96,7 +97,7 @@ exports.handler = async (event) => {
 
     const publicToken = crypto.randomBytes(24).toString("hex");
     const siteUrl = (process.env.PUBLIC_SITE_URL || "https://myvitalink.app").replace(/\/$/, "");
-    const referralLink = `${siteUrl}/referral.html?r=${publicToken}`;
+    const referralLink = `${siteUrl}/referral/${publicToken}`;
 
     const insert = await db.query(
       `
