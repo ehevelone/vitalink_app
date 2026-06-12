@@ -33,14 +33,13 @@ exports.handler = async (event) => {
         r.referral_email,
         r.relationship,
         r.reason,
-        r.status,
         r.public_token,
         CONCAT_WS(' ', u.first_name, u.last_name) AS referring_client,
         a.name AS agent_name,
         a.agency_name,
         a.email AS agent_email,
         a.phone AS agent_phone
-      FROM agent_referrals r
+      FROM agent_referral_invites r
       JOIN users u ON u.id = r.referring_user_id
       JOIN agents a ON a.id = r.agent_id
       WHERE r.public_token = $1
@@ -50,48 +49,15 @@ exports.handler = async (event) => {
     );
 
     if (!result.rows.length) {
-      const oldReferral = await db.query(
-        `
-        SELECT
-          r.id,
-          r.referral_name,
-          r.referral_phone,
-          r.referral_email,
-          r.relationship,
-          r.reason,
-          r.status,
-          r.public_token,
-          CONCAT_WS(' ', u.first_name, u.last_name) AS referring_client,
-          a.name AS agent_name,
-          a.agency_name,
-          a.email AS agent_email,
-          a.phone AS agent_phone
-        FROM agent_referrals r
-        JOIN users u ON u.id = r.referring_user_id
-        JOIN agents a ON a.id = r.agent_id
-        WHERE r.public_token = $1
-        LIMIT 1
-        `,
-        [token]
-      );
-
-      if (!oldReferral.rows.length) {
-        return reply(404, { success: false, error: "Referral link not found." });
-      }
-
-      result.rows.push(oldReferral.rows[0]);
+      return reply(404, { success: false, error: "Referral link not found." });
     }
 
     const referral = result.rows[0];
 
     await db.query(
       `
-      UPDATE agent_referrals
-      SET link_opened_at = COALESCE(link_opened_at, NOW()),
-          status = CASE
-            WHEN status = 'Introduction Sent' THEN 'Referral Link Opened'
-            ELSE status
-          END,
+      UPDATE agent_referral_invites
+      SET opened_at = COALESCE(opened_at, NOW()),
           updated_at = NOW()
       WHERE public_token = $1
       `,
@@ -106,7 +72,6 @@ exports.handler = async (event) => {
         email: referral.referral_email,
         relationship: referral.relationship,
         reason: referral.reason,
-        status: referral.status,
       },
       referringClient: referral.referring_client || "A VitaLink user",
       agent: {
