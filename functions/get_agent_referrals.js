@@ -67,6 +67,14 @@ exports.handler = async (event) => {
 
     const rows = result.rows;
     const total = rows.length;
+    const leadStatuses = [
+      "Contact Preference Submitted",
+      "Agent Contacted",
+      "Appointment Scheduled",
+      "Client Added",
+      "Closed",
+    ];
+    const leads = rows.filter((r) => leadStatuses.includes(r.status)).length;
     const contacted = rows.filter((r) =>
       ["Agent Contacted", "Appointment Scheduled", "Client Added", "Closed"].includes(r.status)
     ).length;
@@ -75,7 +83,7 @@ exports.handler = async (event) => {
     ).length;
     const converted = rows.filter((r) => r.status === "Client Added").length;
     const pending = rows.filter((r) =>
-      ["Introduction Sent", "Referral Link Opened", "Contact Preference Submitted"].includes(r.status)
+      ["Introduction Sent", "Referral Link Opened"].includes(r.status)
     ).length;
 
     return reply(200, {
@@ -83,9 +91,10 @@ exports.handler = async (event) => {
       referrals: rows,
       metrics: {
         total,
-        contactRate: total ? contacted / total : 0,
-        appointmentRate: total ? appointments / total : 0,
-        conversionRate: total ? converted / total : 0,
+        leads,
+        contactRate: leads ? contacted / leads : 0,
+        appointmentRate: leads ? appointments / leads : 0,
+        conversionRate: leads ? converted / leads : 0,
         pending,
       },
     });

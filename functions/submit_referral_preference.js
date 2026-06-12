@@ -75,6 +75,7 @@ exports.handler = async (event) => {
     );
 
     const referral = updated.rows[0];
+
     const referringClient = existing.referring_client || "A VitaLink user";
 
     const agentPush = await sendReferralPush({

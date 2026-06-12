@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/deep_link_service.dart';
+import '../services/profile_update_sync_service.dart';
 import '../services/secure_store.dart';
 
 class ProfileSharingScreen extends StatefulWidget {
@@ -30,6 +33,11 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   @override
   void initState() {
     super.initState();
+    final shareCode = VitaLinkDeepLink.shareCode;
+    if (shareCode != null && shareCode.isNotEmpty) {
+      _inviteCtrl.text = shareCode;
+      VitaLinkDeepLink.clearShareCode();
+    }
     _loadShares();
   }
 
@@ -175,6 +183,34 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
   }
 
+  Future<void> _confirmRevokeShare(Map<String, dynamic> share) async {
+    final label = _shareLabel(share);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _VitaLinkDialog(
+        title: 'Revoke Access?',
+        message:
+            'This will stop $label from receiving future updates for this shared profile.',
+        actions: [
+          _DialogButton(
+            label: 'Cancel',
+            outlined: true,
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          _DialogButton(
+            label: 'Revoke Access',
+            danger: true,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _revokeShare(share);
+    }
+  }
+
   Future<void> _revokeShare(Map<String, dynamic> share) async {
     final shareId = share['id']?.toString() ?? '';
 
@@ -211,6 +247,77 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     if (res['success'] == true) {
       await _loadShares();
+    }
+  }
+
+  Future<void> _sendInvite(Map<String, dynamic> share) async {
+    final inviteCode = share['invite_code']?.toString();
+
+    if (inviteCode == null || inviteCode.isEmpty) {
+      _showMessage('This share does not have an invite code.');
+      return;
+    }
+
+    final profileName = share['profile_name']?.toString().trim();
+    final link = 'vitalink://share?code=$inviteCode';
+    final text = [
+      'I shared a VitaLink profile with you.',
+      '',
+      'Tap this link on your phone to accept it:',
+      link,
+      '',
+      'Share code: $inviteCode',
+      if (profileName != null && profileName.isNotEmpty) '',
+      if (profileName != null && profileName.isNotEmpty)
+        'Profile: $profileName',
+    ].join('\n');
+
+    await Share.share(text, subject: 'VitaLink Profile Share');
+  }
+
+  Future<void> _sendCurrentProfileUpdate() async {
+    if (!_shares.any((share) => share['status']?.toString() == 'accepted')) {
+      _showMessage('A shared profile must be accepted before updates can be sent.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    final profile = await _repo.loadProfile();
+    final res = await ProfileUpdateSyncService().publishProfileUpdate(profile);
+
+    if (!mounted) return;
+
+    setState(() {
+      _saving = false;
+      if (res['success'] == true && (res['recipients'] ?? 0) > 0) {
+        _message = 'Current profile update sent.';
+      } else {
+        _message = (res['message'] ??
+                res['error'] ??
+                'No connected recipients are ready for this update.')
+            .toString();
+      }
+    });
+
+    if (res['success'] == true && (res['recipients'] ?? 0) > 0 && mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _VitaLinkDialog(
+          title: 'Profile Sent',
+          message:
+              'The current profile update was sent to connected profiles.',
+          actions: [
+            _DialogButton(
+              label: 'OK',
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -280,6 +387,11 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   ),
                   const SizedBox(height: 14),
                   _button('Create Share Code', _createShareLink),
+                  const SizedBox(height: 10),
+                  _button(
+                    'Send Current Profile Update',
+                    _sendCurrentProfileUpdate,
+                  ),
                 ],
               ),
             ),
@@ -409,8 +521,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   }
 
   Widget _shareRow(Map<String, dynamic> share) {
-    final email = share['invited_email']?.toString().trim();
-    final phone = share['invited_phone']?.toString().trim();
+    final label = _shareLabel(share);
     final status = share['status']?.toString() ?? 'pending';
     final inviteCode = share['invite_code']?.toString();
     final sections = share['allowed_sections'];
@@ -430,11 +541,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            email?.isNotEmpty == true
-                ? email!
-                : phone?.isNotEmpty == true
-                    ? phone!
-                    : 'Shared profile',
+            label,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -455,17 +562,41 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
             ),
           ],
           const SizedBox(height: 10),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red.shade200,
-              side: BorderSide(color: Colors.red.shade300),
-            ),
-            onPressed: _saving ? null : () => _revokeShare(share),
-            child: const Text('Revoke Access'),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              if (status == 'pending')
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF78C7E7),
+                    side: const BorderSide(color: Color(0xFF78C7E7)),
+                  ),
+                  onPressed: _saving ? null : () => _sendInvite(share),
+                  child: const Text('Send Invite'),
+                ),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade200,
+                  side: BorderSide(color: Colors.red.shade300),
+                ),
+                onPressed: _saving ? null : () => _confirmRevokeShare(share),
+                child: const Text('Revoke Access'),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  String _shareLabel(Map<String, dynamic> share) {
+    final email = share['invited_email']?.toString().trim();
+    final phone = share['invited_phone']?.toString().trim();
+
+    if (email != null && email.isNotEmpty) return email;
+    if (phone != null && phone.isNotEmpty) return phone;
+    return 'Shared profile';
   }
 
   Widget _button(String label, VoidCallback onPressed) {
@@ -505,6 +636,117 @@ class _InfoCard extends StatelessWidget {
         ),
       ),
       child: child,
+    );
+  }
+}
+
+class _VitaLinkDialog extends StatelessWidget {
+  const _VitaLinkDialog({
+    required this.title,
+    required this.message,
+    required this.actions,
+  });
+
+  final String title;
+  final String message;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111827),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF78C7E7).withValues(alpha: .45),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .45),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.end,
+              children: actions,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogButton extends StatelessWidget {
+  const _DialogButton({
+    required this.label,
+    required this.onPressed,
+    this.outlined = false,
+    this.danger = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool outlined;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = danger ? Colors.red.shade700 : const Color(0xFF78C7E7);
+
+    if (outlined) {
+      return OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF78C7E7),
+          side: const BorderSide(color: Color(0xFF78C7E7)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        ),
+        onPressed: onPressed,
+        child: Text(label),
+      );
+    }
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: danger ? Colors.white : Colors.black,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      ),
+      onPressed: onPressed,
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

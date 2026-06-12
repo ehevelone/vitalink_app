@@ -89,6 +89,16 @@
                     android:host="recover" />
             </intent-filter>
 
+            <!-- Profile Share Deep Link -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vitalink"
+                    android:host="share" />
+            </intent-filter>
+
         </activity>
 
         <!-- Flutter embedding -->

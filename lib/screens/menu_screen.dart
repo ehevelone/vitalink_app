@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
+import '../services/deep_link_service.dart';
 import '../widgets/safe_bottom_button.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    print("🚀 MENU INIT HIT");
+    debugPrint("MENU INIT HIT");
 
     _repo = DataRepository(_store);
 
@@ -49,11 +50,11 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     if (_syncRan) return;
     _syncRan = true;
 
-    print("🔥 SYNC STARTING");
+    debugPrint("SYNC STARTING");
 
     ApiService.syncProfilesToServer()
-        .then((res) => print("✅ SYNC RESULT: $res"))
-        .catchError((e) => print("❌ SYNC ERROR: $e"));
+        .then((res) => debugPrint("SYNC RESULT: $res"))
+        .catchError((e) => debugPrint("SYNC ERROR: $e"));
   }
 
   @override
@@ -96,9 +97,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
       await _store.setString("qr_url", qrUrl);
 
-      print("✅ QR UPDATED: $qrUrl");
+      debugPrint("QR UPDATED: $qrUrl");
     } catch (e) {
-      print("❌ QR REFRESH FAILED: $e");
+      debugPrint("QR REFRESH FAILED: $e");
     }
   }
 
@@ -109,8 +110,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       if (token != null && token.isNotEmpty) {
         final userId = await _store.getString("userId");
 
-        print("🔥 REGISTER TOKEN USERID: $userId");
-        print("🔥 REGISTER TOKEN FCM: $token");
+        debugPrint("REGISTER TOKEN USERID: $userId");
+        debugPrint("REGISTER TOKEN FCM: $token");
 
         if (userId == null) return;
 
@@ -119,10 +120,10 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           fcmToken: token,
         );
 
-        print("✅ FCM TOKEN REGISTERED: $token");
+        debugPrint("FCM TOKEN REGISTERED: $token");
       }
     } catch (e) {
-      print("Token registration error: $e");
+      debugPrint("Token registration error: $e");
     }
   }
 
@@ -153,7 +154,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       // 🔥 ADDED — refresh QR AFTER profile loads
       await _refreshQr();
     } catch (e) {
-      print("Profile load error: $e");
+      debugPrint("Profile load error: $e");
 
       if (!mounted) return;
 
@@ -199,13 +200,13 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           fcmToken: newToken,
         );
 
-        print("🔁 TOKEN REFRESHED: $newToken");
+        debugPrint("TOKEN REFRESHED: $newToken");
       });
 
       FirebaseMessaging.onMessage.listen((message) {
-        print("📩 FOREGROUND MESSAGE: ${message.data}");
-        print(
-          "📩 FOREGROUND NOTIFICATION: "
+        debugPrint("FOREGROUND MESSAGE: ${message.data}");
+        debugPrint(
+          "FOREGROUND NOTIFICATION: "
           "${message.notification?.title} / ${message.notification?.body}",
         );
 
@@ -275,11 +276,20 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         _handleNotificationTap(message);
       });
     } catch (e) {
-      print("FCM error: $e");
+      debugPrint("FCM error: $e");
     }
   }
 
   void _handleNotificationTap(RemoteMessage message) {
+    final type = message.data["type"]?.toString();
+    final inviteCode = message.data["inviteCode"]?.toString().toUpperCase();
+
+    if (type == "profile_share_invite" &&
+        inviteCode != null &&
+        inviteCode.isNotEmpty) {
+      VitaLinkDeepLink.shareCode = inviteCode;
+    }
+
     final route = message.data["route"]?.toString();
 
     if (route != null && route.isNotEmpty && mounted) {

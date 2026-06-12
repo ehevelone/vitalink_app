@@ -212,6 +212,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
 
   Widget _buildMetrics() {
     final total = _metrics['total'] ?? 0;
+    final leads = _metrics['leads'] ?? 0;
     final contact = _percent(_metrics['contactRate']);
     final appointment = _percent(_metrics['appointmentRate']);
     final conversion = _percent(_metrics['conversionRate']);
@@ -221,8 +222,9 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _metric('Total', '$total'),
-        _metric('Pending', '$pending'),
+        _metric('Activity', '$total'),
+        _metric('Leads', '$leads'),
+        _metric('Introductions', '$pending'),
         _metric('Contact', contact),
         _metric('Appointments', appointment),
         _metric('Conversion', conversion),

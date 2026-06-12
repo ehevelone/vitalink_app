@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
 import 'profile_update_sync_service.dart';
@@ -114,7 +115,7 @@ class DataRepository {
     // 🔥 CRITICAL FIX — VALIDATE ID
     // ==========================================================
     if (p.id.isEmpty || p.id.length < 30) {
-      print("🚨 INVALID PROFILE ID DETECTED → RESETTING");
+      debugPrint("INVALID PROFILE ID DETECTED - RESETTING");
 
       final newProfile = Profile(); // generates proper UUID
       await saveProfile(newProfile, publishUpdate: false);
@@ -254,7 +255,11 @@ class DataRepository {
       profiles[idx] = updated;
       await _saveProfilesInternal(profiles);
     } else {
-      await _saveProfilesInternal([...profiles, updated]);
+      final updatedProfiles = [...profiles, updated];
+      await _saveProfilesInternal(
+        updatedProfiles,
+        activeIndex: updatedProfiles.length - 1,
+      );
     }
 
     await _syncName(updated);

@@ -50,7 +50,36 @@ exports.handler = async (event) => {
     );
 
     if (!result.rows.length) {
-      return reply(404, { success: false, error: "Referral link not found." });
+      const oldReferral = await db.query(
+        `
+        SELECT
+          r.id,
+          r.referral_name,
+          r.referral_phone,
+          r.referral_email,
+          r.relationship,
+          r.reason,
+          r.status,
+          r.public_token,
+          CONCAT_WS(' ', u.first_name, u.last_name) AS referring_client,
+          a.name AS agent_name,
+          a.agency_name,
+          a.email AS agent_email,
+          a.phone AS agent_phone
+        FROM agent_referrals r
+        JOIN users u ON u.id = r.referring_user_id
+        JOIN agents a ON a.id = r.agent_id
+        WHERE r.public_token = $1
+        LIMIT 1
+        `,
+        [token]
+      );
+
+      if (!oldReferral.rows.length) {
+        return reply(404, { success: false, error: "Referral link not found." });
+      }
+
+      result.rows.push(oldReferral.rows[0]);
     }
 
     const referral = result.rows[0];
@@ -64,9 +93,9 @@ exports.handler = async (event) => {
             ELSE status
           END,
           updated_at = NOW()
-      WHERE id = $1
+      WHERE public_token = $1
       `,
-      [referral.id]
+      [token]
     );
 
     return reply(200, {
