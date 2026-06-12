@@ -95,6 +95,78 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
     }
   }
 
+  Future<void> _confirmDeleteReferral(Map<String, dynamic> referral) async {
+    final referralName = referral['referral_name']?.toString() ?? 'this referral';
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111827),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: Colors.lightBlueAccent.withValues(alpha: .35),
+            ),
+          ),
+          title: const Text(
+            'Delete Referral?',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Remove $referralName from your referral list? This only removes the referral record from your agent screen.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.lightBlueAccent),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await _deleteReferral(referral);
+    }
+  }
+
+  Future<void> _deleteReferral(Map<String, dynamic> referral) async {
+    final agentId = await _agentId();
+    final referralId = referral['id']?.toString();
+    if (agentId == null || referralId == null || referralId.isEmpty) return;
+
+    final res = await ApiService.deleteAgentReferral(
+      agentId: agentId,
+      referralId: referralId,
+    );
+
+    if (!mounted) return;
+
+    if (res['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Referral deleted.')),
+      );
+      await _loadReferrals();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['error']?.toString() ?? 'Delete failed.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,6 +235,25 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
     return '${(number * 100).round()}%';
   }
 
+  String _formatDateTime(dynamic value) {
+    final raw = value?.toString().trim();
+    if (raw == null || raw.isEmpty) return '';
+
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+
+    final local = parsed.toLocal();
+    final hour = local.hour == 0
+        ? 12
+        : local.hour > 12
+            ? local.hour - 12
+            : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+
+    return '${local.month}/${local.day}/${local.year} $hour:$minute $ampm';
+  }
+
   Widget _metric(String label, String value) {
     return Container(
       width: 155,
@@ -193,7 +284,8 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
   Widget _referralCard(Map<String, dynamic> referral) {
     final currentStatus = _statuses.contains(referral['status'])
         ? referral['status'].toString()
-        : 'New';
+        : 'Introduction Sent';
+    final contactedAt = _formatDateTime(referral['agent_first_contacted_at']);
 
     return Card(
       color: const Color(0xFF111827),
@@ -222,6 +314,13 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
             _line('Reason', referral['reason']),
             _line('Preferred Contact', referral['contact_preference']),
             _line('Referred By', referral['referring_client']),
+            _line('Received', _formatDateTime(referral['submitted_at'])),
+            _line('Link Opened', _formatDateTime(referral['link_opened_at'])),
+            _line(
+              'Preference Submitted',
+              _formatDateTime(referral['contact_preference_submitted_at']),
+            ),
+            _line('Contacted', contactedAt),
             if ((referral['notes']?.toString() ?? '').isNotEmpty)
               _line('Notes', referral['notes']),
             const SizedBox(height: 12),
@@ -246,6 +345,36 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
               onChanged: (status) {
                 if (status != null) _updateStatus(referral, status);
               },
+            ),
+            if (currentStatus != 'Agent Contacted' && contactedAt.isEmpty) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () => _updateStatus(referral, 'Agent Contacted'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.lightBlueAccent,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.phone_callback),
+                label: const Text(
+                  'Mark Contacted',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => _confirmDeleteReferral(referral),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text(
+                'Delete Referral',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),

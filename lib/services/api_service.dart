@@ -706,6 +706,16 @@ static Future<Map<String, dynamic>> registerAgentDeviceToken({
     });
   }
 
+  static Future<Map<String, dynamic>> deleteAgentReferral({
+    required int agentId,
+    required String referralId,
+  }) {
+    return _postJsonWithAgentSession("delete_agent_referral", {
+      "agentId": agentId,
+      "referralId": referralId,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------

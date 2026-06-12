@@ -27,9 +27,7 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
   String _mode = 'home';
   String _relationship = 'Friend';
   String _source = 'send_introduction';
-  List<Map<String, dynamic>> _referrals = [];
   bool _saving = false;
-  bool _loadingReferrals = false;
   String? _agentName;
 
   @override
@@ -151,27 +149,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
     }
   }
 
-  Future<void> _loadMyReferrals() async {
-    final userId = await _store.getString('userId');
-    if (userId == null || userId.isEmpty) return;
-
-    setState(() {
-      _mode = 'referrals';
-      _loadingReferrals = true;
-    });
-
-    final res = await ApiService.getMyReferrals(userId: userId);
-    if (!mounted) return;
-
-    setState(() {
-      _loadingReferrals = false;
-      _referrals = (res['referrals'] as List? ?? [])
-          .whereType<Map>()
-          .map((r) => Map<String, dynamic>.from(r))
-          .toList();
-    });
-  }
-
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -203,7 +180,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
 
   Widget _buildBody() {
     if (_mode == 'form') return _buildReferralForm();
-    if (_mode == 'referrals') return _buildMyReferrals();
     return _buildHome();
   }
 
@@ -220,12 +196,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
           title: 'Send Introduction',
           subtitle: 'Create a text message you can review and send.',
           onTap: _openForm,
-        ),
-        _optionCard(
-          icon: Icons.list_alt,
-          title: 'My Referrals',
-          subtitle: 'See referrals you have already submitted.',
-          onTap: _loadMyReferrals,
         ),
       ],
     );
@@ -251,25 +221,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
         ),
         const SizedBox(height: 12),
         _primaryButton('Generate Introduction Text', _saving ? null : _submitReferral),
-        _textButton('Back', () => setState(() => _mode = 'home')),
-      ],
-    );
-  }
-
-  Widget _buildMyReferrals() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _header('My Referrals', 'Referral status shown without agent notes.'),
-        if (_loadingReferrals)
-          const Center(child: CircularProgressIndicator())
-        else if (_referrals.isEmpty)
-          const Text(
-            'No referrals submitted yet.',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          )
-        else
-          ..._referrals.map(_referralTile),
         _textButton('Back', () => setState(() => _mode = 'home')),
       ],
     );
@@ -324,22 +275,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
         trailing: const Icon(Icons.chevron_right, color: Colors.white54),
         onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _referralTile(Map<String, dynamic> referral) {
-    return Card(
-      color: const Color(0xFF111827),
-      child: ListTile(
-        title: Text(
-          referral['referral_name']?.toString() ?? 'Referral',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${referral['relationship'] ?? 'Referral'}\nStatus: ${referral['status'] ?? 'Received'}',
-          style: const TextStyle(color: Colors.white70),
-        ),
       ),
     );
   }
