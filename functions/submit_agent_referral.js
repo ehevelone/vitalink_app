@@ -21,19 +21,6 @@ const VALID_RELATIONSHIPS = new Set([
   "Other",
 ]);
 
-const VALID_REASONS = new Set([
-  "Turning 65",
-  "Medicare Questions",
-  "Insurance Review",
-  "Multiple Medications",
-  "Caregiver Needs",
-  "Recently Retired",
-  "Wants Better Organization",
-  "Emergency Preparedness",
-  "Family Member Concern",
-  "Other",
-]);
-
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") return reply(200, {});
@@ -63,7 +50,6 @@ exports.handler = async (event) => {
     const referralPhone = clean(body.phone || body.referralPhone);
     const referralEmail = clean(body.email || body.referralEmail).toLowerCase();
     const relationship = clean(body.relationship);
-    const reason = clean(body.reason);
     const notes = clean(body.notes);
     const source = clean(body.source) || "recommend_my_agent";
 
@@ -82,10 +68,6 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid relationship." });
     }
 
-    if (reason && !VALID_REASONS.has(reason)) {
-      return reply(400, { success: false, error: "Invalid referral reason." });
-    }
-
     const agentRes = await db.query(
       `SELECT id, name, email, phone FROM agents WHERE id = $1 LIMIT 1`,
       [user.agent_id]
@@ -101,7 +83,7 @@ exports.handler = async (event) => {
 
     const insert = await db.query(
       `
-      INSERT INTO agent_referrals (
+      INSERT INTO agent_referral_invites (
         id,
         agent_id,
         referring_user_id,
@@ -112,10 +94,9 @@ exports.handler = async (event) => {
         reason,
         notes,
         source,
-        public_token,
-        status
+        public_token
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'Introduction Sent')
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *
       `,
       [
@@ -126,20 +107,20 @@ exports.handler = async (event) => {
         referralPhone || null,
         referralEmail || null,
         relationship || null,
-        reason || null,
+        null,
         notes || null,
         source,
         publicToken,
       ]
     );
 
-    const referral = insert.rows[0];
+    const invite = insert.rows[0];
     const referringClient = `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
       user.email;
 
     return reply(200, {
       success: true,
-      referral,
+      invite,
       referralLink,
       referringClient,
       agentName: agentRes.rows[0].name || "my insurance agent",

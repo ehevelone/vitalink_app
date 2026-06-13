@@ -121,7 +121,6 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       referralName: name,
       phone: phone,
       relationship: _relationship,
-      reason: 'Wants Better Organization',
       source: _source,
     );
 

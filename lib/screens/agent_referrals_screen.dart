@@ -313,7 +313,6 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
             _line('Phone', referral['referral_phone']),
             _line('Email', referral['referral_email']),
             _line('Relationship', referral['relationship']),
-            _line('Reason', referral['reason']),
             _line('Preferred Contact', referral['contact_preference']),
             _line('Referred By', referral['referring_client']),
             _line('Received', _formatDateTime(referral['submitted_at'])),
