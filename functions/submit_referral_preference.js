@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const db = require("./services/db");
 const {
   clean,
@@ -45,7 +46,7 @@ exports.handler = async (event) => {
         r.*,
         CONCAT_WS(' ', u.first_name, u.last_name) AS referring_client,
         a.name AS agent_name
-      FROM agent_referrals r
+      FROM agent_referral_invites r
       JOIN users u ON u.id = r.referring_user_id
       JOIN agents a ON a.id = r.agent_id
       WHERE r.public_token = $1
@@ -58,25 +59,78 @@ exports.handler = async (event) => {
       return reply(404, { success: false, error: "Referral link not found." });
     }
 
-    const existing = lookup.rows[0];
-    const updated = await db.query(
+    const invite = lookup.rows[0];
+
+    if (invite.converted_referral_id) {
+      return reply(200, {
+        success: true,
+        referral: { id: invite.converted_referral_id },
+        referringClient: invite.referring_client || "A VitaLink user",
+        agentName: invite.agent_name,
+        alreadySubmitted: true,
+      });
+    }
+
+    const inserted = await db.query(
       `
-      UPDATE agent_referrals
-      SET referral_phone = COALESCE(NULLIF($2, ''), referral_phone),
-          referral_email = COALESCE(NULLIF($3, ''), referral_email),
-          contact_preference = $4,
-          contact_preference_submitted_at = COALESCE(contact_preference_submitted_at, NOW()),
-          status = 'Contact Preference Submitted',
-          updated_at = NOW()
-      WHERE id = $1
+      INSERT INTO agent_referrals (
+        id,
+        agent_id,
+        referring_user_id,
+        referral_name,
+        referral_phone,
+        referral_email,
+        relationship,
+        reason,
+        notes,
+        source,
+        public_token,
+        contact_preference,
+        link_opened_at,
+        contact_preference_submitted_at,
+        status
+      )
+      VALUES (
+        $1,$2,$3,$4,
+        COALESCE(NULLIF($5, ''), $6),
+        COALESCE(NULLIF($7, ''), $8),
+        $9,$10,$11,$12,$13,$14,NOW(),
+        'Contact Preference Submitted'
+      )
       RETURNING *
       `,
-      [existing.id, phone, email, preference]
+      [
+        crypto.randomUUID(),
+        invite.agent_id,
+        invite.referring_user_id,
+        invite.referral_name,
+        phone,
+        invite.referral_phone,
+        email,
+        invite.referral_email,
+        invite.relationship,
+        invite.reason,
+        invite.notes,
+        invite.source,
+        invite.public_token,
+        preference,
+        invite.opened_at,
+      ]
     );
 
-    const referral = updated.rows[0];
+    const referral = inserted.rows[0];
 
-    const referringClient = existing.referring_client || "A VitaLink user";
+    await db.query(
+      `
+      UPDATE agent_referral_invites
+      SET converted_referral_id = $1,
+          updated_at = NOW()
+      WHERE id = $2
+      `,
+      [referral.id, invite.id]
+    );
+
+    const referringClient = invite.referring_client || "A VitaLink user";
 
     const agentPush = await sendReferralPush({
       recipient: { type: "agent", id: referral.agent_id },
@@ -96,7 +150,7 @@ exports.handler = async (event) => {
       success: true,
       referral,
       referringClient,
-      agentName: existing.agent_name,
+      agentName: invite.agent_name,
       push: {
         agent: agentPush,
         client: clientPush,
