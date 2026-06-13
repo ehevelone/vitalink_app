@@ -94,7 +94,7 @@ exports.handler = async (event) => {
         $1,$2,$3,$4,
         COALESCE(NULLIF($5, ''), $6),
         COALESCE(NULLIF($7, ''), $8),
-        $9,$10,$11,$12,$13,$14,NOW(),
+        $9,$10,$11,$12,$13,$14,$15,NOW(),
         'Contact Preference Submitted'
       )
       RETURNING *
