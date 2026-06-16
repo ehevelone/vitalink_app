@@ -67,6 +67,16 @@ exports.handler = async (event) => {
       return ok({ agent: null });
     }
 
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS calendly_url TEXT
+    `);
+
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS business_card_image_base64 TEXT
+    `);
+
     // 4️⃣ Fetch agent details
     const agentResult = await db.query(
       `
@@ -77,6 +87,8 @@ exports.handler = async (event) => {
         agency_name,
         agency_address,
         agency_phone, -- 🔥 ADDED
+        calendly_url,
+        business_card_image_base64,
         active
       FROM agents
       WHERE id = $1

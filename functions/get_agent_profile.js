@@ -51,6 +51,16 @@ if (event.httpMethod !== "POST") {
       return fail("Unauthorized", 403);
     }
 
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS calendly_url TEXT
+    `);
+
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS business_card_image_base64 TEXT
+    `);
+
     // 🔹 Prefer email, fallback to id
     let query = `
       SELECT
@@ -66,6 +76,8 @@ if (event.httpMethod !== "POST") {
         agency_state,
         agency_zip,
         agency_phone,
+        calendly_url,
+        business_card_image_base64,
         unlock_code,
         promo_code,
         active
