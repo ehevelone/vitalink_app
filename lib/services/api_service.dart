@@ -183,6 +183,20 @@ static Future<Map<String, dynamic>> _postJsonWithAgentSession(
     });
   }
 
+  static Future<Map<String, dynamic>> parseAgentBusinessCard({
+    required File image,
+    required String agentEmail,
+    String? cardImageBase64,
+  }) async {
+    final bytes = await image.readAsBytes();
+    return _postJsonWithAgentSession("parse_agent_business_card", {
+      "agentEmail": agentEmail,
+      "imageBase64": base64Encode(bytes),
+      if (cardImageBase64 != null && cardImageBase64.isNotEmpty)
+        "cardImageBase64": cardImageBase64,
+    });
+  }
+
   static Future<Map<String, dynamic>> getMedicarePlanBenefits({
     required String medicarePlanId,
     String? policy,
@@ -430,6 +444,7 @@ static Future<Map<String, dynamic>> registerAgentDeviceToken({
     String? agencyState,
     String? agencyZip,
     String? agencyPhone,
+    String? calendlyUrl,
     String? password,
   }) {
     final body = {
@@ -444,6 +459,7 @@ static Future<Map<String, dynamic>> registerAgentDeviceToken({
       "agencyState": agencyState,
       "agencyZip": agencyZip,
       "agencyPhone": agencyPhone,
+      "calendlyUrl": calendlyUrl,
       "password": password,
     }..removeWhere((k, v) => v == null || v.trim().isEmpty);
 

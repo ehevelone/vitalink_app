@@ -1,8 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/app_state.dart';
 import '../services/api_service.dart';
+import '../services/app_state.dart';
 
 class MyAgentUser extends StatefulWidget {
   const MyAgentUser({super.key});
@@ -17,6 +20,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
   String? _agentEmail;
   String? _agencyName;
   String? _agencyAddress;
+  String? _calendlyUrl;
+  String? _businessCardImageBase64;
   bool _loading = true;
 
   @override
@@ -43,6 +48,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
         _agentEmail = agent["email"];
         _agencyName = agent["agency_name"];
         _agencyAddress = agent["agency_address"];
+        _calendlyUrl = agent["calendly_url"];
+        _businessCardImageBase64 = agent["business_card_image_base64"];
       }
     } catch (e) {
       debugPrint("Agent load error: $e");
@@ -70,6 +77,120 @@ class _MyAgentUserState extends State<MyAgentUser> {
 
   Future<void> _sendToAgent() async {
     Navigator.pushNamed(context, '/authorization_form');
+  }
+
+  Future<void> _schedule() async {
+    final url = _calendlyUrl?.trim();
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Widget _agentCardDisplay() {
+    final image = _businessCardImageBase64?.trim();
+    if (image != null && image.isNotEmpty) {
+      final bytes = base64Decode(image);
+      return GestureDetector(
+        onTap: () => _openBusinessCard(bytes),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _agentTextDisplay(),
+          ),
+        ),
+      );
+    }
+
+    return _agentTextDisplay();
+  }
+
+  void _openBusinessCard(List<int> bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 5,
+              child: Center(
+                child: Image.memory(
+                  Uint8List.fromList(bytes),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _agentTextDisplay() {
+    return Column(
+      children: [
+        Text(
+          _agentName ?? "No Agent Assigned",
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_agencyName?.isNotEmpty == true)
+          Text("Agency: $_agencyName", textAlign: TextAlign.center),
+        if (_agencyAddress?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              "Address: $_agencyAddress",
+              textAlign: TextAlign.center,
+            ),
+          ),
+        const SizedBox(height: 16),
+        if (_agentPhone?.isNotEmpty == true)
+          InkWell(
+            onTap: _call,
+            child: Text(
+              "Phone: $_agentPhone",
+              style: const TextStyle(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        if (_agentEmail?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: InkWell(
+              onTap: _email,
+              child: Text(
+                "Email: $_agentEmail",
+                style: const TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -102,143 +223,71 @@ class _MyAgentUserState extends State<MyAgentUser> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Text(
-                          _agentName ?? "No Agent Assigned",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        if (_agencyName?.isNotEmpty == true)
-                          Text("🏢 $_agencyName"),
-
-                        if (_agencyAddress?.isNotEmpty == true)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              "📍 $_agencyAddress",
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-
-                        const SizedBox(height: 16),
-
-                        if (_agentPhone?.isNotEmpty == true)
-                          InkWell(
-                            onTap: _call,
-                            child: Text(
-                              "📞 $_agentPhone",
-                              style: const TextStyle(
-                                color: Colors.blue,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-
-                        if (_agentEmail?.isNotEmpty == true)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: InkWell(
-                              onTap: _email,
-                              child: Text(
-                                "📧 $_agentEmail",
-                                style: const TextStyle(
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    child: _agentCardDisplay(),
                   ),
                 ),
-
-                // 🔥 UPDATED BUTTON (Reload)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _loadAgent,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text(
-                        "Reload Info",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                if (_calendlyUrl?.isNotEmpty == true) ...[
+                  _actionButton(
+                    icon: Icons.calendar_month,
+                    label: "Schedule with My Agent",
+                    light: true,
+                    onPressed: _schedule,
                   ),
+                  const SizedBox(height: 14),
+                ],
+                _actionButton(
+                  icon: Icons.refresh,
+                  label: "Reload Info",
+                  onPressed: _loadAgent,
                 ),
-
-                // 🔥 UPDATED BUTTON (Send)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    icon: const Icon(Icons.send),
-                    label: const Text(
-                      "Send My Info to Agent",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _sendToAgent,
-                  ),
+                const SizedBox(height: 20),
+                _actionButton(
+                  icon: Icons.send,
+                  label: "Send My Info to Agent",
+                  onPressed: _sendToAgent,
                 ),
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    icon: const Icon(Icons.favorite),
-                    label: const Text(
-                      "Referral Center",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.lightBlueAccent,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () => Navigator.pushNamed(
-                      context,
-                      '/referral_center',
-                    ),
+                _actionButton(
+                  icon: Icons.favorite,
+                  label: "Referral Center",
+                  light: true,
+                  onPressed: () => Navigator.pushNamed(
+                    context,
+                    '/referral_center',
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    bool light = false,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        icon: Icon(icon),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor:
+              light ? Colors.lightBlueAccent : Colors.blue.shade700,
+          foregroundColor: light ? Colors.black : Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onPressed: onPressed,
       ),
     );
   }

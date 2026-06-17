@@ -103,6 +103,12 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                             _item(Icons.badge, "My Agent", '/my_agent_agent'),
                             _item(Icons.person, "My Profile",
                                 '/my_profile_agent'),
+                            _item(
+                              Icons.document_scanner,
+                              "Business Card Scanner",
+                              '/my_profile_agent',
+                              arguments: {'autoScan': true},
+                            ),
 
                             // NEW BUTTON
                             _item(Icons.groups, "My Clients", '/agent_clients'),
@@ -180,7 +186,12 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     );
   }
 
-  Widget _item(IconData icon, String text, String route) {
+  Widget _item(
+    IconData icon,
+    String text,
+    String route, {
+    Object? arguments,
+  }) {
     return ListTile(
       tileColor: Colors.transparent,
       shape: const Border(
@@ -188,7 +199,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       ),
       leading: Icon(icon, color: Colors.blue),
       title: Text(text, style: const TextStyle(fontSize: 18)),
-      onTap: () => Navigator.pushNamed(context, route),
+      onTap: () => Navigator.pushNamed(context, route, arguments: arguments),
     );
   }
 }

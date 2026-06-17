@@ -72,6 +72,7 @@ exports.handler = async (event) => {
       agencyCity,
       agencyState,
       agencyZip,
+      calendlyUrl,
       agencyPhone, // 🔥 ADDED
       password,
       agentSessionToken,
@@ -95,6 +96,11 @@ exports.handler = async (event) => {
         error: "Unauthorized",
       });
     }
+
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS calendly_url TEXT
+    `);
 
     // ✅ Build dynamic update
     const updates = [];
@@ -145,6 +151,17 @@ exports.handler = async (event) => {
       values.push(normalizeUsPhone(agencyPhone));
     }
 
+    if (calendlyUrl) {
+      const cleanUrl = String(calendlyUrl).trim();
+      if (!/^https?:\/\/.+/i.test(cleanUrl)) {
+        return reply(400, {
+          success: false,
+          error: "Calendly link must start with http:// or https://",
+        });
+      }
+      updates.push(`calendly_url = $${idx++}`);
+      values.push(cleanUrl);
+    }
     if (password) {
       const hashed = await bcrypt.hash(password, 10);
       updates.push(`password_hash = $${idx++}`);
@@ -177,6 +194,7 @@ exports.handler = async (event) => {
         agency_state,
         agency_zip,
         agency_phone, -- 🔥 ADDED
+        calendly_url,
         active,
         role;
     `;

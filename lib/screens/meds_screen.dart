@@ -17,6 +17,23 @@ class MedsScreen extends StatefulWidget {
 }
 
 class _MedsScreenState extends State<MedsScreen> {
+  static const List<String> _doctorSpecialtyOptions = [
+    'Primary',
+    'Cardiologist',
+    'Orthopedic',
+    'Neurologist',
+    'Endocrinologist',
+    'Pulmonologist',
+    'Gastroenterologist',
+    'Nephrologist',
+    'Urologist',
+    'Oncologist',
+    'Dermatologist',
+    'Psychiatrist',
+    'Pain Management',
+    'Other',
+  ];
+
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
@@ -34,7 +51,7 @@ class _MedsScreenState extends State<MedsScreen> {
     final p = await _repo.loadProfile();
     if (!mounted) return;
     setState(() {
-      _p = p;
+      _p = p ?? Profile(meds: [], doctors: []);
       _loading = false;
     });
   }
@@ -64,12 +81,26 @@ class _MedsScreenState extends State<MedsScreen> {
     final cleaned = name
         .toLowerCase()
         .replaceAll(",", " ")
+        .replaceAll(RegExp(r'\b(dr|doctor|md|do|np|pa|aprn|fnp|pharmd)\b'), ' ')
+        .replaceAll(RegExp(r'[^a-z\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), " ")
         .trim();
 
     final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
     parts.sort();
     return parts.join(" ");
+  }
+
+  List<String> _doctorNameParts(String name) {
+    return name
+        .toLowerCase()
+        .replaceAll(",", " ")
+        .replaceAll(RegExp(r'\b(dr|doctor|md|do|np|pa|aprn|fnp|pharmd)\b'), ' ')
+        .replaceAll(RegExp(r'[^a-z\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), " ")
+        .trim()
+        .split(" ")
+      ..removeWhere((p) => p.isEmpty);
   }
 
   String _toLastFirstFormat(String name) {
@@ -86,7 +117,35 @@ class _MedsScreenState extends State<MedsScreen> {
 
   bool _doctorExistsByNormalizedName(String docName) {
     final target = _normalizeName(docName);
-    return _p!.doctors.any((d) => _normalizeName(d.name) == target);
+    final targetParts = _doctorNameParts(docName);
+    if (targetParts.isEmpty) return false;
+
+    return _p!.doctors.any((d) {
+      final existing = _normalizeName(d.name);
+      if (existing == target) return true;
+
+      final existingParts = _doctorNameParts(d.name);
+      if (existingParts.isEmpty) return false;
+
+      final overlap = targetParts
+          .where(
+            (targetPart) => existingParts.any(
+              (existingPart) =>
+                  existingPart == targetPart ||
+                  existingPart.startsWith(targetPart) ||
+                  targetPart.startsWith(existingPart),
+            ),
+          )
+          .length;
+
+      final targetHasInitialOrShortName =
+          targetParts.any((part) => part.length <= 2);
+      final minNeeded = targetHasInitialOrShortName ? 1 : 2;
+
+      return overlap >= minNeeded &&
+          (targetParts.length <= existingParts.length ||
+              existingParts.length <= targetParts.length);
+    });
   }
 
   Map<String, dynamic> _normalizeParsed(dynamic parsed) {
@@ -122,6 +181,105 @@ class _MedsScreenState extends State<MedsScreen> {
     }
 
     return pharm.isNotEmpty ? pharm : pharmPhone;
+  }
+
+  Future<String> _chooseDoctorSpecialty(String doctorName) async {
+    String selected = _doctorSpecialtyOptions.first;
+    final otherCtrl = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'New Doctor Found',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                doctorName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'What type of doctor is this?',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: selected,
+                dropdownColor: const Color(0xFF111111),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Doctor Type',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
+                items: _doctorSpecialtyOptions
+                    .map(
+                      (option) => DropdownMenuItem(
+                        value: option,
+                        child: Text(option),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setDialogState(() => selected = value);
+                },
+              ),
+              if (selected == 'Other') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: otherCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Enter Doctor Type',
+                    labelStyle: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, ''),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white70,
+              ),
+              child: const Text('Skip'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final specialty =
+                    selected == 'Other' ? otherCtrl.text.trim() : selected;
+                Navigator.pop(context, specialty);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Save Type'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    otherCtrl.dispose();
+    return result?.trim() ?? '';
   }
 
   // ----------------------------
@@ -269,18 +427,12 @@ class _MedsScreenState extends State<MedsScreen> {
       bool keepScanning = true;
 
       while (keepScanning) {
-        final img = await _picker.pickImage(
-          source: ImageSource.camera,
-          maxWidth: 1600,
-          maxHeight: 1600,
-          imageQuality: 72,
-        );
+        final img = await _picker.pickImage(source: ImageSource.camera);
         if (img == null) break;
 
         final base64Image = base64Encode(await File(img.path).readAsBytes());
         base64Images.add(base64Image);
 
-        if (!mounted) return;
         keepScanning = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
@@ -361,9 +513,7 @@ class _MedsScreenState extends State<MedsScreen> {
         }),
       );
 
-      if (resp.statusCode != 200) {
-        throw Exception("Label scan failed. Please try one photo at a time.");
-      }
+      if (resp.statusCode != 200) return;
 
       final parsed = jsonDecode(resp.body);
       final data = _normalizeParsed(parsed['data'] ?? parsed);
@@ -373,9 +523,7 @@ class _MedsScreenState extends State<MedsScreen> {
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
 
-      if (scannedName.isEmpty) {
-        throw Exception("No medication name found. Try a clearer label photo.");
-      }
+      if (scannedName.isEmpty) return;
 
       final normalizedScannedName = _normalizeMed(scannedName);
 
@@ -386,7 +534,6 @@ class _MedsScreenState extends State<MedsScreen> {
       if (existingIndex != -1) {
         final existing = _p!.meds[existingIndex];
 
-        if (!mounted) return;
         final choice = await showDialog<String>(
           context: context,
           builder: (_) => AlertDialog(
@@ -527,11 +674,12 @@ class _MedsScreenState extends State<MedsScreen> {
         if (normalizedParsed != normalizedProfile &&
             !_doctorExistsByNormalizedName(docName)) {
           final formatted = _toLastFirstFormat(docName);
+          final specialty = await _chooseDoctorSpecialty(formatted);
 
           setState(() {
             _p!.doctors.add(Doctor(
               name: formatted,
-              specialty: "",
+              specialty: specialty,
               clinic: "",
               phone: "",
             ));
@@ -542,10 +690,6 @@ class _MedsScreenState extends State<MedsScreen> {
       }
     } catch (e) {
       debugPrint("Scan error: $e");
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
-      );
     } finally {
       if (mounted) setState(() => _scanning = false);
     }

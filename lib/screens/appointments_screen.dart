@@ -1,4 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -13,6 +18,9 @@ class AppointmentsScreen extends StatefulWidget {
 }
 
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
+  static const MethodChannel _calendarChannel =
+      MethodChannel('com.etnaturals.vitalinkapp/calendar');
+
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
@@ -68,6 +76,106 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     return '$month/$day/$year $hour12:$minute $suffix';
   }
 
+  String _icsDate(DateTime value) {
+    final utc = value.toUtc();
+    return '${utc.year.toString().padLeft(4, '0')}'
+        '${utc.month.toString().padLeft(2, '0')}'
+        '${utc.day.toString().padLeft(2, '0')}T'
+        '${utc.hour.toString().padLeft(2, '0')}'
+        '${utc.minute.toString().padLeft(2, '0')}'
+        '${utc.second.toString().padLeft(2, '0')}Z';
+  }
+
+  String _icsText(String value) {
+    return value
+        .replaceAll('\\', '\\\\')
+        .replaceAll(';', '\\;')
+        .replaceAll(',', '\\,')
+        .replaceAll('\r\n', '\\n')
+        .replaceAll('\n', '\\n');
+  }
+
+  Future<void> _addToDeviceCalendar(UserAppointment appointment) async {
+    final start = appointment.appointmentAt.toLocal();
+    final end = start.add(const Duration(hours: 1));
+    final description = [
+      if (appointment.specialty.isNotEmpty) 'Specialty: ${appointment.specialty}',
+      if (appointment.notes.isNotEmpty) appointment.notes,
+      'Created from VitaLink.',
+    ].join('\n');
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      final opened = await _calendarChannel.invokeMethod<bool>(
+            'insertEvent',
+            {
+              'title': 'Appointment with ${appointment.doctorName}',
+              'description': description,
+              'startMillis': start.millisecondsSinceEpoch,
+              'endMillis': end.millisecondsSinceEpoch,
+            },
+          ) ??
+          false;
+      if (opened) return;
+    }
+
+    final fileName = appointment.doctorName
+        .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '')
+        .toLowerCase();
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/${fileName.isEmpty ? 'vitalink-appointment' : fileName}.ics');
+    final now = DateTime.now().toUtc();
+    final ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//VitaLink//Appointments//EN',
+      'BEGIN:VEVENT',
+      'UID:${now.microsecondsSinceEpoch}@myvitalink.app',
+      'DTSTAMP:${_icsDate(now)}',
+      'DTSTART:${_icsDate(start)}',
+      'DTEND:${_icsDate(end)}',
+      'SUMMARY:${_icsText('Appointment with ${appointment.doctorName}')}',
+      'DESCRIPTION:${_icsText(description)}',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    await file.writeAsString(ics);
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'text/calendar')],
+      text: 'Add this VitaLink appointment to your calendar.',
+    );
+  }
+
+  Future<void> _offerCalendarAdd(UserAppointment appointment) async {
+    if (!mounted) return;
+
+    final shouldAdd = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add to phone calendar?'),
+        content: Text(
+          '${appointment.doctorName}\n${_dateLabel(appointment.appointmentAt)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not Now'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.calendar_month),
+            label: const Text('Add to Calendar'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldAdd == true) {
+      await _addToDeviceCalendar(appointment);
+    }
+  }
+
   Future<void> _addOrEdit({
     UserAppointment? existing,
     int? index,
@@ -112,7 +220,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: addingNewDoctor
+                  isExpanded: true,
+                  initialValue: addingNewDoctor
                       ? addNewDoctorValue
                       : selectedDoctorIndex == null
                           ? null
@@ -128,13 +237,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                           entry.value.specialty.isEmpty
                               ? entry.value.name
                               : '${entry.value.name} - ${entry.value.specialty}',
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
                     const DropdownMenuItem<String>(
                       value: addNewDoctorValue,
-                      child: Text('Add New Doctor'),
+                      child: Text(
+                        'Add New Doctor',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                   onChanged: (value) {
@@ -193,6 +307,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     );
 
                     if (date == null) return;
+                    if (!context.mounted) return;
 
                     final time = await showTimePicker(
                       context: dialogContext,
@@ -294,6 +409,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     });
 
     await _save();
+    await _offerCalendarAdd(appointment);
   }
 
   Future<void> _delete(int index) async {

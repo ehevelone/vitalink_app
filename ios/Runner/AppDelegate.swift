@@ -2,10 +2,13 @@ import UIKit
 import Flutter
 import Firebase
 import FirebaseMessaging
+import EventKit
+import EventKitUI
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate {
+@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate, EKEventEditViewDelegate {
+  private let eventStore = EKEventStore()
 
   override func application(
     _ application: UIApplication,
@@ -30,6 +33,22 @@ import UserNotifications
     application.registerForRemoteNotifications()
 
     GeneratedPluginRegistrant.register(with: self)
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let calendarChannel = FlutterMethodChannel(
+        name: "com.etnaturals.vitalinkapp/calendar",
+        binaryMessenger: controller.binaryMessenger
+      )
+
+      calendarChannel.setMethodCallHandler { [weak self] call, result in
+        guard call.method == "insertEvent" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+
+        self?.openCalendarEvent(arguments: call.arguments, result: result)
+      }
+    }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -58,5 +77,51 @@ import UserNotifications
 
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
     print("🔥 FCM TOKEN: \(String(describing: fcmToken))")
+  }
+  private func openCalendarEvent(arguments: Any?, result: @escaping FlutterResult) {
+    guard
+      let args = arguments as? [String: Any],
+      let startMillis = args["startMillis"] as? NSNumber,
+      let endMillis = args["endMillis"] as? NSNumber
+    else {
+      result(false)
+      return
+    }
+
+    let presentEditor = {
+      DispatchQueue.main.async {
+        let event = EKEvent(eventStore: self.eventStore)
+        event.title = args["title"] as? String ?? "VitaLink Appointment"
+        event.notes = args["description"] as? String ?? ""
+        event.startDate = Date(timeIntervalSince1970: startMillis.doubleValue / 1000.0)
+        event.endDate = Date(timeIntervalSince1970: endMillis.doubleValue / 1000.0)
+        event.calendar = self.eventStore.defaultCalendarForNewEvents
+
+        let editor = EKEventEditViewController()
+        editor.eventStore = self.eventStore
+        editor.event = event
+        editor.editViewDelegate = self
+
+        self.window?.rootViewController?.present(editor, animated: true)
+        result(true)
+      }
+    }
+
+    if #available(iOS 17.0, *) {
+      eventStore.requestFullAccessToEvents { granted, _ in
+        granted ? presentEditor() : result(false)
+      }
+    } else {
+      eventStore.requestAccess(to: .event) { granted, _ in
+        granted ? presentEditor() : result(false)
+      }
+    }
+  }
+
+  func eventEditViewController(
+    _ controller: EKEventEditViewController,
+    didCompleteWith action: EKEventEditViewAction
+  ) {
+    controller.dismiss(animated: true)
   }
 }

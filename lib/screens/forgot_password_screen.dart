@@ -23,22 +23,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _loading = true);
 
     try {
-      final res = await ApiService.requestPasswordReset(_emailCtrl.text.trim());
+      final res = await ApiService.requestPasswordReset(
+        emailOrPhone: _emailCtrl.text.trim(),
+        role: "user",
+      );
+
+      if (!mounted) return;
 
       if (res['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Reset code sent to your email ✅")),
         );
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/reset_password',
-              arguments: _emailCtrl.text.trim());
-        }
+        Navigator.pushReplacementNamed(
+          context,
+          '/reset_password',
+          arguments: _emailCtrl.text.trim(),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['error'] ?? "Request failed ❌")),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );

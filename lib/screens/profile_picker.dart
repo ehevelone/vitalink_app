@@ -1,8 +1,9 @@
 // lib/screens/profile_picker_screen.dart
 import 'package:flutter/material.dart';
+
+import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../models.dart';
 
 class ProfilePickerScreen extends StatefulWidget {
   const ProfilePickerScreen({super.key});
@@ -65,7 +66,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
 
     if (ok != true) return;
     await _repo.deleteProfileAt(index);
-    await _load(); // refresh UI
+    await _load();
   }
 
   @override
@@ -74,47 +75,71 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
       appBar: AppBar(title: const Text("Switch Profile")),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : ListView(
               padding: const EdgeInsets.all(12),
-              itemCount: _profiles.length,
-              itemBuilder: (_, index) {
-                final p = _profiles[index];
-                final isActive = index == _active;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+              children: [
+                Card(
                   child: ListTile(
-                    tileColor: Colors.transparent,
-                    shape: const Border(
-                      bottom: BorderSide(color: Colors.black12),
+                    leading: const Icon(Icons.add_link, color: Colors.blue),
+                    title: const Text(
+                      "Add Profile from Invite",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    leading: Icon(
-                      Icons.person,
-                      color: isActive ? Colors.green : Colors.grey,
-                      size: 32,
+                    subtitle: const Text(
+                      "Use a profile share code from a family member or caregiver.",
                     ),
-                    title: Text(
-                      p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile",
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    subtitle: isActive
-                        ? const Text(
-                            "Currently Active",
-                            style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w600),
-                          )
-                        : null,
-                    onTap: () => _switchTo(index),
-
-                    // 🔥 delete button always available
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () => _delete(index),
-                    ),
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      '/profile_accept',
+                    ).then((_) => _load()),
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 10),
+                ..._profiles.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final p = entry.value;
+                  final isActive = index == _active;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      tileColor: Colors.transparent,
+                      shape: const Border(
+                        bottom: BorderSide(color: Colors.black12),
+                      ),
+                      leading: Icon(
+                        Icons.person,
+                        color: isActive ? Colors.green : Colors.grey,
+                        size: 32,
+                      ),
+                      title: Text(
+                        p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile",
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                      subtitle: isActive
+                          ? const Text(
+                              "Currently Active",
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          : null,
+                      onTap: () => _switchTo(index),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        onPressed: () => _delete(index),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
     );
   }

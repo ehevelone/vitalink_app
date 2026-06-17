@@ -9,6 +9,9 @@ class ProfileUpdateSyncService {
     'emergency',
     'medications',
     'doctors',
+    'insurance_cards',
+    'policies',
+    'appointments',
   ];
 
   final SecureStore _store;

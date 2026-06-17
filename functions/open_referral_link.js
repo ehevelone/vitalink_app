@@ -13,6 +13,10 @@ exports.handler = async (event) => {
     }
 
     await ensureReferralSchema();
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS calendly_url TEXT
+    `);
 
     const params = event.queryStringParameters || {};
     const body = event.httpMethod === "POST"
@@ -38,7 +42,8 @@ exports.handler = async (event) => {
         a.name AS agent_name,
         a.agency_name,
         a.email AS agent_email,
-        a.phone AS agent_phone
+        a.phone AS agent_phone,
+        a.calendly_url AS agent_calendly_url
       FROM agent_referral_invites r
       JOIN users u ON u.id = r.referring_user_id
       JOIN agents a ON a.id = r.agent_id
@@ -79,6 +84,7 @@ exports.handler = async (event) => {
         agencyName: referral.agency_name,
         email: referral.agent_email,
         phone: referral.agent_phone,
+        calendlyUrl: referral.agent_calendly_url,
       },
     });
   } catch (err) {

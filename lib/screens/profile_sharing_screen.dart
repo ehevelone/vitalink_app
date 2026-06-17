@@ -24,6 +24,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   bool _emergency = true;
   bool _medications = true;
   bool _doctors = true;
+  bool _insuranceCards = true;
+  bool _policies = true;
+  bool _appointments = false;
   bool _saving = false;
   bool _loadingShares = true;
   String? _lastInviteCode;
@@ -54,6 +57,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       if (_emergency) 'emergency',
       if (_medications) 'medications',
       if (_doctors) 'doctors',
+      if (_insuranceCards) 'insurance_cards',
+      if (_policies) 'policies',
+      if (_appointments) 'appointments',
     ];
   }
 
@@ -95,8 +101,8 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final email = _emailCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
 
-    if (email.isEmpty && phone.isEmpty) {
-      _showMessage('Enter an email or phone number for this share.');
+    if (email.isEmpty || phone.isEmpty) {
+      _showMessage('Enter both email and phone number for this share.');
       return;
     }
 
@@ -121,8 +127,8 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       userId: userId,
       profileId: profile.id,
       profileName: profile.fullName,
-      email: email.isNotEmpty ? email : null,
-      phone: phone.isNotEmpty ? phone : null,
+      email: email,
+      phone: phone,
       allowedSections: _selectedSections,
     );
 
@@ -132,7 +138,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       _saving = false;
       if (res['success'] == true) {
         _lastInviteCode = res['inviteCode']?.toString();
-        _message = res['status'] == 'accepted'
+        _message = res['accepted'] == true
             ? 'Profile connection is active.'
             : 'Share code created. Give this code to the family member or caregiver.';
       } else {
@@ -141,6 +147,20 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
 
     if (res['success'] == true) {
+      if (res['accepted'] == true) {
+        final update = await ProfileUpdateSyncService().publishProfileUpdate(
+          profile,
+          sections: _selectedSections,
+        );
+
+        if (!mounted) return;
+
+        if (update['success'] == true && (update['recipients'] ?? 0) > 0) {
+          setState(() {
+            _message = 'Profile connection is active. Current profile sent.';
+          });
+        }
+      }
       await _loadShares();
     }
   }
@@ -287,7 +307,10 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
 
     final profile = await _repo.loadProfile();
-    final res = await ProfileUpdateSyncService().publishProfileUpdate(profile);
+    final res = await ProfileUpdateSyncService().publishProfileUpdate(
+      profile,
+      sections: _selectedSections,
+    );
 
     if (!mounted) return;
 
@@ -368,7 +391,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   const SizedBox(height: 14),
                   _field(_emailCtrl, 'Family member email'),
                   const SizedBox(height: 10),
-                  _field(_phoneCtrl, 'Phone number optional'),
+                  _field(_phoneCtrl, 'Family member phone'),
                   const SizedBox(height: 14),
                   _sectionToggle(
                     label: 'Emergency profile',
@@ -384,6 +407,21 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                     label: 'Doctors',
                     value: _doctors,
                     onChanged: (v) => setState(() => _doctors = v),
+                  ),
+                  _sectionToggle(
+                    label: 'Insurance cards',
+                    value: _insuranceCards,
+                    onChanged: (v) => setState(() => _insuranceCards = v),
+                  ),
+                  _sectionToggle(
+                    label: 'Insurance policies',
+                    value: _policies,
+                    onChanged: (v) => setState(() => _policies = v),
+                  ),
+                  _sectionToggle(
+                    label: 'Appointments',
+                    value: _appointments,
+                    onChanged: (v) => setState(() => _appointments = v),
                   ),
                   const SizedBox(height: 14),
                   _button('Create Share Code', _createShareLink),

@@ -94,6 +94,12 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>VitaLink uses speech recognition to turn dictated notes and tasks into text.</string>
 
+	<key>NSCalendarsUsageDescription</key>
+	<string>VitaLink can add appointments to your calendar when you choose to save them there.</string>
+
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>VitaLink can add appointments to your calendar when you choose to save them there.</string>
+
 	<!-- Export Compliance Encryption Declaration -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

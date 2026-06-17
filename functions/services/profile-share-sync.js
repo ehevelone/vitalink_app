@@ -240,6 +240,53 @@ async function sendProfileUpdatePush({ recipientUserIds, packageId, profileName 
   };
 }
 
+async function sendProfileShareInvitePush({ recipientUserId, inviteCode, profileName }) {
+  if (!recipientUserId || !inviteCode || !initFirebase()) {
+    return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
+  }
+
+  const devicesRes = await db.query(
+    `
+    SELECT id, user_id, device_token
+    FROM user_devices
+    WHERE user_id::TEXT = $1
+      AND device_token IS NOT NULL
+      AND TRIM(device_token) <> ''
+      AND TRIM(device_token) <> 'NO_TOKEN'
+    `,
+    [String(recipientUserId)]
+  );
+
+  const tokens = [...new Set(
+    devicesRes.rows
+      .map(row => clean(row.device_token))
+      .filter(Boolean)
+  )];
+
+  if (!tokens.length) {
+    return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
+  }
+
+  const response = await admin.messaging().sendEachForMulticast({
+    tokens,
+    notification: {
+      title: "Profile shared with you",
+      body: `${profileName || "A VitaLink profile"} was shared with you.`,
+    },
+    data: {
+      route: "/profile_accept",
+      type: "profile_share_invite",
+      inviteCode,
+    },
+  });
+
+  return {
+    devicesTargeted: tokens.length,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+  };
+}
+
 function createInviteCode() {
   return `VL-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 }
@@ -254,6 +301,7 @@ module.exports = {
   normalizeSections,
   parseBody,
   reply,
+  sendProfileShareInvitePush,
   sendProfileUpdatePush,
   verifyUserSession,
 };

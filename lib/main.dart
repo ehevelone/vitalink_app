@@ -39,6 +39,7 @@ import 'screens/profile_agent_screen.dart';
 import 'screens/edit_profile.dart';
 import 'screens/profile_picker.dart';
 import 'screens/profile_sharing_screen.dart';
+import 'screens/profile_accept_invite_screen.dart';
 import 'screens/profile_updates_screen.dart';
 import 'screens/new_profile_screen.dart';
 import 'screens/referral_center_screen.dart';
@@ -195,7 +196,7 @@ Future<void> main() async {
       debugPrint("Profile share link code received: $shareCode");
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed('/profile_sharing');
+        navigatorKey.currentState?.pushNamed('/profile_accept');
       });
     }
 
@@ -339,6 +340,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/edit_profile': (context) => const EditProfileScreen(),
         '/profile_picker': (context) => const ProfilePickerScreen(),
         '/profile_sharing': (context) => const ProfileSharingScreen(),
+        '/profile_accept': (context) => const ProfileAcceptInviteScreen(),
         '/profile_updates': (context) => const ProfileUpdatesScreen(),
         '/new_profile': (context) => const NewProfileScreen(),
         '/referral_center': (context) => const ReferralCenterScreen(),

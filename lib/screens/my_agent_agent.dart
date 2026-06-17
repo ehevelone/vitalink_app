@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
-import '../services/secure_store.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../services/api_service.dart';
+import '../services/secure_store.dart';
 
 class MyAgentAgent extends StatefulWidget {
   const MyAgentAgent({super.key});
@@ -22,6 +25,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
   String? _agencyAddress;
   String? _promoCode;
   String? _deepLink;
+  String? _businessCardImageBase64;
 
   @override
   void initState() {
@@ -49,6 +53,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         _agentNpn = data['npn'];
         _agencyName = data['agency_name'];
         _agencyAddress = data['agency_address'];
+        _businessCardImageBase64 = data['business_card_image_base64'];
 
         await store.setString("agentName", _agentName ?? "");
         await store.setString("agentEmail", _agentEmail ?? "");
@@ -56,13 +61,14 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         await store.setString("agentNpn", _agentNpn ?? "");
         await store.setString("agencyName", _agencyName ?? "");
         await store.setString("agencyAddress", _agencyAddress ?? "");
+        if (_businessCardImageBase64?.isNotEmpty == true) {
+          await store.setString(
+            "agentBusinessCardImage",
+            _businessCardImageBase64!,
+          );
+        }
       } else {
-        _agentName = await store.getString("agentName");
-        _agentEmail ??= await store.getString("agentEmail");
-        _agentPhone = await store.getString("agentPhone");
-        _agentNpn = await store.getString("agentNpn");
-        _agencyName = await store.getString("agencyName");
-        _agencyAddress = await store.getString("agencyAddress");
+        await _loadStoredAgentInfo(store);
       }
 
       final res = await ApiService.getAgentPromoCode(_agentEmail ?? "");
@@ -81,16 +87,22 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
             "https://myvitalink.app/agent-success.html?code=$stored";
       }
     } catch (_) {
-      _agentName = await store.getString("agentName");
-      _agentEmail ??= await store.getString("agentEmail");
-      _agentPhone = await store.getString("agentPhone");
-      _agentNpn = await store.getString("agentNpn");
-      _agencyName = await store.getString("agencyName");
-      _agencyAddress = await store.getString("agencyAddress");
+      await _loadStoredAgentInfo(store);
     }
 
     if (!mounted) return;
     setState(() => _loading = false);
+  }
+
+  Future<void> _loadStoredAgentInfo(SecureStore store) async {
+    _agentName = await store.getString("agentName");
+    _agentEmail ??= await store.getString("agentEmail");
+    _agentPhone = await store.getString("agentPhone");
+    _agentNpn = await store.getString("agentNpn");
+    _agencyName = await store.getString("agencyName");
+    _agencyAddress = await store.getString("agencyAddress");
+    _businessCardImageBase64 =
+        await store.getString("agentBusinessCardImage");
   }
 
   Future<void> _copyInviteLink() async {
@@ -98,7 +110,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     await Clipboard.setData(ClipboardData(text: _deepLink!));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Invite link copied 📋")),
+      const SnackBar(content: Text("Invite link copied")),
     );
   }
 
@@ -123,7 +135,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF111111), // 🔥 dark card style
+        backgroundColor: const Color(0xFF111111),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -147,15 +159,23 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
               if (message != null)
                 Text(message, style: const TextStyle(color: Colors.white70)),
               if (campaign.isNotEmpty)
-                Text("Campaign: $campaign",
-                    style: const TextStyle(color: Colors.white70)),
+                Text(
+                  "Campaign: $campaign",
+                  style: const TextStyle(color: Colors.white70),
+                ),
               const SizedBox(height: 10),
-              Text("Devices targeted: $total",
-                  style: const TextStyle(color: Colors.white)),
-              Text("Users notified: $notified",
-                  style: const TextStyle(color: Colors.white)),
-              Text("Failures: $failures",
-                  style: const TextStyle(color: Colors.white)),
+              Text(
+                "Devices targeted: $total",
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                "Users notified: $notified",
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                "Failures: $failures",
+                style: const TextStyle(color: Colors.white),
+              ),
             ],
           ],
         ),
@@ -180,6 +200,101 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     await _loadAgentInfo();
   }
 
+  Future<void> _scanBusinessCard() async {
+    await Navigator.pushNamed(
+      context,
+      '/my_profile_agent',
+      arguments: {'autoScan': true},
+    );
+    await _loadAgentInfo();
+  }
+
+  Widget _agentCardDisplay(String displayName) {
+    final image = _businessCardImageBase64?.trim();
+    if (image != null && image.isNotEmpty) {
+      final bytes = base64Decode(image);
+      return GestureDetector(
+        onTap: () => _openBusinessCard(bytes),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _agentTextDisplay(displayName),
+          ),
+        ),
+      );
+    }
+
+    return _agentTextDisplay(displayName);
+  }
+
+  void _openBusinessCard(List<int> bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 5,
+              child: Center(
+                child: Image.memory(
+                  Uint8List.fromList(bytes),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _agentTextDisplay(String displayName) {
+    return Column(
+      children: [
+        Text(
+          displayName,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_agencyName?.isNotEmpty == true)
+          Text("Agency: $_agencyName", textAlign: TextAlign.center),
+        if (_agencyAddress?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              "Address: $_agencyAddress",
+              textAlign: TextAlign.center,
+            ),
+          ),
+        const SizedBox(height: 16),
+        if (_agentPhone?.isNotEmpty == true)
+          Text("Phone: $_agentPhone", textAlign: TextAlign.center),
+        if (_agentEmail?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text("Email: $_agentEmail", textAlign: TextAlign.center),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -195,7 +310,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
         title: Text(
-          "My Agent – $displayName",
+          "My Agent - $displayName",
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -225,26 +340,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(22),
-                        child: Column(
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            if (_agencyName?.isNotEmpty == true)
-                              Text("🏢 $_agencyName"),
-                            if (_agencyAddress?.isNotEmpty == true)
-                              Text("📍 $_agencyAddress"),
-                            if (_agentPhone?.isNotEmpty == true)
-                              Text("📞 $_agentPhone"),
-                            if (_agentEmail?.isNotEmpty == true)
-                              Text("📧 $_agentEmail"),
-                          ],
-                        ),
+                        child: _agentCardDisplay(displayName),
                       ),
                     ),
 
@@ -282,7 +378,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 style: const TextStyle(fontSize: 12),
                               ),
                               const SizedBox(height: 20),
-
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton.icon(
@@ -290,7 +385,9 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                   style: FilledButton.styleFrom(
                                     backgroundColor: Colors.blue.shade700,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -298,7 +395,10 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                   icon: const Icon(Icons.copy),
                                   label: const Text(
                                     "Copy Invite Link",
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -309,52 +409,54 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
 
                     const SizedBox(height: 28),
 
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _goToAuthorizationForm,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.assignment),
-                        label: const Text(
-                          "Send My Information",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                    _actionButton(
+                      icon: Icons.document_scanner,
+                      label: "Scan Business Card",
+                      onPressed: _scanBusinessCard,
                     ),
-
                     const SizedBox(height: 18),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _sendNotification,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.notifications_active),
-                        label: const Text(
-                          "Send Notification",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                    _actionButton(
+                      icon: Icons.assignment,
+                      label: "Send My Information",
+                      onPressed: _goToAuthorizationForm,
+                    ),
+                    const SizedBox(height: 18),
+                    _actionButton(
+                      icon: Icons.notifications_active,
+                      label: "Send Notification",
+                      onPressed: _sendNotification,
                     ),
                   ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.blue.shade700,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: Icon(icon),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );

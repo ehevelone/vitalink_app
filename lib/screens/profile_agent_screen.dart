@@ -1,5 +1,11 @@
 // lib/screens/profile_agent_screen.dart
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+import 'package:permission_handler/permission_handler.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../widgets/password_rules.dart';
@@ -20,6 +26,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   final _phoneCtrl = TextEditingController();
   final _agencyNameCtrl = TextEditingController();
   final _agencyAddressCtrl = TextEditingController();
+  final _calendlyUrlCtrl = TextEditingController();
   final _agencyPhoneCtrl = TextEditingController(); // 🔥 ADDED
 
   // 🔥 ADDRESS FIELDS ADDED
@@ -31,6 +38,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   final _confirmCtrl = TextEditingController();
 
   bool _loading = false;
+  bool _scanningCard = false;
+  bool _autoScanHandled = false;
   bool _showPassword = false;
   bool _showConfirm = false;
 
@@ -38,6 +47,23 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   void initState() {
     super.initState();
     _loadLocalProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _agencyNameCtrl.dispose();
+    _agencyAddressCtrl.dispose();
+    _agencyPhoneCtrl.dispose();
+    _calendlyUrlCtrl.dispose();
+    _agencyCityCtrl.dispose();
+    _agencyStateCtrl.dispose();
+    _agencyZipCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -55,6 +81,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
     _agencyPhoneCtrl.text =
         await store.getString('agencyPhone') ?? '';
+    _calendlyUrlCtrl.text =
+        await store.getString('agentCalendlyUrl') ?? '';
 
     // 🔥 LOAD NEW ADDRESS FIELDS
     _agencyCityCtrl.text =
@@ -83,6 +111,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         _agencyAddressCtrl.text;
     _agencyPhoneCtrl.text =
         agent['agency_phone']?.toString() ?? _agencyPhoneCtrl.text;
+    _calendlyUrlCtrl.text =
+        agent['calendly_url']?.toString() ?? _calendlyUrlCtrl.text;
     _agencyCityCtrl.text =
         agent['agency_city']?.toString() ?? _agencyCityCtrl.text;
     _agencyStateCtrl.text =
@@ -91,9 +121,200 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         agent['agency_zip']?.toString() ?? _agencyZipCtrl.text;
 
     setState(() {});
+
+    if (!_autoScanHandled) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args['autoScan'] == true) {
+        _autoScanHandled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scanBusinessCard();
+        });
+      }
+    }
   }
 
   String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
+
+  String _value(Map data, String key) => data[key]?.toString().trim() ?? '';
+
+  Future<String?> _businessCardPreviewBase64(String path) async {
+    final bytes = await File(path).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return base64Encode(bytes);
+
+    final resized = decoded.width > 1000
+        ? img.copyResize(decoded, width: 1000)
+        : decoded;
+    return base64Encode(img.encodeJpg(resized, quality: 78));
+  }
+
+  Future<void> _scanBusinessCard() async {
+    if (_emailCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Agent email is required before scanning.")),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (status.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+
+      if (!mounted) return;
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Camera permission not granted")),
+      );
+      return;
+    }
+
+    setState(() => _scanningCard = true);
+
+    try {
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final images = await CunningDocumentScanner.getPictures();
+      if (images == null || images.isEmpty) return;
+      final cardImageBase64 = await _businessCardPreviewBase64(images.first);
+
+      final res = await ApiService.parseAgentBusinessCard(
+        image: File(images.first),
+        agentEmail: _emailCtrl.text.trim(),
+        cardImageBase64: cardImageBase64,
+      );
+
+      if (!mounted) return;
+
+      if (res['success'] != true) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(res['error'] ?? "Business card scan failed")),
+        );
+        return;
+      }
+
+      final data = res['data'];
+      if (data is! Map) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text("No business card details found")),
+        );
+        return;
+      }
+
+      await _reviewBusinessCardFields(data);
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text("Business card scan failed: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _scanningCard = false);
+    }
+  }
+
+  Future<void> _reviewBusinessCardFields(Map data) async {
+    final parsedEmail = _value(data, 'email');
+    final notes = <String>[
+      if (parsedEmail.isNotEmpty && parsedEmail != _emailCtrl.text.trim())
+        "Card email found: $parsedEmail",
+      if (data['hasLogo'] == true) "Logo detected on card.",
+      if (data['hasHeadshot'] == true) "Headshot detected on card.",
+    ];
+
+    final apply = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Review Business Card",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _previewLine("Name", _value(data, 'name')),
+              _previewLine("Phone", _value(data, 'phone')),
+              _previewLine("Agency", _value(data, 'agencyName')),
+              _previewLine("Address", _value(data, 'address')),
+              _previewLine("City", _value(data, 'city')),
+              _previewLine("State", _value(data, 'state')),
+              _previewLine("ZIP", _value(data, 'zip')),
+              _previewLine("Calendly", _value(data, 'calendlyUrl')),
+              if (notes.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ...notes.map(
+                  (note) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(note, style: const TextStyle(color: Colors.white70)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Apply"),
+          ),
+        ],
+      ),
+    );
+
+    if (apply != true) return;
+
+    setState(() {
+      final name = _value(data, 'name');
+      final phone = _value(data, 'phone');
+      final agency = _value(data, 'agencyName');
+      final address = _value(data, 'address');
+      final city = _value(data, 'city');
+      final state = _value(data, 'state');
+      final zip = _value(data, 'zip');
+      final calendly = _value(data, 'calendlyUrl');
+
+      if (name.isNotEmpty) _nameCtrl.text = name;
+      if (phone.isNotEmpty) _phoneCtrl.text = phone;
+      if (agency.isNotEmpty) _agencyNameCtrl.text = agency;
+      if (address.isNotEmpty) _agencyAddressCtrl.text = address;
+      if (city.isNotEmpty) _agencyCityCtrl.text = city;
+      if (state.isNotEmpty) _agencyStateCtrl.text = state;
+      if (zip.isNotEmpty) _agencyZipCtrl.text = zip;
+      if (calendly.isNotEmpty) _calendlyUrlCtrl.text = calendly;
+    });
+  }
+
+  Widget _previewLine(String label, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+          children: [
+            TextSpan(
+              text: "$label: ",
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
 
   String? _validatePassword(String? pw) {
     if (pw == null || pw.isEmpty) return null;
@@ -167,6 +388,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         agencyPhone: _agencyPhoneCtrl.text.trim().isNotEmpty
             ? _agencyPhoneCtrl.text.trim()
             : null,
+        calendlyUrl: _calendlyUrlCtrl.text.trim().isNotEmpty
+            ? _calendlyUrlCtrl.text.trim()
+            : null,
         password:
             _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text.trim() : null,
       );
@@ -184,6 +408,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       await store.setString('agencyName', _agencyNameCtrl.text.trim());
       await store.setString('agencyAddress', _agencyAddressCtrl.text.trim());
       await store.setString('agencyPhone', _agencyPhoneCtrl.text.trim());
+      await store.setString('agentCalendlyUrl', _calendlyUrlCtrl.text.trim());
 
       // 🔥 SAVE NEW ADDRESS FIELDS
       await store.setString('agencyCity', _agencyCityCtrl.text.trim());
@@ -227,6 +452,36 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 enabled: false,
                 decoration: const InputDecoration(
                   labelText: "Email (cannot be changed)",
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _scanningCard ? null : _scanBusinessCard,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.lightBlueAccent,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: _scanningCard
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.badge),
+                  label: Text(
+                    _scanningCard ? "Scanning Business Card..." : "Scan Business Card",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -290,6 +545,27 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 decoration: const InputDecoration(labelText: "Agency Phone Number"),
               ),
 
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _calendlyUrlCtrl,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: "Calendly Link",
+                  hintText: "https://calendly.com/your-link",
+                ),
+                validator: (v) {
+                  final value = v?.trim() ?? '';
+                  if (value.isEmpty) return null;
+                  final uri = Uri.tryParse(value);
+                  if (uri == null ||
+                      !uri.hasScheme ||
+                      !['http', 'https'].contains(uri.scheme.toLowerCase())) {
+                    return "Enter a valid link";
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 12),
