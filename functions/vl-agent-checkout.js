@@ -15,20 +15,35 @@ function getPlan(body = {}) {
       .trim()
       .toLowerCase();
 
+  const billing =
+    (body.billing || body.interval || body.frequency || "monthly")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  const isAnnual =
+    ["annual", "annually", "year", "yearly"].includes(billing);
+
   if (["app_crm", "app-crm", "combo", "appcrm"].includes(plan)) {
     return {
       priceId:
-        process.env.STRIPE_FOUNDERS_APP_CRM_PRICE_ID ||
-        process.env.STRIPE_APP_CRM_PRICE_ID,
-      type: "app_crm_subscription"
+        isAnnual
+          ? process.env.STRIPE_FOUNDERS_APP_CRM_ANNUAL_PRICE_ID
+          : process.env.STRIPE_FOUNDERS_APP_CRM_PRICE_ID,
+      type: "app_crm_subscription",
+      product: "app_crm",
+      billing: isAnnual ? "annual" : "monthly"
     };
   }
 
   return {
     priceId:
-      process.env.STRIPE_FOUNDERS_AGENT_PRICE_ID ||
-      process.env.STRIPE_AGENT_PRICE_ID,
-    type: "agent_subscription"
+      isAnnual
+        ? process.env.STRIPE_FOUNDERS_AGENT_ANNUAL_PRICE_ID
+        : process.env.STRIPE_FOUNDERS_AGENT_PRICE_ID,
+    type: "agent_subscription",
+    product: "agent",
+    billing: isAnnual ? "annual" : "monthly"
   };
 }
 
@@ -89,13 +104,17 @@ exports.handler = async (event) => {
       // 🔥 CRITICAL FOR WEBHOOK MATCHING
       metadata: {
         agentId: String(agentId),
-        type: plan.type
+        type: plan.type,
+        product: plan.product,
+        billing: plan.billing
       },
 
       subscription_data: {
         metadata: {
           agentId: String(agentId),
-          type: plan.type
+          type: plan.type,
+          product: plan.product,
+          billing: plan.billing
         }
       },
 
@@ -103,7 +122,7 @@ exports.handler = async (event) => {
         "https://myvitalink.app/agent-success.html?session_id={CHECKOUT_SESSION_ID}",
 
       cancel_url:
-        "https://myvitalink.app/activate.html"
+        `https://myvitalink.app/agent-access?plan=${encodeURIComponent(plan.product)}&billing=${encodeURIComponent(plan.billing)}`
 
     });
 
