@@ -10,12 +10,25 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
-
   static const Color vitalinkBlue = Color(0xFF79CAE3);
 
   String? activationCode;
 
   bool _checkedRoute = false;
+
+  Widget _scrollableDialog({required Widget child}) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.82;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: child,
+      ),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -39,7 +52,6 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showLoginPopup() {
-
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -47,56 +59,56 @@ class _LandingScreenState extends State<LandingScreen> {
           borderRadius: BorderRadius.circular(24),
         ),
         backgroundColor: const Color(0xFF1A1A1A),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-
-              const Text(
-                "Log In",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        child: _scrollableDialog(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Log In",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  minimumSize: const Size(double.infinity, 55),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    minimumSize: const Size(double.infinity, 55),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/login');
+                  },
+                  child: const Text(
+                    "User Login",
+                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(context, '/login');
-                },
-                child: const Text(
-                  "User Login",
-                  style: TextStyle(fontSize: 18, color: Colors.black),
-                ),
-              ),
 
-              const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: vitalinkBlue,
-                  minimumSize: const Size(double.infinity, 55),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: vitalinkBlue,
+                    minimumSize: const Size(double.infinity, 55),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/agent_login');
+                  },
+                  child: const Text(
+                    "Agent Login",
+                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(context, '/agent_login');
-                },
-                child: const Text(
-                  "Agent Login",
-                  style: TextStyle(fontSize: 18, color: Colors.black),
-                ),
-              ),
-
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -111,58 +123,60 @@ class _LandingScreenState extends State<LandingScreen> {
           borderRadius: BorderRadius.circular(24),
         ),
         backgroundColor: const Color(0xFF1A1A1A),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Create Account",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        child: _scrollableDialog(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Create Account",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-              const Text(
-                "Choose the account type that matches how you use VitaLink.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+                const Text(
+                  "Choose the account type that matches how you use VitaLink.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              _registerOption(
-                icon: Icons.family_restroom,
-                title: "Create Client Account",
-                subtitle: "For VitaLink users and families",
-                color: Colors.green,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _showClientActivationDialog();
-                },
-              ),
+                _registerOption(
+                  icon: Icons.family_restroom,
+                  title: "Create Client Account",
+                  subtitle: "For VitaLink users and families",
+                  color: Colors.green,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showClientActivationDialog();
+                  },
+                ),
 
-              const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-              _registerOption(
-                icon: Icons.business_center,
-                title: "Activate Agent Portal",
-                subtitle:
-                    "Insurance agents must activate access through myvitalink.app",
-                color: vitalinkBlue,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _showAgentActivationDialog();
-                },
-              ),
-            ],
+                _registerOption(
+                  icon: Icons.business_center,
+                  title: "Activate Agent Portal",
+                  subtitle:
+                      "Insurance agents must activate access through myvitalink.app",
+                  color: vitalinkBlue,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showAgentActivationDialog();
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -296,11 +310,12 @@ class _LandingScreenState extends State<LandingScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: _scrollableDialog(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               const Text(
                 "Client Account Activation",
                 textAlign: TextAlign.center,
@@ -343,7 +358,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text("Cancel"),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -358,11 +374,12 @@ class _LandingScreenState extends State<LandingScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: _scrollableDialog(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               const Text(
                 "Agent Portal Activation",
                 textAlign: TextAlign.center,
@@ -409,7 +426,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text("Cancel"),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -418,95 +436,111 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-        child: SafeArea(
-          child: Column(
-            children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactHeight = constraints.maxHeight < 760;
+          final titleSize = compactHeight ? 36.0 : 44.0;
+          final logoWidth = compactHeight ? 200.0 : 240.0;
+          final topGap = compactHeight ? 26.0 : 60.0;
+          final logoGap = compactHeight ? 18.0 : 30.0;
+          final buttonGap = compactHeight ? 32.0 : 70.0;
+          final bottomImageHeight =
+              (constraints.maxHeight * (compactHeight ? 0.18 : 0.24))
+                  .clamp(110.0, 210.0);
 
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  color: Colors.black,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        children: [
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.black,
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            children: [
+                              SizedBox(height: topGap),
 
-                          const SizedBox(height: 60),
+                              Text(
+                                "Welcome To",
+                                style: TextStyle(
+                                  fontSize: titleSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: vitalinkBlue,
+                                ),
+                              ),
 
-                          const Text(
-                            "Welcome To",
-                            style: TextStyle(
-                              fontSize: 44,
-                              fontWeight: FontWeight.bold,
-                              color: vitalinkBlue,
-                            ),
+                              SizedBox(height: logoGap),
+
+                              Image.asset(
+                                'assets/images/vitalink-logo-2.png',
+                                width: logoWidth,
+                              ),
+
+                              SizedBox(height: buttonGap),
+
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  minimumSize: const Size(double.infinity, 55),
+                                ),
+                                onPressed: _showLoginPopup,
+                                child: const Text(
+                                  "Log In to Your Account",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: vitalinkBlue,
+                                  minimumSize: const Size(double.infinity, 55),
+                                ),
+                                onPressed: _showRegisterPopup,
+                                child: const Text(
+                                  "Register for an Account",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+
+                              SizedBox(height: compactHeight ? 28 : 60),
+                            ],
                           ),
-
-                          const SizedBox(height: 30),
-
-                          Image.asset(
-                            'assets/images/vitalink-logo-2.png',
-                            width: 240,
-                          ),
-
-                          const SizedBox(height: 70),
-
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              minimumSize: const Size(double.infinity, 55),
-                            ),
-                            onPressed: _showLoginPopup,
-                            child: const Text(
-                              "Log In to Your Account",
-                              style: TextStyle(fontSize: 18, color: Colors.black),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: vitalinkBlue,
-                              minimumSize: const Size(double.infinity, 55),
-                            ),
-                            onPressed: _showRegisterPopup,
-                            child: const Text(
-                              "Register for an Account",
-                              style: TextStyle(fontSize: 18, color: Colors.black),
-                            ),
-                          ),
-
-                          const SizedBox(height: 60),
-
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              Container(
-                width: double.infinity,
-                color: Colors.black,
-                child: Image.asset(
-                  'assets/images/landing-bottom.png',
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: bottomImageHeight,
+                    child: Image.asset(
+                      'assets/images/landing-bottom.png',
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    ),
+                  ),
+                ],
               ),
-
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
