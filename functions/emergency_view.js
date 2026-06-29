@@ -86,10 +86,11 @@ exports.handler = async (event) => {
     try {
       data = JSON.parse(decrypt(encrypted));
     } catch (e) {
-      console.error("DECRYPT ERROR:", e);
-      return reply(500, {
+      console.error("Emergency profile decrypt requires re-save:", e.message);
+      return reply(200, {
         success: false,
-        error: "Decrypt failed",
+        error: "EMERGENCY_PROFILE_REQUIRES_UPDATE",
+        needsEmergencyProfileUpdate: true,
       });
     }
 
