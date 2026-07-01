@@ -1,8 +1,8 @@
 // @ts-nocheck
 
-const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { Pool } = require("pg");
+const { hashPassword, verifyPassword } = require("./services/passwords");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -96,7 +96,8 @@ exports.handler = async function (event) {
       };
     }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const passwordCheck = await verifyPassword(password, user.password_hash);
+    const valid = passwordCheck.valid;
 
     if (!valid) {
       client.release();
@@ -105,6 +106,13 @@ exports.handler = async function (event) {
         headers: corsHeaders(),
         body: JSON.stringify({ success:false, error:"Invalid credentials" })
       };
+    }
+
+    if (passwordCheck.legacy) {
+      await client.query(
+        "UPDATE rsms SET password_hash = $1 WHERE id = $2",
+        [await hashPassword(password), user.id]
+      );
     }
 
     // ==========================

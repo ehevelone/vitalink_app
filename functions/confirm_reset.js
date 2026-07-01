@@ -1,10 +1,6 @@
 // functions/confirm_reset.js
 const db = require("./services/db");
-const crypto = require("crypto");
-
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
+const { hashPassword } = require("./services/passwords");
 
 exports.handler = async (event) => {
   try {
@@ -37,7 +33,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const hashed = hashPassword(newPassword);
+    const hashed = await hashPassword(newPassword);
 
     await db.query(
       `UPDATE agents 

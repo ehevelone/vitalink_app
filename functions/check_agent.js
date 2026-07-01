@@ -1,6 +1,6 @@
 // functions/check_agent.js
 const db = require("./services/db");
-const bcrypt = require("bcryptjs");
+const { hashPassword, verifyPassword } = require("./services/passwords");
 const { createAgentSession } = require("./services/agent-auth");
 
 const headers = {
@@ -58,9 +58,17 @@ exports.handler = async (event) => {
       return fail("Agent account not set up correctly.");
     }
 
-    const isMatch = await bcrypt.compare(password, agent.password_hash);
+    const passwordCheck = await verifyPassword(password, agent.password_hash);
+    const isMatch = passwordCheck.valid;
     if (!isMatch) {
-      return fail("Invalid password ❌");
+      return fail("Invalid password");
+    }
+
+    if (passwordCheck.legacy) {
+      await db.query(
+        "UPDATE agents SET password_hash = $1 WHERE id = $2",
+        [await hashPassword(password), agent.id]
+      );
     }
 
     // 🔥 FINAL ACCESS CONTROL (THIS IS THE IMPORTANT PART)

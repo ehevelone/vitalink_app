@@ -2,7 +2,7 @@
 // functions/rsm-login.js
 const crypto = require("crypto");
 const { Pool } = require("pg");
-const bcrypt = require("bcryptjs");
+const { hashPassword, verifyPassword } = require("./services/passwords");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -89,11 +89,13 @@ exports.handler = async function (event) {
       });
     }
 
-    let ok = await bcrypt.compare(password, rsm.password_hash);
+    let passwordCheck = await verifyPassword(password, rsm.password_hash);
+    let ok = passwordCheck.valid;
     const trimmedPassword = String(password).trim();
 
     if (!ok && trimmedPassword && trimmedPassword !== password) {
-      ok = await bcrypt.compare(trimmedPassword, rsm.password_hash);
+      passwordCheck = await verifyPassword(trimmedPassword, rsm.password_hash);
+      ok = passwordCheck.valid;
     }
 
     if (!ok) {
@@ -110,6 +112,13 @@ exports.handler = async function (event) {
         error: "Invalid credentials",
         code: "password_mismatch",
       });
+    }
+
+    if (passwordCheck.legacy) {
+      await client.query(
+        "UPDATE rsms SET password_hash = $1 WHERE id = $2",
+        [await hashPassword(trimmedPassword || password), rsm.id]
+      );
     }
 
     if (role === "admin") {

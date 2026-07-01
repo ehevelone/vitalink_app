@@ -1,7 +1,7 @@
 // functions/check_user.js
 const db = require("./services/db");
-const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const { hashPassword, verifyPassword } = require("./services/passwords");
 
 const headers = {
   "Content-Type": "application/json",
@@ -77,10 +77,22 @@ exports.handler = async (event) => {
     }
 
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const passwordCheck = await verifyPassword(password, user.password_hash);
+    const valid = passwordCheck.valid;
 
     if (!valid) {
       return reply(false, { error: "Invalid password" }, 401);
+    }
+
+    if (passwordCheck.legacy) {
+      await db.query(
+        `
+        UPDATE users
+        SET password_hash = $1
+        WHERE id = $2
+        `,
+        [await hashPassword(password), user.id]
+      );
     }
 
     // 🔒 DEVICE ENFORCEMENT ONLY IF NO AGENT
