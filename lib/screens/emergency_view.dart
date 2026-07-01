@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -14,15 +16,12 @@ class Formatters {
   }
 
   static String dob(String raw) {
-    try {
-      final date = DateTime.tryParse(raw);
-      if (date != null) {
-        return "${date.month.toString().padLeft(2, '0')}/"
-            "${date.day.toString().padLeft(2, '0')}/"
-            "${date.year}";
-      }
-    } catch (_) {}
-    return raw;
+    final date = DateTime.tryParse(raw);
+    if (date == null) return raw;
+
+    return "${date.month.toString().padLeft(2, '0')}/"
+        "${date.day.toString().padLeft(2, '0')}/"
+        "${date.year}";
   }
 }
 
@@ -34,11 +33,11 @@ class EmergencyView extends StatefulWidget {
 }
 
 class _EmergencyViewState extends State<EmergencyView> {
+  static const String _baseUrl = "https://myvitalink.app/emergency.html";
+
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
-
-  static const String _baseUrl = "https://myvitalink.app/emergency.html";
 
   @override
   void initState() {
@@ -49,10 +48,28 @@ class _EmergencyViewState extends State<EmergencyView> {
 
   Future<void> _load() async {
     final p = await _repo.loadProfile();
+    if (!mounted) return;
+
     setState(() {
       _p = p;
       _loading = false;
     });
+  }
+
+  Widget _infoTile({
+    required String title,
+    required String subtitle,
+    bool dense = false,
+  }) {
+    return ListTile(
+      tileColor: Colors.transparent,
+      shape: const Border(
+        bottom: BorderSide(color: Colors.black12),
+      ),
+      dense: dense,
+      title: Text(title),
+      subtitle: Text(subtitle),
+    );
   }
 
   @override
@@ -67,8 +84,6 @@ class _EmergencyViewState extends State<EmergencyView> {
 
     final p = _p!;
     final e = p.emergency;
-
-    // 🔥 TOKEN ONLY — NO DATA PAYLOAD
     final qrToken = p.qrToken;
 
     if (qrToken == null || qrToken.isEmpty) {
@@ -83,13 +98,19 @@ class _EmergencyViewState extends State<EmergencyView> {
     }
 
     final qrUrl = "$_baseUrl?token=$qrToken";
+    final qrSize = math
+        .max(
+          160.0,
+          math.min(MediaQuery.sizeOf(context).width - 64, 280.0),
+        )
+        .toDouble();
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.red.shade900,
         foregroundColor: Colors.white,
         title: Text(
-          "Emergency Info${p.fullName.isNotEmpty ? " – ${p.fullName}" : ""}",
+          "Emergency Info${p.fullName.isNotEmpty ? " - ${p.fullName}" : ""}",
         ),
         actions: [
           IconButton(
@@ -107,112 +128,66 @@ class _EmergencyViewState extends State<EmergencyView> {
         padding: const EdgeInsets.all(16),
         children: [
           if (p.fullName.isNotEmpty)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Name"),
-                subtitle: Text(p.fullName)),
+            _infoTile(title: "Name", subtitle: p.fullName),
           if (p.dob?.isNotEmpty == true)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("DOB"),
-                subtitle: Text(Formatters.dob(p.dob!))),
+            _infoTile(title: "DOB", subtitle: Formatters.dob(p.dob!)),
           if (e.allergies.isNotEmpty)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Allergies"),
-                subtitle: Text(e.allergies)),
+            _infoTile(title: "Allergies", subtitle: e.allergies),
           if (e.conditions.isNotEmpty)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Conditions"),
-                subtitle: Text(e.conditions)),
+            _infoTile(title: "Conditions", subtitle: e.conditions),
           if (e.implants.isNotEmpty)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Implants"),
-                subtitle: Text(e.implants)),
+            _infoTile(title: "Implants", subtitle: e.implants),
           if (e.procedures.isNotEmpty)
-            ListTile(
-                tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
-                title: const Text("Procedures"),
-                subtitle: Text(e.procedures)),
+            _infoTile(title: "Procedures", subtitle: e.procedures),
           ...e.effectiveContacts.asMap().entries.map(
-                (entry) => ListTile(
-                  tileColor: Colors.transparent,
-                  shape: const Border(
-                    bottom: BorderSide(color: Colors.black12),
-                  ),
-                  title: Text(
-                    entry.key == 0
-                        ? "Emergency Contact"
-                        : "Emergency Contact ${entry.key + 1}",
-                  ),
-                  subtitle: Text([
+                (entry) => _infoTile(
+                  title: entry.key == 0
+                      ? "Emergency Contact"
+                      : "Emergency Contact ${entry.key + 1}",
+                  subtitle: [
                     if (entry.value.name.isNotEmpty) entry.value.name,
                     if (entry.value.phone.isNotEmpty)
                       Formatters.phone(entry.value.phone),
-                  ].join(" - ")),
+                  ].join(" - "),
                 ),
               ),
           const Divider(height: 32),
-          if (p.meds.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Medications",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                ...p.meds.map((m) => ListTile(
-                      tileColor: Colors.transparent,
-                      shape: const Border(
-                        bottom: BorderSide(color: Colors.black12),
-                      ),
-                      dense: true,
-                      title: Text(m.name),
-                      subtitle: Text("${m.dose} • ${m.frequency}"),
-                    )),
-              ],
+          if (p.meds.isNotEmpty) ...[
+            const Text(
+              "Medications",
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-          if (p.doctors.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Doctors",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                ...p.doctors.map((d) => ListTile(
-                      tileColor: Colors.transparent,
-                      shape: const Border(
-                        bottom: BorderSide(color: Colors.black12),
-                      ),
-                      dense: true,
-                      title: Text(d.name),
-                      subtitle: Text(d.phone),
-                    )),
-              ],
+            ...p.meds.map(
+              (m) => _infoTile(
+                title: m.name,
+                subtitle: "${m.dose} - ${m.frequency}",
+                dense: true,
+              ),
             ),
+          ],
+          if (p.doctors.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text(
+              "Doctors",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            ...p.doctors.map(
+              (d) => _infoTile(
+                title: d.name,
+                subtitle: d.phone,
+                dense: true,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Center(
-            child: QrImageView(
-              data: qrUrl,
-              size: 240,
-              backgroundColor: Colors.white,
+            child: SizedBox.square(
+              dimension: qrSize,
+              child: QrImageView(
+                data: qrUrl,
+                size: qrSize,
+                backgroundColor: Colors.white,
+              ),
             ),
           ),
         ],

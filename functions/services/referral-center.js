@@ -83,6 +83,31 @@ async function ensureReferralSchema() {
     CREATE INDEX IF NOT EXISTS idx_agent_referrals_user_submitted
     ON agent_referrals (referring_user_id, submitted_at DESC)
   `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_referral_invites (
+      id UUID PRIMARY KEY,
+      agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      referring_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      referral_name TEXT NOT NULL,
+      referral_phone TEXT,
+      referral_email TEXT,
+      relationship TEXT,
+      reason TEXT,
+      notes TEXT,
+      source TEXT NOT NULL DEFAULT 'send_introduction',
+      public_token TEXT UNIQUE NOT NULL,
+      opened_at TIMESTAMPTZ,
+      converted_referral_id UUID REFERENCES agent_referrals(id) ON DELETE SET NULL,
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_agent_referral_invites_token
+    ON agent_referral_invites (public_token)
+  `);
 }
 
 async function verifyUserSession(userId, token) {

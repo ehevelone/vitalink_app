@@ -1,4 +1,11 @@
+const crypto = require("crypto");
 const db = require("./db");
+
+const DOCUMENT_TYPES = Object.freeze({
+  HIPAA: "hipaa",
+  SOA: "soa",
+  VITALINK_CSV: "vitalink_csv",
+});
 
 function digitsOnly(value) {
   return (value || "").toString().replace(/\D/g, "");
@@ -57,6 +64,24 @@ function formatList(items, fields) {
 function normalizeClientInput(input = {}) {
   const nameParts =
     splitName(input.fullName || input.name);
+  const medicationList =
+    Array.isArray(input.meds)
+      ? formatList(input.meds, ["name", "dose", "dosage", "frequency", "pharmacy"])
+      : Array.isArray(input.medications)
+        ? formatList(input.medications, ["name", "dose", "dosage", "frequency", "pharmacy"])
+      : null;
+  const doctorList =
+    Array.isArray(input.doctors)
+      ? formatList(input.doctors, ["name", "specialty", "clinic", "phone"])
+      : null;
+  const emergencyContacts =
+    Array.isArray(input.vitalink_emergency_contacts)
+      ? formatList(input.vitalink_emergency_contacts, ["name", "relationship", "phone", "email"])
+      : null;
+  const pharmacies =
+    Array.isArray(input.vitalink_pharmacy_list)
+      ? formatList(input.vitalink_pharmacy_list, ["name", "phone", "details"])
+      : null;
 
   return {
     first_name:
@@ -80,26 +105,131 @@ function normalizeClientInput(input = {}) {
     medication_list:
       firstNonEmpty(
         input.medication_list,
-        input.medications,
-        formatList(input.meds, ["name", "dosage", "frequency"])
+        Array.isArray(input.medications) ? null : input.medications,
+        medicationList
       ),
     doctor_list:
       firstNonEmpty(
         input.doctor_list,
-        input.doctors,
-        formatList(input.doctors, ["name", "specialty", "clinic", "phone"])
+        Array.isArray(input.doctors) ? null : input.doctors,
+        doctorList
+      ),
+    vitalink_emergency_contacts:
+      firstNonEmpty(
+        Array.isArray(input.vitalink_emergency_contacts) ? null : input.vitalink_emergency_contacts,
+        emergencyContacts
+      ),
+    vitalink_pharmacy_list:
+      firstNonEmpty(
+        Array.isArray(input.vitalink_pharmacy_list) ? null : input.vitalink_pharmacy_list,
+        pharmacies
       ),
   };
 }
 
 async function ensureCrmSyncSchema() {
   await db.query(`
+    ALTER TABLE agents
+    ADD COLUMN IF NOT EXISTS crm_subscription_status TEXT,
+    ADD COLUMN IF NOT EXISTS crm_subscription_valid BOOLEAN DEFAULT false
+  `);
+
+  await db.query(`
     ALTER TABLE crm_clients
     ADD COLUMN IF NOT EXISTS linked_app_client_id TEXT,
     ADD COLUMN IF NOT EXISTS profile_linked TEXT,
     ADD COLUMN IF NOT EXISTS medication_list TEXT,
     ADD COLUMN IF NOT EXISTS doctor_list TEXT,
-    ADD COLUMN IF NOT EXISTS last_sync TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS last_sync TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS vitalink_connected BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS vitalink_app_user_id TEXT,
+    ADD COLUMN IF NOT EXISTS vitalink_profile_id TEXT,
+    ADD COLUMN IF NOT EXISTS last_vitalink_package_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_vitalink_import_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS hipaa_signed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS soa_signed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS vitalink_emergency_contacts TEXT,
+    ADD COLUMN IF NOT EXISTS vitalink_pharmacy_list TEXT
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS crm_vitalink_packages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      crm_agent_id TEXT NOT NULL,
+      crm_client_id TEXT,
+      app_user_id TEXT,
+      app_profile_id TEXT,
+      package_type TEXT NOT NULL DEFAULT 'vitalink_package',
+      status TEXT NOT NULL DEFAULT 'received',
+      client_name TEXT,
+      client_dob DATE,
+      client_email TEXT,
+      client_phone TEXT,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      imported_at TIMESTAMPTZ,
+      imported_by_agent_id TEXT,
+      hipaa_signed_at TIMESTAMPTZ,
+      soa_signed_at TIMESTAMPTZ,
+      source TEXT NOT NULL DEFAULT 'vitalink_app',
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS crm_client_documents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      crm_agent_id TEXT NOT NULL,
+      crm_client_id TEXT NOT NULL,
+      package_id UUID REFERENCES crm_vitalink_packages(id) ON DELETE SET NULL,
+      document_type TEXT NOT NULL,
+      document_name TEXT,
+      storage_path TEXT,
+      document_url TEXT,
+      document_data BYTEA,
+      document_size_bytes INTEGER,
+      mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+      sha256 TEXT,
+      signed_at TIMESTAMPTZ,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+    )
+  `);
+
+  await db.query(`
+    ALTER TABLE crm_client_documents
+    ADD COLUMN IF NOT EXISTS document_data BYTEA,
+    ADD COLUMN IF NOT EXISTS document_size_bytes INTEGER,
+    ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS crm_audit_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      crm_agent_id TEXT,
+      crm_client_id TEXT,
+      actor_type TEXT NOT NULL DEFAULT 'system',
+      actor_id TEXT,
+      event_type TEXT NOT NULL,
+      package_id UUID REFERENCES crm_vitalink_packages(id) ON DELETE SET NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_crm_vitalink_packages_client
+    ON crm_vitalink_packages (crm_client_id, received_at DESC)
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_crm_client_documents_client
+    ON crm_client_documents (crm_client_id, document_type, received_at DESC)
   `);
 
   await db.query(`
@@ -173,7 +303,11 @@ async function getCrmAgent({ agentId, agentEmail }) {
 
   const agentRes = await db.query(
     `
-    SELECT id, crm_uuid
+    SELECT
+      id,
+      crm_uuid,
+      crm_subscription_status,
+      crm_subscription_valid
     FROM agents
     WHERE ${where.join(" OR ")}
     LIMIT 1
@@ -185,9 +319,19 @@ async function getCrmAgent({ agentId, agentEmail }) {
     return { error: "Agent is not linked to CRM" };
   }
 
+  const row = agentRes.rows[0];
+  const crmActive =
+    row.crm_subscription_valid === true ||
+    row.crm_subscription_status === "active" ||
+    row.crm_subscription_status === "trialing";
+
+  if (!crmActive) {
+    return { skipped: true, error: "Agent CRM is not active" };
+  }
+
   return {
-    appAgentId: agentRes.rows[0].id,
-    crmAgentId: agentRes.rows[0].crm_uuid,
+    appAgentId: row.id,
+    crmAgentId: row.crm_uuid,
   };
 }
 
@@ -254,11 +398,16 @@ async function updateCrmClient({ crmClientId, clientId, client }) {
     ["zip", client.zip],
     ["medication_list", client.medication_list],
     ["doctor_list", client.doctor_list],
+    ["vitalink_emergency_contacts", client.vitalink_emergency_contacts],
+    ["vitalink_pharmacy_list", client.vitalink_pharmacy_list],
   ].filter(([, value]) => clean(value));
 
   const assignments = [
     "profile_linked = 'Linked'",
     "last_sync = NOW()",
+    "vitalink_connected = TRUE",
+    "last_vitalink_package_at = NOW()",
+    "last_vitalink_import_at = NOW()",
   ];
 
   const values = [];
@@ -307,9 +456,14 @@ async function createCrmClient({ crmAgentId, clientId, client }) {
       profile_linked,
       medication_list,
       doctor_list,
-      last_sync
+      last_sync,
+      vitalink_connected,
+      last_vitalink_package_at,
+      last_vitalink_import_at,
+      vitalink_emergency_contacts,
+      vitalink_pharmacy_list
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Client',$11,'Linked',$12,$13,NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Client',$11,'Linked',$12,$13,NOW(),TRUE,NOW(),NOW(),$14,$15)
     RETURNING *
     `,
     [
@@ -326,10 +480,248 @@ async function createCrmClient({ crmAgentId, clientId, client }) {
       clientId ? String(clientId) : null,
       client.medication_list,
       client.doctor_list,
+      client.vitalink_emergency_contacts,
+      client.vitalink_pharmacy_list,
     ]
   );
 
   return result.rows[0];
+}
+
+async function logCrmAuditEvent({ crmAgentId, crmClientId, eventType, packageId, metadata = {} }) {
+  await db.query(
+    `
+    INSERT INTO crm_audit_log (
+      crm_agent_id,
+      crm_client_id,
+      actor_type,
+      event_type,
+      package_id,
+      metadata
+    )
+    VALUES ($1,$2,'system',$3,$4,$5::jsonb)
+    `,
+    [
+      clean(crmAgentId),
+      clean(crmClientId),
+      eventType,
+      clean(packageId),
+      JSON.stringify(metadata),
+    ]
+  );
+}
+
+async function recordVitalinkPackage({ crmAgentId, crmClientId, client, appUserId, appProfileId, signedAt }) {
+  await db.query(
+    `
+    UPDATE crm_clients
+    SET
+      vitalink_connected = TRUE,
+      last_vitalink_package_at = NOW(),
+      last_vitalink_import_at = NOW(),
+      hipaa_signed_at = COALESCE($1, hipaa_signed_at),
+      soa_signed_at = COALESCE($1, soa_signed_at),
+      updated_at = NOW()
+    WHERE id = $2
+      AND agent_id = $3
+    `,
+    [clean(signedAt), crmClientId, crmAgentId]
+  );
+
+  const result = await db.query(
+    `
+    INSERT INTO crm_vitalink_packages (
+      crm_agent_id,
+      crm_client_id,
+      app_user_id,
+      app_profile_id,
+      client_name,
+      client_dob,
+      client_email,
+      client_phone,
+      imported_at,
+      imported_by_agent_id,
+      hipaa_signed_at,
+      soa_signed_at,
+      metadata
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$1,$9,$9,$10::jsonb)
+    RETURNING *
+    `,
+    [
+      crmAgentId,
+      crmClientId,
+      clean(appUserId),
+      clean(appProfileId),
+      [client.first_name, client.last_name].filter(Boolean).join(" "),
+      clean(client.dob),
+      clean(client.email),
+      clean(client.phone),
+      clean(signedAt),
+      JSON.stringify({ source: "vitalink_package" }),
+    ]
+  );
+
+  const pkg = result.rows[0];
+
+  await logCrmAuditEvent({
+    crmAgentId,
+    crmClientId,
+    eventType: "vitalink_package_received",
+    packageId: pkg.id,
+  });
+
+  await logCrmAuditEvent({
+    crmAgentId,
+    crmClientId,
+    eventType: "hipaa_received",
+    packageId: pkg.id,
+  });
+
+  await logCrmAuditEvent({
+    crmAgentId,
+    crmClientId,
+    eventType: "soa_received",
+    packageId: pkg.id,
+  });
+
+  return pkg;
+}
+
+async function recordCrmClientDocument({
+  crmAgentId,
+  crmClientId,
+  packageId,
+  documentType,
+  documentName,
+  documentBase64,
+  signedAt,
+}) {
+  if (!documentBase64) {
+    return null;
+  }
+
+  const cleanedBase64 = String(documentBase64)
+    .replace(/^data:application\/pdf;base64,/i, "")
+    .trim();
+
+  const documentBuffer = Buffer.from(cleanedBase64, "base64");
+
+  if (documentBuffer.length > 10 * 1024 * 1024) {
+    throw new Error("Document PDF is larger than 10MB");
+  }
+
+  const sha256 = crypto
+    .createHash("sha256")
+    .update(documentBuffer)
+    .digest("hex");
+
+  const result = await db.query(
+    `
+    INSERT INTO crm_client_documents (
+      crm_agent_id,
+      crm_client_id,
+      package_id,
+      document_type,
+      document_name,
+      document_data,
+      document_size_bytes,
+      mime_type,
+      sha256,
+      signed_at,
+      metadata
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,'application/pdf',$8,$9,$10::jsonb)
+    RETURNING id
+    `,
+    [
+      crmAgentId,
+      crmClientId,
+      packageId,
+      documentType,
+      clean(documentName),
+      documentBuffer,
+      documentBuffer.length,
+      sha256,
+      clean(signedAt),
+      JSON.stringify({ source: "vitalink_package" }),
+    ]
+  );
+
+  return result.rows[0];
+}
+
+async function syncVitalinkPackageToCrm({
+  agentEmail,
+  clientData = {},
+  packageData = {},
+}) {
+  const signedAt =
+    packageData.signedAt || new Date().toISOString();
+
+  const sync = await syncAppClientToCrm({
+    agentEmail,
+    clientData: {
+      ...clientData,
+      vitalink_emergency_contacts: packageData.emergencyContacts,
+      vitalink_pharmacy_list: packageData.pharmacies,
+    },
+  });
+
+  if (!sync.success) {
+    return sync;
+  }
+
+  const pkg = await recordVitalinkPackage({
+    crmAgentId: sync.crmAgentId,
+    crmClientId: sync.crmClientId,
+    client: normalizeClientInput(clientData),
+    appUserId: packageData.appUserId,
+    appProfileId: packageData.appProfileId,
+    signedAt,
+  });
+
+  const pdfBase64 = packageData.hipaaSoaPdfBase64;
+
+  const hipaa = await recordCrmClientDocument({
+    crmAgentId: sync.crmAgentId,
+    crmClientId: sync.crmClientId,
+    packageId: pkg.id,
+    documentType: DOCUMENT_TYPES.HIPAA,
+    documentName: "VitaLink HIPAA Authorization",
+    documentBase64: pdfBase64,
+    signedAt,
+  });
+
+  const soa = await recordCrmClientDocument({
+    crmAgentId: sync.crmAgentId,
+    crmClientId: sync.crmClientId,
+    packageId: pkg.id,
+    documentType: DOCUMENT_TYPES.SOA,
+    documentName: "VitaLink Scope of Appointment",
+    documentBase64: pdfBase64,
+    signedAt,
+  });
+
+  await logCrmAuditEvent({
+    crmAgentId: sync.crmAgentId,
+    crmClientId: sync.crmClientId,
+    eventType: "vitalink_import_completed",
+    packageId: pkg.id,
+    metadata: {
+      hipaaDocumentId: hipaa?.id,
+      soaDocumentId: soa?.id,
+    },
+  });
+
+  return {
+    ...sync,
+    packageId: pkg.id,
+    documents: {
+      hipaa: hipaa?.id || null,
+      soa: soa?.id || null,
+    },
+  };
 }
 
 async function syncAppClientToCrm({
@@ -409,4 +801,5 @@ async function syncAppClientToCrm({
 module.exports = {
   ensureCrmSyncSchema,
   syncAppClientToCrm,
+  syncVitalinkPackageToCrm,
 };

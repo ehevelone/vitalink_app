@@ -133,20 +133,20 @@ Future<File> _buildCsv(Profile p) async {
 
   final userEmail = await SecureStore().getString('userEmail') ?? "";
 
-  final parts = (p.fullName ?? "").trim().split(' ');
+  final parts = p.fullName.trim().split(' ');
   final firstName = parts.isNotEmpty ? parts.first : "";
   final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
 
   // 🔥 Medications field
   final medsStr = p.meds
       .map((m) =>
-          "${m.name}${m.dose != null ? " (${m.dose})" : ""}${m.frequency != null ? " ${m.frequency}" : ""}")
+          "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
       .join("; ");
 
   // 🔥 Doctors field
   final docsStr = p.doctors
       .map((d) =>
-          "${d.name}${d.specialty != null ? " (${d.specialty})" : ""}")
+          "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}")
       .join("; ");
 
   // ✅ HEADER
@@ -175,6 +175,34 @@ buffer.writeln(
   final file = File("${dir.path}/vitalink_user_info.csv");
   await file.writeAsString(buffer.toString());
   return file;
+}
+
+List<Map<String, String>> _pharmacyList(Profile p) {
+  final seen = <String>{};
+  final pharmacies = <Map<String, String>>[];
+
+  for (final med in p.meds) {
+    final text = med.prescriber.trim();
+
+    if (text.isEmpty || seen.contains(text.toLowerCase())) {
+      continue;
+    }
+
+    seen.add(text.toLowerCase());
+
+    final lines = text
+        .split(RegExp(r'[\r\n]+'))
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    pharmacies.add({
+      "name": lines.isNotEmpty ? lines.first : text,
+      "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
+    });
+  }
+
+  return pharmacies;
 }
 
 Future<void> _openSignaturePopup() async {
@@ -271,7 +299,7 @@ Future<void> _openSignaturePopup() async {
               ...meds.map(
                 (m) => pw.Bullet(
                   text:
-                      "${m.name}${m.dose != null ? " — ${m.dose}" : ""}${m.frequency != null ? " — ${m.frequency}" : ""}",
+                      "${m.name}${m.dose.isNotEmpty ? " — ${m.dose}" : ""}${m.frequency.isNotEmpty ? " — ${m.frequency}" : ""}",
                 ),
               ),
             pw.SizedBox(height: 12),
@@ -284,7 +312,7 @@ Future<void> _openSignaturePopup() async {
               ...doctors.map(
                 (d) => pw.Bullet(
                   text:
-                      "${d.name}${d.specialty != null ? " — ${d.specialty}" : ""}${d.phone != null ? " — ${d.phone}" : ""}",
+                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
                 ),
               ),
             pw.SizedBox(height: 16),
@@ -317,6 +345,10 @@ Future<void> _openSignaturePopup() async {
       final csvFile = await _buildCsv(_profile!);
       final store = SecureStore();
       final userEmail = await store.getString('userEmail') ?? "";
+      final userId = await store.getString('userId') ?? "";
+      final signedAt = DateTime.now().toIso8601String();
+      final hipaaSoaPdfBase64 = base64Encode(await pdfFile.readAsBytes());
+      final vitalinkCsvBase64 = base64Encode(await csvFile.readAsBytes());
 
       final resp = await http.post(
         Uri.parse(
@@ -329,14 +361,27 @@ Future<void> _openSignaturePopup() async {
             "email": _agentEmail,
             "phone": _agentPhone ?? ""
           },
-          "user": _profile!.fullName ?? "",
+          "user": _profile!.fullName,
           "user_email": userEmail,
-          "user_phone": _profile!.userPhone ?? "",
+          "user_phone": _profile!.userPhone,
           "user_dob": _profile!.dob ?? "",
+          "user_address": _profile!.address ?? "",
+          "user_city": _profile!.city ?? "",
+          "user_state": _profile!.state ?? "",
+          "user_zip": _profile!.zip ?? "",
+          "app_user_id": userId,
+          "app_profile_id": _profile!.id,
+          "signed_at": signedAt,
+          "emergency_contacts": _profile!.emergency.effectiveContacts.map((c) => {
+                "name": c.name,
+                "phone": c.phone,
+              }).toList(),
+          "pharmacies": _pharmacyList(_profile!),
           "medications": meds.map((m) => {
                 "name": m.name,
                 "dose": m.dose,
                 "frequency": m.frequency,
+                "pharmacy": m.prescriber,
               }).toList(),
           "providers": doctors.map((d) => {
                 "name": d.name,
@@ -346,11 +391,11 @@ Future<void> _openSignaturePopup() async {
           "attachments": [
             {
               "name": "HIPAA_SOA_Authorization.pdf",
-              "content": base64Encode(await pdfFile.readAsBytes()),
+              "content": hipaaSoaPdfBase64,
             },
             {
               "name": "vitalink_user_info.csv",
-              "content": base64Encode(await csvFile.readAsBytes()),
+              "content": vitalinkCsvBase64,
             }
           ]
         }),
@@ -465,3 +510,4 @@ SizedBox(
     );
   }
 }
+

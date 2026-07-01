@@ -1,9 +1,9 @@
 // need something to re-deploy
 
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const db = require("./services/db");
 const { verifyAgentSession } = require("./services/agent-auth");
+const { createMailer, fromAddress } = require("./services/mailer");
 
 exports.handler = async (event) => {
 
@@ -81,18 +81,10 @@ exports.handler = async (event) => {
     const link = `https://vitalink-app.netlify.app/.netlify/functions/accept-agent-invite?token=${token}`;
 
     // 📧 Email setup
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587", 10),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createMailer();
 
     const mailOptions = {
-      from: `"VitaLink" <${process.env.SMTP_USER}>`,
+      from: fromAddress("VitaLink"),
       to: body.email,
       subject: "Connect with your VitaLink Agent",
       text: `Hi,

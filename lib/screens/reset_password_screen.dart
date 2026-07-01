@@ -58,6 +58,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
 
     if (mounted) setState(() => _loading = false);
+    if (!mounted) return;
 
     if (data['success'] == true) {
       setState(() => _codeSent = true);
@@ -87,10 +88,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
 
     if (mounted) setState(() => _loading = false);
+    if (!mounted) return;
 
     if (data['success'] == true) {
-      if (!mounted) return;
-
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -107,6 +107,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         ),
       );
 
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/login');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

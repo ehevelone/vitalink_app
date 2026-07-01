@@ -8,6 +8,20 @@ class WelcomeScreen extends StatelessWidget {
   static const Color panelDark = Color(0xFF1A1A1A);
   static const Color cardDark = Color(0xFF101010);
 
+  Widget _scrollableDialog(BuildContext context, {required Widget child}) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.82;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: child,
+      ),
+    );
+  }
+
   void _showLoginOptions(BuildContext context) {
     showDialog(
       context: context,
@@ -42,54 +56,57 @@ class WelcomeScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Create Account",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+        child: _scrollableDialog(
+          context,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Create Account",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Choose the account type that matches how you use VitaLink.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+                const SizedBox(height: 8),
+                const Text(
+                  "Choose the account type that matches how you use VitaLink.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              _registerOption(
-                context,
-                icon: Icons.family_restroom,
-                title: "Create Client Account",
-                subtitle: "For VitaLink users and families",
-              color: Colors.green,
-              onPressed: () {
-                Navigator.pop(ctx);
-                _showClientActivationDialog(context);
-              },
+                const SizedBox(height: 24),
+                _registerOption(
+                  context,
+                  icon: Icons.family_restroom,
+                  title: "Create Client Account",
+                  subtitle: "For VitaLink users and families",
+                  color: Colors.green,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showClientActivationDialog(context);
+                  },
+                ),
+                const SizedBox(height: 12),
+                _registerOption(
+                  context,
+                  icon: Icons.business_center,
+                  title: "Activate Agent Portal",
+                  subtitle:
+                      "Insurance agents must activate access through myvitalink.app",
+                  color: vitalinkBlue,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showAgentActivationDialog(context);
+                  },
+                ),
+              ],
             ),
-              const SizedBox(height: 12),
-              _registerOption(
-                context,
-                icon: Icons.business_center,
-                title: "Activate Agent Portal",
-                subtitle:
-                    "Insurance agents must activate access through myvitalink.app",
-                color: vitalinkBlue,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _showAgentActivationDialog(context);
-                },
-              ),
-            ],
           ),
         ),
       ),
@@ -216,54 +233,57 @@ class WelcomeScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Client Account Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+        child: _scrollableDialog(
+          context,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Client Account Activation",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
-                "Do you already have a VitaLink activation code?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                const Text(
+                  "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
+                  "Do you already have a VitaLink activation code?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "I Have a Code",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(context, '/registration');
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "Get Activation Code",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openClientActivationPage();
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
-            ],
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: "I Have a Code",
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/registration');
+                  },
+                ),
+                const SizedBox(height: 10),
+                _dialogActionButton(
+                  label: "Get Activation Code",
+                  primary: false,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openClientActivationPage();
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel"),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -278,54 +298,57 @@ class WelcomeScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Agent Portal Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+        child: _scrollableDialog(
+          context,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Agent Portal Activation",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-                "Have you already activated your agent account through myvitalink.app?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                const Text(
+                  "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
+                  "Have you already activated your agent account through myvitalink.app?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "Open myvitalink.app",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openVitaLinkWebsite();
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "I Already Activated",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(context, '/terms_agent');
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
-            ],
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: "Open myvitalink.app",
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openVitaLinkWebsite();
+                  },
+                ),
+                const SizedBox(height: 10),
+                _dialogActionButton(
+                  label: "I Already Activated",
+                  primary: false,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/terms_agent');
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel"),
+                ),
+              ],
+            ),
           ),
         ),
       ),

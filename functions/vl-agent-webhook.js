@@ -150,8 +150,8 @@ async function handleAgentCheckout(session) {
     DO UPDATE SET
       stripe_customer_id = EXCLUDED.stripe_customer_id,
       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-      promo_code = COALESCE(agents.promo_code, EXCLUDED.promo_code),
-      unlock_code = COALESCE(agents.unlock_code, EXCLUDED.unlock_code),
+      promo_code = EXCLUDED.promo_code,
+      unlock_code = EXCLUDED.unlock_code,
       subscription_status = 'active',
       subscription_valid = true,
       billing_owner = 'agent',

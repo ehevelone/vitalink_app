@@ -86,6 +86,10 @@ exports.handler = async (event) => {
         phone,
         agency_name,
         agency_address,
+        agency_street,
+        agency_city,
+        agency_state,
+        agency_zip,
         agency_phone, -- 🔥 ADDED
         calendly_url,
         business_card_image_base64,

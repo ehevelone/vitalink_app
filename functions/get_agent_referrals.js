@@ -51,6 +51,13 @@ exports.handler = async (event) => {
       FROM agent_referrals r
       JOIN users u ON u.id = r.referring_user_id
       WHERE r.agent_id = $1
+        AND r.status IN (
+          'Contact Preference Submitted',
+          'Agent Contacted',
+          'Appointment Scheduled',
+          'Client Added',
+          'Closed'
+        )
       ORDER BY r.submitted_at DESC
       `,
       [agent.id]
@@ -67,14 +74,7 @@ exports.handler = async (event) => {
 
     const rows = result.rows;
     const total = rows.length;
-    const leadStatuses = [
-      "Contact Preference Submitted",
-      "Agent Contacted",
-      "Appointment Scheduled",
-      "Client Added",
-      "Closed",
-    ];
-    const leads = rows.filter((r) => leadStatuses.includes(r.status)).length;
+    const leads = rows.length;
     const contacted = rows.filter((r) =>
       ["Agent Contacted", "Appointment Scheduled", "Client Added", "Closed"].includes(r.status)
     ).length;
@@ -82,9 +82,7 @@ exports.handler = async (event) => {
       ["Appointment Scheduled", "Client Added", "Closed"].includes(r.status)
     ).length;
     const converted = rows.filter((r) => r.status === "Client Added").length;
-    const pending = rows.filter((r) =>
-      ["Introduction Sent", "Referral Link Opened"].includes(r.status)
-    ).length;
+    const pending = rows.filter((r) => r.status === "Contact Preference Submitted").length;
 
     return reply(200, {
       success: true,

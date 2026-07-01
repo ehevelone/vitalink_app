@@ -25,85 +25,81 @@ class ApiService {
     return const Uuid().v5(Uuid.NAMESPACE_URL, id);
   }
 
- // -------------------------------------------------------------
+  // -------------------------------------------------------------
 // 🔧 Internal POST helper (SAFE)
 // -------------------------------------------------------------
-static Future<Map<String, dynamic>> _postJson(
-  String path,
-  Map<String, dynamic> body,
-) async {
-  try {
-    final url = Uri.parse("$_baseUrl/$path");
-    debugPrint("🌐 FULL URL → $url");
+  static Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final url = Uri.parse("$_baseUrl/$path");
+      debugPrint("🌐 FULL URL → $url");
 
-    debugPrint("📡 POST → $url");
-    debugPrint("📦 BODY → $body");
+      debugPrint("📡 POST → $url");
+      debugPrint("📦 BODY → $body");
 
-    final res = await http.post(
-      url,
-      headers: const {"Content-Type": "application/json"},
-      body: jsonEncode(body),
-    );
+      final res = await http.post(
+        url,
+        headers: const {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
 
-    debugPrint("📥 STATUS ($path): ${res.statusCode}");
-    debugPrint("📥 RAW BODY ($path): ${res.body}");
+      debugPrint("📥 STATUS ($path): ${res.statusCode}");
+      debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-    // 🔥 CRITICAL FIX:
-    // Always return backend JSON — even on 403
-    if (res.body.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(res.body);
+      // 🔥 CRITICAL FIX:
+      // Always return backend JSON — even on 403
+      if (res.body.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(res.body);
 
-        if (decoded is Map<String, dynamic>) {
-          return decoded;
+          if (decoded is Map<String, dynamic>) {
+            return decoded;
+          }
+        } catch (e) {
+          debugPrint("⚠️ JSON decode failed: $e");
         }
-      } catch (e) {
-        debugPrint("⚠️ JSON decode failed: $e");
       }
+
+      // fallback only if response is unusable
+      return {"success": false, "error": "Server returned ${res.statusCode}"};
+    } catch (e, st) {
+      debugPrint("❌ API ERROR ($path): $e\n$st");
+      return {"success": false, "error": e.toString()};
     }
-
-    // fallback only if response is unusable
-    return {
-      "success": false,
-      "error": "Server returned ${res.statusCode}"
-    };
-
-  } catch (e, st) {
-    debugPrint("❌ API ERROR ($path): $e\n$st");
-    return {"success": false, "error": e.toString()};
   }
 
-}
+  static Future<String?> _userSessionToken() async {
+    return SecureStore().getString("userSessionToken");
+  }
 
-static Future<String?> _userSessionToken() async {
-  return SecureStore().getString("userSessionToken");
-}
+  static Future<String?> _agentSessionToken() async {
+    return SecureStore().getString("agentSessionToken");
+  }
 
-static Future<String?> _agentSessionToken() async {
-  return SecureStore().getString("agentSessionToken");
-}
+  static Future<Map<String, dynamic>> _postJsonWithUserSession(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final token = await _userSessionToken();
+    return _postJson(path, {
+      ...body,
+      if (token != null && token.isNotEmpty) "sessionToken": token,
+    });
+  }
 
-static Future<Map<String, dynamic>> _postJsonWithUserSession(
-  String path,
-  Map<String, dynamic> body,
-) async {
-  final token = await _userSessionToken();
-  return _postJson(path, {
-    ...body,
-    if (token != null && token.isNotEmpty) "sessionToken": token,
-  });
-}
+  static Future<Map<String, dynamic>> _postJsonWithAgentSession(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final token = await _agentSessionToken();
+    return _postJson(path, {
+      ...body,
+      if (token != null && token.isNotEmpty) "agentSessionToken": token,
+    });
+  }
 
-static Future<Map<String, dynamic>> _postJsonWithAgentSession(
-  String path,
-  Map<String, dynamic> body,
-) async {
-  final token = await _agentSessionToken();
-  return _postJson(path, {
-    ...body,
-    if (token != null && token.isNotEmpty) "agentSessionToken": token,
-  });
-}
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
     required List<Map<String, dynamic>> profiles,
@@ -246,45 +242,45 @@ static Future<Map<String, dynamic>> _postJsonWithAgentSession(
     });
   }
 
- // -------------------------------------------------------------
+  // -------------------------------------------------------------
 // 🔹 Agent login
 // -------------------------------------------------------------
-static Future<Map<String, dynamic>> loginAgent({
-  required String email,
-  required String password,
-  String? deviceId,
-  bool replace = false,
-}) async {
-  final body = {
-    "email": email,
-    "password": password,
-    "replace": replace,
-  };
+  static Future<Map<String, dynamic>> loginAgent({
+    required String email,
+    required String password,
+    String? deviceId,
+    bool replace = false,
+  }) async {
+    final body = {
+      "email": email,
+      "password": password,
+      "replace": replace,
+    };
 
-  if (deviceId != null) {
-    body["device_id"] = deviceId;
+    if (deviceId != null) {
+      body["device_id"] = deviceId;
+    }
+
+    final res = await _postJson("check_agent", body);
+
+    return res; // 🔥 DO NOT MODIFY RESPONSE
   }
-
-  final res = await _postJson("check_agent", body);
-
-  return res; // 🔥 DO NOT MODIFY RESPONSE
-}
 
 // -------------------------------------------------------------
 // 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
 // -------------------------------------------------------------
-static Future<Map<String, dynamic>> createAgentCheckout({
-  required String email,
-}) async {
-  final body = {
-    "email": email,
-    "plan": "app_crm",
-  };
+  static Future<Map<String, dynamic>> createAgentCheckout({
+    required String email,
+  }) async {
+    final body = {
+      "email": email,
+      "plan": "app_crm",
+    };
 
-  final res = await _postJson("vl-agent-checkout", body);
+    final res = await _postJson("vl-agent-checkout", body);
 
-  return res;
-}
+    return res;
+  }
 
 // -------------------------------------------------------------
   // 🔹 User login
@@ -305,17 +301,11 @@ static Future<Map<String, dynamic>> createAgentCheckout({
     });
 
     if (res["success"] != true) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid credentials"
-      };
+      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
     }
 
     if (res["user"] == null) {
-      return {
-        "success": false,
-        "error": "User data missing"
-      };
+      return {"success": false, "error": "User data missing"};
     }
 
     return {"success": true, "user": res["user"]};
@@ -363,9 +353,16 @@ static Future<Map<String, dynamic>> createAgentCheckout({
     required String emailOrPhone,
     required String role,
   }) {
+    final normalizedRole = switch (role.trim().toLowerCase()) {
+      "user" => "users",
+      "agent" => "agents",
+      "rsm" => "rsms",
+      _ => role.trim().toLowerCase(),
+    };
+
     return _postJson("request_reset", {
       "emailOrPhone": emailOrPhone,
-      "role": role,
+      "role": normalizedRole,
     });
   }
 
@@ -378,11 +375,18 @@ static Future<Map<String, dynamic>> createAgentCheckout({
     required String newPassword,
     required String role,
   }) {
+    final normalizedRole = switch (role.trim().toLowerCase()) {
+      "user" => "users",
+      "agent" => "agents",
+      "rsm" => "rsms",
+      _ => role.trim().toLowerCase(),
+    };
+
     return _postJson("reset_password", {
       "emailOrPhone": emailOrPhone,
       "code": code,
       "newPassword": newPassword,
-      "role": role,
+      "role": normalizedRole,
     });
   }
 
@@ -396,29 +400,29 @@ static Future<Map<String, dynamic>> createAgentCheckout({
   // -------------------------------------------------------------
   // 🔹 Register device token
   // -------------------------------------------------------------
-static Future<Map<String, dynamic>> registerDeviceToken({
-  required String userId,
-  required String fcmToken,
-  String? platform,
-}) {
-  return _postJsonWithUserSession("register_device_v2", {
-    "user_id": int.parse(userId),   // 🔥 THIS FIXES IT
-    "deviceToken": fcmToken,
-    "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
-  });
-}
+  static Future<Map<String, dynamic>> registerDeviceToken({
+    required String userId,
+    required String fcmToken,
+    String? platform,
+  }) {
+    return _postJsonWithUserSession("register_device_v2", {
+      "user_id": int.parse(userId), // 🔥 THIS FIXES IT
+      "deviceToken": fcmToken,
+      "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+    });
+  }
 
-static Future<Map<String, dynamic>> registerAgentDeviceToken({
-  required int agentId,
-  required String fcmToken,
-  String? platform,
-}) {
-  return _postJsonWithAgentSession("register_agent_device", {
-    "agentId": agentId,
-    "deviceToken": fcmToken,
-    "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
-  });
-}
+  static Future<Map<String, dynamic>> registerAgentDeviceToken({
+    required int agentId,
+    required String fcmToken,
+    String? platform,
+  }) {
+    return _postJsonWithAgentSession("register_agent_device", {
+      "agentId": agentId,
+      "deviceToken": fcmToken,
+      "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+    });
+  }
 
   // -------------------------------------------------------------
   // 🔔 Send notification

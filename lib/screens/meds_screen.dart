@@ -2,12 +2,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import 'vitalink_camera_capture_screen.dart';
 
 class MedsScreen extends StatefulWidget {
   const MedsScreen({super.key});
@@ -38,7 +38,6 @@ class _MedsScreenState extends State<MedsScreen> {
   Profile? _p;
   bool _loading = true;
   bool _scanning = false;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -51,7 +50,7 @@ class _MedsScreenState extends State<MedsScreen> {
     final p = await _repo.loadProfile();
     if (!mounted) return;
     setState(() {
-      _p = p ?? Profile(meds: [], doctors: []);
+      _p = p;
       _loading = false;
     });
   }
@@ -418,73 +417,88 @@ class _MedsScreenState extends State<MedsScreen> {
   // SCAN LABEL
   // ----------------------------
 
+  Future<String?> _showScanIssueDialog({
+    required String title,
+    required String message,
+    bool allowManualEntry = false,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        actions: [
+          Column(
+            children: [
+              if (allowManualEntry) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context, "manual"),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: const Text("Enter Manually"),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context, "ok"),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                  ),
+                  child: const Text("OK"),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _scanLabel() async {
     if (_scanning) return;
     setState(() => _scanning = true);
 
     try {
+      final imagePaths = await Navigator.push<List<String>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const VitalinkCameraCaptureScreen(
+            title: 'Scan Medication Label',
+            reviewTitle: 'Can you read the medication label?',
+            instructions:
+                'Hold the phone steady and fill the screen with the prescription label.',
+            addAnotherLabel: 'Add Another Side',
+          ),
+        ),
+      );
+
       final List<String> base64Images = [];
-      bool keepScanning = true;
-
-      while (keepScanning) {
-        final img = await _picker.pickImage(source: ImageSource.camera);
-        if (img == null) break;
-
-        final base64Image = base64Encode(await File(img.path).readAsBytes());
-        base64Images.add(base64Image);
-
-        keepScanning = await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                backgroundColor: const Color(0xFF111111),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: const Text(
-                  "Did we get all sides of the bottle?",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                content: Text(
-                  "You have taken ${base64Images.length} photo(s).\n\nIf the label wraps around the bottle, take another photo.",
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                actionsPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                actions: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green.shade600,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(44),
-                          ),
-                          child: const Text("Done"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.blue.shade700,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(44),
-                          ),
-                          child: const Text("Take Another"),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ) ??
-            false;
+      for (final path in imagePaths ?? <String>[]) {
+        final bytes = await File(path).readAsBytes();
+        base64Images.add(base64Encode(bytes));
       }
 
       if (base64Images.isEmpty) return;
@@ -513,7 +527,19 @@ class _MedsScreenState extends State<MedsScreen> {
         }),
       );
 
-      if (resp.statusCode != 200) return;
+      if (resp.statusCode != 200) {
+        if (!mounted) return;
+        final choice = await _showScanIssueDialog(
+          title: "Could Not Read Label",
+          message:
+              "VitaLink could not read this medication label. Please try again with brighter lighting, hold the phone steady, or enter the medication manually.",
+          allowManualEntry: true,
+        );
+        if (choice == "manual" && mounted) {
+          await _addOrEdit();
+        }
+        return;
+      }
 
       final parsed = jsonDecode(resp.body);
       final data = _normalizeParsed(parsed['data'] ?? parsed);
@@ -523,7 +549,19 @@ class _MedsScreenState extends State<MedsScreen> {
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
 
-      if (scannedName.isEmpty) return;
+      if (scannedName.isEmpty) {
+        if (!mounted) return;
+        final choice = await _showScanIssueDialog(
+          title: "No Medication Found",
+          message:
+              "The scan completed, but no medication name was found. Retake the photo with the label flat, close, and well-lit, or enter it manually.",
+          allowManualEntry: true,
+        );
+        if (choice == "manual" && mounted) {
+          await _addOrEdit();
+        }
+        return;
+      }
 
       final normalizedScannedName = _normalizeMed(scannedName);
 
@@ -534,6 +572,7 @@ class _MedsScreenState extends State<MedsScreen> {
       if (existingIndex != -1) {
         final existing = _p!.meds[existingIndex];
 
+        if (!mounted) return;
         final choice = await showDialog<String>(
           context: context,
           builder: (_) => AlertDialog(

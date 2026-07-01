@@ -1,6 +1,6 @@
 // functions/weekly_report.js
 const db = require("./services/db");  // ✅ corrected path
-const nodemailer = require("nodemailer");
+const { createMailer, fromAddress } = require("./services/mailer");
 
 exports.handler = async () => {
   try {
@@ -24,19 +24,11 @@ exports.handler = async () => {
     });
 
     // 3. Email transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createMailer();
 
     // 4. Send the email
     await transporter.sendMail({
-      from: `"VitaLink Reports" <${process.env.SMTP_USER}>`,
+      from: fromAddress("VitaLink Reports"),
       to: "ehevelone@gmail.com", // 📩 admin email
       subject: "Weekly VitaLink Agent Report",
       text: report,

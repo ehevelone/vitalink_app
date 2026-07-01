@@ -10,8 +10,7 @@ class AgentRequestResetScreen extends StatefulWidget {
       _AgentRequestResetScreenState();
 }
 
-class _AgentRequestResetScreenState
-    extends State<AgentRequestResetScreen> {
+class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
 
@@ -41,14 +40,15 @@ class _AgentRequestResetScreenState
           arguments: _emailCtrl.text.trim(),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(data['error'] ?? "Request failed ❌"),
+            content: Text(data['error'] ?? "Request failed ❌"),
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
@@ -66,8 +66,7 @@ class _AgentRequestResetScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          AppBar(title: const Text("Agent Request Reset")),
+      appBar: AppBar(title: const Text("Agent Request Reset")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -76,21 +75,16 @@ class _AgentRequestResetScreenState
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(
-                    labelText: "Agent Email"),
+                decoration: const InputDecoration(labelText: "Agent Email"),
                 validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter your email"
-                        : null,
+                    v == null || v.isEmpty ? "Enter your email" : null,
               ),
               const SizedBox(height: 24),
               _loading
-                  ? const Center(
-                      child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.send),
-                      label:
-                          const Text("Send Reset Code"),
+                      label: const Text("Send Reset Code"),
                       onPressed: _doRequest,
                     ),
             ],

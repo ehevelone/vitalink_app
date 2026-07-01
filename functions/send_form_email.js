@@ -1,8 +1,8 @@
-const nodemailer = require("nodemailer");
 const db = require("./services/db");
 const generateClientReportPdf = require("./generate-client-report-pdf");
+const { createMailer, fromAddress } = require("./services/mailer");
 const {
-  syncAppClientToCrm,
+  syncVitalinkPackageToCrm,
 } = require("./services/crm-sync");
 
 exports.handler = async (event) => {
@@ -16,18 +16,10 @@ exports.handler = async (event) => {
       };
     }
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587", 10),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createMailer();
 
     const mailOptions = {
-      from: `"VitaLink" <${process.env.SMTP_USER}>`,
+      from: fromAddress("VitaLink"),
       to: body.agent.email,
       subject: `VitaLink - Signed HIPAA & SOA from ${body.user || "Client"}`,
       text: `Hello ${body.agent.name || "Agent"},
@@ -104,15 +96,31 @@ Attached:
     let crmSync = null;
 
     try {
-      crmSync = await syncAppClientToCrm({
+      const hipaaSoaAttachment = (body.attachments || []).find((att) =>
+        String(att.name || "").toLowerCase().includes("hipaa")
+      );
+
+      crmSync = await syncVitalinkPackageToCrm({
         agentEmail: body.agent.email,
         clientData: {
           name: body.user,
           email: body.user_email,
           phone: body.user_phone,
           dob: body.user_dob,
+          address: body.user_address,
+          city: body.user_city,
+          state: body.user_state,
+          zip: body.user_zip,
           meds: body.medications || [],
           doctors: body.providers || [],
+        },
+        packageData: {
+          appUserId: body.app_user_id,
+          appProfileId: body.app_profile_id,
+          signedAt: body.signed_at,
+          emergencyContacts: body.emergency_contacts || [],
+          pharmacies: body.pharmacies || [],
+          hipaaSoaPdfBase64: hipaaSoaAttachment?.content,
         },
       });
     } catch (syncErr) {

@@ -7,8 +7,14 @@ const {
   normalizeSections,
   parseBody,
   reply,
+  sendProfileShareInvitePush,
   verifyUserSession,
 } = require("./services/profile-share-sync");
+
+function normalizePhoneDigits(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
 
 exports.handler = async (event) => {
   try {
@@ -33,19 +39,27 @@ exports.handler = async (event) => {
     const profileName = clean(body.profileName || body.profile_name);
     const allowedSections = normalizeSections(body.allowedSections);
 
-    if (!invitedEmail && !invitedPhone) {
+    if (!invitedEmail || !invitedPhone) {
       return reply(400, {
         success: false,
-        error: "Enter an email or phone for the person you want to share with.",
+        error: "Enter both the email and phone number for the person you want to share with.",
       });
     }
 
     let recipientUserId = null;
 
-    if (invitedEmail) {
+    const phoneDigits = normalizePhoneDigits(invitedPhone);
+
+    if (invitedEmail && phoneDigits) {
       const userRes = await db.query(
-        `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        [invitedEmail]
+        `
+        SELECT id
+        FROM users
+        WHERE LOWER(email) = LOWER($1)
+          AND RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\\D', '', 'g'), 10) = $2
+        LIMIT 1
+        `,
+        [invitedEmail, phoneDigits]
       );
 
       recipientUserId = userRes.rows[0]?.id || null;
@@ -86,11 +100,20 @@ exports.handler = async (event) => {
       ]
     );
 
+    const push = recipientUserId
+      ? await sendProfileShareInvitePush({
+          recipientUserId,
+          inviteCode,
+          profileName,
+        })
+      : { devicesTargeted: 0, successCount: 0, failureCount: 0 };
+
     return reply(200, {
       success: true,
       share: result.rows[0],
       inviteCode,
       accepted: status === "accepted",
+      push,
     });
   } catch (err) {
     console.error("create_profile_share_link error:", err);

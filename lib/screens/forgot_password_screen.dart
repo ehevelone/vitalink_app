@@ -25,7 +25,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final res = await ApiService.requestPasswordReset(
         emailOrPhone: _emailCtrl.text.trim(),
-        role: "user",
+        role: "users",
       );
 
       if (!mounted) return;

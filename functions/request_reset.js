@@ -1,7 +1,7 @@
 // functions/request_reset.js
 
 const db = require("./services/db");
-const nodemailer = require("nodemailer");
+const { createMailer, fromAddress } = require("./services/mailer");
 
 const CORS_HEADERS = {
   "Content-Type": "application/json",
@@ -121,15 +121,7 @@ exports.handler = async (event) => {
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const transporter = createMailer();
 
     const message = `
 Hi,
@@ -146,7 +138,7 @@ If you did not request this, you can ignore this email.
 `.trim();
 
     await transporter.sendMail({
-      from: `"VitaLink Support" <${process.env.SMTP_USER}>`,
+      from: fromAddress("VitaLink Support"),
       to: user.email,
       subject: getEmailSubject(role),
       text: message,
