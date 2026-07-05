@@ -151,6 +151,42 @@ exports.handler = async (event) => {
 
     const { id: userId, agent_id: agentId } = userRes.rows[0];
 
+    const existingUserDevice = await db.query(
+      `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    if (existingUserDevice.rows.length) {
+      await db.query(
+        `
+        UPDATE user_devices
+        SET device_token=NULL,
+            updated_at=NOW()
+        WHERE device_token=$1
+          AND id<>$2
+        `,
+        [token, existingUserDevice.rows[0].id]
+      );
+
+      const updated = await db.query(
+        `
+        UPDATE user_devices
+        SET device_token=$1,
+            platform=$2,
+            agent_id=$3,
+            push_status='registered',
+            last_push_error=NULL,
+            updated_at=NOW()
+        WHERE id=$4
+        RETURNING *;
+        `,
+        [token, platform || "unknown", agentId || null, existingUserDevice.rows[0].id]
+      );
+
+      console.log("Device updated for user:", updated.rows[0]?.id);
+      return reply(200, { success: true, device: updated.rows[0] });
+    }
+
     // 🔥 ALWAYS REGISTER DEVICE
 
     const existingToken = await db.query(
