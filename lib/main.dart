@@ -107,6 +107,7 @@ void showGlobalNotificationPopup(RemoteMessage message) {
   );
 }
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 }
