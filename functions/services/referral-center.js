@@ -187,7 +187,11 @@ async function sendReferralPush({ recipient, referral, title, body }) {
       title,
       body,
     },
+    android: {
+      priority: "high",
+    },
     data: {
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
       route: recipient.type === "agent" ? "/agent_referrals" : "/referral_center",
       type: "agent_referral",
       referralId: referral.id,
