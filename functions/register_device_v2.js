@@ -15,12 +15,56 @@ function reply(statusCode, obj) {
 
 async function ensureDeviceDeliveryColumns() {
   await db.query(`
+    CREATE TABLE IF NOT EXISTS user_devices (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      device_id TEXT,
+      device_token TEXT,
+      platform TEXT,
+      push_status TEXT,
+      last_push_at TIMESTAMPTZ,
+      last_push_success_at TIMESTAMPTZ,
+      last_push_failure_at TIMESTAMPTZ,
+      last_push_error TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
     ALTER TABLE user_devices
+    ADD COLUMN IF NOT EXISTS agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    ADD COLUMN IF NOT EXISTS device_id TEXT,
+    ADD COLUMN IF NOT EXISTS device_token TEXT,
+    ADD COLUMN IF NOT EXISTS platform TEXT,
     ADD COLUMN IF NOT EXISTS push_status TEXT,
     ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS last_push_error TEXT
+    ADD COLUMN IF NOT EXISTS last_push_error TEXT,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
+  `);
+
+  await db.query(`
+    ALTER TABLE user_devices
+    ALTER COLUMN user_id DROP NOT NULL
+  `);
+
+  await db.query(`
+    ALTER TABLE user_devices
+    ALTER COLUMN device_id DROP NOT NULL
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_devices_user_id
+    ON user_devices(user_id)
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_devices_agent_id
+    ON user_devices(agent_id)
   `);
 }
 

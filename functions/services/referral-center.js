@@ -136,6 +136,13 @@ async function verifyUserSession(userId, token) {
 
 async function sendReferralPush({ recipient, referral, title, body }) {
   if (!recipient || !recipient.id || !initFirebase()) {
+    console.log("Referral push skipped", {
+      reason: !recipient || !recipient.id ? "missing_recipient" : "firebase_not_configured",
+      recipientType: recipient?.type || null,
+      recipientId: recipient?.id || null,
+      referralId: referral?.id || null,
+    });
+
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
 
@@ -157,8 +164,22 @@ async function sendReferralPush({ recipient, referral, title, body }) {
 
   const tokens = [...new Set(devices.rows.map((row) => row.device_token))];
   if (!tokens.length) {
+    console.log("Referral push skipped", {
+      reason: "no_device_tokens",
+      recipientType: recipient.type,
+      recipientId: recipient.id,
+      referralId: referral?.id || null,
+    });
+
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
+
+  console.log("Referral push sending", {
+    recipientType: recipient.type,
+    recipientId: recipient.id,
+    referralId: referral?.id || null,
+    devicesTargeted: tokens.length,
+  });
 
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
@@ -173,10 +194,25 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     },
   });
 
+  const errors = (response.responses || [])
+    .filter((item) => !item.success)
+    .map((item) => item.error?.code || item.error?.message || "unknown");
+
+  console.log("Referral push result", {
+    recipientType: recipient.type,
+    recipientId: recipient.id,
+    referralId: referral?.id || null,
+    devicesTargeted: tokens.length,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+    errors,
+  });
+
   return {
     devicesTargeted: tokens.length,
     successCount: response.successCount,
     failureCount: response.failureCount,
+    errors,
   };
 }
 

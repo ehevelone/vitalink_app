@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/app_state.dart';
+import '../services/api_service.dart';
 
 class AgentMenuScreen extends StatefulWidget {
   const AgentMenuScreen({super.key});
@@ -13,11 +16,130 @@ class AgentMenuScreen extends StatefulWidget {
 class _AgentMenuScreenState extends State<AgentMenuScreen> {
   bool _loading = true;
   String agentName = "Agent";
+  bool _notificationDialogOpen = false;
+  StreamSubscription<RemoteMessage>? _messageSub;
+  StreamSubscription<RemoteMessage>? _openedSub;
+  StreamSubscription<String>? _tokenSub;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _setupAgentNotifications();
+  }
+
+  Future<void> _registerAgentToken() async {
+    try {
+      final store = SecureStore();
+      final agentIdText = await store.getString("agentId");
+      final agentId = int.tryParse(agentIdText ?? "");
+      if (agentId == null || agentId <= 0) return;
+
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null || token.isEmpty) return;
+
+      await ApiService.registerAgentDeviceToken(
+        agentId: agentId,
+        fcmToken: token,
+      );
+    } catch (e) {
+      debugPrint("Agent FCM token registration error: $e");
+    }
+  }
+
+  Future<void> _setupAgentNotifications() async {
+    try {
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      await _registerAgentToken();
+
+      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((_) {
+        _registerAgentToken();
+      });
+
+      _messageSub = FirebaseMessaging.onMessage.listen((message) {
+        _handleAgentNotification(message);
+        _showForegroundNotification(message);
+      });
+
+      _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        _handleAgentNotification(message);
+      });
+
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) {
+        _handleAgentNotification(initial);
+      }
+    } catch (e) {
+      debugPrint("Agent FCM setup error: $e");
+    }
+  }
+
+  void _handleAgentNotification(RemoteMessage message) {
+    final route = message.data["route"]?.toString();
+    if (!mounted || route == null || route.isEmpty) return;
+
+    Navigator.pushNamed(context, route);
+  }
+
+  void _showForegroundNotification(RemoteMessage message) {
+    if (!mounted || _notificationDialogOpen) return;
+
+    final title = message.notification?.title ??
+        message.data["title"] ??
+        "New Notification";
+    final body = message.notification?.body ??
+        message.data["body"] ??
+        "You have a new notification";
+
+    _notificationDialogOpen = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          body,
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (Navigator.canPop(context)) Navigator.pop(context);
+              _notificationDialogOpen = false;
+            },
+            child: const Text(
+              "OK",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _notificationDialogOpen = false;
+    });
   }
 
   Future<void> _loadData() async {
@@ -58,6 +180,14 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       '/landing',
       (route) => false,
     );
+  }
+
+  @override
+  void dispose() {
+    _messageSub?.cancel();
+    _openedSub?.cancel();
+    _tokenSub?.cancel();
+    super.dispose();
   }
 
   @override
