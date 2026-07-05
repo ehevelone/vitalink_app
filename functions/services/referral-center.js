@@ -191,6 +191,8 @@ async function sendReferralPush({ recipient, referral, title, body }) {
       route: recipient.type === "agent" ? "/agent_referrals" : "/referral_center",
       type: "agent_referral",
       referralId: referral.id,
+      title,
+      body,
     },
   });
 
