@@ -108,6 +108,34 @@ exports.handler = async (event) => {
 
     await ensureAgentDeviceSupport();
 
+    const existingToken = await db.query(
+      `
+      SELECT id
+      FROM user_devices
+      WHERE device_token = $1
+      LIMIT 1
+      `,
+      [token]
+    );
+
+    if (existingToken.rows.length) {
+      const updated = await db.query(
+        `
+        UPDATE user_devices
+        SET agent_id = $1,
+            platform = $2,
+            push_status = 'registered',
+            last_push_error = NULL,
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, user_id, agent_id, platform, push_status, updated_at
+        `,
+        [numericAgentId, platform || "unknown", existingToken.rows[0].id]
+      );
+
+      return reply(200, { success: true, device: updated.rows[0] });
+    }
+
     const existing = await db.query(
       `
       SELECT id

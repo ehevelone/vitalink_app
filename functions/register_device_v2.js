@@ -153,6 +153,31 @@ exports.handler = async (event) => {
 
     // 🔥 ALWAYS REGISTER DEVICE
 
+    const existingToken = await db.query(
+      `SELECT id FROM user_devices WHERE device_token = $1 LIMIT 1`,
+      [token]
+    );
+
+    if (existingToken.rows.length) {
+      const updated = await db.query(
+        `
+        UPDATE user_devices
+        SET user_id=$1,
+            agent_id=$2,
+            platform=$3,
+            push_status='registered',
+            last_push_error=NULL,
+            updated_at=NOW()
+        WHERE id=$4
+        RETURNING *;
+        `,
+        [userId, agentId || null, platform || "unknown", existingToken.rows[0].id]
+      );
+
+      console.log("Device token reused for user:", updated.rows[0]?.id);
+      return reply(200, { success: true, device: updated.rows[0] });
+    }
+
     const existing = await db.query(
       `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
       [userId]
