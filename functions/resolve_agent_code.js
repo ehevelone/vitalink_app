@@ -4,8 +4,7 @@ const db = require("./services/db");
 function normalizeCode(value) {
   return String(value || "")
     .replace(/[\u2010-\u2015\u2212]/g, "-")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .replace(/\s+/g, "")
+    .replace(/[^A-Za-z0-9-]/g, "")
     .trim()
     .toUpperCase();
 }

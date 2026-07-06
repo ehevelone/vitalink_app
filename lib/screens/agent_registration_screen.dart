@@ -133,8 +133,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
   String _normalizeCode(String value) {
     return value
         .replaceAll(RegExp(r'[\u2010-\u2015\u2212]'), '-')
-        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
-        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll(RegExp(r'[^A-Za-z0-9-]'), '')
         .trim()
         .toUpperCase();
   }
