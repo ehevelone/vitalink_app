@@ -317,7 +317,7 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 const Text(
                   "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-                  "Have you already activated your agent account through myvitalink.app?",
+                  "Do you have your activation code?",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white70,
@@ -327,20 +327,20 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "Open myvitalink.app",
-                  primary: true,
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _openVitaLinkWebsite();
-                  },
-                ),
-                const SizedBox(height: 10),
-                _dialogActionButton(
-                  label: "I Already Activated",
+                  label: "I Have My Activation Code",
                   primary: false,
                   onPressed: () {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/terms_agent');
+                  },
+                ),
+                const SizedBox(height: 10),
+                _dialogActionButton(
+                  label: "I Need An Activation Code",
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openVitaLinkWebsite();
                   },
                 ),
                 TextButton(
