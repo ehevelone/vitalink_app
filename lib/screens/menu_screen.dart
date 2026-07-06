@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
@@ -26,6 +27,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   Profile? _p;
   bool _loading = true;
   String _displayName = "User";
+  bool _notificationPermissionDialogShown = false;
 
   bool _syncRan = false;
   bool _notificationDialogOpen = false;
@@ -169,7 +171,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
 
-      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        _showNotificationPermissionDialog();
         return;
       }
 
@@ -278,6 +282,56 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint("FCM error: $e");
     }
+  }
+
+  void _showNotificationPermissionDialog() {
+    if (!mounted || _notificationPermissionDialogShown) return;
+    _notificationPermissionDialogShown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "Allow Notifications",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            "VitaLink needs notifications turned on so you can receive important alerts, profile updates, and messages from your agent.",
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (Navigator.canPop(context)) Navigator.pop(context);
+              },
+              child: const Text("Later"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (Navigator.canPop(context)) Navigator.pop(context);
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7ED6F8),
+                foregroundColor: Colors.black,
+              ),
+              child: const Text("Open Settings"),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   void _handleNotificationTap(RemoteMessage message) {

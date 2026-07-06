@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:app_links/app_links.dart';
 
 import 'services/api_service.dart';
@@ -69,6 +70,34 @@ import 'screens/agent_reset_password_screen.dart';
 // GLOBALS
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final AppLinks _appLinks = AppLinks();
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel vitalinkNotificationChannel =
+    AndroidNotificationChannel(
+  'vitalink_high_importance',
+  'VitaLink Alerts',
+  description: 'Important VitaLink alerts and referral notifications.',
+  importance: Importance.high,
+);
+
+Future<void> _setupNotificationDisplay() async {
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initSettings = InitializationSettings(android: androidSettings);
+
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(vitalinkNotificationChannel);
+
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+}
 
 // 🔥 POPUP
 void showGlobalNotificationPopup(RemoteMessage message) {
@@ -174,6 +203,7 @@ Future<void> main() async {
     ]);
 
     await Firebase.initializeApp();
+    await _setupNotificationDisplay();
     await _setupFCMGlobal();
 
     // 🔥 DEEP LINK HANDLER (FIXED LOCATION)

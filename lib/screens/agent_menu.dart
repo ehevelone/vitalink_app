@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/secure_store.dart';
 import '../services/app_state.dart';
@@ -17,6 +18,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
   bool _loading = true;
   String agentName = "Agent";
   bool _notificationDialogOpen = false;
+  bool _notificationPermissionDialogShown = false;
   StreamSubscription<RemoteMessage>? _messageSub;
   StreamSubscription<RemoteMessage>? _openedSub;
   StreamSubscription<String>? _tokenSub;
@@ -55,7 +57,11 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
         sound: true,
       );
 
-      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        _showNotificationPermissionDialog();
+        return;
+      }
 
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
@@ -71,7 +77,6 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       });
 
       _messageSub = FirebaseMessaging.onMessage.listen((message) {
-        _handleAgentNotification(message);
         _showForegroundNotification(message);
       });
 
@@ -86,6 +91,56 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     } catch (e) {
       debugPrint("Agent FCM setup error: $e");
     }
+  }
+
+  void _showNotificationPermissionDialog() {
+    if (!mounted || _notificationPermissionDialogShown) return;
+    _notificationPermissionDialogShown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "Allow Notifications",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            "VitaLink needs notifications turned on so you can receive referral alerts, profile updates, and client messages.",
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                if (Navigator.canPop(context)) Navigator.pop(context);
+              },
+              child: const Text("Later"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (Navigator.canPop(context)) Navigator.pop(context);
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7ED6F8),
+                foregroundColor: Colors.black,
+              ),
+              child: const Text("Open Settings"),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   void _handleAgentNotification(RemoteMessage message) {
@@ -104,6 +159,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     final body = message.notification?.body ??
         message.data["body"] ??
         "You have a new notification";
+    final route = message.data["route"]?.toString();
 
     _notificationDialogOpen = true;
 
@@ -131,7 +187,24 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
               _notificationDialogOpen = false;
             },
             child: const Text(
-              "OK",
+              "Dismiss",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.lightBlueAccent,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              if (Navigator.canPop(context)) Navigator.pop(context);
+              _notificationDialogOpen = false;
+              if (route != null && route.isNotEmpty && mounted) {
+                Navigator.pushNamed(context, route);
+              }
+            },
+            child: const Text(
+              "Open",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
