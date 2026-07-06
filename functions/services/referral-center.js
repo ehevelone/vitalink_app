@@ -152,7 +152,7 @@ async function sendReferralPush({ recipient, referral, title, body }) {
 
   const devices = await db.query(
     `
-    SELECT device_token
+    SELECT id, device_token
     FROM user_devices
     WHERE ${filters}
       AND device_token IS NOT NULL
@@ -162,8 +162,17 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     [recipient.id]
   );
 
-  const tokens = [...new Set(devices.rows.map((row) => row.device_token))];
-  if (!tokens.length) {
+  const seen = new Set();
+  const targets = [];
+
+  for (const row of devices.rows) {
+    const token = clean(row.device_token);
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    targets.push({ id: row.id, token });
+  }
+
+  if (!targets.length) {
     console.log("Referral push skipped", {
       reason: "no_device_tokens",
       recipientType: recipient.type,
@@ -178,11 +187,13 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     recipientType: recipient.type,
     recipientId: recipient.id,
     referralId: referral?.id || null,
-    devicesTargeted: tokens.length,
+    devicesTargeted: targets.length,
+    targetRows: targets.map((item) => item.id),
+    tokenTails: targets.map((item) => item.token.slice(-8)),
   });
 
   const response = await admin.messaging().sendEachForMulticast({
-    tokens,
+    tokens: targets.map((item) => item.token),
     notification: {
       title,
       body,
@@ -204,18 +215,45 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     .filter((item) => !item.success)
     .map((item) => item.error?.code || item.error?.message || "unknown");
 
+  const results = response.responses || [];
+  for (let i = 0; i < targets.length; i += 1) {
+    const result = results[i];
+    if (!result) continue;
+
+    await db.query(
+      `
+      UPDATE user_devices
+      SET push_status = $1,
+          last_push_at = NOW(),
+          last_push_success_at = CASE WHEN $2 THEN NOW() ELSE last_push_success_at END,
+          last_push_failure_at = CASE WHEN $2 THEN last_push_failure_at ELSE NOW() END,
+          last_push_error = $3,
+          updated_at = NOW()
+      WHERE id = $4
+      `,
+      [
+        result.success ? "delivered" : "failed",
+        result.success,
+        result.success ? null : (result.error?.code || result.error?.message || "Push failed"),
+        targets[i].id,
+      ]
+    );
+  }
+
   console.log("Referral push result", {
     recipientType: recipient.type,
     recipientId: recipient.id,
     referralId: referral?.id || null,
-    devicesTargeted: tokens.length,
+    devicesTargeted: targets.length,
+    targetRows: targets.map((item) => item.id),
+    tokenTails: targets.map((item) => item.token.slice(-8)),
     successCount: response.successCount,
     failureCount: response.failureCount,
     errors,
   });
 
   return {
-    devicesTargeted: tokens.length,
+    devicesTargeted: targets.length,
     successCount: response.successCount,
     failureCount: response.failureCount,
     errors,

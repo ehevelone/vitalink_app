@@ -108,113 +108,72 @@ exports.handler = async (event) => {
 
     await ensureAgentDeviceSupport();
 
-    const existingAgentDevice = await db.query(
-      `
-      SELECT id
-      FROM user_devices
-      WHERE agent_id = $1
-      LIMIT 1
-      `,
-      [numericAgentId]
-    );
+    await db.query("BEGIN");
 
-    if (existingAgentDevice.rows.length) {
-      await db.query(
+    try {
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`agent:${numericAgentId}`]);
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`device:${token}`]);
+
+      const existing = await db.query(
         `
-        UPDATE user_devices
-        SET device_token = NULL,
-            updated_at = NOW()
-        WHERE device_token = $1
-          AND id <> $2
+        SELECT id
+        FROM user_devices
+        WHERE agent_id = $1
+           OR device_token = $2
+        ORDER BY CASE WHEN device_token = $2 THEN 0 ELSE 1 END
+        LIMIT 1
+        FOR UPDATE
         `,
-        [token, existingAgentDevice.rows[0].id]
+        [numericAgentId, token]
       );
 
-      const updated = await db.query(
+      if (existing.rows.length) {
+        await db.query(
+          `
+          UPDATE user_devices
+          SET device_token = NULL,
+              updated_at = NOW()
+          WHERE device_token = $1
+            AND id <> $2
+          `,
+          [token, existing.rows[0].id]
+        );
+
+        const updated = await db.query(
+          `
+          UPDATE user_devices
+          SET agent_id = $1,
+              device_token = $2,
+              platform = $3,
+              push_status = 'registered',
+              last_push_error = NULL,
+              updated_at = NOW()
+          WHERE id = $4
+          RETURNING id, user_id, agent_id, platform, push_status, updated_at
+          `,
+          [numericAgentId, token, platform || "unknown", existing.rows[0].id]
+        );
+
+        await db.query("COMMIT");
+        return reply(200, { success: true, device: updated.rows[0] });
+      }
+
+      const inserted = await db.query(
         `
-        UPDATE user_devices
-        SET device_token = $1,
-            platform = $2,
-            push_status = 'registered',
-            last_push_error = NULL,
-            updated_at = NOW()
-        WHERE id = $3
-        RETURNING id, user_id, agent_id, platform, push_status, updated_at
-        `,
-        [token, platform || "unknown", existingAgentDevice.rows[0].id]
-      );
-
-      return reply(200, { success: true, device: updated.rows[0] });
-    }
-
-    const existingToken = await db.query(
-      `
-      SELECT id
-      FROM user_devices
-      WHERE device_token = $1
-      LIMIT 1
-      `,
-      [token]
-    );
-
-    if (existingToken.rows.length) {
-      const updated = await db.query(
-        `
-        UPDATE user_devices
-        SET agent_id = $1,
-            platform = $2,
-            push_status = 'registered',
-            last_push_error = NULL,
-            updated_at = NOW()
-        WHERE id = $3
-        RETURNING id, user_id, agent_id, platform, push_status, updated_at
-        `,
-        [numericAgentId, platform || "unknown", existingToken.rows[0].id]
-      );
-
-      return reply(200, { success: true, device: updated.rows[0] });
-    }
-
-    const existing = await db.query(
-      `
-      SELECT id
-      FROM user_devices
-      WHERE agent_id = $1
-        AND user_id IS NULL
-      LIMIT 1
-      `,
-      [numericAgentId]
-    );
-
-    if (existing.rows.length) {
-      const updated = await db.query(
-        `
-        UPDATE user_devices
-        SET device_token = $1,
-            platform = $2,
-            push_status = 'registered',
-            last_push_error = NULL,
-            updated_at = NOW()
-        WHERE id = $3
+        INSERT INTO user_devices
+          (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+        VALUES (NULL, $1, $2, $3, 'registered', NOW(), NOW())
         RETURNING id, agent_id, platform, push_status, updated_at
         `,
-        [token, platform || "unknown", existing.rows[0].id]
+        [numericAgentId, token, platform || "unknown"]
       );
 
-      return reply(200, { success: true, device: updated.rows[0] });
+      await db.query("COMMIT");
+      return reply(200, { success: true, device: inserted.rows[0] });
+    } catch (err) {
+      await db.query("ROLLBACK");
+      throw err;
     }
-
-    const inserted = await db.query(
-      `
-      INSERT INTO user_devices
-        (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
-      VALUES (NULL, $1, $2, $3, 'registered', NOW(), NOW())
-      RETURNING id, agent_id, platform, push_status, updated_at
-      `,
-      [numericAgentId, token, platform || "unknown"]
-    );
-
-    return reply(200, { success: true, device: inserted.rows[0] });
   } catch (err) {
     console.error("register_agent_device error:", err);
     return reply(500, { success: false, error: "Server error" });

@@ -151,6 +151,76 @@ exports.handler = async (event) => {
 
     const { id: userId, agent_id: agentId } = userRes.rows[0];
 
+    await db.query("BEGIN");
+
+    try {
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`user:${userId}`]);
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`device:${token}`]);
+
+      const lockedExisting = await db.query(
+        `
+        SELECT id
+        FROM user_devices
+        WHERE user_id = $1
+           OR device_token = $2
+        ORDER BY CASE WHEN device_token = $2 THEN 0 ELSE 1 END
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [userId, token]
+      );
+
+      if (lockedExisting.rows.length) {
+        await db.query(
+          `
+          UPDATE user_devices
+          SET device_token = NULL,
+              updated_at = NOW()
+          WHERE device_token = $1
+            AND id <> $2
+          `,
+          [token, lockedExisting.rows[0].id]
+        );
+
+        const updated = await db.query(
+          `
+          UPDATE user_devices
+          SET user_id = $1,
+              agent_id = $2,
+              device_token = $3,
+              platform = $4,
+              push_status = 'registered',
+              last_push_error = NULL,
+              updated_at = NOW()
+          WHERE id = $5
+          RETURNING *;
+          `,
+          [userId, agentId || null, token, platform || "unknown", lockedExisting.rows[0].id]
+        );
+
+        await db.query("COMMIT");
+        console.log("Device updated for user:", updated.rows[0]?.id);
+        return reply(200, { success: true, device: updated.rows[0] });
+      }
+
+      const insertedDevice = await db.query(
+        `
+        INSERT INTO user_devices
+          (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,'registered',NOW(),NOW())
+        RETURNING *;
+        `,
+        [userId, agentId || null, token, platform || "unknown"]
+      );
+
+      await db.query("COMMIT");
+      console.log("Device inserted:", insertedDevice.rows[0]?.id);
+      return reply(200, { success: true, device: insertedDevice.rows[0] });
+    } catch (err) {
+      await db.query("ROLLBACK");
+      throw err;
+    }
+
     const existingUserDevice = await db.query(
       `SELECT id FROM user_devices WHERE user_id = $1 LIMIT 1`,
       [userId]

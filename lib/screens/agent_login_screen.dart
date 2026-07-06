@@ -166,7 +166,9 @@ Future<void> _login() async {
             );
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint("Agent device registration failed: $e");
+      }
 
       if (!mounted) return;
 
