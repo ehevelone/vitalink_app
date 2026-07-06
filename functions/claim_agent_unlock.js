@@ -32,6 +32,15 @@ function normalizeUsPhone(value) {
   return value || null;
 }
 
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -64,8 +73,7 @@ exports.handler = async (event) => {
       agencyZip,
     } = JSON.parse(event.body || "{}");
 
-    const registrationCode =
-      String(unlockCode || "").trim().toUpperCase();
+    const registrationCode = normalizeCode(unlockCode);
 
     if (!registrationCode || !email || !password || !npn) {
       return fail(

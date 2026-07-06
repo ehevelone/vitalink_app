@@ -13,6 +13,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 exports.handler = async function (event) {
 
   if (event.httpMethod === "OPTIONS") {
@@ -34,7 +43,7 @@ exports.handler = async function (event) {
   try {
 
     const body = JSON.parse(event.body || "{}");
-    const code = body.code?.toUpperCase().trim();
+    const code = normalizeCode(body.code);
 
     if (!code) {
       return {

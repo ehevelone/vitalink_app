@@ -25,6 +25,15 @@ function normalizeUsPhone(value) {
   return value || null;
 }
 
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 async function ensureUserSessionColumns() {
   await db.query(`
     ALTER TABLE users
@@ -72,7 +81,8 @@ if (event.httpMethod !== "POST") {
     }
 
     const body = JSON.parse(event.body || "{}");
-    const { firstName, lastName, email, phone, password, promoCode, platform } = body;
+    const { firstName, lastName, email, phone, password, platform } = body;
+    const promoCode = normalizeCode(body.promoCode);
 
     await ensureUserSessionColumns();
 

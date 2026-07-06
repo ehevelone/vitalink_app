@@ -130,6 +130,15 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     return null;
   }
 
+  String _normalizeCode(String value) {
+    return value
+        .replaceAll(RegExp(r'[\u2010-\u2015\u2212]'), '-')
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim()
+        .toUpperCase();
+  }
+
   Future<void> _tryRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -137,7 +146,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
 
     try {
       final data = await ApiService.claimAgentUnlock(
-        unlockCode: _codeCtrl.text.trim().toUpperCase(),
+        unlockCode: _normalizeCode(_codeCtrl.text),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
         npn: _npnCtrl.text.trim(),

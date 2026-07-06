@@ -1,6 +1,15 @@
 // netlify/functions/resolve_agent_code.js
 const db = require("./services/db");
 
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 /**
  * Resolve an agent unlock code during USER registration.
  * Validates active agent and returns agent profile info.
@@ -15,7 +24,8 @@ exports.handler = async (event) => {
       };
     }
 
-    const { code } = JSON.parse(event.body || "{}");
+    const { code: rawCode } = JSON.parse(event.body || "{}");
+    const code = normalizeCode(rawCode);
 
     if (!code) {
       return {
@@ -33,7 +43,7 @@ exports.handler = async (event) => {
       WHERE unlock_code = $1
       LIMIT 1
       `,
-      [code.trim()]
+      [code]
     );
 
     if (!result.rows.length) {

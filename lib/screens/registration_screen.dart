@@ -160,6 +160,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return PhoneNumberFormatter.normalizedForApi(input);
   }
 
+  String _normalizeCode(String value) {
+    return value
+        .replaceAll(RegExp(r'[\u2010-\u2015\u2212]'), '-')
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim()
+        .toUpperCase();
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -168,7 +177,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     try {
       final repo = DataRepository();
 
-      final code = _activationCodeCtrl.text.trim().toUpperCase();
+      final code = _normalizeCode(_activationCodeCtrl.text);
       final email = _emailCtrl.text.trim().toLowerCase();
 
       final agentRes = await ApiService.resolveAgentByCode(code);
