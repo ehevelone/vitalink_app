@@ -154,6 +154,30 @@ exports.handler = async (event) => {
       referringUserId: referral.referring_user_id,
     });
 
+    const referringClient = invite.referring_client || "A VitaLink user";
+
+    console.log("submit_referral_preference push_start", {
+      referralId: referral.id,
+      agentId: referral.agent_id,
+    });
+
+    const agentPush = await sendReferralPush({
+      recipient: { type: "agent", id: referral.agent_id },
+      referral,
+      title: "New VitaLink Referral",
+      body: `${referral.referral_name} preferred contact: ${preference}.`,
+    });
+
+    console.log("submit_referral_preference push_complete", {
+      referralId: referral.id,
+      agentPush,
+    });
+
+    console.log("submit_referral_preference mark_invite_converted_start", {
+      inviteId: invite.id,
+      referralId: referral.id,
+    });
+
     await db.query(
       `
       UPDATE agent_referral_invites
@@ -164,13 +188,9 @@ exports.handler = async (event) => {
       [referral.id, invite.id]
     );
 
-    const referringClient = invite.referring_client || "A VitaLink user";
-
-    const agentPush = await sendReferralPush({
-      recipient: { type: "agent", id: referral.agent_id },
-      referral,
-      title: "New VitaLink Referral",
-      body: `${referral.referral_name} preferred contact: ${preference}.`,
+    console.log("submit_referral_preference mark_invite_converted_complete", {
+      inviteId: invite.id,
+      referralId: referral.id,
     });
 
     return reply(200, {
