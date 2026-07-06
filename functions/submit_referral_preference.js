@@ -173,13 +173,6 @@ exports.handler = async (event) => {
       body: `${referral.referral_name} preferred contact: ${preference}.`,
     });
 
-    const clientPush = await sendReferralPush({
-      recipient: { type: "user", id: referral.referring_user_id },
-      referral,
-      title: "Referral sent successfully",
-      body: `${referral.referral_name} submitted a contact preference.`,
-    });
-
     return reply(200, {
       success: true,
       referral,
@@ -187,7 +180,10 @@ exports.handler = async (event) => {
       agentName: invite.agent_name,
       push: {
         agent: agentPush,
-        client: clientPush,
+        client: {
+          skipped: true,
+          reason: "referral_page_confirms_submission",
+        },
       },
     });
   } catch (err) {
