@@ -24,6 +24,14 @@ exports.handler = async (event) => {
     const phone = clean(body.phone);
     const email = clean(body.email).toLowerCase();
 
+    console.log("submit_referral_preference start", {
+      hasToken: Boolean(token),
+      tokenTail: token ? token.slice(-6) : null,
+      preference,
+      hasPhone: Boolean(phone),
+      hasEmail: Boolean(email),
+    });
+
     if (!token) {
       return reply(400, { success: false, error: "Missing referral link." });
     }
@@ -56,12 +64,26 @@ exports.handler = async (event) => {
     );
 
     if (!lookup.rows.length) {
+      console.log("submit_referral_preference not_found", {
+        tokenTail: token.slice(-6),
+      });
       return reply(404, { success: false, error: "Referral link not found." });
     }
 
     const invite = lookup.rows[0];
 
+    console.log("submit_referral_preference invite_found", {
+      inviteId: invite.id,
+      agentId: invite.agent_id,
+      referringUserId: invite.referring_user_id,
+      alreadyConverted: Boolean(invite.converted_referral_id),
+    });
+
     if (invite.converted_referral_id) {
+      console.log("submit_referral_preference already_submitted", {
+        referralId: invite.converted_referral_id,
+        agentId: invite.agent_id,
+      });
       return reply(200, {
         success: true,
         referral: { id: invite.converted_referral_id },
@@ -119,6 +141,12 @@ exports.handler = async (event) => {
     );
 
     const referral = inserted.rows[0];
+
+    console.log("submit_referral_preference referral_created", {
+      referralId: referral.id,
+      agentId: referral.agent_id,
+      referringUserId: referral.referring_user_id,
+    });
 
     await db.query(
       `
