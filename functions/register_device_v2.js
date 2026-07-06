@@ -43,6 +43,8 @@ async function ensureDeviceDeliveryColumns() {
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_error TEXT,
+    ADD COLUMN IF NOT EXISTS agent_device_registered BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS agent_registered_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
   `);
@@ -157,20 +159,31 @@ exports.handler = async (event) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`user:${userId}`]);
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`device:${token}`]);
 
-      const lockedExisting = await db.query(
+      const tokenRow = await db.query(
+        `
+        SELECT id
+        FROM user_devices
+        WHERE device_token = $1
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [token]
+      );
+
+      const userRow = await db.query(
         `
         SELECT id
         FROM user_devices
         WHERE user_id = $1
-           OR device_token = $2
-        ORDER BY CASE WHEN device_token = $2 THEN 0 ELSE 1 END
         LIMIT 1
         FOR UPDATE
         `,
-        [userId, token]
+        [userId]
       );
 
-      if (lockedExisting.rows.length) {
+      const targetId = tokenRow.rows[0]?.id || userRow.rows[0]?.id || null;
+
+      if (targetId) {
         await db.query(
           `
           UPDATE user_devices
@@ -179,14 +192,25 @@ exports.handler = async (event) => {
           WHERE device_token = $1
             AND id <> $2
           `,
-          [token, lockedExisting.rows[0].id]
+          [token, targetId]
+        );
+
+        await db.query(
+          `
+          UPDATE user_devices
+          SET user_id = NULL,
+              updated_at = NOW()
+          WHERE user_id = $1
+            AND id <> $2
+          `,
+          [userId, targetId]
         );
 
         const updated = await db.query(
           `
           UPDATE user_devices
           SET user_id = $1,
-              agent_id = $2,
+              agent_id = COALESCE($2, agent_id),
               device_token = $3,
               platform = $4,
               push_status = 'registered',
@@ -195,7 +219,7 @@ exports.handler = async (event) => {
           WHERE id = $5
           RETURNING *;
           `,
-          [userId, agentId || null, token, platform || "unknown", lockedExisting.rows[0].id]
+          [userId, agentId || null, token, platform || "unknown", targetId]
         );
 
         await db.query("COMMIT");

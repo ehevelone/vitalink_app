@@ -44,6 +44,8 @@ async function ensureAgentDeviceSupport() {
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_error TEXT,
+    ADD COLUMN IF NOT EXISTS agent_device_registered BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS agent_registered_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
   `);
@@ -114,20 +116,31 @@ exports.handler = async (event) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`agent:${numericAgentId}`]);
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`device:${token}`]);
 
-      const existing = await db.query(
+      const tokenRow = await db.query(
+        `
+        SELECT id
+        FROM user_devices
+        WHERE device_token = $1
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [token]
+      );
+
+      const agentRow = await db.query(
         `
         SELECT id
         FROM user_devices
         WHERE agent_id = $1
-           OR device_token = $2
-        ORDER BY CASE WHEN device_token = $2 THEN 0 ELSE 1 END
         LIMIT 1
         FOR UPDATE
         `,
-        [numericAgentId, token]
+        [numericAgentId]
       );
 
-      if (existing.rows.length) {
+      const targetId = tokenRow.rows[0]?.id || agentRow.rows[0]?.id || null;
+
+      if (targetId) {
         await db.query(
           `
           UPDATE user_devices
@@ -136,7 +149,18 @@ exports.handler = async (event) => {
           WHERE device_token = $1
             AND id <> $2
           `,
-          [token, existing.rows[0].id]
+          [token, targetId]
+        );
+
+        await db.query(
+          `
+          UPDATE user_devices
+          SET agent_id = NULL,
+              updated_at = NOW()
+          WHERE agent_id = $1
+            AND id <> $2
+          `,
+          [numericAgentId, targetId]
         );
 
         const updated = await db.query(
@@ -147,11 +171,13 @@ exports.handler = async (event) => {
               platform = $3,
               push_status = 'registered',
               last_push_error = NULL,
+              agent_device_registered = TRUE,
+              agent_registered_at = NOW(),
               updated_at = NOW()
           WHERE id = $4
           RETURNING id, user_id, agent_id, platform, push_status, updated_at
           `,
-          [numericAgentId, token, platform || "unknown", existing.rows[0].id]
+          [numericAgentId, token, platform || "unknown", targetId]
         );
 
         await db.query("COMMIT");
@@ -161,8 +187,8 @@ exports.handler = async (event) => {
       const inserted = await db.query(
         `
         INSERT INTO user_devices
-          (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
-        VALUES (NULL, $1, $2, $3, 'registered', NOW(), NOW())
+          (user_id, agent_id, device_token, platform, push_status, agent_device_registered, agent_registered_at, created_at, updated_at)
+        VALUES (NULL, $1, $2, $3, 'registered', TRUE, NOW(), NOW(), NOW())
         RETURNING id, agent_id, platform, push_status, updated_at
         `,
         [numericAgentId, token, platform || "unknown"]

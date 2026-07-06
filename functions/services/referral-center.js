@@ -146,21 +146,38 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
 
-  const filters = recipient.type === "agent"
-    ? "agent_id = $1"
-    : "user_id = $1";
-
-  const devices = await db.query(
-    `
-    SELECT id, device_token
-    FROM user_devices
-    WHERE ${filters}
-      AND device_token IS NOT NULL
-      AND TRIM(device_token) <> ''
-      AND TRIM(device_token) <> 'NO_TOKEN'
-    `,
-    [recipient.id]
-  );
+  const devices = recipient.type === "agent"
+    ? await db.query(
+      `
+      SELECT ud.id, ud.device_token
+      FROM user_devices ud
+      WHERE ud.agent_device_registered IS TRUE
+        AND (
+          ud.agent_id = $1
+          OR ud.user_id IN (
+            SELECT u.id
+            FROM users u
+            JOIN agents a ON LOWER(a.email) = LOWER(u.email)
+            WHERE a.id = $1
+          )
+        )
+        AND ud.device_token IS NOT NULL
+        AND TRIM(ud.device_token) <> ''
+        AND TRIM(ud.device_token) <> 'NO_TOKEN'
+      `,
+      [recipient.id]
+    )
+    : await db.query(
+      `
+      SELECT id, device_token
+      FROM user_devices
+      WHERE user_id = $1
+        AND device_token IS NOT NULL
+        AND TRIM(device_token) <> ''
+        AND TRIM(device_token) <> 'NO_TOKEN'
+      `,
+      [recipient.id]
+    );
 
   const seen = new Set();
   const targets = [];
