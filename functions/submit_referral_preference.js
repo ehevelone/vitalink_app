@@ -11,6 +11,12 @@ const VALID_PREFERENCES = new Set(["Text Message", "Phone Call", "Email"]);
 
 exports.handler = async (event) => {
   try {
+    console.log("submit_referral_preference request", {
+      method: event.httpMethod,
+      hasBody: Boolean(event.body),
+      bodyLength: event.body ? event.body.length : 0,
+    });
+
     if (event.httpMethod === "OPTIONS") return reply(200, {});
     if (event.httpMethod !== "POST") {
       return reply(405, { success: false, error: "Method Not Allowed" });
