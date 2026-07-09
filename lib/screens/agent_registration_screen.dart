@@ -138,6 +138,41 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         .toUpperCase();
   }
 
+  String _normalizeEmail(String value) {
+    return value.trim().toLowerCase();
+  }
+
+  String? _validateEmail(String? value) {
+    final email = _normalizeEmail(value ?? "");
+    if (email.isEmpty) return "Enter a valid email";
+
+    final emailPattern = RegExp(
+      r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$",
+    );
+    if (!emailPattern.hasMatch(email) ||
+        email.contains("..") ||
+        email.startsWith(".") ||
+        email.endsWith(".")) {
+      return "Enter a valid email";
+    }
+
+    final tld = email.split(".").last;
+    const commonTypos = {
+      "coim",
+      "comm",
+      "conm",
+      "cmo",
+      "ocm",
+      "cpm",
+      "gom",
+    };
+    if (commonTypos.contains(tld)) {
+      return "Check the email ending. Did you mean .com?";
+    }
+
+    return null;
+  }
+
   Future<void> _tryRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -146,7 +181,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     try {
       final data = await ApiService.claimAgentUnlock(
         unlockCode: _normalizeCode(_codeCtrl.text),
-        email: _emailCtrl.text.trim(),
+        email: _normalizeEmail(_emailCtrl.text),
         password: _passwordCtrl.text.trim(),
         npn: _npnCtrl.text.trim(),
         phone: PhoneNumberFormatter.normalizedForApi(_phoneCtrl.text),
@@ -160,7 +195,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
 
       if (data['success'] == true) {
         final store = SecureStore();
-        final email = _emailCtrl.text.trim();
+        final email = _normalizeEmail(_emailCtrl.text);
         final password = _passwordCtrl.text.trim();
 
         await store.setString("agentName", _nameCtrl.text.trim());
@@ -269,8 +304,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
                 keyboardType: TextInputType.emailAddress,
-                validator: (v) =>
-                    v == null || !v.contains('@') ? "Enter a valid email" : null,
+                validator: _validateEmail,
               ),
 
               const SizedBox(height: 12),

@@ -33,6 +33,28 @@ function normalizeCode(value) {
     .toUpperCase();
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getEmailValidationError(value) {
+  const email = normalizeEmail(value);
+  if (!email) return "Email required";
+
+  const emailPattern = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/;
+  if (!emailPattern.test(email) || email.includes("..") || email.startsWith(".") || email.endsWith(".")) {
+    return "Enter a valid email";
+  }
+
+  const tld = email.split(".").pop();
+  const commonTypos = new Set(["coim", "comm", "conm", "cmo", "ocm", "cpm", "gom"]);
+  if (commonTypos.has(tld)) {
+    return "Check the email ending. Did you mean .com?";
+  }
+
+  return null;
+}
+
 async function ensureUserSessionColumns() {
   await db.query(`
     ALTER TABLE users
@@ -80,13 +102,19 @@ if (event.httpMethod !== "POST") {
     }
 
     const body = JSON.parse(event.body || "{}");
-    const { firstName, lastName, email, phone, password, platform } = body;
+    const { firstName, lastName, phone, password, platform } = body;
+    const email = normalizeEmail(body.email);
     const promoCode = normalizeCode(body.promoCode);
 
     await ensureUserSessionColumns();
 
     if (!firstName || !lastName || !email || !password || !promoCode) {
       return reply(false, { error: "Missing required fields" });
+    }
+
+    const emailError = getEmailValidationError(email);
+    if (emailError) {
+      return reply(false, { error: emailError });
     }
 
     // ✅ Hash password
@@ -139,7 +167,7 @@ if (event.httpMethod !== "POST") {
       [
         firstName,
         lastName,
-        email.toLowerCase(),
+        email,
         normalizeUsPhone(phone),
         password_hash,
         agentId,

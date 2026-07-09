@@ -40,6 +40,28 @@ function normalizeCode(value) {
     .toUpperCase();
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getEmailValidationError(value) {
+  const email = normalizeEmail(value);
+  if (!email) return "Email required";
+
+  const emailPattern = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/;
+  if (!emailPattern.test(email) || email.includes("..") || email.startsWith(".") || email.endsWith(".")) {
+    return "Enter a valid email";
+  }
+
+  const tld = email.split(".").pop();
+  const commonTypos = new Set(["coim", "comm", "conm", "cmo", "ocm", "cpm", "gom"]);
+  if (commonTypos.has(tld)) {
+    return "Check the email ending. Did you mean .com?";
+  }
+
+  return null;
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -73,11 +95,17 @@ exports.handler = async (event) => {
     } = JSON.parse(event.body || "{}");
 
     const registrationCode = normalizeCode(unlockCode);
+    const cleanEmail = normalizeEmail(email);
 
-    if (!registrationCode || !email || !password || !npn) {
+    if (!registrationCode || !cleanEmail || !password || !npn) {
       return fail(
         "Agent registration code, email, password, and NPN are required."
       );
+    }
+
+    const emailError = getEmailValidationError(cleanEmail);
+    if (emailError) {
+      return fail(emailError);
     }
 
     const existing = await db.query(
@@ -134,7 +162,7 @@ exports.handler = async (event) => {
         agency_state, agency_zip, promo_code, active, role
       `,
       [
-        email,
+        cleanEmail,
         hashedPassword,
         npn,
         normalizeUsPhone(phone),

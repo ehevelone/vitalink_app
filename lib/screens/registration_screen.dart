@@ -168,6 +168,41 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         .toUpperCase();
   }
 
+  String _normalizeEmail(String value) {
+    return value.trim().toLowerCase();
+  }
+
+  String? _validateEmail(String? value) {
+    final email = _normalizeEmail(value ?? "");
+    if (email.isEmpty) return "Email required";
+
+    final emailPattern = RegExp(
+      r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$",
+    );
+    if (!emailPattern.hasMatch(email) ||
+        email.contains("..") ||
+        email.startsWith(".") ||
+        email.endsWith(".")) {
+      return "Enter a valid email";
+    }
+
+    final tld = email.split(".").last;
+    const commonTypos = {
+      "coim",
+      "comm",
+      "conm",
+      "cmo",
+      "ocm",
+      "cpm",
+      "gom",
+    };
+    if (commonTypos.contains(tld)) {
+      return "Check the email ending. Did you mean .com?";
+    }
+
+    return null;
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -177,7 +212,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final repo = DataRepository();
 
       final code = _normalizeCode(_activationCodeCtrl.text);
-      final email = _emailCtrl.text.trim().toLowerCase();
+      final email = _normalizeEmail(_emailCtrl.text);
 
       final agentRes = await ApiService.resolveAgentByCode(code);
 
@@ -305,11 +340,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
                 keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return "Email required";
-                  if (!v.contains("@")) return "Enter a valid email";
-                  return null;
-                },
+                validator: _validateEmail,
               ),
 
               const SizedBox(height: 12),
