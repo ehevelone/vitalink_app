@@ -8,8 +8,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const SITE = "https://myvitalink.app";
-const FUNCTION_URL = "https://vitalink-app.netlify.app/.netlify/functions/rsm-onboard";
+const SITE = (process.env.PUBLIC_SITE_URL || "https://myvitalink.app").replace(/\/$/, "");
 
 // Generate permanent RSM agent enrollment code
 function generateRsmEnrollCode(prefix = "RSM", length = 8) {
@@ -96,7 +95,7 @@ exports.handler = async function (event) {
 
     client.release();
 
-    const onboardingUrl = `${FUNCTION_URL}?token=${token}`;
+    const onboardingUrl = `${SITE}/rsm-onboard?token=${encodeURIComponent(token)}`;
 
     return {
       statusCode: 200,

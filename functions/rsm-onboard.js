@@ -6,7 +6,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const SITE = "https://myvitalink.app";
+const SITE = (process.env.PUBLIC_SITE_URL || "https://myvitalink.app").replace(/\/$/, "");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
@@ -65,7 +65,7 @@ exports.handler = async function (event) {
       return {
         statusCode: 302,
         headers: {
-          Location: `${SITE}/core-node/rsm_onboard.html?token=${token}`
+          Location: `${SITE}/rsm-onboard?token=${encodeURIComponent(token)}`
         }
       };
 
