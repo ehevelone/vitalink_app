@@ -25,6 +25,14 @@ function getResetTable(role) {
   return null;
 }
 
+async function ensureResetColumns(table) {
+  await db.query(`
+    ALTER TABLE ${table}
+    ADD COLUMN IF NOT EXISTS reset_code TEXT,
+    ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMPTZ
+  `);
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -59,6 +67,8 @@ exports.handler = async (event) => {
       console.log("❌ Invalid role:", role);
       return reply(400, { success: false, error: "Invalid role" });
     }
+
+    await ensureResetColumns(resetTable);
 
     const email = String(emailOrPhone).trim().toLowerCase();
 

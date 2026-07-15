@@ -31,6 +31,14 @@ function getEmailSubject(role) {
   return "VitaLink Password Reset Code";
 }
 
+async function ensureResetColumns(table) {
+  await db.query(`
+    ALTER TABLE ${table}
+    ADD COLUMN IF NOT EXISTS reset_code TEXT,
+    ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMPTZ
+  `);
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -73,6 +81,8 @@ exports.handler = async (event) => {
         error: "Invalid role",
       });
     }
+
+    await ensureResetColumns(resetTable);
 
     const email = String(emailOrPhone).trim().toLowerCase();
 

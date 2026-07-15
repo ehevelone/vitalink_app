@@ -55,16 +55,51 @@ exports.handler = async function (event) {
     const client = await pool.connect();
 
     const existing = await client.query(
-      "SELECT id FROM rsms WHERE email=$1 LIMIT 1",
+      "SELECT id, active, password_hash FROM rsms WHERE email=$1 LIMIT 1",
       [email]
     );
 
     if (existing.rows.length > 0) {
+      const rsm = existing.rows[0];
+
+      if (rsm.active === true && rsm.password_hash !== "PENDING_SETUP") {
+        client.release();
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: "RSM already exists"
+        };
+      }
+
+      const token = crypto.randomBytes(24).toString("hex");
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await client.query(
+        `UPDATE rsms
+         SET phone = $2,
+             onboard_token = $3,
+             onboard_token_expires = $4,
+             password_hash = CASE
+               WHEN password_hash IS NULL OR password_hash = '' THEN 'PENDING_SETUP'
+               ELSE password_hash
+             END
+         WHERE id = $1`,
+        [rsm.id, phone, token, expires]
+      );
+
       client.release();
+
+      const onboardingUrl = `${SITE}/rsm-onboard?token=${encodeURIComponent(token)}`;
+
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers: corsHeaders,
-        body: "RSM already exists"
+        body: JSON.stringify({
+          success: true,
+          recovered: true,
+          onboard_url: onboardingUrl,
+          onboard_token: token
+        })
       };
     }
 
