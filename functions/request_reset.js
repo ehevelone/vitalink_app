@@ -40,7 +40,10 @@ async function ensureResetColumns(table) {
 }
 
 exports.handler = async (event) => {
+  let stage = "start";
+
   try {
+    stage = "method";
     if (event.httpMethod === "OPTIONS") {
       return { statusCode: 200, headers: CORS_HEADERS, body: "" };
     }
@@ -54,6 +57,7 @@ exports.handler = async (event) => {
 
     let body = {};
     try {
+      stage = "parse_body";
       body = event.isBase64Encoded
         ? JSON.parse(Buffer.from(event.body, "base64").toString("utf8"))
         : JSON.parse(event.body || "{}");
@@ -82,10 +86,12 @@ exports.handler = async (event) => {
       });
     }
 
+    stage = "ensure_reset_columns";
     await ensureResetColumns(resetTable);
 
     const email = String(emailOrPhone).trim().toLowerCase();
 
+    stage = "find_account";
     const result = await db.query(
       `
       SELECT id, email, reset_code, reset_expires
@@ -120,6 +126,7 @@ exports.handler = async (event) => {
       : new Date(Date.now() + 20 * 60 * 1000);
 
     if (!existingCodeValid) {
+      stage = "save_reset_code";
       await db.query(
         `
         UPDATE ${resetTable}
@@ -131,6 +138,7 @@ exports.handler = async (event) => {
       );
     }
 
+    stage = "create_mailer";
     const transporter = createMailer();
 
     const message = `
@@ -147,6 +155,7 @@ If you did not request this, you can ignore this email.
 - VitaLink Support
 `.trim();
 
+    stage = "send_email";
     await transporter.sendMail({
       from: fromAddress("VitaLink Support"),
       to: user.email,
@@ -168,10 +177,28 @@ If you did not request this, you can ignore this email.
       reusedExistingCode: Boolean(existingCodeValid),
     });
   } catch (err) {
-    console.error("request_reset error:", err);
+    console.error("request_reset error:", {
+      stage,
+      message: err.message,
+      code: err.code,
+      command: err.command,
+      response: err.response,
+      responseCode: err.responseCode,
+    });
+
+    if (stage === "create_mailer" || stage === "send_email") {
+      return reply(500, {
+        success: false,
+        error: "Email server error",
+        code: "email_send_failed",
+      });
+    }
+
     return reply(500, {
       success: false,
       error: "Server error",
+      code: "reset_failed",
+      stage,
     });
   }
 };
