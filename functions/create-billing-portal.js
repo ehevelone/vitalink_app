@@ -9,9 +9,16 @@ const pool = new Pool({
 });
 
 const SITE = "https://myvitalink.app";
-const RSM_PRICE_ID =
-  process.env.STRIPE_FOUNDERS_RSM_PRICE_ID ||
-  process.env.STRIPE_RSM_PRICE_ID;
+const RSM_PRICES = {
+  founders: {
+    monthly: process.env.STRIPE_FOUNDERS_RSM_PRICE_ID,
+    annual: process.env.STRIPE_FOUNDERS_RSM_ANNUAL_PRICE_ID
+  },
+  regular: {
+    monthly: process.env.STRIPE_RSM_PRICE_ID,
+    annual: process.env.STRIPE_RSM_ANNUAL_PRICE_ID
+  }
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
@@ -37,7 +44,9 @@ async function ensureBillingColumns(client) {
     ADD COLUMN IF NOT EXISTS stripe_subscription_item_id TEXT,
     ADD COLUMN IF NOT EXISTS subscription_status TEXT,
     ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid'
+    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid',
+    ADD COLUMN IF NOT EXISTS billing_interval TEXT DEFAULT 'monthly',
+    ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'
   `);
 
   await client.query(`
@@ -48,6 +57,18 @@ async function ensureBillingColumns(client) {
 
 function normalizeBillingMode(value) {
   return value === "agent_paid" ? "agent_paid" : "office_paid";
+}
+
+function normalizeBillingInterval(value) {
+  return value === "annual" ? "annual" : "monthly";
+}
+
+function normalizePricingTier(value) {
+  return value === "regular" ? "regular" : "founders";
+}
+
+function getRsmPriceId(pricingTier, billingInterval) {
+  return RSM_PRICES[pricingTier]?.[billingInterval] || "";
 }
 
 async function countBillableSeats(client, rsmId, billingMode) {
@@ -89,15 +110,9 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
     const selectedBillingMode = normalizeBillingMode(body.billingMode);
+    const selectedBillingInterval = normalizeBillingInterval(body.billingInterval);
 
     await ensureBillingColumns(client);
-
-    if (!RSM_PRICE_ID) {
-      return reply(500, {
-        success: false,
-        error: "Stripe RSM price is not configured"
-      });
-    }
 
     const rsm = await client.query(
       `
@@ -109,7 +124,9 @@ exports.handler = async (event) => {
         stripe_subscription_item_id,
         billing_active,
         subscription_status,
-        billing_mode
+        billing_mode,
+        billing_interval,
+        pricing_tier
       FROM rsms
       WHERE admin_session_token = $1
         AND role = 'rsm'
@@ -125,12 +142,18 @@ exports.handler = async (event) => {
 
     const rsmData = rsm.rows[0];
     const billingMode = selectedBillingMode || normalizeBillingMode(rsmData.billing_mode);
-    const checkoutQuantity = await countBillableSeats(client, rsmData.id, billingMode);
+    const billingInterval = selectedBillingInterval || normalizeBillingInterval(rsmData.billing_interval);
+    const pricingTier = normalizePricingTier(rsmData.pricing_tier);
+    const rsmPriceId = getRsmPriceId(pricingTier, billingInterval);
 
-    await client.query(
-      "UPDATE rsms SET billing_mode = $1 WHERE id = $2",
-      [billingMode, rsmData.id]
-    );
+    if (!rsmPriceId) {
+      return reply(500, {
+        success: false,
+        error: `Stripe ${pricingTier} RSM ${billingInterval} price is not configured`
+      });
+    }
+
+    const checkoutQuantity = await countBillableSeats(client, rsmData.id, billingMode);
 
     const hasActiveSubscription =
       rsmData.billing_active === true &&
@@ -140,6 +163,11 @@ exports.handler = async (event) => {
       rsmData.subscription_status !== "canceled";
 
     if (hasActiveSubscription) {
+      await client.query(
+        "UPDATE rsms SET billing_mode = $1 WHERE id = $2",
+        [billingMode, rsmData.id]
+      );
+
       await stripe.subscriptionItems.update(
         rsmData.stripe_subscription_item_id,
         { quantity: checkoutQuantity }
@@ -157,11 +185,16 @@ exports.handler = async (event) => {
       });
     }
 
+    await client.query(
+      "UPDATE rsms SET billing_mode = $1, billing_interval = $2 WHERE id = $3",
+      [billingMode, billingInterval, rsmData.id]
+    );
+
     const checkoutParams = {
       mode: "subscription",
       line_items: [
         {
-          price: RSM_PRICE_ID,
+          price: rsmPriceId,
           quantity: checkoutQuantity
         }
       ],
@@ -171,13 +204,17 @@ exports.handler = async (event) => {
       metadata: {
         rsm_id: String(rsmData.id),
         type: "rsm_agent_billing",
-        billing_mode: billingMode
+        billing_mode: billingMode,
+        billing_interval: billingInterval,
+        pricing_tier: pricingTier
       },
       subscription_data: {
         metadata: {
           rsm_id: String(rsmData.id),
           type: "rsm_agent_billing",
-          billing_mode: billingMode
+          billing_mode: billingMode,
+          billing_interval: billingInterval,
+          pricing_tier: pricingTier
         }
       }
     };
@@ -195,6 +232,8 @@ exports.handler = async (event) => {
       success: true,
       mode: "checkout",
       billing_mode: billingMode,
+      billing_interval: billingInterval,
+      pricing_tier: pricingTier,
       billed_quantity: checkoutQuantity,
       url: checkoutSession.url
     });

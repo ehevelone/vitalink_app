@@ -39,6 +39,8 @@ exports.handler = async function (event) {
     body: JSON.stringify({
       success: true,
       registration_url: `${SITE}/rsm-register`,
+      founders_registration_url: `${SITE}/rsm-register?pricing=founders`,
+      regular_registration_url: `${SITE}/rsm-register?pricing=regular`,
       creation_code: creationCode,
       configured: Boolean(creationCode)
     })

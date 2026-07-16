@@ -29,6 +29,10 @@ function normalizeCode(value) {
   return clean(value).toUpperCase().replace(/\s+/g, "");
 }
 
+function normalizePricingTier(value) {
+  return clean(value).toLowerCase() === "regular" ? "regular" : "founders";
+}
+
 function generateRsmEnrollCode(prefix = "RSM", length = 8) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -80,6 +84,7 @@ exports.handler = async function (event) {
   const region = clean(body.region);
   const password = String(body.password || "");
   const creationCode = normalizeCode(body.creationCode);
+  const pricingTier = normalizePricingTier(body.pricingTier);
 
   if (!name || !email || !phone || !region || !password || !creationCode) {
     return reply(400, { success: false, error: "All fields are required" });
@@ -104,6 +109,11 @@ exports.handler = async function (event) {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 12);
+
+    await client.query(`
+      ALTER TABLE rsms
+      ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'
+    `);
 
     const existing = await client.query(
       `SELECT id, active, password_hash, invite_code
@@ -135,10 +145,11 @@ exports.handler = async function (event) {
              active = true,
              role = 'rsm',
              invite_code = $7,
+             pricing_tier = $8,
              onboard_token = NULL,
              onboard_token_expires = NULL
          WHERE id = $1`,
-        [rsm.id, name, email, phone, region, hashedPassword, inviteCode]
+        [rsm.id, name, email, phone, region, hashedPassword, inviteCode, pricingTier]
       );
 
       return reply(200, {
@@ -152,10 +163,10 @@ exports.handler = async function (event) {
 
     await client.query(
       `INSERT INTO rsms
-        (role, email, password_hash, name, region, phone, active, created_at, invite_code)
+        (role, email, password_hash, name, region, phone, active, created_at, invite_code, pricing_tier)
        VALUES
-        ('rsm', $1, $2, $3, $4, $5, true, NOW(), $6)`,
-      [email, hashedPassword, name, region, phone, inviteCode]
+        ('rsm', $1, $2, $3, $4, $5, true, NOW(), $6, $7)`,
+      [email, hashedPassword, name, region, phone, inviteCode, pricingTier]
     );
 
     return reply(200, {

@@ -19,7 +19,9 @@ async function ensureBillingColumns(client) {
     ADD COLUMN IF NOT EXISTS billing_active BOOLEAN DEFAULT false,
     ADD COLUMN IF NOT EXISTS subscription_status TEXT,
     ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid'
+    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid',
+    ADD COLUMN IF NOT EXISTS billing_interval TEXT DEFAULT 'monthly',
+    ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'
   `);
 
   await client.query(`
@@ -30,6 +32,14 @@ async function ensureBillingColumns(client) {
 
 function normalizeBillingMode(value) {
   return value === "agent_paid" ? "agent_paid" : "office_paid";
+}
+
+function normalizeBillingInterval(value) {
+  return value === "annual" ? "annual" : "monthly";
+}
+
+function normalizePricingTier(value) {
+  return value === "regular" ? "regular" : "founders";
 }
 
 exports.handler = async function (event) {
@@ -56,7 +66,7 @@ exports.handler = async function (event) {
 
     // 🔐 Validate session + get billing status + invite code
     const rsmResult = await client.query(`
-      SELECT id, billing_active, invite_code, subscription_status, current_period_end, billing_mode
+      SELECT id, billing_active, invite_code, subscription_status, current_period_end, billing_mode, billing_interval, pricing_tier
       FROM rsms
       WHERE admin_session_token = $1
       AND role = 'rsm'
@@ -75,6 +85,8 @@ exports.handler = async function (event) {
     const subscriptionStatus = rsmResult.rows[0].subscription_status;
     const currentPeriodEnd = rsmResult.rows[0].current_period_end;
     const billingMode = normalizeBillingMode(rsmResult.rows[0].billing_mode);
+    const billingInterval = normalizeBillingInterval(rsmResult.rows[0].billing_interval);
+    const pricingTier = normalizePricingTier(rsmResult.rows[0].pricing_tier);
 
     const { search, download, id } = event.queryStringParameters || {};
 
@@ -204,6 +216,10 @@ exports.handler = async function (event) {
     const billableSeats = billingMode === "agent_paid"
       ? 1
       : activeNonSelfAgents + 1;
+    const seatPrice = pricingTier === "regular" ? 20 : 10;
+    const billingEstimate = billingInterval === "annual"
+      ? billableSeats * seatPrice * 12
+      : billableSeats * seatPrice;
 
     return {
       statusCode: 200,
@@ -211,12 +227,14 @@ exports.handler = async function (event) {
       body: JSON.stringify({
         billing_active: billingActive,
         billing_mode: billingMode,
+        billing_interval: billingInterval,
+        pricing_tier: pricingTier,
         subscription_status: subscriptionStatus,
         current_period_end: currentPeriodEnd,
         invite_code: inviteCode,
         active_agents: activeNonSelfAgents,
         billable_seats: billableSeats,
-        billing_estimate: billableSeats * 10,
+        billing_estimate: billingEstimate,
         agents: agents.rows
       })
     };
