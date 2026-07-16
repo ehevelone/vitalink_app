@@ -10,6 +10,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+function normalizeBillingMode(value) {
+  return value === "agent_paid" ? "agent_paid" : "office_paid";
+}
+
 exports.handler = async () => {
 
   const client = await pool.connect();
@@ -21,7 +25,7 @@ exports.handler = async () => {
     // Get all active RSM subscriptions
     const rsms = await client.query(
       `
-      SELECT id, stripe_subscription_item_id
+      SELECT id, stripe_subscription_item_id, billing_mode
       FROM rsms
       WHERE billing_active = true
       AND stripe_subscription_item_id IS NOT NULL
@@ -32,20 +36,27 @@ exports.handler = async () => {
 
     for (const rsm of rsms.rows) {
 
-      // Count active agents
+      const billingMode = normalizeBillingMode(rsm.billing_mode);
+
+      // Count active non-self agents. The RSM always counts as one billable seat
+      // unless agents are paying individually.
       const countResult = await client.query(
         `
         SELECT COUNT(*)
         FROM agents
         WHERE rsm_id = $1
         AND active = true
+        AND linked_rsm_id IS DISTINCT FROM $1
         `,
         [rsm.id]
       );
 
       const activeAgents = parseInt(countResult.rows[0].count);
+      const billableSeats = billingMode === "agent_paid"
+        ? 1
+        : activeAgents + 1;
 
-      console.log(`RSM ${rsm.id} active agents: ${activeAgents}`);
+      console.log(`RSM ${rsm.id} billable seats: ${billableSeats}`);
 
       try {
 
@@ -53,11 +64,11 @@ exports.handler = async () => {
         await stripe.subscriptionItems.update(
           rsm.stripe_subscription_item_id,
           {
-            quantity: activeAgents
+            quantity: billableSeats
           }
         );
 
-        console.log(`Stripe quantity synced → ${activeAgents}`);
+        console.log(`Stripe quantity synced -> ${billableSeats}`);
 
       } catch (stripeErr) {
 

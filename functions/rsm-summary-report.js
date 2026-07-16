@@ -18,8 +18,18 @@ async function ensureBillingColumns(client) {
     ALTER TABLE rsms
     ADD COLUMN IF NOT EXISTS billing_active BOOLEAN DEFAULT false,
     ADD COLUMN IF NOT EXISTS subscription_status TEXT,
-    ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid'
   `);
+
+  await client.query(`
+    ALTER TABLE agents
+    ADD COLUMN IF NOT EXISTS linked_rsm_id UUID
+  `);
+}
+
+function normalizeBillingMode(value) {
+  return value === "agent_paid" ? "agent_paid" : "office_paid";
 }
 
 exports.handler = async function (event) {
@@ -46,7 +56,7 @@ exports.handler = async function (event) {
 
     // 🔐 Validate session + get billing status + invite code
     const rsmResult = await client.query(`
-      SELECT id, billing_active, invite_code, subscription_status, current_period_end
+      SELECT id, billing_active, invite_code, subscription_status, current_period_end, billing_mode
       FROM rsms
       WHERE admin_session_token = $1
       AND role = 'rsm'
@@ -64,6 +74,7 @@ exports.handler = async function (event) {
     const inviteCode = rsmResult.rows[0].invite_code;
     const subscriptionStatus = rsmResult.rows[0].subscription_status;
     const currentPeriodEnd = rsmResult.rows[0].current_period_end;
+    const billingMode = normalizeBillingMode(rsmResult.rows[0].billing_mode);
 
     const { search, download, id } = event.queryStringParameters || {};
 
@@ -184,19 +195,28 @@ exports.handler = async function (event) {
       FROM agents
       WHERE rsm_id = $1
       AND active = true
+      AND linked_rsm_id IS DISTINCT FROM $1
     `, [rsmId]);
 
     client.release();
+
+    const activeNonSelfAgents = Number(count.rows[0].count);
+    const billableSeats = billingMode === "agent_paid"
+      ? 1
+      : activeNonSelfAgents + 1;
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         billing_active: billingActive,
+        billing_mode: billingMode,
         subscription_status: subscriptionStatus,
         current_period_end: currentPeriodEnd,
         invite_code: inviteCode,
-        active_agents: Number(count.rows[0].count),
+        active_agents: activeNonSelfAgents,
+        billable_seats: billableSeats,
+        billing_estimate: billableSeats * 10,
         agents: agents.rows
       })
     };

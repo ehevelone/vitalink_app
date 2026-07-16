@@ -36,22 +36,37 @@ async function ensureBillingColumns(client) {
     ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT,
     ADD COLUMN IF NOT EXISTS stripe_subscription_item_id TEXT,
     ADD COLUMN IF NOT EXISTS subscription_status TEXT,
-    ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS billing_mode TEXT DEFAULT 'office_paid'
+  `);
+
+  await client.query(`
+    ALTER TABLE agents
+    ADD COLUMN IF NOT EXISTS linked_rsm_id UUID
   `);
 }
 
-async function countActiveAgents(client, rsmId) {
+function normalizeBillingMode(value) {
+  return value === "agent_paid" ? "agent_paid" : "office_paid";
+}
+
+async function countBillableSeats(client, rsmId, billingMode) {
+  if (billingMode === "agent_paid") {
+    return 1;
+  }
+
   const result = await client.query(
     `
     SELECT COUNT(*)::INT AS count
     FROM agents
     WHERE rsm_id = $1
       AND active = TRUE
+      AND linked_rsm_id IS DISTINCT FROM $1
     `,
     [rsmId]
   );
 
-  return Number(result.rows[0]?.count || 0);
+  return Number(result.rows[0]?.count || 0) + 1;
 }
 
 exports.handler = async (event) => {
@@ -72,6 +87,9 @@ exports.handler = async (event) => {
   const client = await pool.connect();
 
   try {
+    const body = JSON.parse(event.body || "{}");
+    const selectedBillingMode = normalizeBillingMode(body.billingMode);
+
     await ensureBillingColumns(client);
 
     if (!RSM_PRICE_ID) {
@@ -90,7 +108,8 @@ exports.handler = async (event) => {
         stripe_subscription_id,
         stripe_subscription_item_id,
         billing_active,
-        subscription_status
+        subscription_status,
+        billing_mode
       FROM rsms
       WHERE admin_session_token = $1
         AND role = 'rsm'
@@ -105,8 +124,14 @@ exports.handler = async (event) => {
     }
 
     const rsmData = rsm.rows[0];
-    const activeAgents = await countActiveAgents(client, rsmData.id);
-    const checkoutQuantity = Math.max(activeAgents, 1);
+    const billingMode = selectedBillingMode || normalizeBillingMode(rsmData.billing_mode);
+    const checkoutQuantity = await countBillableSeats(client, rsmData.id, billingMode);
+
+    await client.query(
+      "UPDATE rsms SET billing_mode = $1 WHERE id = $2",
+      [billingMode, rsmData.id]
+    );
+
     const hasActiveSubscription =
       rsmData.billing_active === true &&
       rsmData.stripe_customer_id &&
@@ -115,6 +140,11 @@ exports.handler = async (event) => {
       rsmData.subscription_status !== "canceled";
 
     if (hasActiveSubscription) {
+      await stripe.subscriptionItems.update(
+        rsmData.stripe_subscription_item_id,
+        { quantity: checkoutQuantity }
+      );
+
       const portalSession = await stripe.billingPortal.sessions.create({
         customer: rsmData.stripe_customer_id,
         return_url: `${SITE}/core-node/rsm_report.html`
@@ -140,12 +170,14 @@ exports.handler = async (event) => {
       client_reference_id: String(rsmData.id),
       metadata: {
         rsm_id: String(rsmData.id),
-        type: "rsm_agent_billing"
+        type: "rsm_agent_billing",
+        billing_mode: billingMode
       },
       subscription_data: {
         metadata: {
           rsm_id: String(rsmData.id),
-          type: "rsm_agent_billing"
+          type: "rsm_agent_billing",
+          billing_mode: billingMode
         }
       }
     };
@@ -162,7 +194,7 @@ exports.handler = async (event) => {
     return reply(200, {
       success: true,
       mode: "checkout",
-      active_agents: activeAgents,
+      billing_mode: billingMode,
       billed_quantity: checkoutQuantity,
       url: checkoutSession.url
     });
