@@ -78,6 +78,26 @@ Future<void> _openActivationPage() async {
   }
 }
 
+Future<String?> _chooseBillingInterval() {
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text("Choose Billing"),
+      content: const Text("How would you like to activate your VitaLink Agent Access?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop("monthly"),
+          child: const Text("Monthly"),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop("annual"),
+          child: const Text("Annual"),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<void> _login() async {
   final form = _formKey.currentState;
   if (form == null || !form.validate()) return;
@@ -99,6 +119,33 @@ Future<void> _login() async {
       setState(() {
         _loading = false;
       });
+
+      if (res["requires_payment"] == true && res["agentId"] != null) {
+        final billing = await _chooseBillingInterval();
+        if (billing == null) {
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
+
+        final checkout = await ApiService.createAgentCheckout(
+          email: res["email"]?.toString() ?? _emailCtrl.text.trim(),
+          agentId: res["agentId"]?.toString(),
+          plan: "agent",
+          billing: billing,
+        );
+
+        if (!mounted) return;
+
+        final checkoutUrl = checkout["url"]?.toString() ?? "";
+        if (checkoutUrl.isNotEmpty) {
+          setState(() => _loading = false);
+          await launchUrl(
+            Uri.parse(checkoutUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          return;
+        }
+      }
 
       // Show the access activation prompt when backend access is not active.
       if (res["requires_payment"] == true) {

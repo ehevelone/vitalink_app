@@ -1,5 +1,6 @@
 const Stripe = require("stripe");
 const { Pool } = require("pg");
+const { getRsmPriceId } = require("./services/stripe-prices");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -9,17 +10,6 @@ const pool = new Pool({
 });
 
 const SITE = "https://myvitalink.app";
-const RSM_PRICES = {
-  founders: {
-    monthly: process.env.STRIPE_FOUNDERS_RSM_PRICE_ID,
-    annual: process.env.STRIPE_FOUNDERS_RSM_ANNUAL_PRICE_ID
-  },
-  regular: {
-    monthly: process.env.STRIPE_RSM_PRICE_ID,
-    annual: process.env.STRIPE_RSM_ANNUAL_PRICE_ID
-  }
-};
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,
   "Access-Control-Allow-Headers": "Content-Type, x-admin-session",
@@ -65,10 +55,6 @@ function normalizeBillingInterval(value) {
 
 function normalizePricingTier(value) {
   return value === "regular" ? "regular" : "founders";
-}
-
-function getRsmPriceId(pricingTier, billingInterval) {
-  return RSM_PRICES[pricingTier]?.[billingInterval] || "";
 }
 
 async function countBillableSeats(client, rsmId, billingMode) {
@@ -144,7 +130,7 @@ exports.handler = async (event) => {
     const billingMode = selectedBillingMode || normalizeBillingMode(rsmData.billing_mode);
     const billingInterval = selectedBillingInterval || normalizeBillingInterval(rsmData.billing_interval);
     const pricingTier = normalizePricingTier(rsmData.pricing_tier);
-    const rsmPriceId = getRsmPriceId(pricingTier, billingInterval);
+    const rsmPriceId = getRsmPriceId({ pricingTier, billingInterval });
 
     if (!rsmPriceId) {
       return reply(500, {

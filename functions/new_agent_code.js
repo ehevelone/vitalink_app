@@ -62,7 +62,7 @@ exports.handler = async (event) => {
     // ✅ Your current logic: rsms table stores admin_session_token/expiry
     const rsmResult = await client.query(
       `
-      SELECT id, billing_active
+      SELECT id, billing_active, billing_mode, pricing_tier
       FROM rsms
       WHERE admin_session_token = $1
         AND role = 'rsm'
@@ -97,16 +97,33 @@ exports.handler = async (event) => {
     }
 
     const rsmId = rsm.id;
+    const billingOwner = rsm.billing_mode === "agent_paid" ? "agent" : "agency";
+    const subscriptionStatus = rsm.billing_mode === "agent_paid" ? "pending_payment" : "active";
+    const pricingTier = rsm.pricing_tier === "regular" ? "regular" : "founders";
+
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'
+    `);
 
     const unlockCode = generateUnlockCode();
 
     const agentResult = await db.query(
       `
-      INSERT INTO agents (unlock_code, active, role, rsm_id, created_at)
-      VALUES ($1, FALSE, 'agent', $2, NOW())
+      INSERT INTO agents (
+        unlock_code,
+        active,
+        role,
+        rsm_id,
+        billing_owner,
+        subscription_status,
+        pricing_tier,
+        created_at
+      )
+      VALUES ($1, FALSE, 'agent', $2, $3, $4, $5, NOW())
       RETURNING id
       `,
-      [unlockCode, rsmId]
+      [unlockCode, rsmId, billingOwner, subscriptionStatus, pricingTier]
     );
 
     const agentId = agentResult.rows[0].id;

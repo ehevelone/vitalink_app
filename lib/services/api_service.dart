@@ -271,11 +271,19 @@ class ApiService {
 // -------------------------------------------------------------
   static Future<Map<String, dynamic>> createAgentCheckout({
     required String email,
+    String? agentId,
+    String plan = "agent",
+    String billing = "monthly",
   }) async {
     final body = {
       "email": email,
-      "plan": "app_crm",
+      "plan": plan,
+      "billing": billing,
     };
+
+    if (agentId != null && agentId.isNotEmpty) {
+      body["agentId"] = agentId;
+    }
 
     final res = await _postJson("vl-agent-checkout", body);
 

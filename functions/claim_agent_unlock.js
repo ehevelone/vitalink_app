@@ -111,6 +111,7 @@ exports.handler = async (event) => {
     const existing = await db.query(
       `
       SELECT id, active, password_hash, promo_code, unlock_code,
+        rsm_id, billing_owner, subscription_status,
         CASE WHEN promo_code = $1 THEN 'promo' ELSE 'unlock' END AS code_match
       FROM agents
       WHERE promo_code = $1
@@ -156,10 +157,15 @@ exports.handler = async (event) => {
           agency_state = $9,
           agency_zip = $10,
           active = TRUE,
+          subscription_status = CASE
+            WHEN billing_owner = 'agent' AND subscription_status <> 'active'
+              THEN 'pending_payment'
+            ELSE COALESCE(subscription_status, 'active')
+          END,
           promo_code = $11
       WHERE id = $12
       RETURNING id, name, email, phone, npn, agency_name, agency_street, agency_city,
-        agency_state, agency_zip, promo_code, active, role
+        agency_state, agency_zip, promo_code, active, role, subscription_status
       `,
       [
         cleanEmail,
@@ -178,6 +184,10 @@ exports.handler = async (event) => {
     );
 
     const row = result.rows[0];
+    const requiresAgentBilling =
+      agent.rsm_id &&
+      agent.billing_owner === "agent" &&
+      agent.subscription_status !== "active";
 
     return ok({
       message: "Agent registration complete",
@@ -194,6 +204,9 @@ exports.handler = async (event) => {
       agencyZip: row.agency_zip,
       active: row.active,
       role: row.role,
+      requiresAgentBilling,
+      billingOwner: agent.billing_owner || null,
+      subscriptionStatus: requiresAgentBilling ? "pending_payment" : row.subscription_status || null,
     });
   } catch (err) {
     console.error("claim_agent_unlock error:", err);

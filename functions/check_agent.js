@@ -77,6 +77,20 @@ exports.handler = async (event) => {
       agent.billing_owner !== null &&
       agent.subscription_status === "active";
 
+    if (agent.billing_owner === "agent" && !hasValidSubscription) {
+      return fail(
+        "Billing required",
+        403,
+        {
+          requires_payment: true,
+          agentId: agent.id,
+          email: agent.email,
+          message:
+            "Activate your VitaLink Agent Access to continue.",
+        }
+      );
+    }
+
     const isAllowed =
       agent.active === true || hasValidSubscription;
 

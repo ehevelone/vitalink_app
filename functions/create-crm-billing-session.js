@@ -1,12 +1,11 @@
 const Stripe = require("stripe");
 const db = require("./services/db");
 const { verifyAgentSession } = require("./services/agent-auth");
+const { getCrmPriceId } = require("./services/stripe-prices");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const SITE = "https://myvitalink.app";
-const CRM_PRICE_ID =
-  process.env.STRIPE_FOUNDERS_CRM_PRICE_ID ||
-  process.env.STRIPE_CRM_PRICE_ID;
+const CRM_PRICE_ID = getCrmPriceId({ pricingTier: "founders", billingInterval: "monthly" });
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": SITE,

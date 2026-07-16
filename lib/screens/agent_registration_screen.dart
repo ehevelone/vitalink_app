@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
@@ -173,6 +174,65 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     return null;
   }
 
+  Future<String?> _chooseBillingInterval() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Choose Billing"),
+        content: const Text("How would you like to activate your VitaLink Agent Access?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop("monthly"),
+            child: const Text("Monthly"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop("annual"),
+            child: const Text("Annual"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _openAgentBilling({
+    required String email,
+    required String? agentId,
+  }) async {
+    final billing = await _chooseBillingInterval();
+    if (billing == null) return false;
+
+    final checkout = await ApiService.createAgentCheckout(
+      email: email,
+      agentId: agentId,
+      plan: "agent",
+      billing: billing,
+    );
+
+    if (!mounted) return false;
+
+    final checkoutUrl = checkout["url"]?.toString() ?? "";
+    if (checkoutUrl.isEmpty) {
+      _showPopup(
+        "Billing Setup Required",
+        checkout["error"] ?? "Unable to open billing setup.",
+      );
+      return false;
+    }
+
+    await launchUrl(
+      Uri.parse(checkoutUrl),
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!mounted) return true;
+
+    _showPopup(
+      "Billing Setup Required",
+      "Complete billing to activate your VitaLink agent access. After checkout, return to the app and log in.",
+    );
+    return true;
+  }
+
   Future<void> _tryRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -194,9 +254,19 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
       );
 
       if (data['success'] == true) {
-        final store = SecureStore();
         final email = _normalizeEmail(_emailCtrl.text);
         final password = _passwordCtrl.text.trim();
+        final requiresAgentBilling = data['requiresAgentBilling'] == true;
+
+        if (requiresAgentBilling) {
+          await _openAgentBilling(
+            email: email,
+            agentId: data["agentId"]?.toString(),
+          );
+          return;
+        }
+
+        final store = SecureStore();
 
         await store.setString("agentName", _nameCtrl.text.trim());
         await store.setString("agentEmail", email);

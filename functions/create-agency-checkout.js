@@ -1,6 +1,7 @@
-import Stripe from "stripe";
+const Stripe = require("stripe");
+const { getLegacyOfficePriceId } = require("./services/stripe-prices");
 
-export async function handler(event) {
+exports.handler = async function (event) {
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -19,7 +20,7 @@ export async function handler(event) {
 
       line_items: [
         {
-          price: process.env.VITALINK_PRICE_ID,
+          price: getLegacyOfficePriceId(),
           quantity: quantity
         }
       ],
@@ -46,4 +47,4 @@ export async function handler(event) {
       body: "Checkout creation failed"
     };
   }
-}
+};

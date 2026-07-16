@@ -1,4 +1,5 @@
 const Stripe = require("stripe");
+const { getActivationPriceId } = require("./services/stripe-prices");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -28,7 +29,7 @@ exports.handler = async (event) => {
 
       line_items: [
         {
-          price: process.env.STRIPE_ACTIVATION_PRICE_ID,
+          price: getActivationPriceId(),
           quantity: 1
         }
       ],
