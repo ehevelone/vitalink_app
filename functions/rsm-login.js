@@ -1,6 +1,5 @@
 // FORCE REDEPLOY - bcryptjs only - 2026-02-23
 // functions/rsm-login.js
-const crypto = require("crypto");
 const { Pool } = require("pg");
 const { hashPassword, verifyPassword } = require("./services/passwords");
 
@@ -121,68 +120,44 @@ exports.handler = async function (event) {
       );
     }
 
-    if (role === "admin") {
-      if (rsm.active !== true) {
-        console.log("rsm-login rejected: inactive admin", {
-          id: rsm.id,
-          email: rsm.email,
-        });
-        return reply(403, {
-          success: false,
-          error: "Admin account is inactive",
-          code: "admin_inactive",
-        });
-      }
-
-      if (!rsm.phone) {
-        console.log("rsm-login rejected: admin phone missing", {
-          id: rsm.id,
-          email: rsm.email,
-        });
-        return reply(400, {
-          success: false,
-          error: "Admin phone not configured",
-          code: "admin_phone_missing",
-        });
-      }
-
-      return reply(200, {
-        success: true,
-        step: "firebase_2fa",
-        phone: rsm.phone,
-        role: "admin",
+    if (rsm.active !== true) {
+      console.log("rsm-login rejected: inactive account", {
+        id: rsm.id,
+        email: rsm.email,
+        role,
+      });
+      return reply(403, {
+        success: false,
+        error: "Account is inactive",
+        code: "account_inactive",
       });
     }
 
-    console.log("rsm-login success", {
+    if (!rsm.phone) {
+      console.log("rsm-login rejected: phone missing", {
+        id: rsm.id,
+        email: rsm.email,
+        role,
+      });
+      return reply(400, {
+        success: false,
+        error: "Phone not configured",
+        code: "phone_missing",
+      });
+    }
+
+    console.log("rsm-login password verified, 2FA required", {
       id: rsm.id,
       email: rsm.email,
       role,
       active: rsm.active,
     });
 
-    const token = crypto.randomBytes(24).toString("hex");
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    await client.query(
-      `
-      UPDATE rsms
-      SET admin_session_token = $1,
-          admin_session_expires = $2
-      WHERE id = $3
-      `,
-      [token, expires, rsm.id]
-    );
-
     return reply(200, {
       success: true,
-      step: "login_success",
-      role: "rsm",
-      token,
-      rsm: {
-        id: rsm.id,
-        email: rsm.email,
-      },
+      step: "firebase_2fa",
+      phone: rsm.phone,
+      role,
     });
 
   } catch (err) {
