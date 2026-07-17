@@ -2,6 +2,7 @@
 // functions/rsm-login.js
 const { Pool } = require("pg");
 const { hashPassword, verifyPassword } = require("./services/passwords");
+const { findAdminByEmail } = require("./services/admins");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -50,6 +51,70 @@ exports.handler = async function (event) {
   const client = await pool.connect();
 
   try {
+    const adminUser = await findAdminByEmail(client, email);
+
+    if (adminUser) {
+      if (adminUser.active !== true || adminUser.full_access !== true) {
+        return reply(403, {
+          success: false,
+          error: "Account is inactive",
+          code: "account_inactive",
+        });
+      }
+
+      if (!adminUser.password_hash || adminUser.password_hash === "PENDING_SETUP") {
+        return reply(403, {
+          success: false,
+          error: "Account not set up yet.",
+          code: "setup_incomplete",
+        });
+      }
+
+      let passwordCheck = await verifyPassword(password, adminUser.password_hash);
+      let ok = passwordCheck.valid;
+      const trimmedPassword = String(password).trim();
+
+      if (!ok && trimmedPassword && trimmedPassword !== password) {
+        passwordCheck = await verifyPassword(trimmedPassword, adminUser.password_hash);
+        ok = passwordCheck.valid;
+      }
+
+      if (!ok) {
+        return reply(401, {
+          success: false,
+          error: "Invalid credentials",
+          code: "password_mismatch",
+        });
+      }
+
+      if (passwordCheck.legacy) {
+        await client.query(
+          "UPDATE admins SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+          [await hashPassword(trimmedPassword || password), adminUser.id]
+        );
+      }
+
+      if (!adminUser.phone) {
+        return reply(400, {
+          success: false,
+          error: "Phone not configured",
+          code: "phone_missing",
+        });
+      }
+
+      console.log("rsm-login admin password verified, 2FA required", {
+        id: adminUser.id,
+        email: adminUser.email,
+      });
+
+      return reply(200, {
+        success: true,
+        step: "firebase_2fa",
+        phone: adminUser.phone,
+        role: "admin",
+      });
+    }
+
     const rsmRes = await client.query(
       `
       SELECT id, email, password_hash, role, active, phone
