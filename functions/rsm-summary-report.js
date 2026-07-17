@@ -42,6 +42,42 @@ function normalizePricingTier(value) {
   return value === "regular" ? "regular" : "founders";
 }
 
+function generateRsmInviteCode(prefix = "RSM", length = 8) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${code}`;
+}
+
+async function ensureRsmInviteCode(client, rsmId, currentCode) {
+  if (currentCode) {
+    return currentCode;
+  }
+
+  for (let i = 0; i < 8; i++) {
+    const inviteCode = generateRsmInviteCode();
+    const exists = await client.query(
+      "SELECT id FROM rsms WHERE invite_code = $1 LIMIT 1",
+      [inviteCode]
+    );
+
+    if (exists.rowCount > 0) {
+      continue;
+    }
+
+    await client.query(
+      "UPDATE rsms SET invite_code = $1 WHERE id = $2",
+      [inviteCode, rsmId]
+    );
+
+    return inviteCode;
+  }
+
+  throw new Error("Unable to generate RSM invite code");
+}
+
 function isAdminOverride(...values) {
   return values.some((value) =>
     String(value || "").trim().toLowerCase() === "admin_override"
@@ -105,7 +141,7 @@ exports.handler = async function (event) {
       rsm.stripe_subscription_item_id
     );
     const billingActive = rsm.billing_active === true || rsmAccessOverride;
-    const inviteCode = rsmResult.rows[0].invite_code;
+    const inviteCode = await ensureRsmInviteCode(client, rsmId, rsmResult.rows[0].invite_code);
     const subscriptionStatus = rsmResult.rows[0].subscription_status;
     const currentPeriodEnd = rsmResult.rows[0].current_period_end;
     const billingMode = normalizeBillingMode(rsmResult.rows[0].billing_mode);
