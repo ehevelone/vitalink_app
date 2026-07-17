@@ -53,42 +53,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     setState(() {});
   }
 
-  String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final agentPhone = _phoneCtrl.text.trim();
-    final agencyPhone = _agencyPhoneCtrl.text.trim();
-
-    // 🔥 VALIDATION
-    if (agencyPhone.isNotEmpty &&
-        clean(agentPhone) == clean(agencyPhone)) {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            "Invalid Phone Number",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            "Agency phone number cannot match your personal phone number.",
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     setState(() => _loading = true);
 

@@ -142,6 +142,29 @@ exports.handler = async (event) => {
       return fail("Agent registration code already used");
     }
 
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS linked_rsm_id UUID
+    `);
+
+    const matchingRsm = await db.query(
+      `
+      SELECT id
+      FROM rsms
+      WHERE LOWER(email) = LOWER($1)
+        AND role = 'rsm'
+        AND active = TRUE
+      LIMIT 1
+      `,
+      [cleanEmail]
+    );
+
+    const selfRsmId =
+      matchingRsm.rows.length > 0 &&
+      (!agent.rsm_id || String(agent.rsm_id) === String(matchingRsm.rows[0].id))
+        ? matchingRsm.rows[0].id
+        : null;
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const promoCode =
@@ -163,7 +186,14 @@ exports.handler = async (event) => {
           agency_state = $9,
           agency_zip = $10,
           active = TRUE,
+          rsm_id = COALESCE(rsm_id, $13),
+          linked_rsm_id = $13,
+          billing_owner = CASE
+            WHEN $13::uuid IS NOT NULL THEN 'rsm'
+            ELSE billing_owner
+          END,
           subscription_status = CASE
+            WHEN $13::uuid IS NOT NULL THEN 'active'
             WHEN billing_owner = 'agent' AND subscription_status <> 'active'
               THEN 'pending_payment'
             ELSE COALESCE(subscription_status, 'active')
@@ -186,12 +216,14 @@ exports.handler = async (event) => {
         agencyZip,
         promoCode,
         agent.id,
+        selfRsmId,
       ]
     );
 
     const row = result.rows[0];
     const requiresAgentBilling =
       !isAdminOverride(agent.subscription_status) &&
+      !selfRsmId &&
       agent.rsm_id &&
       agent.billing_owner === "agent" &&
       agent.subscription_status !== "active";
@@ -212,7 +244,7 @@ exports.handler = async (event) => {
       active: row.active,
       role: row.role,
       requiresAgentBilling,
-      billingOwner: agent.billing_owner || null,
+      billingOwner: selfRsmId ? "rsm" : agent.billing_owner || null,
       subscriptionStatus: requiresAgentBilling ? "pending_payment" : row.subscription_status || null,
     });
   } catch (err) {

@@ -133,8 +133,6 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     }
   }
 
-  String clean(String p) => p.replaceAll(RegExp(r'\D'), '');
-
   String _value(Map data, String key) => data[key]?.toString().trim() ?? '';
 
   Future<String?> _businessCardPreviewBase64(String path) async {
@@ -328,34 +326,6 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_agencyPhoneCtrl.text.isNotEmpty &&
-        clean(_agencyPhoneCtrl.text) == clean(_phoneCtrl.text)) {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            "Invalid Phone Number",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            "Agency phone number cannot match your personal phone number.",
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     setState(() => _loading = true);
     final store = SecureStore();
