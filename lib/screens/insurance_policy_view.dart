@@ -19,6 +19,9 @@ class InsurancePolicyView extends StatefulWidget {
 }
 
 class _InsurancePolicyViewState extends State<InsurancePolicyView> {
+  static const double _maxPickedImageSize = 2048;
+  static const int _pickedImageQuality = 88;
+
   late final DataRepository _repo;
   final ImagePicker _picker = ImagePicker();
   Profile? _p;
@@ -122,7 +125,12 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
 
   Future<void> _addDecPageFromGallery() async {
     if (_p == null) return;
-    final img = await _picker.pickImage(source: ImageSource.gallery);
+    final img = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: _maxPickedImageSize,
+      maxHeight: _maxPickedImageSize,
+      imageQuality: _pickedImageQuality,
+    );
     if (img == null) return;
 
     setState(() {
@@ -135,7 +143,12 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
 
   Future<void> _addDecPageFromCamera() async {
     if (_p == null) return;
-    final img = await _picker.pickImage(source: ImageSource.camera);
+    final img = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: _maxPickedImageSize,
+      maxHeight: _maxPickedImageSize,
+      imageQuality: _pickedImageQuality,
+    );
     if (img == null) return;
 
     setState(() {
@@ -213,6 +226,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
                           body: Center(
                             child: Image.file(
                               File(ins.cards.first.frontImagePath),
+                              cacheWidth: 2048,
                             ),
                           ),
                         ),
@@ -222,6 +236,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
                   child: Image.file(
                     File(ins.cards.first.frontImagePath),
                     height: 180,
+                    cacheHeight: 360,
                     fit: BoxFit.contain,
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as image_lib;
 
 class VitalinkCameraCaptureScreen extends StatefulWidget {
   final String title;
@@ -27,6 +28,8 @@ class VitalinkCameraCaptureScreen extends StatefulWidget {
 class _VitalinkCameraCaptureScreenState
     extends State<VitalinkCameraCaptureScreen> {
   static const Color _vitalinkBlue = Color(0xFF79CAE3);
+  static const int _maxSavedImageSide = 2048;
+  static const int _jpegQuality = 88;
 
   CameraController? _controller;
   List<CameraDescription> _cameras = [];
@@ -99,8 +102,9 @@ class _VitalinkCameraCaptureScreenState
 
     try {
       final file = await controller.takePicture();
+      final optimizedPath = await _downsampleImage(file.path);
       if (!mounted) return;
-      setState(() => _previewPath = file.path);
+      setState(() => _previewPath = optimizedPath);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,6 +113,32 @@ class _VitalinkCameraCaptureScreenState
     } finally {
       if (mounted) setState(() => _takingPicture = false);
     }
+  }
+
+  Future<String> _downsampleImage(String path) async {
+    try {
+      final source = File(path);
+      final bytes = await source.readAsBytes();
+      final image = image_lib.decodeImage(bytes);
+      if (image == null) return path;
+
+      final longestSide = image.width > image.height ? image.width : image.height;
+      if (longestSide <= _maxSavedImageSide) return path;
+
+      final resized = image_lib.copyResize(
+        image,
+        width: image.width >= image.height ? _maxSavedImageSide : null,
+        height: image.height > image.width ? _maxSavedImageSide : null,
+        interpolation: image_lib.Interpolation.average,
+      );
+
+      final optimized = image_lib.encodeJpg(resized, quality: _jpegQuality);
+      await source.writeAsBytes(optimized, flush: true);
+    } catch (_) {
+      return path;
+    }
+
+    return path;
   }
 
   void _usePhoto({required bool addAnother}) {
@@ -193,6 +223,7 @@ class _VitalinkCameraCaptureScreenState
             child: Image.file(
               File(path),
               fit: BoxFit.contain,
+              cacheWidth: _maxSavedImageSide,
             ),
           ),
         ),

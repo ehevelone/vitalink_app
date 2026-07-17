@@ -29,6 +29,9 @@ class InsuranceCardDetail extends StatefulWidget {
 }
 
 class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
+  static const double _maxPickedImageSize = 2048;
+  static const int _pickedImageQuality = 88;
+
   bool _showFront = true;
   final ImagePicker _picker = ImagePicker();
   late final DataRepository _repo;
@@ -358,8 +361,12 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
   Future<void> _captureBack() async {
     try {
-      final XFile? image =
-          await _picker.pickImage(source: ImageSource.camera);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: _maxPickedImageSize,
+        maxHeight: _maxPickedImageSize,
+        imageQuality: _pickedImageQuality,
+      );
       if (image == null) return;
 
       File file = File(image.path);
@@ -447,6 +454,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                         child: Image.file(
                           file,
                           fit: BoxFit.contain,
+                          cacheWidth: 2048,
                         ),
                       ),
                     )
