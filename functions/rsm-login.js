@@ -25,6 +25,20 @@ function reply(statusCode, obj) {
   };
 }
 
+function toFirebasePhone(phone) {
+  let digits = String(phone || "").replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  return String(phone || "").trim();
+}
+
 exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: corsHeaders, body: "" };
@@ -110,7 +124,7 @@ exports.handler = async function (event) {
       return reply(200, {
         success: true,
         step: "firebase_2fa",
-        phone: adminUser.phone,
+        phone: toFirebasePhone(adminUser.phone),
         role: "admin",
       });
     }
@@ -221,7 +235,7 @@ exports.handler = async function (event) {
     return reply(200, {
       success: true,
       step: "firebase_2fa",
-      phone: rsm.phone,
+      phone: toFirebasePhone(rsm.phone),
       role,
     });
 
