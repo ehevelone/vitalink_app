@@ -22,11 +22,13 @@ function getResetTable(role) {
   if (role === "users") return "users";
   if (role === "agents") return "agents";
   if (role === "rsms") return "rsms";
+  if (role === "admins") return "admins";
   return null;
 }
 
 function getEmailSubject(role) {
   if (role === "agents") return "VitaLink Agent Password Reset Code";
+  if (role === "admins") return "VitaLink Admin Password Reset Code";
   if (role === "rsms") return "VitaLink RSM Password Reset Code";
   return "VitaLink Password Reset Code";
 }

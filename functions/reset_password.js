@@ -22,6 +22,7 @@ function getResetTable(role) {
   if (role === "users") return "users";
   if (role === "agents") return "agents";
   if (role === "rsms") return "rsms";
+  if (role === "admins") return "admins";
   return null;
 }
 
