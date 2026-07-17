@@ -27,6 +27,12 @@ function generateUnlockCode(prefix = "AG", length = 10) {
   return `${prefix}-${code}`;
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override"
+  );
+}
+
 exports.handler = async (event) => {
   try {
     // ✅ Handle CORS preflight
@@ -62,7 +68,15 @@ exports.handler = async (event) => {
     // ✅ Your current logic: rsms table stores admin_session_token/expiry
     const rsmResult = await client.query(
       `
-      SELECT id, billing_active, billing_mode, pricing_tier
+      SELECT
+        id,
+        billing_active,
+        billing_mode,
+        pricing_tier,
+        subscription_status,
+        stripe_customer_id,
+        stripe_subscription_id,
+        stripe_subscription_item_id
       FROM rsms
       WHERE admin_session_token = $1
         AND role = 'rsm'
@@ -83,8 +97,14 @@ exports.handler = async (event) => {
     }
 
     const rsm = rsmResult.rows[0];
+    const rsmAccessOverride = isAdminOverride(
+      rsm.subscription_status,
+      rsm.stripe_customer_id,
+      rsm.stripe_subscription_id,
+      rsm.stripe_subscription_item_id
+    );
 
-    if (rsm.billing_active !== true) {
+    if (rsm.billing_active !== true && !rsmAccessOverride) {
       return {
         statusCode: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

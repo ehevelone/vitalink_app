@@ -26,6 +26,12 @@ function fail(msg, code = 400, extra = {}) {
   };
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override"
+  );
+}
+
 exports.handler = async (event) => {
   try {
     // ✅ PREFLIGHT
@@ -73,11 +79,18 @@ exports.handler = async (event) => {
 
     // 🔥 FINAL ACCESS CONTROL (THIS IS THE IMPORTANT PART)
 
+    const agentAccessOverride = isAdminOverride(
+      agent.subscription_status,
+      agent.stripe_customer_id,
+      agent.stripe_subscription_id
+    );
+
     const hasValidSubscription =
+      agentAccessOverride ||
       agent.billing_owner !== null &&
       agent.subscription_status === "active";
 
-    if (agent.billing_owner === "agent" && !hasValidSubscription) {
+    if (!agentAccessOverride && agent.billing_owner === "agent" && !hasValidSubscription) {
       return fail(
         "Billing required",
         403,
@@ -92,7 +105,9 @@ exports.handler = async (event) => {
     }
 
     const isAllowed =
-      agent.active === true || hasValidSubscription;
+      agentAccessOverride ||
+      agent.active === true ||
+      hasValidSubscription;
 
     if (!isAllowed) {
       return fail(
@@ -121,6 +136,7 @@ exports.handler = async (event) => {
         active: agent.active,
         billing_owner: agent.billing_owner || null,
         subscription_status: agent.subscription_status || null,
+        admin_override: agentAccessOverride,
       },
     });
 

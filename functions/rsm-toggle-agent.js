@@ -44,6 +44,12 @@ function normalizeBillingMode(value) {
   return value === "agent_paid" ? "agent_paid" : "office_paid";
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override"
+  );
+}
+
 async function countBillableSeats(client, rsmId, billingMode) {
   if (billingMode === "agent_paid") {
     return 1;
@@ -122,6 +128,8 @@ exports.handler = async function (event) {
         email,
         billing_active,
         stripe_subscription_item_id,
+        stripe_customer_id,
+        stripe_subscription_id,
         subscription_status,
         billing_mode
       FROM rsms
@@ -138,6 +146,12 @@ exports.handler = async function (event) {
     }
 
     const rsm = rsmCheck.rows[0];
+    const rsmAccessOverride = isAdminOverride(
+      rsm.subscription_status,
+      rsm.stripe_customer_id,
+      rsm.stripe_subscription_id,
+      rsm.stripe_subscription_item_id
+    );
 
     const current = await client.query(
       `
@@ -157,7 +171,7 @@ exports.handler = async function (event) {
     const currentlyActive = current.rows[0].active === true;
     const newActive = !currentlyActive;
 
-    if (newActive && rsm.billing_active !== true) {
+    if (newActive && rsm.billing_active !== true && !rsmAccessOverride) {
       return reply(402, {
         success: false,
         requires_billing: true,

@@ -43,8 +43,20 @@ function isTestAgent(user) {
     "agent-test@example.com";
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override" ||
+    String(value || "").trim().toLowerCase() === "admin_manual_access"
+  );
+}
+
 function hasCrmAccess(user) {
-  return user.crm_subscription_valid === true ||
+  return isAdminOverride(
+      user.crm_subscription_status,
+      user.crm_stripe_customer_id,
+      user.crm_stripe_subscription_id
+    ) ||
+    user.crm_subscription_valid === true ||
     user.crm_subscription_status === "active" ||
     user.crm_subscription_status === "trialing";
 }
@@ -113,7 +125,9 @@ exports.handler = async function (event) {
          TRIM(name) AS name,
          phone,
          crm_subscription_status,
-         crm_subscription_valid
+         crm_subscription_valid,
+         crm_stripe_customer_id,
+         crm_stripe_subscription_id
        FROM agents
        WHERE LOWER(email) = LOWER($1)
        AND active = true

@@ -42,6 +42,12 @@ function normalizePricingTier(value) {
   return value === "regular" ? "regular" : "founders";
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override"
+  );
+}
+
 exports.handler = async function (event) {
 
   if (event.httpMethod === "OPTIONS") {
@@ -66,7 +72,18 @@ exports.handler = async function (event) {
 
     // 🔐 Validate session + get billing status + invite code
     const rsmResult = await client.query(`
-      SELECT id, billing_active, invite_code, subscription_status, current_period_end, billing_mode, billing_interval, pricing_tier
+      SELECT
+        id,
+        billing_active,
+        invite_code,
+        subscription_status,
+        current_period_end,
+        billing_mode,
+        billing_interval,
+        pricing_tier,
+        stripe_customer_id,
+        stripe_subscription_id,
+        stripe_subscription_item_id
       FROM rsms
       WHERE admin_session_token = $1
       AND role = 'rsm'
@@ -80,7 +97,14 @@ exports.handler = async function (event) {
     }
 
     const rsmId = rsmResult.rows[0].id;
-    const billingActive = rsmResult.rows[0].billing_active;
+    const rsm = rsmResult.rows[0];
+    const rsmAccessOverride = isAdminOverride(
+      rsm.subscription_status,
+      rsm.stripe_customer_id,
+      rsm.stripe_subscription_id,
+      rsm.stripe_subscription_item_id
+    );
+    const billingActive = rsm.billing_active === true || rsmAccessOverride;
     const inviteCode = rsmResult.rows[0].invite_code;
     const subscriptionStatus = rsmResult.rows[0].subscription_status;
     const currentPeriodEnd = rsmResult.rows[0].current_period_end;
@@ -226,6 +250,7 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         billing_active: billingActive,
+        admin_override: rsmAccessOverride,
         billing_mode: billingMode,
         billing_interval: billingInterval,
         pricing_tier: pricingTier,

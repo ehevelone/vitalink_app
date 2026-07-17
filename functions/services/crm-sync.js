@@ -28,6 +28,13 @@ function firstNonEmpty(...values) {
   return null;
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override" ||
+    String(value || "").trim().toLowerCase() === "admin_manual_access"
+  );
+}
+
 function splitName(name) {
   const parts = clean(name)?.split(/\s+/) || [];
 
@@ -131,7 +138,9 @@ async function ensureCrmSyncSchema() {
   await db.query(`
     ALTER TABLE agents
     ADD COLUMN IF NOT EXISTS crm_subscription_status TEXT,
-    ADD COLUMN IF NOT EXISTS crm_subscription_valid BOOLEAN DEFAULT false
+    ADD COLUMN IF NOT EXISTS crm_subscription_valid BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS crm_stripe_customer_id TEXT,
+    ADD COLUMN IF NOT EXISTS crm_stripe_subscription_id TEXT
   `);
 
   await db.query(`
@@ -307,7 +316,9 @@ async function getCrmAgent({ agentId, agentEmail }) {
       id,
       crm_uuid,
       crm_subscription_status,
-      crm_subscription_valid
+      crm_subscription_valid,
+      crm_stripe_customer_id,
+      crm_stripe_subscription_id
     FROM agents
     WHERE ${where.join(" OR ")}
     LIMIT 1
@@ -321,6 +332,11 @@ async function getCrmAgent({ agentId, agentEmail }) {
 
   const row = agentRes.rows[0];
   const crmActive =
+    isAdminOverride(
+      row.crm_subscription_status,
+      row.crm_stripe_customer_id,
+      row.crm_stripe_subscription_id
+    ) ||
     row.crm_subscription_valid === true ||
     row.crm_subscription_status === "active" ||
     row.crm_subscription_status === "trialing";

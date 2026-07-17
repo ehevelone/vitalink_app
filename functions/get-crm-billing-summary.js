@@ -73,6 +73,10 @@ function paymentMethodLabel(paymentMethod) {
 }
 
 function billingOwnerLabel(agent) {
+  if (String(agent.crm_subscription_status || "").trim().toLowerCase() === "admin_override") {
+    return "Manual admin access";
+  }
+
   if (!agent.crm_stripe_subscription_id) {
     return "Not assigned";
   }
@@ -216,8 +220,14 @@ exports.handler = async (event) => {
     }
 
     const agent = agentRes.rows[0];
+    const manualCrmAccess =
+      String(agent.crm_subscription_status || "").trim().toLowerCase() === "admin_override" ||
+      String(agent.crm_stripe_customer_id || "").trim().toLowerCase() === "admin_override" ||
+      String(agent.crm_stripe_subscription_id || "").trim().toLowerCase() === "admin_override" ||
+      String(agent.crm_stripe_customer_id || "").trim().toLowerCase() === "admin_manual_access" ||
+      String(agent.crm_stripe_subscription_id || "").trim().toLowerCase() === "admin_manual_access";
 
-    if (!agent.crm_stripe_subscription_id) {
+    if (!agent.crm_stripe_subscription_id && !manualCrmAccess) {
       return reply(200, {
         success: true,
         billing: {
@@ -232,7 +242,7 @@ exports.handler = async (event) => {
       });
     }
 
-    if (!String(agent.crm_stripe_subscription_id).startsWith("sub_")) {
+    if (manualCrmAccess || !String(agent.crm_stripe_subscription_id).startsWith("sub_")) {
       return reply(200, {
         success: true,
         billing: {
@@ -242,7 +252,7 @@ exports.handler = async (event) => {
           next_billing_date: null,
           billing_owner: billingOwnerLabel(agent),
           last_payment_status: "Manual admin access",
-          active: agent.crm_subscription_valid === true
+          active: true
         }
       });
     }

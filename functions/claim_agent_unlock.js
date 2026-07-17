@@ -62,6 +62,12 @@ function getEmailValidationError(value) {
   return null;
 }
 
+function isAdminOverride(...values) {
+  return values.some((value) =>
+    String(value || "").trim().toLowerCase() === "admin_override"
+  );
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -185,6 +191,7 @@ exports.handler = async (event) => {
 
     const row = result.rows[0];
     const requiresAgentBilling =
+      !isAdminOverride(agent.subscription_status) &&
       agent.rsm_id &&
       agent.billing_owner === "agent" &&
       agent.subscription_status !== "active";
