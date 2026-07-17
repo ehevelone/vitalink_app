@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const { findAdminBySession } = require("./services/admins");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -18,6 +19,13 @@ async function requireAdmin(event) {
     }
 
     const client = await pool.connect();
+
+    const adminSession = await findAdminBySession(client, token);
+
+    if (adminSession) {
+      client.release();
+      return { admin: adminSession };
+    }
 
     const result = await client.query(
       "SELECT id, role, admin_session_expires FROM rsms WHERE admin_session_token=$1 LIMIT 1",
@@ -61,6 +69,18 @@ async function requireRole(event, allowedRoles) {
     }
 
     const client = await pool.connect();
+
+    const adminSession = await findAdminBySession(client, token);
+
+    if (adminSession) {
+      client.release();
+
+      if (!allowedRoles.includes("admin")) {
+        return { error: "Not authorized" };
+      }
+
+      return { user: adminSession };
+    }
 
     const result = await client.query(
       `

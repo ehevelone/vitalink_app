@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { Pool } = require("pg");
 const { hashPassword, verifyPassword } = require("./services/passwords");
+const { findAdminByEmail } = require("./services/admins");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -55,6 +56,67 @@ exports.handler = async function (event) {
     }
 
     client = await pool.connect();
+
+    const adminUser = await findAdminByEmail(client, email);
+
+    if (adminUser) {
+      if (adminUser.active !== true || adminUser.full_access !== true) {
+        client.release();
+        return {
+          statusCode: 403,
+          headers: corsHeaders(),
+          body: JSON.stringify({ success:false, error:"Account inactive" })
+        };
+      }
+
+      if (!adminUser.password_hash || adminUser.password_hash === "PENDING_SETUP") {
+        client.release();
+        return {
+          statusCode: 403,
+          headers: corsHeaders(),
+          body: JSON.stringify({ success:false, error:"Account setup incomplete" })
+        };
+      }
+
+      const adminPasswordCheck = await verifyPassword(password, adminUser.password_hash);
+
+      if (!adminPasswordCheck.valid) {
+        client.release();
+        return {
+          statusCode: 403,
+          headers: corsHeaders(),
+          body: JSON.stringify({ success:false, error:"Invalid credentials" })
+        };
+      }
+
+      if (adminPasswordCheck.legacy) {
+        await client.query(
+          "UPDATE admins SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+          [await hashPassword(password), adminUser.id]
+        );
+      }
+
+      if (!adminUser.phone) {
+        client.release();
+        return {
+          statusCode: 400,
+          headers: corsHeaders(),
+          body: JSON.stringify({ success:false, error:"Admin phone not configured" })
+        };
+      }
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders(),
+        body: JSON.stringify({
+          step: "firebase_2fa",
+          phone: adminUser.phone,
+          role: "admin"
+        })
+      };
+    }
 
     const result = await client.query(
       `

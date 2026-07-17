@@ -23,6 +23,11 @@ exports.handler = async function (event) {
       [token]
     );
 
+    await client.query(
+      "UPDATE admins SET admin_session_token = NULL, admin_session_expires = NULL, updated_at = NOW() WHERE admin_session_token=$1",
+      [token]
+    );
+
     client.release();
 
     return { statusCode: 200, body: JSON.stringify({ success: true }) };

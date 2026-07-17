@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const { Pool } = require("pg");
+const { findAdminByEmail, createAdminSession } = require("./services/admins");
 
 /* ✅ FIXED FIREBASE INIT (SURGICAL FIX) */
 if (!admin.apps.length) {
@@ -86,6 +87,53 @@ exports.handler = async function (event) {
     }
 
     const client = await pool.connect();
+
+    const adminUser = await findAdminByEmail(client, email);
+
+    if (adminUser) {
+      if (adminUser.active !== true || adminUser.full_access !== true) {
+        client.release();
+        return {
+          statusCode: 403,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: "Unauthorized" })
+        };
+      }
+
+      function normalizePhone(p) {
+        let digits = String(p || "").replace(/\D/g, "");
+        if (digits.length === 11 && digits.startsWith("1")) {
+          digits = digits.slice(1);
+        }
+        return digits;
+      }
+
+      const dbPhone = normalizePhone(adminUser.phone);
+      const firebasePhone = normalizePhone(decoded.phone_number);
+
+      if (dbPhone !== firebasePhone) {
+        client.release();
+        return {
+          statusCode: 403,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: "Phone mismatch" })
+        };
+      }
+
+      const { sessionToken } = await createAdminSession(client, adminUser.id);
+
+      client.release();
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          token: sessionToken,
+          role: "admin"
+        })
+      };
+    }
 
     const result = await client.query(
       `
