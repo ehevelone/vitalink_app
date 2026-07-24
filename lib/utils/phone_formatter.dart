@@ -23,24 +23,20 @@ class PhoneNumberFormatter extends TextInputFormatter {
 
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue) {
+      TextEditingValue oldValue, TextEditingValue newValue) {
     final digits = digitsForUsPhone(newValue.text);
 
     String formatted = digits;
-    if (digits.length >= 1) {
-      formatted = "(" + digits.substring(0, digits.length.clamp(0, 3));
+    if (digits.isNotEmpty) {
+      formatted = "(${digits.substring(0, digits.length.clamp(0, 3))}";
     }
     if (digits.length >= 4) {
-      formatted = "(" + digits.substring(0, 3) + ") " + digits.substring(3, digits.length.clamp(3, 6));
+      formatted =
+          "(${digits.substring(0, 3)}) ${digits.substring(3, digits.length.clamp(3, 6))}";
     }
     if (digits.length >= 7) {
-      formatted = "(" +
-          digits.substring(0, 3) +
-          ") " +
-          digits.substring(3, 6) +
-          "-" +
-          digits.substring(6);
+      formatted =
+          "(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}";
     }
 
     return TextEditingValue(

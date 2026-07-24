@@ -9,7 +9,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   bool _routed = false;
 
   @override
@@ -22,7 +21,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _route() {
-
     if (_routed) return;
     _routed = true;
 
@@ -39,7 +37,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return const Scaffold(
       backgroundColor: Colors.black,
       body: Center(
@@ -48,6 +45,5 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       ),
     );
-
   }
 }

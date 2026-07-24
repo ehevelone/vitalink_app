@@ -1,0 +1,17 @@
+/* Camera Permission */
+"NSCameraUsageDescription" = "VitaLink uses the camera to scan medication labels, insurance cards, and QR codes.";
+
+/* Photo Library Permission */
+"NSPhotoLibraryUsageDescription" = "VitaLink needs access to your photo library to select and store scanned images.";
+
+/* Photo Library Add Permission */
+"NSPhotoLibraryAddUsageDescription" = "VitaLink may save scanned images to your photo library when needed.";
+
+/* Voice Notes Permission */
+"NSMicrophoneUsageDescription" = "VitaLink uses the microphone to dictate notes and tasks.";
+
+"NSSpeechRecognitionUsageDescription" = "VitaLink uses speech recognition to turn dictated notes and tasks into text.";
+
+"NSCalendarsUsageDescription" = "VitaLink can add appointments to your calendar when you choose to save them there.";
+
+"NSCalendarsFullAccessUsageDescription" = "VitaLink can add appointments to your calendar when you choose to save them there.";

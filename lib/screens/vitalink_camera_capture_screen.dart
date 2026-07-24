@@ -122,7 +122,8 @@ class _VitalinkCameraCaptureScreenState
       final image = image_lib.decodeImage(bytes);
       if (image == null) return path;
 
-      final longestSide = image.width > image.height ? image.width : image.height;
+      final longestSide =
+          image.width > image.height ? image.width : image.height;
       if (longestSide <= _maxSavedImageSide) return path;
 
       final resized = image_lib.copyResize(

@@ -155,10 +155,12 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_p == null)
+    }
+    if (_p == null) {
       return const Scaffold(body: Center(child: Text("No profile found")));
+    }
 
     final insurances = _p!.insurances;
 
@@ -205,7 +207,7 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
           // 🔥 LOADING OVERLAY
           if (_isParsing)
             Container(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

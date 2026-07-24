@@ -47,7 +47,7 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
     if (!mounted) return;
 
     setState(() {
-      _p = p ?? Profile();
+      _p = p;
     });
   }
 
@@ -94,6 +94,7 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
     if (uninstall == true) {
       SystemNavigator.pop();
     } else {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You must accept the terms to continue.")),
       );
@@ -142,55 +143,42 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
                               fontSize: 16, color: Colors.black),
                           children: [
                             const TextSpan(
-                              text:
-                                  "Welcome to VitaLink (Agent).\n\n"
-
+                              text: "Welcome to VitaLink (Agent).\n\n"
                                   "By using this app as an Agent, you agree:\n"
                                   "• You must maintain a valid license to offer Medicare services.\n"
                                   "• You are solely responsible for compliance with CMS and AHIP guidelines.\n"
                                   "• You must safeguard client data and never share login credentials.\n"
                                   "• You agree that misuse may result in immediate access termination.\n\n"
-
                                   "Agent Responsibility & Compliance\n\n"
                                   "• You are responsible for ensuring all client information entered or shared is accurate and up to date.\n"
                                   "• You must handle all client data in accordance with applicable privacy, security, and regulatory requirements.\n"
                                   "• VitaLink does not verify or validate any data entered by agents or users.\n\n"
-
                                   "Medical & Liability Disclaimer\n\n"
                                   "• VitaLink is a data storage and sharing tool only and does not verify, validate, or guarantee the accuracy, completeness, or timeliness of any information.\n"
                                   "• VitaLink is not a medical provider, insurer, or licensed advisory service.\n"
                                   "• The app does not provide medical advice, diagnosis, or treatment recommendations.\n"
                                   "• Agents and users must not rely solely on this app for healthcare or emergency decisions.\n"
                                   "• VitaLink is not liable for errors, omissions, or outdated information contained within the app.\n\n"
-
                                   "Activation & Client Access\n\n"
                                   "Agents may provide activation codes to their clients for access to the VitaLink service.\n\n"
-
                                   "Clients of participating agents will receive an activation code from their agent.\n\n"
-
                                   "Agents are responsible for ensuring that any client information entered into the app is accurate and handled in accordance with applicable privacy and regulatory requirements.\n\n"
-
                                   "For full Terms of Service and Privacy Policy, visit:\n",
                             ),
-
                             TextSpan(
-                              text:
-                                  "https://myvitalink.app/terms\n\n",
+                              text: "https://myvitalink.app/terms\n\n",
                               style: const TextStyle(
                                 color: Colors.blue,
-                                decoration:
-                                    TextDecoration.underline,
+                                decoration: TextDecoration.underline,
                               ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () async {
-                                  final uri = Uri.parse(
-                                      "https://myvitalink.app/terms");
+                                  final uri =
+                                      Uri.parse("https://myvitalink.app/terms");
                                   await launchUrl(uri,
-                                      mode: LaunchMode
-                                          .externalApplication);
+                                      mode: LaunchMode.externalApplication);
                                 },
                             ),
-
                             const TextSpan(
                               text:
                                   "If you do not agree to these terms, you cannot use the app as an Agent.",
@@ -202,12 +190,10 @@ class _TermsAgentScreenState extends State<TermsAgentScreen> {
                   ),
                   const SizedBox(height: 32),
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       OutlinedButton(
-                        onPressed: () =>
-                            _handleDecline(context),
+                        onPressed: () => _handleDecline(context),
                         child: const Text("Decline"),
                       ),
                       ElevatedButton(

@@ -12,6 +12,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
 import '../widgets/safe_bottom_button.dart';
+import '../l10n/app_strings.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -218,13 +219,15 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
         if (!mounted || _notificationDialogOpen) return;
 
+        final strings = AppStrings.of(context);
+
         final title = message.notification?.title ??
             message.data["title"] ??
-            "New Notification";
+            strings.newNotification;
 
         final body = message.notification?.body ??
             message.data["body"] ??
-            "You have a new notification";
+            strings.newNotificationBody;
 
         _notificationDialogOpen = true;
 
@@ -258,9 +261,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.greenAccent,
                 ),
-                child: const Text(
-                  "OK",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                child: Text(
+                  strings.ok,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -299,23 +302,23 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            "Allow Notifications",
-            style: TextStyle(
+          title: Text(
+            AppStrings.of(context).allowNotifications,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            "VitaLink needs notifications turned on so you can receive important alerts, profile updates, and messages from your agent.",
-            style: TextStyle(color: Colors.white70),
+          content: Text(
+            AppStrings.of(context).notificationsNeeded,
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 if (Navigator.canPop(context)) Navigator.pop(context);
               },
-              child: const Text("Later"),
+              child: Text(AppStrings.of(context).later),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -326,7 +329,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 backgroundColor: const Color(0xFF7ED6F8),
                 foregroundColor: Colors.black,
               ),
-              child: const Text("Open Settings"),
+              child: Text(AppStrings.of(context).openSettings),
             ),
           ],
         ),
@@ -377,11 +380,13 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         title: Text(
-          "Welcome $_displayName",
+          strings.welcome(_displayName == "User" ? strings.user : _displayName),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -414,28 +419,30 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            _item(Icons.person_pin_circle, "My Agent",
+                            _item(Icons.person_pin_circle, strings.myAgent,
                                 '/my_agent_user'),
-                            _item(Icons.medical_information, "Medications",
-                                '/meds'),
-                            _item(Icons.people, "Doctors", '/doctors'),
-                            _item(Icons.event_available, "Appointments",
+                            _item(Icons.medical_information,
+                                strings.medications, '/meds'),
+                            _item(Icons.people, strings.doctors, '/doctors'),
+                            _item(Icons.event_available, strings.appointments,
                                 '/appointments'),
-                            _item(Icons.credit_card, "Insurance Cards",
+                            _item(Icons.credit_card, strings.insuranceCards,
                                 '/insurance_cards_menu'),
-                            _item(Icons.policy, "Insurance Policies",
+                            _item(Icons.policy, strings.insurancePolicies,
                                 '/insurance_policies'),
-                            _item(
-                                Icons.person, "My Profile", '/my_profile_user'),
-                            _item(Icons.share, "Profile Sharing",
+                            _item(Icons.person, strings.myProfile,
+                                '/my_profile_user'),
+                            _item(Icons.share, strings.profileSharing,
                                 '/profile_sharing'),
-                            _item(Icons.sync, "Profile Updates",
+                            _item(Icons.sync, strings.profileUpdates,
                                 '/profile_updates'),
+                            _item(
+                                Icons.settings, strings.settings, '/settings'),
                           ],
                         ),
                       ),
                       SafeBottomButton(
-                        label: "Add Family Member",
+                        label: strings.addFamilyMember,
                         icon: Icons.group_add,
                         color: Colors.blue.shade700,
                         onPressed: () => Navigator.pushNamed(
@@ -444,7 +451,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: "Switch Profile",
+                        label: strings.switchProfile,
                         icon: Icons.swap_horiz,
                         color: Colors.grey.shade900,
                         onPressed: () => Navigator.pushNamed(
@@ -453,14 +460,14 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: "Emergency Info",
+                        label: strings.emergencyInfo,
                         icon: Icons.warning_amber_rounded,
                         color: Colors.red.shade800,
                         onPressed: () =>
                             Navigator.pushNamed(context, '/emergency'),
                       ),
                       SafeBottomButton(
-                        label: "Log Out",
+                        label: strings.logOut,
                         icon: Icons.logout,
                         color: Colors.pink.shade100,
                         onPressed: () => _logout(context),

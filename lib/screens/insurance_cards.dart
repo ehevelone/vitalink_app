@@ -9,16 +9,13 @@ import 'insurance_card_detail.dart';
 class InsuranceCardsScreen extends StatefulWidget {
   final int index;
 
-  const InsuranceCardsScreen(
-      {super.key, required this.index});
+  const InsuranceCardsScreen({super.key, required this.index});
 
   @override
-  State<InsuranceCardsScreen> createState() =>
-      _InsuranceCardsScreenState();
+  State<InsuranceCardsScreen> createState() => _InsuranceCardsScreenState();
 }
 
-class _InsuranceCardsScreenState
-    extends State<InsuranceCardsScreen> {
+class _InsuranceCardsScreenState extends State<InsuranceCardsScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
@@ -88,19 +85,13 @@ class _InsuranceCardsScreenState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_error ||
-        _p == null ||
-        widget.index >=
-            _p!.insurances.length) {
+    if (_error || _p == null || widget.index >= _p!.insurances.length) {
       return const Scaffold(
-        body: Center(
-            child:
-                Text("Unable to load cards")),
+        body: Center(child: Text("Unable to load cards")),
       );
     }
 
@@ -109,9 +100,7 @@ class _InsuranceCardsScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          ins.carrier.isNotEmpty
-              ? "${ins.carrier} – Cards"
-              : "Insurance Cards",
+          ins.carrier.isNotEmpty ? "${ins.carrier} – Cards" : "Insurance Cards",
         ),
       ),
       body: Column(
@@ -141,25 +130,18 @@ class _InsuranceCardsScreenState
               ),
             ),
           ),
-
           Expanded(
             child: ins.cards.isEmpty
-                ? const Center(
-                    child:
-                        Text("No cards for this policy"))
+                ? const Center(child: Text("No cards for this policy"))
                 : ListView.builder(
                     itemCount: ins.cards.length,
-                    itemBuilder:
-                        (context, index) {
+                    itemBuilder: (context, index) {
                       final card = ins.cards[index];
 
-                      final path =
-                          card.frontImagePath;
+                      final path = card.frontImagePath;
 
                       final hasImage =
-                          path.isNotEmpty &&
-                              File(path)
-                                  .existsSync();
+                          path.isNotEmpty && File(path).existsSync();
                       final hasMedicarePlan =
                           _detectMedicarePlanId(card).isNotEmpty;
 
@@ -175,10 +157,8 @@ class _InsuranceCardsScreenState
                                   Icons.credit_card,
                                   size: 40,
                                 ),
-                          title:
-                              Text("Card ${index + 1}"),
-                          subtitle:
-                              Text("Source: ${card.source}"),
+                          title: Text("Card ${index + 1}"),
+                          subtitle: Text("Source: ${card.source}"),
                           onTap: () => _openCard(card),
                           trailing: hasMedicarePlan
                               ? SizedBox(
@@ -216,49 +196,33 @@ class _InsuranceCardsScreenState
 class CardDetailViewer extends StatefulWidget {
   final InsuranceCard card;
 
-  const CardDetailViewer(
-      {super.key, required this.card});
+  const CardDetailViewer({super.key, required this.card});
 
   @override
-  State<CardDetailViewer> createState() =>
-      _CardDetailViewerState();
+  State<CardDetailViewer> createState() => _CardDetailViewerState();
 }
 
-class _CardDetailViewerState
-    extends State<CardDetailViewer> {
+class _CardDetailViewerState extends State<CardDetailViewer> {
   bool showingFront = true;
 
   @override
   Widget build(BuildContext context) {
-    final front =
-        widget.card.frontImagePath;
-    final back =
-        widget.card.backImagePath;
+    final front = widget.card.frontImagePath;
+    final back = widget.card.backImagePath;
 
-    final path = showingFront
-        ? front
-        : back;
+    final path = showingFront ? front : back;
 
-    if (path == null ||
-        path.isEmpty ||
-        !File(path).existsSync()) {
+    if (path == null || path.isEmpty || !File(path).existsSync()) {
       return const Scaffold(
-        body: Center(
-            child:
-                Text("No image available")),
+        body: Center(child: Text("No image available")),
       );
     }
 
     return Scaffold(
-      appBar:
-          AppBar(title: const Text("Card Viewer")),
+      appBar: AppBar(title: const Text("Card Viewer")),
       body: GestureDetector(
-        onTap: (back != null &&
-                back.isNotEmpty)
-            ? () => setState(
-                () =>
-                    showingFront =
-                        !showingFront)
+        onTap: (back != null && back.isNotEmpty)
+            ? () => setState(() => showingFront = !showingFront)
             : null,
         child: Center(
           child: Image.file(

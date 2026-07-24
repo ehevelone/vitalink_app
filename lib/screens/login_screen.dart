@@ -5,6 +5,7 @@ import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../services/device_id.dart';
+import '../l10n/app_strings.dart';
 import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -54,6 +55,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<bool> _showReplacePopup() async {
+    final strings = AppStrings.of(context);
+
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => Dialog(
@@ -66,19 +69,19 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    "New Device Detected",
-                    style: TextStyle(
+                  Text(
+                    strings.newDeviceDetected,
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "This account is already active on another device.\n\nDo you want to switch to this device?",
+                  Text(
+                    strings.deviceAlreadyActive,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70),
+                    style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -87,8 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text("YES",
-                        style: TextStyle(color: Colors.black)),
+                    child: Text(strings.yes,
+                        style: const TextStyle(color: Colors.black)),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
@@ -97,8 +100,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text("NO",
-                        style: TextStyle(color: Colors.white)),
+                    child: Text(strings.no,
+                        style: const TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -118,11 +121,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailCtrl.text.trim().toLowerCase();
     final password = _passwordCtrl.text.trim();
+    final platform =
+        Theme.of(context).platform == TargetPlatform.iOS ? "ios" : "android";
+    final strings = AppStrings.of(context);
     final deviceId = await DeviceId.getOrCreate();
-
-    final platform = Theme.of(context).platform == TargetPlatform.iOS
-        ? "ios"
-        : "android";
 
     final res = await ApiService.loginUser(
       email: email,
@@ -177,6 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } catch (_) {}
 
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, "/logo");
     } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
       final confirmed = await _showReplacePopup();
@@ -191,12 +194,12 @@ class _LoginScreenState extends State<LoginScreen> {
         await store.setBool("rememberMeUser", false);
       }
 
-      String msg = "Login failed";
+      String msg = strings.loginFailed;
 
       if (res["status"] == 401) {
-        msg = "Incorrect password";
+        msg = strings.incorrectPassword;
       } else if (res["status"] == 404) {
-        msg = "Account not found";
+        msg = strings.accountNotFound;
       } else if (res["error"] != null) {
         msg = res["error"];
       }
@@ -241,6 +244,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -248,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("User Login")),
+      appBar: AppBar(title: Text(strings.userLogin)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -258,9 +263,9 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _emailCtrl,
                 onChanged: (_) => _clearError(),
-                decoration: const InputDecoration(labelText: "Email"),
+                decoration: InputDecoration(labelText: strings.email),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter email" : null,
+                    v == null || v.isEmpty ? strings.enterEmail : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -268,21 +273,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (_) => _clearError(),
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: "Password",
+                  labelText: strings.password,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? "Enter password" : null,
+                    v == null || v.isEmpty ? strings.enterPassword : null,
               ),
-
               if (_errorMessage != null) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -293,29 +295,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _goToReset,
-                  child: const Text("Forgot Password?"),
+                  child: Text(strings.forgotPassword),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               CheckboxListTile(
                 value: _rememberMe,
-                onChanged: (v) =>
-                    setState(() => _rememberMe = v ?? false),
-                title: const Text("Remember me"),
+                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                title: Text(strings.rememberMe),
               ),
-
               const SizedBox(height: 24),
-
               ElevatedButton(
                 onPressed: () => _login(),
-                child: const Text("Login"),
+                child: Text(strings.login),
               ),
             ],
           ),

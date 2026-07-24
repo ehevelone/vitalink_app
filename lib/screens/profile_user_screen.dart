@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
-import '../models.dart';
 import '../utils/phone_formatter.dart';
 
 class ProfileUserScreen extends StatefulWidget {
@@ -53,7 +52,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     // ✅ LOAD DOB FROM PROFILE MODEL (ONLY ONCE)
     final repo = DataRepository();
     final profile = await repo.loadProfile();
-    final dob = profile?.dob ?? "";
+    final dob = profile.dob ?? "";
 
     if (!mounted) return;
 
@@ -107,6 +106,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       );
 
       if (res['success'] != true) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['error'] ?? "Failed to update profile ❌")),
         );
@@ -123,7 +123,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       await store.setString('profileZip', newZip);
 
       final repo = DataRepository();
-      final profile = await repo.loadProfile() ?? Profile();
+      final profile = await repo.loadProfile();
 
       profile.fullName = newName;
       profile.userPhone = newPhone;
@@ -152,11 +152,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  bool _validFullName(String v) {
-    final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
-    return parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2;
   }
 
   @override
@@ -245,7 +240,8 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(labelText: "Address Line 1"),
+                  decoration:
+                      const InputDecoration(labelText: "Address Line 1"),
                 ),
                 const SizedBox(height: 12),
 

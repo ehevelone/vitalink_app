@@ -168,8 +168,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
     }
 
     final ins = _p!.insurances[widget.index];
-    final profileName =
-        (_p!.fullName.isNotEmpty ? " – ${_p!.fullName}" : "");
+    final profileName = (_p!.fullName.isNotEmpty ? " – ${_p!.fullName}" : "");
 
     return Scaffold(
       appBar: AppBar(
@@ -206,14 +205,11 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
           ),
         ],
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           // CARD IMAGE
-          if (ins.cards.isNotEmpty &&
-              ins.cards.first.frontImagePath.isNotEmpty)
+          if (ins.cards.isNotEmpty && ins.cards.first.frontImagePath.isNotEmpty)
             Column(
               children: [
                 GestureDetector(
@@ -265,13 +261,13 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
           // 🔥 NEW FIELDS
           ListTile(
             title: const Text("Insured"),
-            subtitle: Text(
-                ins.insuredName.isNotEmpty ? ins.insuredName : "N/A"),
+            subtitle:
+                Text(ins.insuredName.isNotEmpty ? ins.insuredName : "N/A"),
           ),
           ListTile(
             title: const Text("Beneficiary"),
-            subtitle: Text(
-                ins.beneficiary.isNotEmpty ? ins.beneficiary : "N/A"),
+            subtitle:
+                Text(ins.beneficiary.isNotEmpty ? ins.beneficiary : "N/A"),
           ),
 
           const Divider(),
@@ -309,8 +305,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      InsuranceCardsScreen(index: widget.index),
+                  builder: (_) => InsuranceCardsScreen(index: widget.index),
                 ),
               );
             },
@@ -358,8 +353,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                DeclarationPageViewer(path: path),
+                            builder: (_) => DeclarationPageViewer(path: path),
                           ),
                         );
                       },

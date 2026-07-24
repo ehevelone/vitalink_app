@@ -42,7 +42,6 @@ class UpdateAppScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               Center(
                 child: Icon(
                   Icons.system_update,
@@ -50,9 +49,7 @@ class UpdateAppScreen extends StatelessWidget {
                   color: Colors.blue.shade300,
                 ),
               ),
-
               const SizedBox(height: 30),
-
               const Text(
                 "A New VitaLink Update is Available",
                 style: TextStyle(
@@ -61,9 +58,7 @@ class UpdateAppScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 "We’re continually improving VitaLink to make managing and sharing your important information easier and more secure.",
                 style: TextStyle(
@@ -72,9 +67,7 @@ class UpdateAppScreen extends StatelessWidget {
                   color: Colors.white70,
                 ),
               ),
-
               const SizedBox(height: 30),
-
               const Text(
                 "What's New",
                 style: TextStyle(
@@ -83,16 +76,12 @@ class UpdateAppScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-
               const SizedBox(height: 16),
-
               _bullet("Improved performance and reliability"),
               _bullet("Enhanced notification support"),
               _bullet("Better account and agent linking"),
               _bullet("General bug fixes and stability improvements"),
-
               const SizedBox(height: 30),
-
               const Text(
                 "Why Update?",
                 style: TextStyle(
@@ -101,16 +90,12 @@ class UpdateAppScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-
               const SizedBox(height: 16),
-
               _bullet("Access the latest VitaLink features"),
               _bullet("Improve app security and protection"),
               _bullet("Ensure better device compatibility"),
               _bullet("Experience faster and more reliable performance"),
-
               const SizedBox(height: 40),
-
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -125,9 +110,7 @@ class UpdateAppScreen extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.open_in_new),
                   label: Text(
-                    Platform.isIOS
-                        ? "Open App Store"
-                        : "Open Google Play",
+                    Platform.isIOS ? "Open App Store" : "Open Google Play",
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
@@ -135,9 +118,7 @@ class UpdateAppScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -175,15 +156,12 @@ class UpdateAppScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           Icon(
             Icons.check_circle,
             color: Colors.blue.shade300,
             size: 22,
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Text(
               text,

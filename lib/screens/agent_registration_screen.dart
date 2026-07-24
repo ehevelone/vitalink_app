@@ -179,7 +179,8 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Choose Billing"),
-        content: const Text("How would you like to activate your VitaLink Agent Access?"),
+        content: const Text(
+            "How would you like to activate your VitaLink Agent Access?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop("monthly"),
@@ -360,25 +361,20 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
           key: _formKey,
           child: ListView(
             children: [
-
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: "Full Name"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your name" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: "Email"),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _npnCtrl,
                 decoration: const InputDecoration(labelText: "NPN"),
@@ -386,9 +382,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your NPN" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: "Phone Number"),
@@ -397,18 +391,14 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your phone number" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _agencyNameCtrl,
                 decoration: const InputDecoration(labelText: "Agency Name"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency name" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _agencyStreetCtrl,
                 decoration:
@@ -416,18 +406,14 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency address" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _agencyCityCtrl,
                 decoration: const InputDecoration(labelText: "Agency City"),
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter your agency city" : null,
               ),
-
               const SizedBox(height: 12),
-
               Row(
                 children: [
                   Expanded(
@@ -451,9 +437,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
@@ -472,22 +456,17 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: _validatePassword,
                 onChanged: (_) => setState(() {}),
               ),
-
               const SizedBox(height: 8),
-
               PasswordRules(controller: _passwordCtrl),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _confirmCtrl,
                 obscureText: !_showConfirm,
                 decoration: InputDecoration(
                   labelText: "Confirm Password",
                   suffixIcon: IconButton(
-                    icon: Icon(_showConfirm
-                        ? Icons.visibility_off
-                        : Icons.visibility),
+                    icon: Icon(
+                        _showConfirm ? Icons.visibility_off : Icons.visibility),
                     onPressed: () =>
                         setState(() => _showConfirm = !_showConfirm),
                   ),
@@ -495,26 +474,20 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 validator: (v) =>
                     v != _passwordCtrl.text ? "Passwords don’t match" : null,
               ),
-
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _codeCtrl,
                 decoration:
                     const InputDecoration(labelText: "Agent Registration Code"),
-                validator: (v) =>
-                    v == null || v.isEmpty
-                        ? "Enter agent registration code"
-                        : null,
+                validator: (v) => v == null || v.isEmpty
+                    ? "Enter agent registration code"
+                    : null,
               ),
-
               const SizedBox(height: 24),
-
             ],
           ),
         ),
       ),
-
       bottomNavigationBar: SafeBottomButton(
         label: "Complete Registration",
         icon: Icons.check,

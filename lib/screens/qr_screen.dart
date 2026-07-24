@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../l10n/app_strings.dart';
+
 class QrScreen extends StatelessWidget {
   final String qrToken;
   final String? title;
@@ -18,10 +20,11 @@ class QrScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final qrUrl = "$_baseUrl?token=$qrToken";
+    final strings = AppStrings.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title ?? "Emergency QR"),
+        title: Text(title ?? strings.emergencyQr),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -49,20 +52,19 @@ class QrScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                "Emergency Access",
+              Text(
+                strings.emergencyAccess,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                "Scan this QR code to view emergency information.\n\n"
-                "If the page shows Session expired, rescan the QR.",
+              Text(
+                strings.emergencyQrInstructions,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Colors.black54,
                 ),

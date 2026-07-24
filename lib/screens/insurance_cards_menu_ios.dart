@@ -13,12 +13,10 @@ class IOSCardScanScreen extends StatefulWidget {
   const IOSCardScanScreen({super.key});
 
   @override
-  State<IOSCardScanScreen> createState() =>
-      _IOSCardScanScreenState();
+  State<IOSCardScanScreen> createState() => _IOSCardScanScreenState();
 }
 
-class _IOSCardScanScreenState
-    extends State<IOSCardScanScreen> {
+class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
   late final DataRepository _repo;
 
   Profile? _p;
@@ -80,8 +78,7 @@ class _IOSCardScanScreenState
       bool keepScanning = true;
 
       while (keepScanning) {
-        final result =
-            await CunningDocumentScanner.getPictures();
+        final result = await CunningDocumentScanner.getPictures();
 
         if (result == null || result.isEmpty) break;
 
@@ -98,13 +95,11 @@ class _IOSCardScanScreenState
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () =>
-                        Navigator.pop(context, false),
+                    onPressed: () => Navigator.pop(context, false),
                     child: const Text("Done"),
                   ),
                   FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(context, true),
+                    onPressed: () => Navigator.pop(context, true),
                     child: const Text("Scan Back"),
                   ),
                 ],
@@ -136,8 +131,7 @@ class _IOSCardScanScreenState
           policy: (parsed['policy'] ?? '').toString().trim(),
           memberId: (parsed['memberId'] ?? '').toString().trim(),
           policyType: (parsed['planType'] ?? '').toString().trim(),
-          medicarePlanId:
-              (parsed['medicarePlanId'] ?? '').toString().trim(),
+          medicarePlanId: (parsed['medicarePlanId'] ?? '').toString().trim(),
           medicarePlanKind:
               (parsed['medicarePlanKind'] ?? '').toString().trim(),
           ocrText: (parsed['notes'] ?? '').toString().trim(),
@@ -244,14 +238,15 @@ class _IOSCardScanScreenState
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _scanCard,
-style: FilledButton.styleFrom(
-  backgroundColor: Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
-  foregroundColor: Colors.white,
-  padding: const EdgeInsets.symmetric(vertical: 16),
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(12),
-  ),
-),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 icon: const Icon(Icons.camera_alt),
                 label: const Text(
                   "Scan Insurance Card",
@@ -323,8 +318,8 @@ style: FilledButton.styleFrom(
                                   ),
                                 ),
                               IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Colors.red),
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => _deleteCard(card),
                               ),
                             ],

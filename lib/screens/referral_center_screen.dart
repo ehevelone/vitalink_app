@@ -62,9 +62,27 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
     required String name,
     required String referralLink,
   }) {
+    final isSpanish = Localizations.localeOf(context).languageCode == 'es';
     final agent = (_agentName == null || _agentName!.isEmpty)
         ? 'my insurance agent'
         : 'my agent, $_agentName';
+
+    if (isSpanish) {
+      final spanishAgent = (_agentName == null || _agentName!.isEmpty)
+          ? 'mi agente de seguros'
+          : 'mi agente, $_agentName';
+
+      return "Hola $name,\n\n"
+          "Hace poco empecé a usar VitaLink para mantener mis medicamentos, doctores, "
+          "tarjetas de seguro, citas e información de emergencia organizados en un solo lugar.\n\n"
+          "Lo que más me sorprendió fue lo útil que sería si alguna vez hubiera una emergencia "
+          "o si necesitara compartir mi información actualizada con mi agente.\n\n"
+          "Si desea saber un poco más, con gusto puedo conectarle con $spanishAgent, "
+          "quien me ayudó a configurarlo.\n\n"
+          "¿Estaría bien si le pide que se comunique con usted? Si es así, ¿prefiere mensaje de texto, llamada telefónica o correo electrónico?\n\n"
+          "Toque aquí para más información:\n"
+          "$referralLink";
+    }
 
     return "Hey $name,\n\n"
         "I recently started using VitaLink to keep my medications, doctors, "
@@ -135,7 +153,10 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       );
 
       setState(() => _mode = 'home');
-      _showMessage('Introduction created. Review and send the text message.');
+      final isSpanish = Localizations.localeOf(context).languageCode == 'es';
+      _showMessage(isSpanish
+          ? 'Introducción creada. Revise y envíe el mensaje de texto.'
+          : 'Introduction created. Review and send the text message.');
 
       final uri = Uri(
         scheme: 'sms',
@@ -144,7 +165,9 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       );
       await launchUrl(uri);
     } else {
-      _showMessage(res['error']?.toString() ?? 'Referral failed.');
+      final isSpanish = Localizations.localeOf(context).languageCode == 'es';
+      _showMessage(res['error']?.toString() ??
+          (isSpanish ? 'El referido falló.' : 'Referral failed.'));
     }
   }
 
@@ -206,7 +229,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       children: [
         _header(
           title ?? 'Send Introduction',
-          prompt ?? 'Create a simple introduction text for someone outside your household.',
+          prompt ??
+              'Create a simple introduction text for someone outside your household.',
         ),
         _field(_nameCtrl, 'Name'),
         _field(_phoneCtrl, 'Phone Number', keyboardType: TextInputType.phone),
@@ -219,7 +243,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
           onChanged: (v) => setState(() => _relationship = v),
         ),
         const SizedBox(height: 12),
-        _primaryButton('Generate Introduction Text', _saving ? null : _submitReferral),
+        _primaryButton(
+            'Generate Introduction Text', _saving ? null : _submitReferral),
         _textButton('Back', () => setState(() => _mode = 'home')),
       ],
     );
@@ -259,7 +284,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       color: const Color(0xFF111827),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.lightBlue.shade200.withValues(alpha: .35)),
+        side:
+            BorderSide(color: Colors.lightBlue.shade200.withValues(alpha: .35)),
       ),
       child: ListTile(
         leading: Icon(icon, color: Colors.lightBlueAccent, size: 30),
@@ -302,7 +328,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.lightBlueAccent, width: 2),
+            borderSide:
+                const BorderSide(color: Colors.lightBlueAccent, width: 2),
           ),
         ),
       ),

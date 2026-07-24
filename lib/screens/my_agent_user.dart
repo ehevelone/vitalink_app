@@ -250,8 +250,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                     onPressed: _call,
                   ),
                 ),
-              if (_contactPhone.isNotEmpty &&
-                  _agentEmail?.isNotEmpty == true)
+              if (_contactPhone.isNotEmpty && _agentEmail?.isNotEmpty == true)
                 const SizedBox(width: 12),
               if (_agentEmail?.isNotEmpty == true)
                 Expanded(

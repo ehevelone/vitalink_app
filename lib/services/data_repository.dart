@@ -234,7 +234,8 @@ class DataRepository {
       appointments: updatePayload['appointments'] is List
           ? (updatePayload['appointments'] as List)
               .whereType<Map>()
-              .map((a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
+              .map(
+                  (a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
               .toList()
           : current.appointments,
       insurances: updatePayload['insurances'] is List

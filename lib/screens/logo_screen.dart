@@ -262,92 +262,92 @@ class _LogoScreenState extends State<LogoScreen> {
         child: SizedBox.expand(
           child: Center(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/vitalink-logo-1.png',
-                width: 220,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 28),
-              if (_loading)
-                const CircularProgressIndicator(color: Colors.white70)
-              else if (hasName) ...[
-                Text(
-                  "Welcome, $name",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/vitalink-logo-1.png',
+                  width: 220,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 10),
-              ],
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white60,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: _openEmergencyScreen,
-                child: Container(
-                  width: 240,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade700,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.redAccent,
-                      width: 3,
+                const SizedBox(height: 28),
+                if (_loading)
+                  const CircularProgressIndicator(color: Colors.white70)
+                else if (hasName) ...[
+                  Text(
+                    "Welcome, $name",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent.withValues(alpha: 0.4),
-                        blurRadius: 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.white,
-                        size: 42,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "EMERGENCY",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        "TAP FOR INFO",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 10),
+                ],
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28),
+                  child: Text(
+                    "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                GestureDetector(
+                  onTap: _openEmergencyScreen,
+                  child: Container(
+                    width: 240,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade700,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.redAccent,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.redAccent.withValues(alpha: 0.4),
+                          blurRadius: 18,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.white,
+                          size: 42,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          "EMERGENCY",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          "TAP FOR INFO",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -355,4 +355,3 @@ class _LogoScreenState extends State<LogoScreen> {
     );
   }
 }
-

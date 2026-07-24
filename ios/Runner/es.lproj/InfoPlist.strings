@@ -1,0 +1,17 @@
+/* Permiso de camara */
+"NSCameraUsageDescription" = "VitaLink usa la cámara para escanear etiquetas de medicamentos, tarjetas de seguro y códigos QR.";
+
+/* Permiso de fototeca */
+"NSPhotoLibraryUsageDescription" = "VitaLink necesita acceso a su fototeca para seleccionar y guardar imágenes escaneadas.";
+
+/* Permiso para agregar a la fototeca */
+"NSPhotoLibraryAddUsageDescription" = "VitaLink puede guardar imágenes escaneadas en su fototeca cuando sea necesario.";
+
+/* Permiso de notas de voz */
+"NSMicrophoneUsageDescription" = "VitaLink usa el micrófono para dictar notas y tareas.";
+
+"NSSpeechRecognitionUsageDescription" = "VitaLink usa el reconocimiento de voz para convertir notas y tareas dictadas en texto.";
+
+"NSCalendarsUsageDescription" = "VitaLink puede agregar citas a su calendario cuando usted elige guardarlas allí.";
+
+"NSCalendarsFullAccessUsageDescription" = "VitaLink puede agregar citas a su calendario cuando usted elige guardarlas allí.";

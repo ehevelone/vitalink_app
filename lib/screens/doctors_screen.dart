@@ -27,7 +27,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   Future<void> _load() async {
     final p = await _repo.loadProfile();
     setState(() {
-      _p = p ?? Profile(doctors: []);
+      _p = p;
       _loading = false;
     });
   }

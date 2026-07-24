@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -7,6 +7,7 @@ import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../utils/phone_formatter.dart';
+import '../l10n/app_strings.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -77,10 +78,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _dobCtrl.text = _p!.dob ?? '';
       _bloodCtrl.text = e.bloodType;
       final contacts = e.effectiveContacts;
-      _contactCtrl.text =
-          contacts.isNotEmpty ? contacts.first.name : e.contact;
-      _phoneCtrl.text =
-          contacts.isNotEmpty ? contacts.first.phone : e.phone;
+      _contactCtrl.text = contacts.isNotEmpty ? contacts.first.name : e.contact;
+      _phoneCtrl.text = contacts.isNotEmpty ? contacts.first.phone : e.phone;
       _extraContactCtrls.clear();
       _extraPhoneCtrls.clear();
       for (final contact in contacts.skip(1)) {
@@ -107,7 +106,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (!_formKey.currentState!.validate()) return;
 
-    // 🔥 FIX: capture ORIGINAL values BEFORE mutation
+    // ðŸ”¥ FIX: capture ORIGINAL values BEFORE mutation
     final originalContacts = _p!.emergency.effectiveContacts;
     final emergencyContacts = _buildEmergencyContacts();
     final contactsToText = _contactsNeedingText(
@@ -137,8 +136,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (!mounted) return;
 
-    // 🔥 FIXED CONDITION
+    // ðŸ”¥ FIXED CONDITION
     if (contactsToText.isNotEmpty) {
+      final strings = AppStrings.of(context);
+      final isSpanish = strings.languageCode == 'es';
       String agentName = "";
       String agentPhone = "";
 
@@ -155,18 +156,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final contact = contactsToText.first;
       final agentLine = (agentName.isNotEmpty && agentPhone.isNotEmpty)
-          ? "\n\nVitaLink was provided through ${_p!.fullName}'s insurance agent:\n"
-              "$agentName\n"
-              "$agentPhone\n"
-              "Contact the agent if you have questions or would like more information."
+          ? isSpanish
+              ? "\n\nVitaLink fue proporcionado a través del agente de seguros de ${_p!.fullName}:\n"
+                  "$agentName\n"
+                  "$agentPhone\n"
+                  "Comuníquese con el agente si tiene preguntas o desea más información."
+              : "\n\nVitaLink was provided through ${_p!.fullName}'s insurance agent:\n"
+                  "$agentName\n"
+                  "$agentPhone\n"
+                  "Contact the agent if you have questions or would like more information."
           : "";
 
-      final message =
-          "Hi ${contact.name},\n\n"
-          "${_p!.fullName} selected you as an emergency contact in VitaLink.\n\n"
-          "VitaLink stores important health information that can help in an emergency if someone is unconscious or unable to communicate."
-          "$agentLine\n\n"
-          "More information: https://myvitalink.app";
+      final message = isSpanish
+          ? "Hola ${contact.name},\n\n"
+              "${_p!.fullName} lo/la seleccionó como contacto de emergencia en VitaLink.\n\n"
+              "VitaLink guarda información importante de salud que puede ayudar en una emergencia si una persona está inconsciente o no puede comunicarse."
+              "$agentLine\n\n"
+              "Más información: https://myvitalink.app"
+          : "Hi ${contact.name},\n\n"
+              "${_p!.fullName} selected you as an emergency contact in VitaLink.\n\n"
+              "VitaLink stores important health information that can help in an emergency if someone is unconscious or unable to communicate."
+              "$agentLine\n\n"
+              "More information: https://myvitalink.app";
 
       await _openEmergencyContactText(contact, message);
     }

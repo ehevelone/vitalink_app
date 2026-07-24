@@ -162,7 +162,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
       if (res["success"] == true) {
         _textController.clear();
         await _loadItems();
-        _showMessage(_type == _AgentItemType.note ? "Note saved" : "Task saved");
+        _showMessage(
+            _type == _AgentItemType.note ? "Note saved" : "Task saved");
       } else {
         _showMessage(res["error"] ?? "Failed to save");
       }
@@ -188,7 +189,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text("Delete ${isTask ? "task" : "note"}?"),
-        content: Text(
+        content: const Text(
           "This will remove it from the app and CRM.",
         ),
         actions: [
@@ -268,9 +269,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
         final words = result.recognizedWords.trim();
         if (words.isEmpty) return;
 
-        _textController.text = _dictationBaseText.isEmpty
-            ? words
-            : "$_dictationBaseText $words";
+        _textController.text =
+            _dictationBaseText.isEmpty ? words : "$_dictationBaseText $words";
         _textController.selection = TextSelection.fromPosition(
           TextPosition(offset: _textController.text.length),
         );
@@ -457,7 +457,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
                 const SizedBox(width: 10),
                 Container(
                   decoration: BoxDecoration(
-                    color: _listening ? Colors.red.shade700 : Colors.red.shade100,
+                    color:
+                        _listening ? Colors.red.shade700 : Colors.red.shade100,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: IconButton(

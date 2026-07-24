@@ -99,7 +99,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     final start = appointment.appointmentAt.toLocal();
     final end = start.add(const Duration(hours: 1));
     final description = [
-      if (appointment.specialty.isNotEmpty) 'Specialty: ${appointment.specialty}',
+      if (appointment.specialty.isNotEmpty)
+        'Specialty: ${appointment.specialty}',
       if (appointment.notes.isNotEmpty) appointment.notes,
       'Created from VitaLink.',
     ].join('\n');
@@ -123,7 +124,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         .replaceAll(RegExp(r'^-+|-+$'), '')
         .toLowerCase();
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/${fileName.isEmpty ? 'vitalink-appointment' : fileName}.ics');
+    final file = File(
+        '${dir.path}/${fileName.isEmpty ? 'vitalink-appointment' : fileName}.ics');
     final now = DateTime.now().toUtc();
     final ics = [
       'BEGIN:VCALENDAR',
@@ -231,17 +233,17 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   ),
                   items: [
                     ...doctors.asMap().entries.map(
-                      (entry) => DropdownMenuItem<String>(
-                        value: 'doctor_${entry.key}',
-                        child: Text(
-                          entry.value.specialty.isEmpty
-                              ? entry.value.name
-                              : '${entry.value.name} - ${entry.value.specialty}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          (entry) => DropdownMenuItem<String>(
+                            value: 'doctor_${entry.key}',
+                            child: Text(
+                              entry.value.specialty.isEmpty
+                                  ? entry.value.name
+                                  : '${entry.value.name} - ${entry.value.specialty}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
                     const DropdownMenuItem<String>(
                       value: addNewDoctorValue,
                       child: Text(
@@ -502,9 +504,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   subtitle: Text(subtitle),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: originalIndex < 0
-                        ? null
-                        : () => _delete(originalIndex),
+                    onPressed:
+                        originalIndex < 0 ? null : () => _delete(originalIndex),
                   ),
                   onTap: originalIndex < 0
                       ? null

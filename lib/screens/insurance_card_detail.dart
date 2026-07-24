@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
-import 'package:path_provider/path_provider.dart';    // ✅ ADDED
+import 'package:pdf/widgets.dart' as pw; // ✅ ADDED
+import 'package:path_provider/path_provider.dart'; // ✅ ADDED
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -80,8 +80,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         : '${match.group(1)}-${match.group(2)}-${int.parse(segment)}';
   }
 
-  bool get _hasMedicarePlanId =>
-      _detectMedicarePlanId(widget.card).isNotEmpty;
+  bool get _hasMedicarePlanId => _detectMedicarePlanId(widget.card).isNotEmpty;
 
   bool get _looksLikeMedicareCard {
     final text = [
@@ -141,9 +140,10 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   }
 
   void _showBenefitsError(Map<String, dynamic> data) {
-    final message = data['error']?.toString() ??
-        'Unable to load co-pays for this card.';
-    final planId = data['plan_id']?.toString() ?? _detectMedicarePlanId(widget.card);
+    final message =
+        data['error']?.toString() ?? 'Unable to load co-pays for this card.';
+    final planId =
+        data['plan_id']?.toString() ?? _detectMedicarePlanId(widget.card);
     final planYear = data['plan_year']?.toString() ?? '';
 
     showDialog<void>(
@@ -319,17 +319,15 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         ? pw.MemoryImage(File(frontPath).readAsBytesSync())
         : null;
 
-    final backImage = (backPath != null &&
-            backPath.isNotEmpty &&
-            File(backPath).existsSync())
-        ? pw.MemoryImage(File(backPath).readAsBytesSync())
-        : null;
+    final backImage =
+        (backPath != null && backPath.isNotEmpty && File(backPath).existsSync())
+            ? pw.MemoryImage(File(backPath).readAsBytesSync())
+            : null;
 
     if (frontImage != null) {
       pdf.addPage(
         pw.Page(
-          build: (pw.Context context) =>
-              pw.Center(child: pw.Image(frontImage)),
+          build: (pw.Context context) => pw.Center(child: pw.Image(frontImage)),
         ),
       );
     }
@@ -337,8 +335,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     if (backImage != null) {
       pdf.addPage(
         pw.Page(
-          build: (pw.Context context) =>
-              pw.Center(child: pw.Image(backImage)),
+          build: (pw.Context context) => pw.Center(child: pw.Image(backImage)),
         ),
       );
     }
@@ -410,20 +407,15 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   Widget build(BuildContext context) {
     final card = widget.card;
 
-    final imagePath = _showFront
-        ? card.frontImagePath
-        : (card.backImagePath ?? '');
+    final imagePath =
+        _showFront ? card.frontImagePath : (card.backImagePath ?? '');
 
-    final file = (imagePath.isNotEmpty)
-        ? File(imagePath)
-        : null;
+    final file = (imagePath.isNotEmpty) ? File(imagePath) : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          card.carrier.isNotEmpty
-              ? card.carrier
-              : "Insurance Card",
+          card.carrier.isNotEmpty ? card.carrier : "Insurance Card",
         ),
         actions: [
           if (widget.onDelete != null)
@@ -448,8 +440,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                         minScale: 1.0,
                         maxScale: 5.0,
                         onInteractionUpdate: (details) {
-                          setState(
-                              () => _currentScale = details.scale);
+                          setState(() => _currentScale = details.scale);
                         },
                         child: Image.file(
                           file,
@@ -461,7 +452,6 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                   : const Icon(Icons.broken_image, size: 120),
             ),
           ),
-
           SafeArea(
             top: false,
             child: Padding(
@@ -513,9 +503,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(

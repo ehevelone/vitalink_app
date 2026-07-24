@@ -60,120 +60,121 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   }
 
 // 🔥 NEW: clean close handler
-void _closeOverlay() {
-  setState(() {
-    _showAccessOverlay = false;
-  });
-}
+  void _closeOverlay() {
+    setState(() {
+      _showAccessOverlay = false;
+    });
+  }
 
-Future<void> _openActivationPage() async {
-  final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
+  Future<void> _openActivationPage() async {
+    final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
 
-  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-    if (!mounted) return;
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Could not open activation page")),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not open activation page")),
+      );
+    }
+  }
+
+  Future<String?> _chooseBillingInterval() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Choose Billing"),
+        content: const Text(
+            "How would you like to activate your VitaLink Agent Access?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop("monthly"),
+            child: const Text("Monthly"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop("annual"),
+            child: const Text("Annual"),
+          ),
+        ],
+      ),
     );
   }
-}
 
-Future<String?> _chooseBillingInterval() {
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text("Choose Billing"),
-      content: const Text("How would you like to activate your VitaLink Agent Access?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop("monthly"),
-          child: const Text("Monthly"),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop("annual"),
-          child: const Text("Annual"),
-        ),
-      ],
-    ),
-  );
-}
+  Future<void> _login() async {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
 
-Future<void> _login() async {
-  final form = _formKey.currentState;
-  if (form == null || !form.validate()) return;
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
 
-  setState(() {
-    _loading = true;
-    _errorMessage = null;
-  });
+    try {
+      final res = await ApiService.loginAgent(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text.trim(),
+      );
 
-  try {
-    final res = await ApiService.loginAgent(
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text.trim(),
-    );
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    if (res["success"] != true) {
-      setState(() {
-        _loading = false;
-      });
-
-      if (res["requires_payment"] == true && res["agentId"] != null) {
-        final billing = await _chooseBillingInterval();
-        if (billing == null) {
-          if (mounted) setState(() => _loading = false);
-          return;
-        }
-
-        final checkout = await ApiService.createAgentCheckout(
-          email: res["email"]?.toString() ?? _emailCtrl.text.trim(),
-          agentId: res["agentId"]?.toString(),
-          plan: "agent",
-          billing: billing,
-        );
-
-        if (!mounted) return;
-
-        final checkoutUrl = checkout["url"]?.toString() ?? "";
-        if (checkoutUrl.isNotEmpty) {
-          setState(() => _loading = false);
-          await launchUrl(
-            Uri.parse(checkoutUrl),
-            mode: LaunchMode.externalApplication,
-          );
-          return;
-        }
-      }
-
-      // Show the access activation prompt when backend access is not active.
-      if (res["requires_payment"] == true) {
+      if (res["success"] != true) {
         setState(() {
-          _showAccessOverlay = true;
-          _overlayMessage =
-              "Your agent portal access is not active.\n\nVisit myvitalink.app to activate access before logging in.";
+          _loading = false;
         });
+
+        if (res["requires_payment"] == true && res["agentId"] != null) {
+          final billing = await _chooseBillingInterval();
+          if (billing == null) {
+            if (mounted) setState(() => _loading = false);
+            return;
+          }
+
+          final checkout = await ApiService.createAgentCheckout(
+            email: res["email"]?.toString() ?? _emailCtrl.text.trim(),
+            agentId: res["agentId"]?.toString(),
+            plan: "agent",
+            billing: billing,
+          );
+
+          if (!mounted) return;
+
+          final checkoutUrl = checkout["url"]?.toString() ?? "";
+          if (checkoutUrl.isNotEmpty) {
+            setState(() => _loading = false);
+            await launchUrl(
+              Uri.parse(checkoutUrl),
+              mode: LaunchMode.externalApplication,
+            );
+            return;
+          }
+        }
+
+        // Show the access activation prompt when backend access is not active.
+        if (res["requires_payment"] == true) {
+          setState(() {
+            _showAccessOverlay = true;
+            _overlayMessage =
+                "Your agent portal access is not active.\n\nVisit myvitalink.app to activate access before logging in.";
+          });
+          return;
+        }
+
+        // ❌ Normal error
+        setState(() {
+          _errorMessage = res["error"] ?? "Login failed";
+        });
+
         return;
       }
 
-      // ❌ Normal error
-      setState(() {
-        _errorMessage = res["error"] ?? "Login failed";
-      });
+      final agent = res["agent"];
 
-      return;
-    }
-
-    final agent = res["agent"];
-
-    if (agent == null) {
-      setState(() {
-        _errorMessage = "Invalid response";
-        _loading = false;
-      });
-      return;
-    }
+      if (agent == null) {
+        setState(() {
+          _errorMessage = "Invalid response";
+          _loading = false;
+        });
+        return;
+      }
 
       final store = SecureStore();
 
@@ -247,7 +248,6 @@ Future<void> _login() async {
       appBar: AppBar(title: const Text("Agent Login")),
       body: Stack(
         children: [
-
           // 🔹 MAIN UI
           Padding(
             padding: const EdgeInsets.all(24),
@@ -255,7 +255,6 @@ Future<void> _login() async {
               key: _formKey,
               child: ListView(
                 children: [
-
                   TextFormField(
                     controller: _emailCtrl,
                     onChanged: (_) => _clearError(),
@@ -263,9 +262,7 @@ Future<void> _login() async {
                     validator: (v) =>
                         v == null || v.isEmpty ? "Enter your email" : null,
                   ),
-
                   const SizedBox(height: 12),
-
                   TextFormField(
                     controller: _passwordCtrl,
                     onChanged: (_) => _clearError(),
@@ -285,7 +282,6 @@ Future<void> _login() async {
                     validator: (v) =>
                         v == null || v.isEmpty ? "Enter password" : null,
                   ),
-
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 10),
                     Text(
@@ -294,7 +290,6 @@ Future<void> _login() async {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ],
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -302,16 +297,12 @@ Future<void> _login() async {
                       child: const Text("Forgot Password?"),
                     ),
                   ),
-
                   CheckboxListTile(
                     value: _rememberMe,
-                    onChanged: (v) =>
-                        setState(() => _rememberMe = v ?? false),
+                    onChanged: (v) => setState(() => _rememberMe = v ?? false),
                     title: const Text("Remember me"),
                   ),
-
                   const SizedBox(height: 24),
-
                   _loading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton(
@@ -346,7 +337,6 @@ Future<void> _login() async {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-
                         const Text(
                           "Access Not Active",
                           style: TextStyle(
@@ -355,9 +345,7 @@ Future<void> _login() async {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 12),
-
                         Text(
                           _overlayMessage,
                           textAlign: TextAlign.center,
@@ -366,9 +354,7 @@ Future<void> _login() async {
                             height: 1.35,
                           ),
                         ),
-
                         const SizedBox(height: 20),
-
                         Row(
                           children: [
                             Expanded(

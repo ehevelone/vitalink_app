@@ -79,8 +79,10 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
         ),
       );
 
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/agent_login');
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(data['error'] ?? "Reset failed")),
       );

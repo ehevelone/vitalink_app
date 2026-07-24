@@ -105,9 +105,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
       return 'Emergency profile';
     }
 
-    return sections
-        .map((s) => s.toString().replaceAll('_', ' '))
-        .join(', ');
+    return sections.map((s) => s.toString().replaceAll('_', ' ')).join(', ');
   }
 
   @override
@@ -226,7 +224,8 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
+        border:
+            Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
       ),
       child: child,
     );

@@ -71,7 +71,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.isEmpty ? "Enter a username" : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
@@ -80,7 +79,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.length < 6 ? "Min 6 characters" : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
@@ -90,7 +88,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v != _passwordCtrl.text ? "Passwords don’t match" : null,
                 ),
                 const SizedBox(height: 24),
-
                 TextFormField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(labelText: "Full Name"),
@@ -98,7 +95,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.isEmpty ? "Enter your name" : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
@@ -110,7 +106,6 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
                       v == null || v.isEmpty ? "Enter your phone" : null,
                 ),
                 const SizedBox(height: 24),
-
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(

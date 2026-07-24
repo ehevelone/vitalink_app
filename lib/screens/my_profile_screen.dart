@@ -66,12 +66,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     if (_role == "user") {
       final repo = DataRepository(store);
       final p = await repo.loadProfile();
-      if (p != null) {
-        p.fullName = _nameCtrl.text.trim();
-        p.emergency.phone = _phoneCtrl.text.trim();
-        p.updatedAt = DateTime.now();
-        await repo.saveProfile(p);
-      }
+      p.fullName = _nameCtrl.text.trim();
+      p.emergency.phone = _phoneCtrl.text.trim();
+      p.updatedAt = DateTime.now();
+      await repo.saveProfile(p);
 
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -167,7 +165,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                       const InputDecoration(labelText: "Agency Address"),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _npnCtrl,
                   enabled: false,
@@ -176,7 +173,6 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,

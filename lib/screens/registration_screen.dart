@@ -3,16 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
 import '../services/deep_link_service.dart';
 import '../services/secure_store.dart';
-import '../models.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../utils/phone_formatter.dart';
+import '../l10n/app_strings.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -138,24 +137,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     await _lookupActivation();
   }
 
-  void _recoverCode() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Recover Activation Code"),
-        content: const Text(
-          "If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _normalizePhone(String input) {
     return PhoneNumberFormatter.normalizedForApi(input);
   }
@@ -173,8 +154,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   String? _validateEmail(String? value) {
+    final strings = AppStrings.of(context);
     final email = _normalizeEmail(value ?? "");
-    if (email.isEmpty) return "Email required";
+    if (email.isEmpty) return strings.emailRequired;
 
     final emailPattern = RegExp(
       r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$",
@@ -183,7 +165,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email.contains("..") ||
         email.startsWith(".") ||
         email.endsWith(".")) {
-      return "Enter a valid email";
+      return strings.enterValidEmail;
     }
 
     final tld = email.split(".").last;
@@ -197,7 +179,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       "gom",
     };
     if (commonTypos.contains(tld)) {
-      return "Check the email ending. Did you mean .com?";
+      return strings.checkEmailEnding;
     }
 
     return null;
@@ -205,6 +187,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    final strings = AppStrings.of(context);
 
     setState(() => _loading = true);
 
@@ -217,7 +200,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final agentRes = await ApiService.resolveAgentByCode(code);
 
       if (agentRes['success'] != true || agentRes['agent'] == null) {
-        throw Exception("Invalid or inactive activation code");
+        throw Exception(strings.invalidActivationCode);
       }
 
       final nameParts = _nameCtrl.text.trim().split(" ");
@@ -255,7 +238,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         await store.remove("userSessionToken");
       }
 
-      final profile = await repo.loadProfile() ?? Profile();
+      final profile = await repo.loadProfile();
 
       profile.fullName = _nameCtrl.text.trim();
       profile.emergency =
@@ -284,7 +267,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registration failed: $e")),
+        SnackBar(content: Text(strings.registrationFailed('$e'))),
       );
     } finally {
       if (mounted) {
@@ -295,17 +278,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text("User Registration")),
+      appBar: AppBar(title: Text(strings.userRegistration)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              const Text(
-                "ENTER YOUR ACTIVATION CODE",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                strings.enterActivationCode,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
 
@@ -313,7 +299,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _activationCodeCtrl,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  labelText: "Activation Code",
+                  labelText: strings.activationCode,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.paste),
@@ -321,7 +307,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 validator: (v) => v == null || v.trim().isEmpty
-                    ? "Activation code required"
+                    ? strings.activationCodeRequired
                     : null,
               ),
 
@@ -329,16 +315,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
+                decoration: InputDecoration(labelText: strings.fullName),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Name required" : null,
+                    v == null || v.trim().isEmpty ? strings.nameRequired : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Email"),
+                decoration: InputDecoration(labelText: strings.email),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
               ),
@@ -347,7 +333,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: "Phone"),
+                decoration: InputDecoration(labelText: strings.phone),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
               ),
@@ -357,37 +343,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               // ✅ ADDRESS BLOCK
               TextFormField(
                 controller: _addressCtrl,
-                decoration: const InputDecoration(labelText: "Address Line 1"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Address required" : null,
+                decoration: InputDecoration(labelText: strings.addressLine1),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? strings.addressRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _cityCtrl,
-                decoration: const InputDecoration(labelText: "City"),
+                decoration: InputDecoration(labelText: strings.city),
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? "City required" : null,
+                    v == null || v.trim().isEmpty ? strings.cityRequired : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _stateCtrl,
-                decoration: const InputDecoration(labelText: "State"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "State required" : null,
+                decoration: InputDecoration(labelText: strings.state),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? strings.stateRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _zipCtrl,
-                decoration: const InputDecoration(labelText: "Zip Code"),
+                decoration: InputDecoration(labelText: strings.zipCode),
                 keyboardType: TextInputType.number,
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Zip required" : null,
+                    v == null || v.trim().isEmpty ? strings.zipRequired : null,
               ),
 
               const SizedBox(height: 12),
@@ -396,7 +384,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: "Password",
+                  labelText: strings.password,
                   suffixIcon: IconButton(
                     icon: Icon(_showPassword
                         ? Icons.visibility
@@ -408,7 +396,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
                 ),
-                validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? strings.requiredField : null,
               ),
 
               const SizedBox(height: 8),
@@ -420,7 +409,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _confirmCtrl,
                 obscureText: !_showConfirmPassword,
                 decoration: InputDecoration(
-                  labelText: "Confirm Password",
+                  labelText: strings.confirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(_showConfirmPassword
                         ? Icons.visibility
@@ -433,14 +422,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 validator: (v) =>
-                    v != _passwordCtrl.text ? "Passwords don’t match" : null,
+                    v != _passwordCtrl.text ? strings.passwordsDontMatch : null,
               ),
             ],
           ),
         ),
       ),
       bottomNavigationBar: SafeBottomButton(
-        label: "Complete Registration",
+        label: strings.completeRegistration,
         icon: Icons.check,
         loading: _loading,
         onPressed: _register,

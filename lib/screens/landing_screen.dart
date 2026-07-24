@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/app_strings.dart';
 import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 
 class LandingScreen extends StatefulWidget {
@@ -52,6 +53,8 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showLoginPopup() {
+    final strings = AppStrings.of(context);
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -65,17 +68,15 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Log In",
-                  style: TextStyle(
+                Text(
+                  strings.logIn,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -85,14 +86,12 @@ class _LandingScreenState extends State<LandingScreen> {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/login');
                   },
-                  child: const Text(
-                    "User Login",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  child: Text(
+                    strings.userLogin,
+                    style: const TextStyle(fontSize: 18, color: Colors.black),
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: vitalinkBlue,
@@ -102,9 +101,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/agent_login');
                   },
-                  child: const Text(
-                    "Agent Login",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  child: Text(
+                    strings.agentLogin,
+                    style: const TextStyle(fontSize: 18, color: Colors.black),
                   ),
                 ),
               ],
@@ -116,6 +115,8 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showRegisterPopup() {
+    final strings = AppStrings.of(context);
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -129,46 +130,39 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Create Account",
-                  style: TextStyle(
+                Text(
+                  strings.createAccount,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
-                const Text(
-                  "Choose the account type that matches how you use VitaLink.",
+                Text(
+                  strings.chooseAccountType,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 _registerOption(
                   icon: Icons.family_restroom,
-                  title: "Create Client Account",
-                  subtitle: "For VitaLink users and families",
+                  title: strings.createClientAccount,
+                  subtitle: strings.forUsersAndFamilies,
                   color: Colors.green,
                   onPressed: () {
                     Navigator.pop(ctx);
                     _showClientActivationDialog();
                   },
                 ),
-
                 const SizedBox(height: 15),
-
                 _registerOption(
                   icon: Icons.business_center,
-                  title: "Activate Agent Portal",
-                  subtitle:
-                      "Insurance agents must activate access through myvitalink.app",
+                  title: strings.activateAgentPortal,
+                  subtitle: strings.agentActivationSubtitle,
                   color: vitalinkBlue,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -303,6 +297,8 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showClientActivationDialog() {
+    final strings = AppStrings.of(context);
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -316,48 +312,47 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              const Text(
-                "Client Account Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  strings.clientAccountActivation,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
-                "Do you already have a VitaLink activation code?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                Text(
+                  strings.clientActivationBody,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "I Have a Code",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _continueClientRegistration();
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "Get Activation Code",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openClientActivationPage();
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: strings.iHaveCode,
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _continueClientRegistration();
+                  },
+                ),
+                const SizedBox(height: 10),
+                _dialogActionButton(
+                  label: strings.getActivationCode,
+                  primary: false,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openClientActivationPage();
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(strings.cancel),
+                ),
               ],
             ),
           ),
@@ -367,6 +362,8 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showAgentActivationDialog() {
+    final strings = AppStrings.of(context);
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -380,52 +377,51 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              const Text(
-                "Agent Portal Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  strings.agentPortalActivation,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-                "Do you have your activation code?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                Text(
+                  strings.agentActivationBody,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "I Have My Activation Code",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(
-                    context,
-                    '/terms_agent',
-                    arguments: {"code": activationCode},
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "I Need An Activation Code",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openVitaLinkWebsite();
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: strings.iHaveMyActivationCode,
+                  primary: false,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(
+                      context,
+                      '/terms_agent',
+                      arguments: {"code": activationCode},
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                _dialogActionButton(
+                  label: strings.iNeedActivationCode,
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openVitaLinkWebsite();
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(strings.cancel),
+                ),
               ],
             ),
           ),
@@ -436,6 +432,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: LayoutBuilder(
@@ -467,57 +465,49 @@ class _LandingScreenState extends State<LandingScreen> {
                           child: Column(
                             children: [
                               SizedBox(height: topGap),
-
                               Text(
-                                "Welcome To",
+                                strings.welcomeTo,
                                 style: TextStyle(
                                   fontSize: titleSize,
                                   fontWeight: FontWeight.bold,
                                   color: vitalinkBlue,
                                 ),
                               ),
-
                               SizedBox(height: logoGap),
-
                               Image.asset(
                                 'assets/images/vitalink-logo-2.png',
                                 width: logoWidth,
                               ),
-
                               SizedBox(height: buttonGap),
-
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   minimumSize: const Size(double.infinity, 55),
                                 ),
                                 onPressed: _showLoginPopup,
-                                child: const Text(
-                                  "Log In to Your Account",
-                                  style: TextStyle(
+                                child: Text(
+                                  strings.loginToYourAccount,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     color: Colors.black,
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 20),
-
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: vitalinkBlue,
                                   minimumSize: const Size(double.infinity, 55),
                                 ),
                                 onPressed: _showRegisterPopup,
-                                child: const Text(
-                                  "Register for an Account",
-                                  style: TextStyle(
+                                child: Text(
+                                  strings.registerForAccount,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     color: Colors.black,
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: compactHeight ? 28 : 60),
                             ],
                           ),
@@ -525,7 +515,6 @@ class _LandingScreenState extends State<LandingScreen> {
                       ),
                     ),
                   ),
-
                   SizedBox(
                     width: double.infinity,
                     height: bottomImageHeight,

@@ -82,9 +82,8 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     if (accept['success'] != true) {
       setState(() {
         _working = false;
-        _message =
-            (accept['error'] ?? 'Unable to accept this profile invite.')
-                .toString();
+        _message = (accept['error'] ?? 'Unable to accept this profile invite.')
+            .toString();
       });
       return;
     }
@@ -258,7 +257,8 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
+        border:
+            Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
       ),
       child: child,
     );

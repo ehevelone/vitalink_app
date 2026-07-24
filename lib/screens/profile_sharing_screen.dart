@@ -280,24 +280,42 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     final profileName = share['profile_name']?.toString().trim();
     final link = 'vitalink://share?code=$inviteCode';
-    final text = [
-      'I shared a VitaLink profile with you.',
-      '',
-      'Tap this link on your phone to accept it:',
-      link,
-      '',
-      'Share code: $inviteCode',
-      if (profileName != null && profileName.isNotEmpty) '',
-      if (profileName != null && profileName.isNotEmpty)
-        'Profile: $profileName',
-    ].join('\n');
+    final isSpanish = Localizations.localeOf(context).languageCode == 'es';
+    final text = isSpanish
+        ? [
+            'Compartí un perfil de VitaLink con usted.',
+            '',
+            'Toque este enlace en su teléfono para aceptarlo:',
+            link,
+            '',
+            'Código para compartir: $inviteCode',
+            if (profileName != null && profileName.isNotEmpty) '',
+            if (profileName != null && profileName.isNotEmpty)
+              'Perfil: $profileName',
+          ].join('\n')
+        : [
+            'I shared a VitaLink profile with you.',
+            '',
+            'Tap this link on your phone to accept it:',
+            link,
+            '',
+            'Share code: $inviteCode',
+            if (profileName != null && profileName.isNotEmpty) '',
+            if (profileName != null && profileName.isNotEmpty)
+              'Profile: $profileName',
+          ].join('\n');
 
-    await Share.share(text, subject: 'VitaLink Profile Share');
+    await Share.share(
+      text,
+      subject:
+          isSpanish ? 'Perfil compartido de VitaLink' : 'VitaLink Profile Share',
+    );
   }
 
   Future<void> _sendCurrentProfileUpdate() async {
     if (!_shares.any((share) => share['status']?.toString() == 'accepted')) {
-      _showMessage('A shared profile must be accepted before updates can be sent.');
+      _showMessage(
+          'A shared profile must be accepted before updates can be sent.');
       return;
     }
 
@@ -331,8 +349,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
         context: context,
         builder: (context) => _VitaLinkDialog(
           title: 'Profile Sent',
-          message:
-              'The current profile update was sent to connected profiles.',
+          message: 'The current profile update was sent to connected profiles.',
           actions: [
             _DialogButton(
               label: 'OK',

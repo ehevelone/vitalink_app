@@ -38,7 +38,7 @@ class _AppHeaderState extends State<AppHeader> {
     if (!mounted) return;
 
     setState(() {
-      if (profile != null && profile.fullName.isNotEmpty) {
+      if (profile.fullName.isNotEmpty) {
         _userName = profile.fullName;
       } else {
         _userName = "Guest";
@@ -49,8 +49,8 @@ class _AppHeaderState extends State<AppHeader> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor:
-          widget.backgroundColor ?? Theme.of(context).appBarTheme.backgroundColor,
+      backgroundColor: widget.backgroundColor ??
+          Theme.of(context).appBarTheme.backgroundColor,
       title: Row(
         children: [
           Expanded(

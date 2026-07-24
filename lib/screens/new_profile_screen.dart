@@ -224,7 +224,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
                 title: const Text("Organ Donor"),
-                activeColor: Colors.red,
+                activeThumbColor: Colors.red,
               ),
               const SizedBox(height: 26),
 

@@ -48,7 +48,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
     if (!mounted) return;
 
     setState(() {
-      _p = p ?? Profile();
+      _p = p;
     });
   }
 
@@ -95,6 +95,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
     if (uninstall == true) {
       SystemNavigator.pop();
     } else {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You must accept the terms to continue.")),
       );
@@ -143,58 +144,44 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
                               fontSize: 16, color: Colors.black),
                           children: [
                             const TextSpan(
-                              text:
-                                  "Welcome to VitaLink (User).\n\n"
-
+                              text: "Welcome to VitaLink (User).\n\n"
                                   "By using this app, you agree:\n"
                                   "• This app is provided as-is, without warranties.\n"
                                   "• You are responsible for the accuracy and completeness of all data entered.\n\n"
-
                                   "Medical & Platform Disclaimer\n\n"
                                   "• VitaLink is a data storage and sharing tool only and does not verify, validate, or guarantee the accuracy, completeness, or timeliness of any information.\n"
                                   "• VitaLink is not a medical provider, insurer, or licensed advisory service.\n"
                                   "• This app does not provide medical advice, diagnosis, or treatment.\n"
                                   "• Always consult licensed healthcare providers for medical decisions.\n\n"
-
                                   "Emergency Disclaimer\n\n"
                                   "• VitaLink is not an emergency service.\n"
                                   "• Information displayed may not be complete, current, or verified.\n"
                                   "• First responders and medical personnel should not rely solely on this app for treatment decisions.\n"
                                   "• In an emergency, call 911 or local emergency services immediately.\n\n"
-
                                   "Insurance Information\n\n"
                                   "• Insurance cards and documents are user-provided and may not reflect current coverage.\n"
                                   "• You are responsible for ensuring all insurance information is accurate and up to date.\n\n"
-
                                   "Activation Requirement\n\n"
                                   "A VitaLink account requires an activation code.\n\n"
-
                                   "Clients of participating insurance agents will receive an activation code from their agent.\n\n"
-
                                   "Personal users can obtain an activation code at:\n"
                                   "myvitalink.app\n\n"
-
                                   "For full Terms of Service and Privacy Policy, visit:\n",
                             ),
-
                             TextSpan(
-                              text:
-                                  "https://myvitalink.app/terms\n\n",
+                              text: "https://myvitalink.app/terms\n\n",
                               style: const TextStyle(
                                 color: Colors.blue,
-                                decoration:
-                                    TextDecoration.underline,
+                                decoration: TextDecoration.underline,
                               ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () async {
-                                  final uri = Uri.parse(
-                                      "https://myvitalink.app/terms");
+                                  final uri =
+                                      Uri.parse("https://myvitalink.app/terms");
                                   await launchUrl(uri,
-                                      mode: LaunchMode
-                                          .externalApplication);
+                                      mode: LaunchMode.externalApplication);
                                 },
                             ),
-
                             const TextSpan(
                               text:
                                   "If you do not agree to these terms, you cannot use the app.",
@@ -206,12 +193,10 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
                   ),
                   const SizedBox(height: 32),
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       OutlinedButton(
-                        onPressed: () =>
-                            _handleDecline(context),
+                        onPressed: () => _handleDecline(context),
                         child: const Text("Decline"),
                       ),
                       ElevatedButton(
