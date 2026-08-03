@@ -12,6 +12,7 @@ import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../utils/phone_formatter.dart';
 import '../l10n/app_strings.dart';
+import '../models.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -49,6 +50,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _activationLoaded = false;
   bool _lookupRunning = false;
   bool _argsLoaded = false;
+  bool _onboardingLoaded = false;
+  String? _onboardingCode;
+  Map<String, dynamic>? _onboardingPayload;
+  String? _onboardingMessage;
 
   @override
   void didChangeDependencies() {
@@ -58,6 +63,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _argsLoaded = true;
 
     String? code;
+    String? onboardingCode;
 
     final args = ModalRoute.of(context)?.settings.arguments;
 
@@ -65,7 +71,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       code = args['code'].toString().trim().toUpperCase();
     }
 
+    if (args is Map && args['onboard'] != null) {
+      onboardingCode = args['onboard'].toString().trim().toUpperCase();
+    }
+
     code ??= VitaLinkDeepLink.code?.trim().toUpperCase();
+    onboardingCode ??= VitaLinkDeepLink.onboardingCode?.trim().toUpperCase();
+
+    if (onboardingCode != null && onboardingCode.isNotEmpty) {
+      _onboardingCode = onboardingCode;
+
+      if (VitaLinkDeepLink.onboardingCode == onboardingCode) {
+        VitaLinkDeepLink.clearOnboardingCode();
+      }
+
+      _lookupAssistedOnboarding();
+      return;
+    }
 
     if (code != null && code.isNotEmpty) {
       _activationCodeCtrl.text = code;
@@ -123,6 +145,65 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  Future<void> _lookupAssistedOnboarding() async {
+    if (_onboardingLoaded) return;
+
+    final code = _onboardingCode?.trim().toUpperCase() ?? "";
+    if (code.isEmpty) return;
+
+    setState(() {
+      _loading = true;
+      _onboardingMessage = null;
+    });
+
+    try {
+      final res = await ApiService.getAssistedOnboarding(code);
+
+      if (!mounted) return;
+
+      if (res['success'] != true) {
+        setState(() {
+          _onboardingMessage = (res['error'] ??
+                  AppStrings.of(context).assistedOnboardingExpired)
+              .toString();
+        });
+        return;
+      }
+
+      final payload =
+          Map<String, dynamic>.from(res['payload'] as Map? ?? {});
+      final profile =
+          Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+
+      setState(() {
+        _onboardingPayload = payload;
+        _onboardingLoaded = true;
+        _onboardingMessage =
+            AppStrings.of(context).assistedOnboardingLoaded;
+
+        _activationCodeCtrl.text =
+            (payload['activationCode'] ?? '').toString();
+        _nameCtrl.text = (profile['fullName'] ?? '').toString();
+        _emailCtrl.text = (profile['email'] ?? '').toString();
+        _phoneCtrl.text = (profile['userPhone'] ?? '').toString();
+        _addressCtrl.text = (profile['address'] ?? '').toString();
+        _cityCtrl.text = (profile['city'] ?? '').toString();
+        _stateCtrl.text = (profile['state'] ?? '').toString();
+        _zipCtrl.text = (profile['zip'] ?? '').toString();
+        _activationLoaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _onboardingMessage = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   Future<void> _pasteCode() async {
     final data = await Clipboard.getData('text/plain');
     if (data?.text == null) return;
@@ -151,6 +232,91 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   String _normalizeEmail(String value) {
     return value.trim().toLowerCase();
+  }
+
+  EmergencyInfo? _emergencyFromOnboarding() {
+    final payload = _onboardingPayload;
+    if (payload == null) return null;
+
+    final emergency =
+        Map<String, dynamic>.from(payload['emergency'] as Map? ?? {});
+
+    if (emergency.isEmpty) return null;
+
+    final contacts = (emergency['contacts'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((item) => EmergencyContact.fromJson(
+              Map<String, dynamic>.from(item),
+            ))
+        .where((contact) => contact.hasDetails)
+        .toList();
+
+    return EmergencyInfo(
+      contact: contacts.isNotEmpty ? contacts.first.name : '',
+      phone: contacts.isNotEmpty ? contacts.first.phone : '',
+      contacts: contacts,
+      allergies: (emergency['allergies'] ?? '').toString(),
+      conditions: (emergency['conditions'] ?? '').toString(),
+      bloodType: (emergency['bloodType'] ?? '').toString(),
+      implants: (emergency['implants'] ?? '').toString(),
+      procedures: (emergency['procedures'] ?? '').toString(),
+      organDonor: emergency['organDonor'] == true,
+    );
+  }
+
+  String? _onboardingProfileValue(String key) {
+    final payload = _onboardingPayload;
+    if (payload == null) return null;
+
+    final profile = Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+    final value = profile[key]?.toString().trim();
+
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  List<String> _onboardingReviewLines() {
+    final payload = _onboardingPayload;
+    if (payload == null) return [];
+
+    final strings = AppStrings.of(context);
+    final profile = Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+    final emergency =
+        Map<String, dynamic>.from(payload['emergency'] as Map? ?? {});
+    final contacts = (emergency['contacts'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final lines = <String>[];
+
+    void add(String label, Object? value) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty) lines.add('$label: $text');
+    }
+
+    add(strings.dateOfBirth, profile['dob']);
+
+    for (var i = 0; i < contacts.length; i += 1) {
+      final contact = contacts[i];
+      final details = [
+        contact['name']?.toString().trim() ?? '',
+        contact['phone']?.toString().trim() ?? '',
+      ].where((item) => item.isNotEmpty).join(' - ');
+
+      add(strings.emergencyContactNumber(i + 1), details);
+    }
+
+    add(strings.bloodType, emergency['bloodType']);
+    add(strings.allergies, emergency['allergies']);
+    add(strings.conditions, emergency['conditions']);
+    add(strings.implantedDevices, emergency['implants']);
+    add(strings.majorProcedures, emergency['procedures']);
+
+    if (emergency['organDonor'] == true) {
+      lines.add('${strings.organDonor}: ${strings.yes}');
+    }
+
+    return lines;
   }
 
   String? _validateEmail(String? value) {
@@ -244,6 +410,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
       profile.userPhone = _phoneCtrl.text.trim();
+      profile.dob = _onboardingProfileValue('dob') ?? profile.dob;
 
       // ✅ SAVE ADDRESS DATA
       profile.address = _addressCtrl.text.trim();
@@ -251,10 +418,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.state = _stateCtrl.text.trim();
       profile.zip = _zipCtrl.text.trim();
 
+      final onboardingEmergency = _emergencyFromOnboarding();
+      if (onboardingEmergency != null) {
+        profile.emergency = onboardingEmergency;
+      }
+
       profile.registered = true;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
+
+      if (_onboardingCode != null && _onboardingCode!.isNotEmpty) {
+        await ApiService.claimAssistedOnboarding(
+          code: _onboardingCode!,
+          userId: user["id"].toString(),
+        );
+      }
 
       await AppState.setLoggedIn(true);
       await AppState.setRole('user');
@@ -310,6 +489,58 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ? strings.activationCodeRequired
                     : null,
               ),
+
+              if (_onboardingMessage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _onboardingMessage!,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+
+              if (_onboardingReviewLines().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.reviewAgentEnteredDetails,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._onboardingReviewLines().map(
+                        (line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            line,
+                            style: const TextStyle(color: Color(0xFF334155)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
 

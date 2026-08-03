@@ -352,6 +352,22 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> getAssistedOnboarding(String code) {
+    return _postJson("get_assisted_onboarding", {
+      "code": code,
+    });
+  }
+
+  static Future<Map<String, dynamic>> claimAssistedOnboarding({
+    required String code,
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("claim_assisted_onboarding", {
+      "code": code,
+      "userId": userId,
+    });
+  }
+
   // -------------------------------------------------------------
   // ðŸ”¹ Promo lookup
   // -------------------------------------------------------------

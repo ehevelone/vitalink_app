@@ -322,6 +322,18 @@ I understand:
       _es ? 'Registro fallido: $error' : 'Registration failed: $error';
   String get registrationFailedShort =>
       _es ? 'Registro fallido' : 'Registration failed';
+  String get assistedOnboardingLoaded => _es
+      ? 'Registro asistido por agente cargado. Revise esta informacion antes de completar el registro.'
+      : 'Agent-assisted onboarding loaded. Please review this information before completing registration.';
+  String get assistedOnboardingExpired => _es
+      ? 'Esta sesion de registro ha vencido. Pida a su agente que inicie una nueva sesion con usted.'
+      : 'This onboarding session has expired. Please ask your agent to start a new session with you.';
+  String get reviewAgentEnteredDetails => _es
+      ? 'Revise los detalles ingresados por el agente'
+      : 'Review Agent-Entered Details';
+  String emergencyContactNumber(int number) => _es
+      ? 'Contacto de emergencia $number'
+      : 'Emergency Contact $number';
   String get invalidActivationCode => _es
       ? 'Codigo de activacion invalido o inactivo'
       : 'Invalid or inactive activation code';

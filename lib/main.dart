@@ -221,6 +221,23 @@ Future<void> main() async {
     });
 
     // 🔥 HANDLE TAP WHEN APP IS CLOSED
+    Future<void> handleAssistedOnboardingLink(Uri uri) async {
+      final onboardingCode =
+          (uri.queryParameters['onboard'] ?? uri.queryParameters['onboarding'])
+              ?.toUpperCase();
+
+      if (onboardingCode == null || onboardingCode.isEmpty) return;
+
+      VitaLinkDeepLink.onboardingCode = onboardingCode;
+      debugPrint("Assisted onboarding code received: $onboardingCode");
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushNamed('/registration');
+      });
+    }
+
+    _appLinks.uriLinkStream.listen(handleAssistedOnboardingLink);
+
     Future<void> handleProfileShareLink(Uri uri) async {
       if (uri.host != 'share') return;
 
@@ -237,6 +254,7 @@ Future<void> main() async {
 
     final initialShareUri = await _appLinks.getInitialLink();
     if (initialShareUri != null) {
+      await handleAssistedOnboardingLink(initialShareUri);
       await handleProfileShareLink(initialShareUri);
     }
 
