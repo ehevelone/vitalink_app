@@ -36,6 +36,21 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
     return '"$s"'; // Ã°Å¸â€Â¥ wrap everything in quotes
   }
 
+  String _medicationSummary(Medication m) {
+    final parts = <String>[
+      m.name,
+      if (m.dose.isNotEmpty) m.dose,
+      if (m.frequency.isNotEmpty) m.frequency,
+      if (m.servingSize.isNotEmpty) "Serving: ${m.servingSize}",
+      if (m.activeIngredients.isNotEmpty)
+        "Supplement Facts: ${m.activeIngredients.join(", ")}",
+      if (m.otherIngredients.isNotEmpty)
+        "Other Ingredients: ${m.otherIngredients.join(", ")}",
+    ].where((part) => part.trim().isNotEmpty).toList();
+
+    return parts.join(" - ");
+  }
+
   bool _saving = false;
   bool _acknowledged = false;
   bool _canScroll = false;
@@ -103,10 +118,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
     final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
 
     // Ã°Å¸â€Â¥ Medications field
-    final medsStr = p.meds
-        .map((m) =>
-            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
-        .join("; ");
+    final medsStr = p.meds.map(_medicationSummary).join("; ");
 
     // Ã°Å¸â€Â¥ Doctors field
     final docsStr = p.doctors
@@ -262,8 +274,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
             else
               ...meds.map(
                 (m) => pw.Bullet(
-                  text:
-                      "${m.name}${m.dose.isNotEmpty ? " Ã¢â‚¬â€ ${m.dose}" : ""}${m.frequency.isNotEmpty ? " Ã¢â‚¬â€ ${m.frequency}" : ""}",
+                  text: _medicationSummary(m),
                 ),
               ),
             pw.SizedBox(height: 12),
@@ -349,6 +360,10 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
                     "dose": m.dose,
                     "frequency": m.frequency,
                     "pharmacy": m.prescriber,
+                    "itemType": m.itemType,
+                    "servingSize": m.servingSize,
+                    "activeIngredients": m.activeIngredients,
+                    "otherIngredients": m.otherIngredients,
                   })
               .toList(),
           "providers": doctors

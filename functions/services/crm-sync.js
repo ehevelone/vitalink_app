@@ -68,14 +68,51 @@ function formatList(items, fields) {
   return lines.length ? lines.join("; ") : null;
 }
 
+function formatMedicationList(items) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+
+  const lines = items
+    .map((item) => {
+      const type = clean(item?.itemType || item?.item_type);
+      const activeIngredients = Array.isArray(item?.activeIngredients)
+        ? item.activeIngredients.filter(Boolean).join(", ")
+        : Array.isArray(item?.active_ingredients)
+          ? item.active_ingredients.filter(Boolean).join(", ")
+          : clean(item?.activeIngredients || item?.active_ingredients);
+      const otherIngredients = Array.isArray(item?.otherIngredients)
+        ? item.otherIngredients.filter(Boolean).join(", ")
+        : Array.isArray(item?.other_ingredients)
+          ? item.other_ingredients.filter(Boolean).join(", ")
+          : clean(item?.otherIngredients || item?.other_ingredients);
+
+      return [
+        clean(item?.name),
+        clean(item?.dose || item?.dosage),
+        clean(item?.frequency),
+        clean(item?.pharmacy),
+        clean(item?.servingSize || item?.serving_size),
+        activeIngredients ? `Supplement Facts: ${activeIngredients}` : null,
+        otherIngredients ? `Other Ingredients: ${otherIngredients}` : null,
+        type && type !== "prescription" ? `Type: ${type}` : null,
+      ]
+        .filter(Boolean)
+        .join(" - ");
+    })
+    .filter(Boolean);
+
+  return lines.length ? lines.join("; ") : null;
+}
+
 function normalizeClientInput(input = {}) {
   const nameParts =
     splitName(input.fullName || input.name);
   const medicationList =
     Array.isArray(input.meds)
-      ? formatList(input.meds, ["name", "dose", "dosage", "frequency", "pharmacy"])
+      ? formatMedicationList(input.meds)
       : Array.isArray(input.medications)
-        ? formatList(input.medications, ["name", "dose", "dosage", "frequency", "pharmacy"])
+        ? formatMedicationList(input.medications)
       : null;
   const doctorList =
     Array.isArray(input.doctors)

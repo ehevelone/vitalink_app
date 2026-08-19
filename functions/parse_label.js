@@ -89,19 +89,23 @@ exports.handler = async (event) => {
         {
           role: "system",
           content: `
-You are a prescription bottle label parser.
+You are a medication and supplement label parser.
 
 You MUST return valid JSON only.
 
 Extract and return EXACTLY these fields:
 
 {
+  "item_type": "prescription",
   "name": "",
   "dose": "",
   "frequency": "",
   "prescribing_doctor": "",
   "pharmacy": "",
-  "pharmacy_phone": ""
+  "pharmacy_phone": "",
+  "serving_size": "",
+  "active_ingredients": [],
+  "other_ingredients": []
 }
 
 Rules:
@@ -109,13 +113,21 @@ Rules:
 1. Combine information across all images.
 2. Do NOT guess.
 3. If a field is not visible, return an empty string.
-4. Pharmacy examples: VA, Walmart, CVS, Walgreens, Hy-Vee, Target, etc.
-5. pharmacy_phone must be a visible 10-digit phone number.
-6. Remove credentials like MD, DO, NP from doctor name.
-7. Return medication name only (no dosage in name).
-8. Return dose separately (e.g., "500 mg", "4 mg").
-9. Return frequency as written (e.g., "Take 1 tablet twice daily").
-10. No commentary outside JSON.
+4. item_type must be exactly one of: "prescription", "supplement", "otc", "unknown".
+5. Use "prescription" when the label shows Rx number, prescriber, pharmacy, refills, patient directions, or NDC prescription context.
+6. Use "supplement" when the label shows Supplement Facts, Dietary Supplement, serving size, suggested use, or botanical/vitamin/mineral ingredients.
+7. Use "otc" for non-prescription over-the-counter medications such as aspirin, acetaminophen, ibuprofen, allergy medicine, antacids, or cold medicine.
+8. For prescriptions, pharmacy examples include VA, Walmart, CVS, Walgreens, Hy-Vee, Target, etc.
+9. pharmacy_phone must be a visible 10-digit phone number.
+10. Remove credentials like MD, DO, NP from doctor name.
+11. Return medication or supplement name only. Do not include dosage in name.
+12. Return prescription dose separately (e.g., "500 mg", "4 mg").
+13. Return prescription frequency as written (e.g., "Take 1 tablet twice daily").
+14. For supplements, return serving_size exactly as shown, such as "3 capsules".
+15. For supplements, active_ingredients should include Supplement Facts items with amount when visible, such as "Ginger Root Extract - 700 mg".
+16. For supplements, other_ingredients should include Other Ingredients items when visible.
+17. Do not put marketing claims or benefit bullets into active_ingredients.
+18. No commentary outside JSON.
 `
         },
         {
@@ -124,20 +136,20 @@ Rules:
             {
               type: "text",
               text:
-                "Extract medication, prescribing doctor, pharmacy name, and pharmacy phone number from these prescription bottle images."
+                "Extract the medication or supplement details from these label images. Classify whether this is a prescription, supplement, OTC medicine, or unknown."
             },
             ...imageInputs,
           ],
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 700,
+      max_tokens: 1000,
     });
 
     const parsed = JSON.parse(response.choices[0].message.content);
 
     return reply(200, {
-      version: "v5-multi-image-pharmacy-phone",
+      version: "v6-medication-supplement-classifier",
       data: parsed,
     });
   } catch (err) {

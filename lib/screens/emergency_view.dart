@@ -161,7 +161,13 @@ class _EmergencyViewState extends State<EmergencyView> {
             ...p.meds.map(
               (m) => _infoTile(
                 title: m.name,
-                subtitle: "${m.dose} - ${m.frequency}",
+                subtitle: [
+                  if (m.dose.isNotEmpty) m.dose,
+                  if (m.frequency.isNotEmpty) m.frequency,
+                  if (m.servingSize.isNotEmpty) "Serving: ${m.servingSize}",
+                  if (m.activeIngredients.isNotEmpty)
+                    "Supplement Facts: ${m.activeIngredients.take(3).join(", ")}",
+                ].join(" - "),
                 dense: true,
               ),
             ),

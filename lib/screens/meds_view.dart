@@ -31,6 +31,17 @@ class _MedsViewState extends State<MedsView> {
     });
   }
 
+  String _supplementPreview(Medication m) {
+    final parts = <String>[
+      if (m.dose.isNotEmpty) m.dose,
+      if (m.frequency.isNotEmpty) m.frequency,
+      if (m.servingSize.isNotEmpty) 'Serving: ${m.servingSize}',
+      if (m.activeIngredients.isNotEmpty)
+        'Supplement Facts: ${m.activeIngredients.take(3).join(", ")}',
+    ];
+    return parts.join(" • ");
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -60,19 +71,24 @@ class _MedsViewState extends State<MedsView> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final m = meds[i];
+                final subtitle = m.isSupplementOrOtc
+                    ? _supplementPreview(m)
+                    : [m.dose, m.frequency, m.prescriber]
+                        .where((s) => s.isNotEmpty)
+                        .join(" • ");
                 return ListTile(
                   tileColor: Colors.transparent,
                   shape: const Border(
                     bottom: BorderSide(color: Colors.black12),
                   ),
-                  leading: const Icon(Icons.medication_outlined),
+                  leading: Icon(
+                    m.isSupplementOrOtc
+                        ? Icons.spa_outlined
+                        : Icons.medication_outlined,
+                  ),
                   title:
                       Text(m.name.isNotEmpty ? m.name : "Unnamed Medication"),
-                  subtitle: Text(
-                    [m.dose, m.frequency, m.prescriber]
-                        .where((s) => s.isNotEmpty)
-                        .join(" • "),
-                  ),
+                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
                 );
               },
             ),

@@ -316,6 +316,10 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                             [
                               if (m.dose.isNotEmpty) m.dose,
                               if (m.frequency.isNotEmpty) m.frequency,
+                              if (m.servingSize.isNotEmpty)
+                                "Serving: ${m.servingSize}",
+                              if (m.activeIngredients.isNotEmpty)
+                                "Supplement Facts: ${m.activeIngredients.take(3).join(", ")}",
                             ].join(" • "),
                           ),
                         )),
