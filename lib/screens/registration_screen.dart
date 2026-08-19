@@ -42,6 +42,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _activationCodeCtrl = TextEditingController();
+  final _manualOnboardingCodeCtrl = TextEditingController();
 
   bool _loading = false;
   bool _showPassword = false;
@@ -115,6 +116,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _activationCodeCtrl.dispose();
+    _manualOnboardingCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -202,6 +204,27 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _loadManualOnboardingCode() async {
+    final code = _manualOnboardingCodeCtrl.text.trim().toUpperCase();
+    final strings = AppStrings.of(context);
+
+    if (code.isEmpty) {
+      setState(() {
+        _onboardingMessage = strings.enterOnboardingCode;
+      });
+      return;
+    }
+
+    setState(() {
+      _onboardingCode = code;
+      _onboardingLoaded = false;
+      _onboardingPayload = null;
+      _onboardingMessage = null;
+    });
+
+    await _lookupAssistedOnboarding();
   }
 
   Future<void> _pasteCode() async {
@@ -467,6 +490,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           key: _formKey,
           child: ListView(
             children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.assistedOnboardingPromptTitle,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      strings.assistedOnboardingPromptBody,
+                      style: const TextStyle(color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _manualOnboardingCodeCtrl,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: InputDecoration(
+                              labelText: strings.onboardingCode,
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed:
+                              _loading ? null : _loadManualOnboardingCode,
+                          child: Text(strings.loadMyInfo),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               Text(
                 strings.enterActivationCode,
                 style:

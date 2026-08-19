@@ -196,9 +196,9 @@ Future<void> _setupFCMGlobal() async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
   await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     await SystemChrome.setPreferredOrientations([

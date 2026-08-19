@@ -464,6 +464,9 @@ class _MedsScreenState extends State<MedsScreen> {
                   TextField(
                     controller: freqCtrl,
                     style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.multiline,
+                    minLines: 1,
+                    maxLines: 3,
                     decoration: const InputDecoration(
                       labelText: 'Frequency',
                       labelStyle: TextStyle(color: Colors.white70),

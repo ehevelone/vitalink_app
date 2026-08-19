@@ -47,6 +47,10 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
     _loadProfile();
     _setupFCM();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingDeviceTransfer();
+    });
   }
 
   @override
@@ -159,7 +163,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
       // 🔥 ADDED — refresh QR AFTER profile loads
       await _refreshQr();
-      await _checkPendingDeviceTransfer();
     } catch (e) {
       debugPrint("Profile load error: $e");
 
@@ -174,10 +177,14 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Future<void> _checkPendingDeviceTransfer() async {
     if (_transferPromptChecked || !mounted) return;
-    _transferPromptChecked = true;
 
     try {
       final result = await _transferService.checkPendingTransfer();
+      debugPrint("DEVICE TRANSFER CHECK RESULT: $result");
+      if (result["success"] == true) {
+        _transferPromptChecked = true;
+      }
+
       if (!mounted || result["hasTransfer"] != true) return;
 
       final code = result["transferCode"]?.toString() ?? "";
@@ -207,11 +214,12 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       await _transferService.redeemTransfer(code);
       if (!mounted) return;
 
+      await _loadProfile();
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(strings.transferLoaded)),
       );
-
-      await _loadProfile();
     } catch (e) {
       debugPrint("Device transfer check failed: $e");
     }
