@@ -198,6 +198,21 @@ class _MedsScreenState extends State<MedsScreen> {
 
   String _joinLines(List<String> values) => values.join('\n');
 
+  String _stripBrandMarks(String value) {
+    return value
+        .replaceAll(RegExp(r'(™|®|℠|©)'), '')
+        .replaceAll(RegExp(r'(â„¢|Â®|â„ |Â©|&trade;|&reg;)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  List<String> _stripBrandMarksFromList(List<String> values) {
+    return values
+        .map(_stripBrandMarks)
+        .where((value) => value.isNotEmpty)
+        .toList();
+  }
+
   String _typeLabel(String itemType) {
     switch (itemType) {
       case 'supplement':
@@ -760,18 +775,19 @@ class _MedsScreenState extends State<MedsScreen> {
       final parsed = jsonDecode(resp.body);
       final data = _normalizeParsed(parsed['data'] ?? parsed);
 
-      final scannedName = (data['name'] ?? "").toString().trim();
-      final scannedDose = (data['dose'] ?? "").toString().trim();
+      final scannedName =
+          _stripBrandMarks((data['name'] ?? "").toString().trim());
+      final scannedDose =
+          _stripBrandMarks((data['dose'] ?? "").toString().trim());
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
       var itemType = _normalizeItemType(data['item_type'] ?? data['itemType']);
-      final servingSize = (data['serving_size'] ?? data['servingSize'] ?? "")
-          .toString()
-          .trim();
-      final activeIngredients =
-          _stringList(data['active_ingredients'] ?? data['activeIngredients']);
-      final otherIngredients =
-          _stringList(data['other_ingredients'] ?? data['otherIngredients']);
+      final servingSize = _stripBrandMarks(
+          (data['serving_size'] ?? data['servingSize'] ?? "").toString().trim());
+      final activeIngredients = _stripBrandMarksFromList(
+          _stringList(data['active_ingredients'] ?? data['activeIngredients']));
+      final otherIngredients = _stripBrandMarksFromList(
+          _stringList(data['other_ingredients'] ?? data['otherIngredients']));
 
       if (scannedName.isEmpty) {
         if (!mounted) return;

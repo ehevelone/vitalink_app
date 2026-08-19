@@ -127,7 +127,8 @@ Rules:
 15. For supplements, active_ingredients should include Supplement Facts items with amount when visible, such as "Ginger Root Extract - 700 mg".
 16. For supplements, other_ingredients should include Other Ingredients items when visible.
 17. Do not put marketing claims or benefit bullets into active_ingredients.
-18. No commentary outside JSON.
+18. Remove trademark, registered, service mark, and copyright symbols from returned values.
+19. No commentary outside JSON.
 `
         },
         {
