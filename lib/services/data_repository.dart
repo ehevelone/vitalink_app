@@ -143,6 +143,48 @@ class DataRepository {
     return _loadProfilesInternal();
   }
 
+  Future<Map<String, dynamic>> exportDeviceTransferPayload() async {
+    final profiles = await _loadProfilesInternal();
+    final activeIndex = await _getActiveIndex(profiles);
+
+    return {
+      'version': 1,
+      'createdAt': DateTime.now().toIso8601String(),
+      'activeProfileIndex': activeIndex,
+      'profiles': profiles.map((p) => p.toJson()).toList(),
+    };
+  }
+
+  Future<void> importDeviceTransferPayload(
+    Map<String, dynamic> payload,
+  ) async {
+    final rawProfiles = payload['profiles'];
+
+    if (rawProfiles is! List || rawProfiles.isEmpty) {
+      throw Exception('No VitaLink profiles were found in this transfer.');
+    }
+
+    final profiles = <Profile>[];
+
+    for (final item in rawProfiles) {
+      if (item is Map) {
+        profiles.add(Profile.fromJson(Map<String, dynamic>.from(item)));
+      }
+    }
+
+    if (profiles.isEmpty) {
+      throw Exception('No VitaLink profiles were found in this transfer.');
+    }
+
+    final rawIndex = payload['activeProfileIndex'];
+    final activeIndex = rawIndex is int
+        ? rawIndex.clamp(0, profiles.length - 1).toInt()
+        : 0;
+
+    await _saveProfilesInternal(profiles, activeIndex: activeIndex);
+    await _syncName(profiles[activeIndex]);
+  }
+
   Future<void> saveProfile(
     Profile profile, {
     bool publishUpdate = true,

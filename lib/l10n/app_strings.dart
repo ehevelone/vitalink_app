@@ -25,6 +25,44 @@ class AppStrings {
       _es ? 'Usar idioma del telefono' : 'Use phone language';
   String get english => _es ? 'Ingles' : 'English';
   String get spanish => _es ? 'Espanol' : 'Spanish';
+  String get moveToNewDevice =>
+      _es ? 'Mover VitaLink a un dispositivo nuevo' : 'Move VitaLink to a New Device';
+  String get moveToNewDeviceBody => _es
+      ? 'Cree un traslado temporal para mover sus perfiles, tarjetas, polizas y datos de VitaLink a otro dispositivo. Esto no es una copia de seguridad permanente.'
+      : 'Create a temporary transfer to move your VitaLink profiles, cards, policies, and data to another device. This is not a permanent backup.';
+  String get createTransferCode =>
+      _es ? 'Crear codigo de traslado' : 'Create Transfer Code';
+  String get haveTransferCode =>
+      _es ? 'Tengo un codigo de traslado' : 'I Have a Transfer Code';
+  String get transferWarning => _es
+      ? 'Su informacion se guardara temporalmente en el servidor de VitaLink para moverla a su nuevo dispositivo. Se elimina automaticamente despues de 6 horas o inmediatamente despues de usar el codigo.'
+      : 'Your information will be temporarily stored on the VitaLink server so it can be moved to your new device. It is automatically deleted after 6 hours or immediately after the code is used.';
+  String get transferCodeCreated =>
+      _es ? 'Codigo de traslado creado' : 'Transfer Code Created';
+  String get transferCodeExpires => _es
+      ? 'Este codigo vence en 6 horas.'
+      : 'This code expires in 6 hours.';
+  String get enterTransferCode =>
+      _es ? 'Ingrese codigo de traslado' : 'Enter transfer code';
+  String get restoreTransfer =>
+      _es ? 'Cargar traslado' : 'Load Transfer';
+  String get transferComplete =>
+      _es ? 'Traslado completado.' : 'Transfer complete.';
+  String get pendingTransferTitle => _es
+      ? 'Mover VitaLink a este dispositivo?'
+      : 'Move VitaLink to This Device?';
+  String get pendingTransferBody => _es
+      ? 'Hay un traslado temporal de VitaLink esperando para esta cuenta. Desea cargarlo en este dispositivo ahora?'
+      : 'A temporary VitaLink transfer is waiting for this account. Do you want to load it on this device now?';
+  String get notNow => _es ? 'Ahora no' : 'Not Now';
+  String get transferLoaded =>
+      _es ? 'Traslado de VitaLink cargado.' : 'VitaLink transfer loaded.';
+  String get creatingTransfer =>
+      _es ? 'Creando traslado...' : 'Creating transfer...';
+  String get loadingTransfer =>
+      _es ? 'Cargando traslado...' : 'Loading transfer...';
+  String get copyCode => _es ? 'Copiar codigo' : 'Copy Code';
+  String get copied => _es ? 'Copiado.' : 'Copied.';
 
   String welcome(String name) => _es ? 'Bienvenido $name' : 'Welcome $name';
   String get user => _es ? 'Usuario' : 'User';
@@ -142,6 +180,17 @@ class AppStrings {
   String get activationCode => _es ? 'Codigo de activacion' : 'Activation Code';
   String get activationCodeRequired =>
       _es ? 'Codigo de activacion requerido' : 'Activation code required';
+  String get assistedOnboardingPromptTitle => _es
+      ? 'Su agente ya inicio su registro?'
+      : 'Did your agent already start your registration?';
+  String get assistedOnboardingPromptBody => _es
+      ? 'Ingrese el codigo de registro asistido para cargar la informacion que su agente ingreso con usted.'
+      : 'Enter the assisted onboarding code to load the information your agent entered with you.';
+  String get onboardingCode =>
+      _es ? 'Codigo de registro asistido' : 'Onboarding Code';
+  String get enterOnboardingCode =>
+      _es ? 'Ingrese el codigo de registro asistido' : 'Enter onboarding code';
+  String get loadMyInfo => _es ? 'Cargar mi informacion' : 'Load My Info';
   String get fullName => _es ? 'Nombre completo' : 'Full Name';
   String get nameRequired => _es ? 'Nombre requerido' : 'Name required';
   String get phone => _es ? 'Telefono' : 'Phone';

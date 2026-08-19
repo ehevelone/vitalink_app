@@ -706,6 +706,34 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> createDeviceTransfer({
+    required String userId,
+    required Map<String, dynamic> payload,
+  }) {
+    return _postJsonWithUserSession("create_device_transfer", {
+      "userId": userId,
+      "payload": payload,
+    });
+  }
+
+  static Future<Map<String, dynamic>> checkDeviceTransfer({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("check_device_transfer", {
+      "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> redeemDeviceTransfer({
+    required String userId,
+    required String transferCode,
+  }) {
+    return _postJsonWithUserSession("redeem_device_transfer", {
+      "userId": userId,
+      "transferCode": transferCode,
+    });
+  }
+
   static Future<Map<String, dynamic>> submitAgentReferral({
     required String userId,
     required String referralName,
