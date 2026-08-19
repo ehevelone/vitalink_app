@@ -11,7 +11,6 @@ import '../services/app_state.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
-import '../services/device_transfer_service.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../l10n/app_strings.dart';
 
@@ -25,13 +24,11 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   late final DataRepository _repo;
   final SecureStore _store = SecureStore();
-  final DeviceTransferService _transferService = DeviceTransferService();
 
   Profile? _p;
   bool _loading = true;
   String _displayName = "User";
   bool _notificationPermissionDialogShown = false;
-  bool _transferPromptChecked = false;
 
   bool _syncRan = false;
   bool _notificationDialogOpen = false;
@@ -47,10 +44,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
     _loadProfile();
     _setupFCM();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPendingDeviceTransfer();
-    });
   }
 
   @override
@@ -172,56 +165,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         _displayName = "User";
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _checkPendingDeviceTransfer() async {
-    if (_transferPromptChecked || !mounted) return;
-
-    try {
-      final result = await _transferService.checkPendingTransfer();
-      debugPrint("DEVICE TRANSFER CHECK RESULT: $result");
-      if (result["success"] == true) {
-        _transferPromptChecked = true;
-      }
-
-      if (!mounted || result["hasTransfer"] != true) return;
-
-      final code = result["transferCode"]?.toString() ?? "";
-      if (code.isEmpty) return;
-      final strings = AppStrings.of(context);
-
-      final restore = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(strings.pendingTransferTitle),
-          content: Text(strings.pendingTransferBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(strings.notNow),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(strings.restoreTransfer),
-            ),
-          ],
-        ),
-      );
-
-      if (restore != true || !mounted) return;
-
-      await _transferService.redeemTransfer(code);
-      if (!mounted) return;
-
-      await _loadProfile();
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.transferLoaded)),
-      );
-    } catch (e) {
-      debugPrint("Device transfer check failed: $e");
     }
   }
 
