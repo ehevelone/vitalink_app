@@ -149,7 +149,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _stateCtrl,
-                        decoration: const InputDecoration(labelText: "State"),
+                        decoration:
+                            const InputDecoration(labelText: "State"),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -157,7 +158,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                       child: TextFormField(
                         controller: _zipCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "ZIP"),
+                        decoration:
+                            const InputDecoration(labelText: "ZIP"),
                       ),
                     ),
                   ],

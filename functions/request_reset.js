@@ -26,50 +26,11 @@ function getResetTable(role) {
   return null;
 }
 
-function getEmailSubject(role, languageCode = "en") {
-  if (languageCode === "es") {
-    if (role === "agents") return "Código de restablecimiento de contraseña de agente de VitaLink";
-    if (role === "admins") return "Código de restablecimiento de contraseña de administrador de VitaLink";
-    if (role === "rsms") return "Código de restablecimiento de contraseña de RSM de VitaLink";
-    return "Código de restablecimiento de contraseña de VitaLink";
-  }
-
+function getEmailSubject(role) {
   if (role === "agents") return "VitaLink Agent Password Reset Code";
   if (role === "admins") return "VitaLink Admin Password Reset Code";
   if (role === "rsms") return "VitaLink RSM Password Reset Code";
   return "VitaLink Password Reset Code";
-}
-
-function getEmailMessage(resetCode, languageCode = "en") {
-  if (languageCode === "es") {
-    return `
-Hola,
-
-Su código de restablecimiento de contraseña de VitaLink es:
-
-${resetCode}
-
-Este código vence en 20 minutos.
-
-Si usted no solicitó esto, puede ignorar este correo electrónico.
-
-- Soporte de VitaLink
-`.trim();
-  }
-
-  return `
-Hi,
-
-Your VitaLink password reset code is:
-
-${resetCode}
-
-This code expires in 20 minutes.
-
-If you did not request this, you can ignore this email.
-
-- VitaLink Support
-`.trim();
 }
 
 async function ensureResetColumns(table) {
@@ -110,10 +71,6 @@ exports.handler = async (event) => {
     }
 
     const { emailOrPhone, role } = body;
-    const requestedLanguage = String(body.languageCode || body.language_code || "en")
-      .trim()
-      .toLowerCase();
-    const languageCode = requestedLanguage === "es" ? "es" : "en";
 
     if (!emailOrPhone || !role) {
       return reply(400, {
@@ -186,13 +143,25 @@ exports.handler = async (event) => {
     stage = "create_mailer";
     const transporter = createMailer();
 
-    const message = getEmailMessage(resetCode, languageCode);
+    const message = `
+Hi,
+
+Your VitaLink password reset code is:
+
+${resetCode}
+
+This code expires in 20 minutes.
+
+If you did not request this, you can ignore this email.
+
+- VitaLink Support
+`.trim();
 
     stage = "send_email";
     await transporter.sendMail({
       from: fromAddress("VitaLink Support"),
       to: user.email,
-      subject: getEmailSubject(role, languageCode),
+      subject: getEmailSubject(role),
       text: message,
     });
 

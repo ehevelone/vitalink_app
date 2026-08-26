@@ -278,6 +278,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
             child: Image.asset(
               "assets/images/app_icon_big.png",
               height: 32,
+              cacheHeight: 96,
             ),
           ),
         ],
@@ -291,6 +292,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                 child: Image.asset(
                   "assets/images/logo_icon.png",
                   width: MediaQuery.of(context).size.width * 0.9,
+                  cacheWidth: 1024,
                 ),
               ),
             ),
@@ -317,8 +319,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                             _item(Icons.groups, "My Clients", '/agent_clients'),
                             _item(Icons.favorite, "Referral Center",
                                 '/agent_referrals'),
-                            _item(Icons.task_alt, "Notes / Tasks",
-                                '/agent_notes'),
+                            _item(Icons.task_alt, "Notes / Tasks", '/agent_notes'),
                             _item(Icons.medical_information, "Medications",
                                 '/meds'),
                             _item(Icons.people, "Doctors", '/doctors'),

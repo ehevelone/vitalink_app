@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models.dart';
 import 'api_service.dart';
+import 'persistent_file_store.dart';
 import 'secure_store.dart';
 
 class ProfileUpdateSyncService {
@@ -70,7 +71,9 @@ class ProfileUpdateSyncService {
         profileId: profile.id,
         profileName: profile.fullName,
         allowedSections: sections,
-        payload: buildPayload(profile, sections: sections),
+        payload: await PersistentFileStore.attachProfileFileBytes(
+          buildPayload(profile, sections: sections),
+        ),
       );
     } catch (e) {
       debugPrint('Profile update publish failed: $e');

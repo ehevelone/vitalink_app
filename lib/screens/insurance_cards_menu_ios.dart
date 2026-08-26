@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/api_service.dart';
+import '../services/persistent_file_store.dart';
 import '../services/secure_store.dart';
 import 'insurance_card_detail.dart';
 
@@ -13,10 +14,12 @@ class IOSCardScanScreen extends StatefulWidget {
   const IOSCardScanScreen({super.key});
 
   @override
-  State<IOSCardScanScreen> createState() => _IOSCardScanScreenState();
+  State<IOSCardScanScreen> createState() =>
+      _IOSCardScanScreenState();
 }
 
-class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
+class _IOSCardScanScreenState
+    extends State<IOSCardScanScreen> {
   late final DataRepository _repo;
 
   Profile? _p;
@@ -78,7 +81,8 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
       bool keepScanning = true;
 
       while (keepScanning) {
-        final result = await CunningDocumentScanner.getPictures();
+        final result =
+            await CunningDocumentScanner.getPictures();
 
         if (result == null || result.isEmpty) break;
 
@@ -95,11 +99,13 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context, false),
+                    onPressed: () =>
+                        Navigator.pop(context, false),
                     child: const Text("Done"),
                   ),
                   FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
+                    onPressed: () =>
+                        Navigator.pop(context, true),
                     child: const Text("Scan Back"),
                   ),
                 ],
@@ -110,8 +116,16 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
 
       if (images.isEmpty) return;
 
-      final front = images[0];
-      final back = images.length > 1 ? images[1] : null;
+      final front = await PersistentFileStore.saveImageFile(
+        images[0],
+        folder: 'insurance_cards',
+      );
+      final back = images.length > 1
+          ? await PersistentFileStore.saveImageFile(
+              images[1],
+              folder: 'insurance_cards',
+            )
+          : null;
       Map<String, dynamic> parsed = {};
 
       try {
@@ -131,7 +145,8 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
           policy: (parsed['policy'] ?? '').toString().trim(),
           memberId: (parsed['memberId'] ?? '').toString().trim(),
           policyType: (parsed['planType'] ?? '').toString().trim(),
-          medicarePlanId: (parsed['medicarePlanId'] ?? '').toString().trim(),
+          medicarePlanId:
+              (parsed['medicarePlanId'] ?? '').toString().trim(),
           medicarePlanKind:
               (parsed['medicarePlanKind'] ?? '').toString().trim(),
           ocrText: (parsed['notes'] ?? '').toString().trim(),
@@ -238,15 +253,14 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _scanCard,
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+style: FilledButton.styleFrom(
+  backgroundColor: Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
+  foregroundColor: Colors.white,
+  padding: const EdgeInsets.symmetric(vertical: 16),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+  ),
+),
                 icon: const Icon(Icons.camera_alt),
                 label: const Text(
                   "Scan Insurance Card",
@@ -279,6 +293,8 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
                                   file,
                                   width: 70,
                                   height: 50,
+                                  cacheWidth: 210,
+                                  cacheHeight: 150,
                                   fit: BoxFit.cover,
                                 )
                               : const Icon(Icons.broken_image),
@@ -318,8 +334,8 @@ class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
                                   ),
                                 ),
                               IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
                                 onPressed: () => _deleteCard(card),
                               ),
                             ],

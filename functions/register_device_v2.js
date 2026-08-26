@@ -22,7 +22,6 @@ async function ensureDeviceDeliveryColumns() {
       device_id TEXT,
       device_token TEXT,
       platform TEXT,
-      language_code TEXT,
       push_status TEXT,
       last_push_at TIMESTAMPTZ,
       last_push_success_at TIMESTAMPTZ,
@@ -39,7 +38,6 @@ async function ensureDeviceDeliveryColumns() {
     ADD COLUMN IF NOT EXISTS device_id TEXT,
     ADD COLUMN IF NOT EXISTS device_token TEXT,
     ADD COLUMN IF NOT EXISTS platform TEXT,
-    ADD COLUMN IF NOT EXISTS language_code TEXT,
     ADD COLUMN IF NOT EXISTS push_status TEXT,
     ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
@@ -120,10 +118,6 @@ exports.handler = async (event) => {
     // 🔥 CHANGED: email → user_id
     const { user_id, deviceToken, fcmToken, platform, sessionToken } = body;
     const token = deviceToken || fcmToken;
-    const requestedLanguage = String(body.languageCode || body.language_code || "en")
-      .trim()
-      .toLowerCase();
-    const languageCode = requestedLanguage === "es" ? "es" : "en";
 
     if (!user_id || !token) {
       return reply(400, {
@@ -219,14 +213,13 @@ exports.handler = async (event) => {
               agent_id = COALESCE($2, agent_id),
               device_token = $3,
               platform = $4,
-              language_code = $5,
               push_status = 'registered',
               last_push_error = NULL,
               updated_at = NOW()
-          WHERE id = $6
+          WHERE id = $5
           RETURNING *;
           `,
-          [userId, agentId || null, token, platform || "unknown", languageCode, targetId]
+          [userId, agentId || null, token, platform || "unknown", targetId]
         );
 
         await db.query("COMMIT");
@@ -237,11 +230,11 @@ exports.handler = async (event) => {
       const insertedDevice = await db.query(
         `
         INSERT INTO user_devices
-          (user_id, agent_id, device_token, platform, language_code, push_status, created_at, updated_at)
-        VALUES ($1,$2,$3,$4,$5,'registered',NOW(),NOW())
+          (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,'registered',NOW(),NOW())
         RETURNING *;
         `,
-        [userId, agentId || null, token, platform || "unknown", languageCode]
+        [userId, agentId || null, token, platform || "unknown"]
       );
 
       await db.query("COMMIT");
@@ -302,14 +295,13 @@ exports.handler = async (event) => {
         SET user_id=$1,
             agent_id=$2,
             platform=$3,
-            language_code=$4,
             push_status='registered',
             last_push_error=NULL,
             updated_at=NOW()
-        WHERE id=$5
+        WHERE id=$4
         RETURNING *;
         `,
-        [userId, agentId || null, platform || "unknown", languageCode, existingToken.rows[0].id]
+        [userId, agentId || null, platform || "unknown", existingToken.rows[0].id]
       );
 
       console.log("Device token reused for user:", updated.rows[0]?.id);
@@ -328,14 +320,13 @@ exports.handler = async (event) => {
         SET device_token=$1,
             platform=$2,
             agent_id=$3,
-            language_code=$4,
             push_status='registered',
             last_push_error=NULL,
             updated_at=NOW()
-        WHERE user_id=$5
+        WHERE user_id=$4
         RETURNING *;
         `,
-        [token, platform || "unknown", agentId || null, languageCode, userId]
+        [token, platform || "unknown", agentId || null, userId]
       );
 
       console.log("♻️ Device updated:", updated.rows[0]);
@@ -345,11 +336,11 @@ exports.handler = async (event) => {
     const inserted = await db.query(
       `
       INSERT INTO user_devices
-        (user_id, agent_id, device_token, platform, language_code, push_status, created_at, updated_at)
-      VALUES ($1,$2,$3,$4,$5,'registered',NOW(),NOW())
+        (user_id, agent_id, device_token, platform, push_status, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,'registered',NOW(),NOW())
       RETURNING *;
       `,
-      [userId, agentId || null, token, platform || "unknown", languageCode]
+      [userId, agentId || null, token, platform || "unknown"]
     );
 
     console.log("✅ Device inserted:", inserted.rows[0]);

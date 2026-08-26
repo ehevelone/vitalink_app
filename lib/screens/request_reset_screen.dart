@@ -1,7 +1,5 @@
 // lib/screens/request_reset_screen.dart
 import 'package:flutter/material.dart';
-
-import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 
 class RequestResetScreen extends StatefulWidget {
@@ -25,14 +23,14 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
     try {
       final data = await ApiService.requestPasswordReset(
         emailOrPhone: _emailCtrl.text.trim(),
-        role: "users",
+        role: "users", // 🔥 REQUIRED
       );
 
       if (data['success'] == true) {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.of(context).resetCodeSent)),
+          const SnackBar(content: Text("Reset code sent ✅")),
         );
 
         Navigator.pushNamed(
@@ -44,16 +42,14 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              data['error'] ?? AppStrings.of(context).requestFailed,
-            ),
+            content: Text(data['error'] ?? "Request failed ❌"),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.of(context).errorMessage('$e'))),
+        SnackBar(content: Text("Error: $e")),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -68,10 +64,8 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
     return Scaffold(
-      appBar: AppBar(title: Text(strings.requestPasswordReset)),
+      appBar: AppBar(title: const Text("Request Password Reset")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -80,16 +74,16 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: InputDecoration(labelText: strings.emailOrPhone),
+                decoration: const InputDecoration(labelText: "Email or Phone"),
                 validator: (v) =>
-                    v == null || v.isEmpty ? strings.enterEmailOrPhone : null,
+                    v == null || v.isEmpty ? "Enter email or phone" : null,
               ),
               const SizedBox(height: 24),
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.send),
-                      label: Text(strings.sendResetCode),
+                      label: const Text("Send Reset Code"),
                       onPressed: _doRequest,
                     ),
             ],

@@ -23,7 +23,8 @@ class PhoneNumberFormatter extends TextInputFormatter {
 
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+      TextEditingValue oldValue,
+      TextEditingValue newValue) {
     final digits = digitsForUsPhone(newValue.text);
 
     String formatted = digits;

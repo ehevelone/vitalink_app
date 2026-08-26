@@ -73,8 +73,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
     }
   }
 
-  Future<void> _updateStatus(
-      Map<String, dynamic> referral, String status) async {
+  Future<void> _updateStatus(Map<String, dynamic> referral, String status) async {
     final agentId = await _agentId();
     final referralId = referral['id']?.toString();
     if (agentId == null || referralId == null || referralId.isEmpty) return;
@@ -97,8 +96,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
   }
 
   Future<void> _confirmDeleteReferral(Map<String, dynamic> referral) async {
-    final referralName =
-        referral['referral_name']?.toString() ?? 'this referral';
+    final referralName = referral['referral_name']?.toString() ?? 'this referral';
 
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -195,8 +193,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_error != null)
-                      Text(_error!,
-                          style: const TextStyle(color: Colors.redAccent)),
+                      Text(_error!, style: const TextStyle(color: Colors.redAccent)),
                     _buildMetrics(),
                     const SizedBox(height: 16),
                     if (_referrals.isEmpty)
@@ -266,8 +263,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: Colors.lightBlueAccent.withValues(alpha: .35)),
+        border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: .35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

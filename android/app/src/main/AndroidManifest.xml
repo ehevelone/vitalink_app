@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.etnaturals.vitalinkapp">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- REMOVE Advertising ID from merged dependencies -->
     <uses-permission
@@ -14,7 +13,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:label="@string/app_name"
+        android:label="vitalink"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -105,6 +104,14 @@
             </intent-filter>
 
         </activity>
+
+        <activity
+            android:name="biz.cunning.cunning_document_scanner.fallback.DocumentScannerActivity"
+            tools:remove="android:screenOrientation" />
+
+        <activity
+            android:name="com.google.mlkit.vision.documentscanner.internal.GmsDocumentScanningDelegateActivity"
+            tools:remove="android:screenOrientation" />
 
         <!-- Flutter embedding -->
         <meta-data

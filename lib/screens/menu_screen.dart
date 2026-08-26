@@ -12,7 +12,6 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
 import '../widgets/safe_bottom_button.dart';
-import '../l10n/app_strings.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -32,6 +31,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   bool _syncRan = false;
   bool _notificationDialogOpen = false;
+  StreamSubscription<String>? _tokenSub;
+  StreamSubscription<RemoteMessage>? _messageSub;
+  StreamSubscription<RemoteMessage>? _openedSub;
 
   @override
   void initState() {
@@ -195,7 +197,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
       await _registerToken();
 
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      await _tokenSub?.cancel();
+      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         final userId = await _store.getString("userId");
 
         if (userId == null) return;
@@ -208,7 +211,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         debugPrint("TOKEN REFRESHED: $newToken");
       });
 
-      FirebaseMessaging.onMessage.listen((message) {
+      await _messageSub?.cancel();
+      _messageSub = FirebaseMessaging.onMessage.listen((message) {
         debugPrint("FOREGROUND MESSAGE: ${message.data}");
         debugPrint(
           "FOREGROUND NOTIFICATION: "
@@ -219,15 +223,13 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
         if (!mounted || _notificationDialogOpen) return;
 
-        final strings = AppStrings.of(context);
-
         final title = message.notification?.title ??
             message.data["title"] ??
-            strings.newNotification;
+            "New Notification";
 
         final body = message.notification?.body ??
             message.data["body"] ??
-            strings.newNotificationBody;
+            "You have a new notification";
 
         _notificationDialogOpen = true;
 
@@ -261,9 +263,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.greenAccent,
                 ),
-                child: Text(
-                  strings.ok,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                child: const Text(
+                  "OK",
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -279,7 +281,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         }
       });
 
-      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      await _openedSub?.cancel();
+      _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
         _handleNotificationTap(message);
       });
     } catch (e) {
@@ -302,23 +305,23 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text(
-            AppStrings.of(context).allowNotifications,
-            style: const TextStyle(
+          title: const Text(
+            "Allow Notifications",
+            style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: Text(
-            AppStrings.of(context).notificationsNeeded,
-            style: const TextStyle(color: Colors.white70),
+          content: const Text(
+            "VitaLink needs notifications turned on so you can receive important alerts, profile updates, and messages from your agent.",
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 if (Navigator.canPop(context)) Navigator.pop(context);
               },
-              child: Text(AppStrings.of(context).later),
+              child: const Text("Later"),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -329,7 +332,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 backgroundColor: const Color(0xFF7ED6F8),
                 foregroundColor: Colors.black,
               ),
-              child: Text(AppStrings.of(context).openSettings),
+              child: const Text("Open Settings"),
             ),
           ],
         ),
@@ -375,18 +378,19 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _tokenSub?.cancel();
+    _messageSub?.cancel();
+    _openedSub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         title: Text(
-          strings.welcome(_displayName == "User" ? strings.user : _displayName),
+          "Welcome $_displayName",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -395,6 +399,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
             child: Image.asset(
               "assets/images/app_icon_big.png",
               height: 32,
+              cacheHeight: 96,
             ),
           ),
         ],
@@ -408,6 +413,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 child: Image.asset(
                   "assets/images/logo_icon.png",
                   width: MediaQuery.of(context).size.width * 0.9,
+                  cacheWidth: 1024,
                 ),
               ),
             ),
@@ -419,30 +425,29 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            _item(Icons.person_pin_circle, strings.myAgent,
+                            _item(Icons.person_pin_circle, "My Agent",
                                 '/my_agent_user'),
-                            _item(Icons.medical_information,
-                                strings.medications, '/meds'),
-                            _item(Icons.people, strings.doctors, '/doctors'),
-                            _item(Icons.event_available, strings.appointments,
+                            _item(Icons.medical_information, "Medications",
+                                '/meds'),
+                            _item(Icons.people, "Doctors", '/doctors'),
+                            _item(Icons.event_available, "Appointments",
                                 '/appointments'),
-                            _item(Icons.credit_card, strings.insuranceCards,
+                            _item(Icons.credit_card, "Insurance Cards",
                                 '/insurance_cards_menu'),
-                            _item(Icons.policy, strings.insurancePolicies,
+                            _item(Icons.policy, "Insurance Policies",
                                 '/insurance_policies'),
-                            _item(Icons.person, strings.myProfile,
-                                '/my_profile_user'),
-                            _item(Icons.share, strings.profileSharing,
-                                '/profile_sharing'),
-                            _item(Icons.sync, strings.profileUpdates,
-                                '/profile_updates'),
                             _item(
-                                Icons.settings, strings.settings, '/settings'),
+                                Icons.person, "My Profile", '/my_profile_user'),
+                            _item(Icons.share, "Profile Sharing",
+                                '/profile_sharing'),
+                            _item(Icons.sync, "Profile Updates",
+                                '/profile_updates'),
+                            _item(Icons.settings, "Settings", '/settings'),
                           ],
                         ),
                       ),
                       SafeBottomButton(
-                        label: strings.addFamilyMember,
+                        label: "Add Family Member",
                         icon: Icons.group_add,
                         color: Colors.blue.shade700,
                         onPressed: () => Navigator.pushNamed(
@@ -451,7 +456,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: strings.switchProfile,
+                        label: "Switch Profile",
                         icon: Icons.swap_horiz,
                         color: Colors.grey.shade900,
                         onPressed: () => Navigator.pushNamed(
@@ -460,14 +465,14 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: strings.emergencyInfo,
+                        label: "Emergency Info",
                         icon: Icons.warning_amber_rounded,
                         color: Colors.red.shade800,
                         onPressed: () =>
                             Navigator.pushNamed(context, '/emergency'),
                       ),
                       SafeBottomButton(
-                        label: strings.logOut,
+                        label: "Log Out",
                         icon: Icons.logout,
                         color: Colors.pink.shade100,
                         onPressed: () => _logout(context),

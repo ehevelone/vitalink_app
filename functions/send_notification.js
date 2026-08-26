@@ -68,7 +68,6 @@ async function ensureDeviceDeliveryColumns() {
   await db.query(`
     ALTER TABLE user_devices
     ADD COLUMN IF NOT EXISTS push_status TEXT,
-    ADD COLUMN IF NOT EXISTS language_code TEXT,
     ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
@@ -140,51 +139,8 @@ function pickCampaign(now = new Date()) {
 }
 
 /* CAMPAIGN MESSAGES */
-function campaignText(campaign, agentName, languageCode = "en") {
-  const lang = languageCode === "es" ? "es" : "en";
+function campaignText(campaign, agentName) {
   const name = agentName || "Your Agent";
-
-  if (lang === "es") {
-    const spanishName = agentName || "su agente";
-
-    if (campaign === "PREP") {
-      return {
-        title: `Mensaje de ${spanishName}`,
-        body: "Se acerca la temporada de inscripción de Medicare. Toque aquí para enviar su información de forma segura antes de su próxima cita.",
-        route: "/authorization_form",
-      };
-    }
-
-    if (campaign === "AEP") {
-      return {
-        title: `Mensaje de ${spanishName}`,
-        body: "Es hora de su revisión de Medicare. Toque aquí para enviar de forma segura su información actualizada a su agente.",
-        route: "/authorization_form",
-      };
-    }
-
-    if (campaign === "OEP") {
-      return {
-        title: `Mensaje de ${spanishName}`,
-        body: "Todavía hay tiempo para revisar su cobertura de Medicare. Toque aquí para enviar de forma segura su información actualizada a su agente.",
-        route: "/authorization_form",
-      };
-    }
-
-    if (campaign === "UPDATE") {
-      return {
-        title: "VitaLink actualizado",
-        body: "VitaLink se ha actualizado con mejoras y nuevas funciones. Abra la aplicación para ver las novedades.",
-        route: "/update_app",
-      };
-    }
-
-    return {
-      title: `Mensaje de ${spanishName}`,
-      body: "Toque aquí para enviar de forma segura su información de Medicare para que su agente pueda mantener su cobertura actualizada.",
-      route: "/authorization_form",
-    };
-  }
 
   if (campaign === "PREP") {
     return {
@@ -294,8 +250,7 @@ exports.handler = async (event) => {
       SELECT
         ud.id AS device_row_id,
         ud.device_token AS device_token,
-        ud.user_id AS user_id,
-        COALESCE(NULLIF(LOWER(TRIM(ud.language_code)), ''), 'en') AS language_code
+        ud.user_id AS user_id
       FROM user_devices ud
       JOIN users u ON u.id = ud.user_id
       WHERE u.agent_id = $1
@@ -326,46 +281,38 @@ exports.handler = async (event) => {
         deviceRowId: row.device_row_id,
         userId: row.user_id,
         token,
-        languageCode: row.language_code === "es" ? "es" : "en",
       });
     }
 
-    let successCount = 0;
-    let failureCount = 0;
+    const tokens = devices.map(d => d.token);
 
-    for (const languageCode of ["en", "es"]) {
-      const languageDevices = devices.filter((device) => device.languageCode === languageCode);
-      if (!languageDevices.length) continue;
+    const notif = campaignText(campaign, agent.name);
 
-      const notif = campaignText(campaign, agent.name, languageCode);
-      const message = {
-        tokens: languageDevices.map((device) => device.token),
-        notification: {
-          title: notif.title,
-          body: notif.body,
-        },
-        android: {
-          priority: "high",
-        },
-        data: {
-          click_action: "FLUTTER_NOTIFICATION_CLICK",
-          route: notif.route,
-        },
-      };
+    const message = {
+      tokens,
+      notification: {
+        title: notif.title,
+        body: notif.body,
+      },
+      android: {
+        priority: "high",
+      },
+      data: {
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+        route: notif.route,
+      },
+    };
 
-      const response = await admin.messaging().sendEachForMulticast(message);
-      await recordDeliveryResults(languageDevices, response);
+    const response = await admin.messaging().sendEachForMulticast(message);
 
-      successCount += response?.successCount ?? 0;
-      failureCount += response?.failureCount ?? 0;
-    }
+    await recordDeliveryResults(devices, response);
 
     return reply(200, {
       success: true,
-      devicesTargeted: devices.length,
-      successCount,
-      failureCount,
-      needsContactCount: failureCount,
+      devicesTargeted: tokens.length,
+      successCount: response?.successCount ?? 0,
+      failureCount: response?.failureCount ?? 0,
+      needsContactCount: response?.failureCount ?? 0,
     });
 
   } catch (err) {

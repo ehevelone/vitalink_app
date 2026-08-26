@@ -9,10 +9,6 @@ class Medication {
   String frequency;
   String prescriber;
   String source;
-  String itemType;
-  String servingSize;
-  List<String> activeIngredients;
-  List<String> otherIngredients;
   DateTime updatedAt;
 
   Medication({
@@ -21,17 +17,8 @@ class Medication {
     this.frequency = '',
     this.prescriber = '',
     this.source = 'Manual',
-    this.itemType = 'prescription',
-    this.servingSize = '',
-    List<String>? activeIngredients,
-    List<String>? otherIngredients,
     DateTime? updatedAt,
-  })  : activeIngredients = activeIngredients ?? [],
-        otherIngredients = otherIngredients ?? [],
-        updatedAt = updatedAt ?? DateTime.now();
-
-  bool get isSupplementOrOtc =>
-      itemType == 'supplement' || itemType == 'otc';
+  }) : updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -39,29 +26,8 @@ class Medication {
         'frequency': frequency,
         'prescriber': prescriber,
         'source': source,
-        'itemType': itemType,
-        'servingSize': servingSize,
-        'activeIngredients': activeIngredients,
-        'otherIngredients': otherIngredients,
         'updatedAt': updatedAt.toIso8601String(),
       };
-
-  static List<String> _stringList(dynamic value) {
-    if (value is List) {
-      return value
-          .map((item) => item?.toString().trim() ?? '')
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-    if (value is String && value.trim().isNotEmpty) {
-      return value
-          .split(RegExp(r'[\n;]'))
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-    return [];
-  }
 
   factory Medication.fromJson(Map<String, dynamic> json) => Medication(
         name: json['name'] ?? '',
@@ -69,13 +35,8 @@ class Medication {
         frequency: json['frequency'] ?? '',
         prescriber: json['prescriber'] ?? '',
         source: json['source'] ?? 'Manual',
-        itemType: json['itemType'] ?? json['type'] ?? 'prescription',
-        servingSize: json['servingSize'] ?? json['serving_size'] ?? '',
-        activeIngredients:
-            _stringList(json['activeIngredients'] ?? json['active_ingredients']),
-        otherIngredients:
-            _stringList(json['otherIngredients'] ?? json['other_ingredients']),
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -144,7 +105,8 @@ class UserAppointment {
         appointmentAt:
             DateTime.tryParse(json['appointmentAt'] ?? '') ?? DateTime.now(),
         notes: json['notes'] ?? '',
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -212,7 +174,8 @@ class InsuranceCard {
         backImagePath: json['backImagePath'],
         imagePath: json['imagePath'],
         source: json['source'] ?? 'Manual',
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -275,19 +238,21 @@ class Insurance {
         beneficiary: json['beneficiary'] ?? '',
         decPagePaths:
             (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
-        benefits: (json['benefits'] as List<dynamic>? ?? []).map((b) {
-          if (b is Map) {
-            return {
-              'name': b['name']?.toString() ?? '',
-              'value': b['value']?.toString() ?? '',
-            };
-          } else {
-            return {
-              'name': b.toString(),
-              'value': '',
-            };
-          }
-        }).toList(),
+        benefits: (json['benefits'] as List<dynamic>? ?? [])
+            .map((b) {
+              if (b is Map) {
+                return {
+                  'name': b['name']?.toString() ?? '',
+                  'value': b['value']?.toString() ?? '',
+                };
+              } else {
+                return {
+                  'name': b.toString(),
+                  'value': '',
+                };
+              }
+            })
+            .toList(),
         cards: (json['cards'] as List<dynamic>? ?? [])
             .map((c) => InsuranceCard.fromJson(c))
             .toList(),
@@ -407,16 +372,16 @@ class EmergencyInfo {
         parsedContacts.isNotEmpty ? parsedContacts.first.phone : legacyPhone;
 
     return EmergencyInfo(
-      contact: firstContact,
-      phone: firstPhone,
-      contacts: parsedContacts,
-      allergies: json['allergies'] ?? '',
-      conditions: json['conditions'] ?? '',
-      bloodType: json['bloodType'] ?? '',
-      implants: json['implants'] ?? '',
-      procedures: json['procedures'] ?? '',
-      organDonor: json['organDonor'] ?? false,
-    );
+        contact: firstContact,
+        phone: firstPhone,
+        contacts: parsedContacts,
+        allergies: json['allergies'] ?? '',
+        conditions: json['conditions'] ?? '',
+        bloodType: json['bloodType'] ?? '',
+        implants: json['implants'] ?? '',
+        procedures: json['procedures'] ?? '',
+        organDonor: json['organDonor'] ?? false,
+      );
   }
 }
 
@@ -604,7 +569,8 @@ class Profile {
         id: json['id'],
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
-        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt:
+            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
         userPhone: json['userPhone'] ?? '',
         address: json['address'],
         city: json['city'],

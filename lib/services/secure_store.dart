@@ -33,7 +33,8 @@ class SecureStore {
   }
 
   Future<bool?> getBool(String key) async {
-    final value = await _storage.read(key: key, iOptions: _iosOptions);
+    final value =
+        await _storage.read(key: key, iOptions: _iosOptions);
     if (value == null) return null;
     return value.toLowerCase() == 'true';
   }

@@ -68,51 +68,14 @@ function formatList(items, fields) {
   return lines.length ? lines.join("; ") : null;
 }
 
-function formatMedicationList(items) {
-  if (!Array.isArray(items)) {
-    return null;
-  }
-
-  const lines = items
-    .map((item) => {
-      const type = clean(item?.itemType || item?.item_type);
-      const activeIngredients = Array.isArray(item?.activeIngredients)
-        ? item.activeIngredients.filter(Boolean).join(", ")
-        : Array.isArray(item?.active_ingredients)
-          ? item.active_ingredients.filter(Boolean).join(", ")
-          : clean(item?.activeIngredients || item?.active_ingredients);
-      const otherIngredients = Array.isArray(item?.otherIngredients)
-        ? item.otherIngredients.filter(Boolean).join(", ")
-        : Array.isArray(item?.other_ingredients)
-          ? item.other_ingredients.filter(Boolean).join(", ")
-          : clean(item?.otherIngredients || item?.other_ingredients);
-
-      return [
-        clean(item?.name),
-        clean(item?.dose || item?.dosage),
-        clean(item?.frequency),
-        clean(item?.pharmacy),
-        clean(item?.servingSize || item?.serving_size),
-        activeIngredients ? `Supplement Facts: ${activeIngredients}` : null,
-        otherIngredients ? `Other Ingredients: ${otherIngredients}` : null,
-        type && type !== "prescription" ? `Type: ${type}` : null,
-      ]
-        .filter(Boolean)
-        .join(" - ");
-    })
-    .filter(Boolean);
-
-  return lines.length ? lines.join("; ") : null;
-}
-
 function normalizeClientInput(input = {}) {
   const nameParts =
     splitName(input.fullName || input.name);
   const medicationList =
     Array.isArray(input.meds)
-      ? formatMedicationList(input.meds)
+      ? formatList(input.meds, ["name", "dose", "dosage", "frequency", "pharmacy"])
       : Array.isArray(input.medications)
-        ? formatMedicationList(input.medications)
+        ? formatList(input.medications, ["name", "dose", "dosage", "frequency", "pharmacy"])
       : null;
   const doctorList =
     Array.isArray(input.doctors)
@@ -158,6 +121,10 @@ function normalizeClientInput(input = {}) {
         Array.isArray(input.doctors) ? null : input.doctors,
         doctorList
       ),
+    meds_reviewed_at:
+      firstNonEmpty(input.meds_reviewed_at, input.medsReviewedAt),
+    doctors_reviewed_at:
+      firstNonEmpty(input.doctors_reviewed_at, input.doctorsReviewedAt),
     vitalink_emergency_contacts:
       firstNonEmpty(
         Array.isArray(input.vitalink_emergency_contacts) ? null : input.vitalink_emergency_contacts,
@@ -193,6 +160,8 @@ async function ensureCrmSyncSchema() {
     ADD COLUMN IF NOT EXISTS vitalink_profile_id TEXT,
     ADD COLUMN IF NOT EXISTS last_vitalink_package_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_vitalink_import_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS meds_reviewed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS doctors_reviewed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS hipaa_signed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS soa_signed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS vitalink_emergency_contacts TEXT,
@@ -451,6 +420,8 @@ async function updateCrmClient({ crmClientId, clientId, client }) {
     ["zip", client.zip],
     ["medication_list", client.medication_list],
     ["doctor_list", client.doctor_list],
+    ["meds_reviewed_at", client.meds_reviewed_at],
+    ["doctors_reviewed_at", client.doctors_reviewed_at],
     ["vitalink_emergency_contacts", client.vitalink_emergency_contacts],
     ["vitalink_pharmacy_list", client.vitalink_pharmacy_list],
   ].filter(([, value]) => clean(value));
@@ -513,10 +484,12 @@ async function createCrmClient({ crmAgentId, clientId, client }) {
       vitalink_connected,
       last_vitalink_package_at,
       last_vitalink_import_at,
+      meds_reviewed_at,
+      doctors_reviewed_at,
       vitalink_emergency_contacts,
       vitalink_pharmacy_list
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Client',$11,'Linked',$12,$13,NOW(),TRUE,NOW(),NOW(),$14,$15)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Client',$11,'Linked',$12,$13,NOW(),TRUE,NOW(),NOW(),$14,$15,$16,$17)
     RETURNING *
     `,
     [
@@ -533,6 +506,8 @@ async function createCrmClient({ crmAgentId, clientId, client }) {
       clientId ? String(clientId) : null,
       client.medication_list,
       client.doctor_list,
+      client.meds_reviewed_at,
+      client.doctors_reviewed_at,
       client.vitalink_emergency_contacts,
       client.vitalink_pharmacy_list,
     ]
@@ -564,7 +539,16 @@ async function logCrmAuditEvent({ crmAgentId, crmClientId, eventType, packageId,
   );
 }
 
-async function recordVitalinkPackage({ crmAgentId, crmClientId, client, appUserId, appProfileId, signedAt }) {
+async function recordVitalinkPackage({
+  crmAgentId,
+  crmClientId,
+  client,
+  appUserId,
+  appProfileId,
+  signedAt,
+  medsReviewedAt,
+  doctorsReviewedAt,
+}) {
   await db.query(
     `
     UPDATE crm_clients
@@ -572,13 +556,21 @@ async function recordVitalinkPackage({ crmAgentId, crmClientId, client, appUserI
       vitalink_connected = TRUE,
       last_vitalink_package_at = NOW(),
       last_vitalink_import_at = NOW(),
+      meds_reviewed_at = COALESCE($4, meds_reviewed_at),
+      doctors_reviewed_at = COALESCE($5, doctors_reviewed_at),
       hipaa_signed_at = COALESCE($1, hipaa_signed_at),
       soa_signed_at = COALESCE($1, soa_signed_at),
       updated_at = NOW()
     WHERE id = $2
       AND agent_id = $3
     `,
-    [clean(signedAt), crmClientId, crmAgentId]
+    [
+      clean(signedAt),
+      crmClientId,
+      crmAgentId,
+      clean(medsReviewedAt),
+      clean(doctorsReviewedAt),
+    ]
   );
 
   const result = await db.query(
@@ -611,7 +603,11 @@ async function recordVitalinkPackage({ crmAgentId, crmClientId, client, appUserI
       clean(client.email),
       clean(client.phone),
       clean(signedAt),
-      JSON.stringify({ source: "vitalink_package" }),
+      JSON.stringify({
+        source: "vitalink_package",
+        medsReviewedAt: clean(medsReviewedAt),
+        doctorsReviewedAt: clean(doctorsReviewedAt),
+      }),
     ]
   );
 
@@ -712,10 +708,18 @@ async function syncVitalinkPackageToCrm({
   const signedAt =
     packageData.signedAt || new Date().toISOString();
 
+  const medsReviewedAt =
+    packageData.medsReviewedAt || signedAt;
+
+  const doctorsReviewedAt =
+    packageData.doctorsReviewedAt || signedAt;
+
   const sync = await syncAppClientToCrm({
     agentEmail,
     clientData: {
       ...clientData,
+      meds_reviewed_at: medsReviewedAt,
+      doctors_reviewed_at: doctorsReviewedAt,
       vitalink_emergency_contacts: packageData.emergencyContacts,
       vitalink_pharmacy_list: packageData.pharmacies,
     },
@@ -732,6 +736,8 @@ async function syncVitalinkPackageToCrm({
     appUserId: packageData.appUserId,
     appProfileId: packageData.appProfileId,
     signedAt,
+    medsReviewedAt,
+    doctorsReviewedAt,
   });
 
   const pdfBase64 = packageData.hipaaSoaPdfBase64;

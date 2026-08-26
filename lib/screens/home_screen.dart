@@ -64,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Image.asset(
                 'assets/images/vitalink-logo-1.png',
                 width: 220,
+                cacheWidth: 660,
                 fit: BoxFit.contain,
               ),
             ),

@@ -37,8 +37,9 @@ class _DeclarationPageViewerState extends State<DeclarationPageViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final profileName =
-        (_p != null && _p!.fullName.isNotEmpty) ? " – ${_p!.fullName}" : "";
+    final profileName = (_p != null && _p!.fullName.isNotEmpty)
+        ? " – ${_p!.fullName}"
+        : "";
 
     final file = File(widget.path);
 

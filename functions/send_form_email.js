@@ -118,6 +118,8 @@ Attached:
           appUserId: body.app_user_id,
           appProfileId: body.app_profile_id,
           signedAt: body.signed_at,
+          medsReviewedAt: body.meds_reviewed_at,
+          doctorsReviewedAt: body.doctors_reviewed_at,
           emergencyContacts: body.emergency_contacts || [],
           pharmacies: body.pharmacies || [],
           hipaaSoaPdfBase64: hipaaSoaAttachment?.content,

@@ -7,9 +7,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
-import '../services/device_transfer_service.dart';
 import '../services/secure_store.dart';
-import '../l10n/app_strings.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -21,13 +19,11 @@ class LogoScreen extends StatefulWidget {
 class _LogoScreenState extends State<LogoScreen> {
   Timer? _timer;
   late final DataRepository _repo = DataRepository();
-  late final DeviceTransferService _transferService = DeviceTransferService();
 
   Profile? _p;
   bool _loading = true;
   bool _deviceRegistered = false;
   bool _navigated = false;
-  bool _transferPromptChecked = false;
 
   @override
   void initState() {
@@ -194,53 +190,6 @@ class _LogoScreenState extends State<LogoScreen> {
     }
   }
 
-  Future<void> _checkPendingDeviceTransfer() async {
-    if (_transferPromptChecked || !mounted) return;
-    _transferPromptChecked = true;
-
-    try {
-      final result = await _transferService.checkPendingTransfer();
-
-      if (!mounted || result["hasTransfer"] != true) return;
-
-      final code = result["transferCode"]?.toString() ?? "";
-      if (code.isEmpty) return;
-
-      final strings = AppStrings.of(context);
-      final restore = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(strings.pendingTransferTitle),
-          content: Text(strings.pendingTransferBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(strings.notNow),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(strings.restoreTransfer),
-            ),
-          ],
-        ),
-      );
-
-      if (restore != true || !mounted) return;
-
-      await _transferService.redeemTransfer(code);
-      if (!mounted) return;
-
-      await _loadProfile();
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.transferLoaded)),
-      );
-    } catch (e) {
-      debugPrint("Device transfer check failed: $e");
-    }
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -281,12 +230,8 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
-      await _checkPendingDeviceTransfer();
-      if (!mounted) return;
-
       Navigator.pushReplacementNamed(context, '/menu');
-    } catch (e) {
-      debugPrint("Logo route error: $e");
+    } catch (_) {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/landing');
     }
@@ -317,92 +262,93 @@ class _LogoScreenState extends State<LogoScreen> {
         child: SizedBox.expand(
           child: Center(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/vitalink-logo-1.png',
-                  width: 220,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 28),
-                if (_loading)
-                  const CircularProgressIndicator(color: Colors.white70)
-                else if (hasName) ...[
-                  Text(
-                    "Welcome, $name",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 28),
-                  child: Text(
-                    "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/vitalink-logo-1.png',
+                width: 220,
+                cacheWidth: 660,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 28),
+              if (_loading)
+                const CircularProgressIndicator(color: Colors.white70)
+              else if (hasName) ...[
+                Text(
+                  "Welcome, $name",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
                   ),
                 ),
-                const SizedBox(height: 24),
-                GestureDetector(
-                  onTap: _openEmergencyScreen,
-                  child: Container(
-                    width: 240,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade700,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.redAccent,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.redAccent.withValues(alpha: 0.4),
-                          blurRadius: 18,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.white,
-                          size: 42,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          "EMERGENCY",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          "TAP FOR INFO",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 10),
               ],
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: _openEmergencyScreen,
+                child: Container(
+                  width: 240,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade700,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.redAccent,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withValues(alpha: 0.4),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "EMERGENCY",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        "TAP FOR INFO",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             ),
           ),
         ),

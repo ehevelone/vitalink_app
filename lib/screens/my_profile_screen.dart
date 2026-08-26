@@ -165,6 +165,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                       const InputDecoration(labelText: "Agency Address"),
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _npnCtrl,
                   enabled: false,
@@ -173,6 +174,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,

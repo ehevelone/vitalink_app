@@ -1,15 +1,13 @@
 # Firebase
--keep class com.google.firebase.** { *; }
+# Firebase artifacts ship consumer ProGuard rules. Do not blanket-keep the
+# whole Firebase tree, or R8 cannot shrink/optimize those dependencies.
 -dontwarn com.google.firebase.**
 
-# Firebase IID (required by MLKit)
--keep class com.google.firebase.iid.** { *; }
--dontwarn com.google.firebase.iid.**
-
-# MLKit
--keep class com.google.mlkit.** { *; }
+# MLKit (pulled in transitively by the cunning_document_scanner plugin via
+# the play-services-mlkit-document-scanner dependency forced in the root
+# build.gradle)
+# MLKit also ships consumer rules through Google Play Services artifacts.
 -dontwarn com.google.mlkit.**
 
 # Google Play Services
--keep class com.google.android.gms.** { *; }
 -dontwarn com.google.android.gms.**

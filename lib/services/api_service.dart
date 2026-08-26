@@ -1,20 +1,19 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
-// ðŸ”¥ ADDED FOR PROFILE SYNC
+// 🔥 ADDED FOR PROFILE SYNC
 import '../services/secure_store.dart';
 import '../services/data_repository.dart';
-import '../services/language_service.dart';
 
 class ApiService {
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // ðŸ”¥ UUID FIX (KEEP FOR OTHER USES)
+  // 🔥 UUID FIX (KEEP FOR OTHER USES)
   // -------------------------------------------------------------
   static String _ensureUuid(String? id) {
     if (id == null || id.isEmpty) return const Uuid().v4();
@@ -27,7 +26,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-// ðŸ”§ Internal POST helper (SAFE)
+// 🔧 Internal POST helper (SAFE)
 // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
@@ -35,10 +34,10 @@ class ApiService {
   ) async {
     try {
       final url = Uri.parse("$_baseUrl/$path");
-      debugPrint("ðŸŒ FULL URL â†’ $url");
+      debugPrint("🌐 FULL URL → $url");
 
-      debugPrint("ðŸ“¡ POST â†’ $url");
-      debugPrint("ðŸ“¦ BODY â†’ $body");
+      debugPrint("📡 POST → $url");
+      debugPrint("📦 BODY → $body");
 
       final res = await http.post(
         url,
@@ -46,11 +45,11 @@ class ApiService {
         body: jsonEncode(body),
       );
 
-      debugPrint("ðŸ“¥ STATUS ($path): ${res.statusCode}");
-      debugPrint("ðŸ“¥ RAW BODY ($path): ${res.body}");
+      debugPrint("📥 STATUS ($path): ${res.statusCode}");
+      debugPrint("📥 RAW BODY ($path): ${res.body}");
 
-      // ðŸ”¥ CRITICAL FIX:
-      // Always return backend JSON â€” even on 403
+      // 🔥 CRITICAL FIX:
+      // Always return backend JSON — even on 403
       if (res.body.isNotEmpty) {
         try {
           final decoded = jsonDecode(res.body);
@@ -59,14 +58,14 @@ class ApiService {
             return decoded;
           }
         } catch (e) {
-          debugPrint("âš ï¸ JSON decode failed: $e");
+          debugPrint("⚠️ JSON decode failed: $e");
         }
       }
 
       // fallback only if response is unusable
       return {"success": false, "error": "Server returned ${res.statusCode}"};
     } catch (e, st) {
-      debugPrint("âŒ API ERROR ($path): $e\n$st");
+      debugPrint("❌ API ERROR ($path): $e\n$st");
       return {"success": false, "error": e.toString()};
     }
   }
@@ -106,21 +105,21 @@ class ApiService {
     required List<Map<String, dynamic>> profiles,
   }) async {
     final body = {
-      "id": userId, // âœ… FIXED
+      "id": userId, // ✅ FIXED
       "profiles": profiles,
     };
 
-    debugPrint("ðŸš€ SAVE USER PROFILES: $body");
+    debugPrint("🚀 SAVE USER PROFILES: $body");
 
     return await _postJsonWithUserSession("save_user_profiles", body);
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¥ GET PROFILES (FOR QR TOKEN)
+  // 🔥 GET PROFILES (FOR QR TOKEN)
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getProfiles(String id) async {
     return await _postJson("get_profiles", {
-      "id": id, // âœ… FIXED
+      "id": id, // ✅ FIXED
     });
   }
 
@@ -131,14 +130,14 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”Ž Get User's Assigned Agent
+  // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getUserAgent(String email) {
     return _postJson("get_user_agent", {"email": email});
   }
 
   // -------------------------------------------------------------
-  // ðŸ”Ž Get full agent profile
+  // 🔎 Get full agent profile
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentProfile({
     required String email,
@@ -147,7 +146,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¹ Insurance card parsing
+  // 🔹 Insurance card parsing
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> parseInsurance(File image) async {
     final bytes = await image.readAsBytes();
@@ -213,7 +212,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¹ Agent unlock claim
+  // 🔹 Agent unlock claim
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> claimAgentUnlock({
     required String unlockCode,
@@ -244,7 +243,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-// ðŸ”¹ Agent login
+// 🔹 Agent login
 // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
@@ -264,11 +263,11 @@ class ApiService {
 
     final res = await _postJson("check_agent", body);
 
-    return res; // ðŸ”¥ DO NOT MODIFY RESPONSE
+    return res; // 🔥 DO NOT MODIFY RESPONSE
   }
 
 // -------------------------------------------------------------
-// ðŸ”¥ NEW â€” CREATE AGENT CHECKOUT (PUBLIC)
+// 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
 // -------------------------------------------------------------
   static Future<Map<String, dynamic>> createAgentCheckout({
     required String email,
@@ -292,7 +291,7 @@ class ApiService {
   }
 
 // -------------------------------------------------------------
-  // ðŸ”¹ User login
+  // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
     required String email,
@@ -321,7 +320,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¹ Register user
+  // 🔹 Register user
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerUser({
     required String firstName,
@@ -344,7 +343,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”Ž Activation lookup
+  // 🔎 Activation lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> lookupActivation(String code) {
     return _postJson("vl-get-activation-details", {
@@ -352,49 +351,31 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getAssistedOnboarding(String code) {
-    return _postJson("get_assisted_onboarding", {
-      "code": code,
-    });
-  }
-
-  static Future<Map<String, dynamic>> claimAssistedOnboarding({
-    required String code,
-    required String userId,
-  }) {
-    return _postJsonWithUserSession("claim_assisted_onboarding", {
-      "code": code,
-      "userId": userId,
-    });
-  }
-
   // -------------------------------------------------------------
-  // ðŸ”¹ Promo lookup
+  // 🔹 Promo lookup
   // -------------------------------------------------------------
   // -------------------------------------------------------------
-  // ðŸ”¹ Request password reset
+  // 🔹 Request password reset
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> requestPasswordReset({
     required String emailOrPhone,
     required String role,
-  }) async {
+  }) {
     final normalizedRole = switch (role.trim().toLowerCase()) {
       "user" => "users",
       "agent" => "agents",
       "rsm" => "rsms",
       _ => role.trim().toLowerCase(),
     };
-    final languageCode = await LanguageService.getEffectiveLanguageCode();
 
     return _postJson("request_reset", {
       "emailOrPhone": emailOrPhone,
       "role": normalizedRole,
-      "languageCode": languageCode,
     });
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¹ Complete password reset
+  // 🔹 Complete password reset
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resetPassword({
     required String emailOrPhone,
@@ -418,27 +399,52 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¥ Get agent promo code
+  // 🔥 Get agent promo code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentPromoCode(String email) {
     return _postJsonWithAgentSession("get_agent_promo", {"email": email});
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¹ Register device token
+  // 🔹 Register device token
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> registerDeviceToken({
     required String userId,
     required String fcmToken,
     String? platform,
-  }) async {
-    final languageCode = await LanguageService.getEffectiveLanguageCode();
-
+  }) {
     return _postJsonWithUserSession("register_device_v2", {
-      "user_id": int.parse(userId),
+      "user_id": int.parse(userId), // 🔥 THIS FIXES IT
       "deviceToken": fcmToken,
       "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
-      "languageCode": languageCode,
+    });
+  }
+
+  static Future<Map<String, dynamic>> createDeviceTransfer({
+    required String userId,
+    required Map<String, dynamic> payload,
+  }) {
+    return _postJsonWithUserSession("create_device_transfer", {
+      "userId": userId,
+      "payload": payload,
+    });
+  }
+
+  static Future<Map<String, dynamic>> checkDeviceTransfer({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("check_device_transfer", {
+      "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> redeemDeviceTransfer({
+    required String userId,
+    required String transferCode,
+  }) {
+    return _postJsonWithUserSession("redeem_device_transfer", {
+      "userId": userId,
+      "transferCode": transferCode,
     });
   }
 
@@ -455,7 +461,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”” Send notification
+  // 🔔 Send notification
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> sendNotification({
     required String agentEmail,
@@ -464,7 +470,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ§‘â€ðŸ’¼ Update agent profile
+  // 🧑‍💼 Update agent profile
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> updateAgentProfile({
     required String email,
@@ -501,7 +507,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ‘¤ Update user profile
+  // 👤 Update user profile
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> updateUserProfile({
     required String currentEmail,
@@ -522,7 +528,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”Ž Mark agent as reviewed
+  // 🔎 Mark agent as reviewed
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> markReviewed({
     required String email,
@@ -533,7 +539,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”Ž Resolve agent by code
+  // 🔎 Resolve agent by code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
     final res = await _postJson("resolve_agent_code", {
@@ -554,7 +560,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ†• GET AGENT CLIENTS
+  // 🆕 GET AGENT CLIENTS
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> getAgentClients({
     required int agentId,
@@ -706,34 +712,6 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> createDeviceTransfer({
-    required String userId,
-    required Map<String, dynamic> payload,
-  }) {
-    return _postJsonWithUserSession("create_device_transfer", {
-      "userId": userId,
-      "payload": payload,
-    });
-  }
-
-  static Future<Map<String, dynamic>> checkDeviceTransfer({
-    required String userId,
-  }) {
-    return _postJsonWithUserSession("check_device_transfer", {
-      "userId": userId,
-    });
-  }
-
-  static Future<Map<String, dynamic>> redeemDeviceTransfer({
-    required String userId,
-    required String transferCode,
-  }) {
-    return _postJsonWithUserSession("redeem_device_transfer", {
-      "userId": userId,
-      "transferCode": transferCode,
-    });
-  }
-
   static Future<Map<String, dynamic>> submitAgentReferral({
     required String userId,
     required String referralName,
@@ -795,7 +773,7 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ðŸ”¥ SYNC USER PROFILES
+  // 🔥 SYNC USER PROFILES
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> syncProfilesToServer() async {
     try {
@@ -805,14 +783,14 @@ class ApiService {
       final userId = await store.getString("userId");
 
       if (userId == null) {
-        debugPrint("âŒ No userId found â€” skipping profile sync");
+        debugPrint("❌ No userId found — skipping profile sync");
         return {"success": false};
       }
 
       final profiles = await repo.loadAllProfiles();
 
       if (profiles.isEmpty) {
-        debugPrint("âš ï¸ No profiles to sync");
+        debugPrint("⚠️ No profiles to sync");
         return {"success": false};
       }
 
@@ -823,17 +801,16 @@ class ApiService {
       }).toList();
 
       final body = {
-        "id": userId, // âœ… FIXED
+        "id": userId, // ✅ FIXED
         "profiles": fixedProfiles,
       };
 
-      debugPrint("ðŸš€ SENDING PROFILES: $body");
+      debugPrint("🚀 SENDING PROFILES: $body");
 
       return await _postJsonWithUserSession("save_user_profiles", body);
     } catch (e, st) {
-      debugPrint("âŒ Profile Sync Error: $e\n$st");
+      debugPrint("❌ Profile Sync Error: $e\n$st");
       return {"success": false, "error": e.toString()};
     }
   }
 }
-

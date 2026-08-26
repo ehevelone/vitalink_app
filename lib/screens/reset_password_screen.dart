@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -32,14 +31,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   String? _validatePassword(String? pw) {
-    final strings = AppStrings.of(context);
-    if (pw == null || pw.isEmpty) return strings.enterAPassword;
-    if (pw.length < 10) return strings.passwordAtLeast10;
+    if (pw == null || pw.isEmpty) return "Enter a password";
+    if (pw.length < 10) return "Must be at least 10 characters";
     if (!RegExp(r'[A-Z]').hasMatch(pw)) {
-      return strings.passwordNeedsUppercase;
+      return "Must contain at least one uppercase letter";
     }
     if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(pw)) {
-      return strings.passwordNeedsSpecial;
+      return "Must contain at least one special character";
     }
     return null;
   }
@@ -47,7 +45,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Future<void> _sendResetCode() async {
     if (_emailCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.of(context).enterEmailFirst)),
+        const SnackBar(content: Text("Enter your email address first")),
       );
       return;
     }
@@ -66,15 +64,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       setState(() => _codeSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppStrings.of(context)
-              .resetCodeSentTo('${data['sentTo'] ?? _emailCtrl.text}')),
+          content:
+              Text("Reset code sent to ${data['sentTo'] ?? _emailCtrl.text}"),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                data['error'] ?? AppStrings.of(context).failedToSendResetCode)),
+        SnackBar(content: Text(data['error'] ?? "Failed to send reset code")),
       );
     }
   }
@@ -98,12 +94,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text(AppStrings.of(context).success),
-          content: Text(AppStrings.of(context).passwordResetSuccess),
+          title: const Text("Success"),
+          content: const Text(
+            "Your password has been reset successfully.",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(AppStrings.of(context).ok),
+              child: const Text("OK"),
             ),
           ],
         ),
@@ -113,8 +111,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       Navigator.pushReplacementNamed(context, '/login');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(data['error'] ?? AppStrings.of(context).resetFailed)),
+        SnackBar(content: Text(data['error'] ?? "Reset failed")),
       );
     }
   }
@@ -130,10 +127,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
     return Scaffold(
-      appBar: AppBar(title: Text(strings.resetPassword)),
+      appBar: AppBar(title: const Text("Reset Password")),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -141,32 +136,32 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           child: ListView(
             children: [
               if (!_codeSent)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
                   child: Text(
-                    strings.resetStepOne,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    "Step 1: We'll email you a 6-digit reset code.",
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ),
               TextFormField(
                 controller: _emailCtrl,
-                decoration: InputDecoration(
-                  labelText: strings.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: "Email Address",
                   border: InputBorder.none,
                 ),
                 validator: (v) =>
-                    v == null || v.isEmpty ? strings.enterEmailAddress : null,
+                    v == null || v.isEmpty ? "Enter your email address" : null,
               ),
               const SizedBox(height: 12),
               if (_codeSent) ...[
                 TextFormField(
                   controller: _codeCtrl,
-                  decoration: InputDecoration(
-                    labelText: strings.sixDigitResetCode,
+                  decoration: const InputDecoration(
+                    labelText: "6-digit Reset Code",
                     border: InputBorder.none,
                   ),
                   validator: (v) => v == null || v.length != 6
-                      ? strings.enterValidSixDigitCode
+                      ? "Enter valid 6-digit code"
                       : null,
                 ),
                 const SizedBox(height: 12),
@@ -174,7 +169,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _newPassCtrl,
                   obscureText: !_showPass,
                   decoration: InputDecoration(
-                    labelText: strings.newPassword,
+                    labelText: "New Password",
                     border: InputBorder.none,
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -189,7 +184,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _confirmCtrl,
                   obscureText: !_showConfirm,
                   decoration: InputDecoration(
-                    labelText: strings.confirmPassword,
+                    labelText: "Confirm Password",
                     border: InputBorder.none,
                     suffixIcon: IconButton(
                       icon: Icon(_showConfirm
@@ -199,9 +194,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           setState(() => _showConfirm = !_showConfirm),
                     ),
                   ),
-                  validator: (v) => v != _newPassCtrl.text
-                      ? strings.passwordsDoNotMatch
-                      : null,
+                  validator: (v) =>
+                      v != _newPassCtrl.text ? "Passwords do not match" : null,
                 ),
               ],
               const SizedBox(height: 24),
@@ -210,9 +204,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   : ElevatedButton.icon(
                       icon: Icon(
                           _codeSent ? Icons.lock_reset : Icons.mark_email_read),
-                      label: Text(_codeSent
-                          ? strings.resetPassword
-                          : strings.sendResetCode),
+                      label: Text(
+                          _codeSent ? "Reset Password" : "Send Reset Code"),
                       onPressed:
                           _codeSent ? _submitNewPassword : _sendResetCode,
                     ),

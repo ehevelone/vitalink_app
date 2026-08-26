@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models.dart';
+import 'persistent_file_store.dart';
 import 'profile_update_sync_service.dart';
 import 'secure_store.dart';
 
@@ -225,6 +226,9 @@ class DataRepository {
   Future<void> applySharedProfileUpdate(
     Map<String, dynamic> updatePayload,
   ) async {
+    updatePayload =
+        await PersistentFileStore.restoreProfileFileBytes(updatePayload);
+
     final profileMap =
         Map<String, dynamic>.from(updatePayload['profile'] as Map? ?? {});
 
@@ -276,8 +280,7 @@ class DataRepository {
       appointments: updatePayload['appointments'] is List
           ? (updatePayload['appointments'] as List)
               .whereType<Map>()
-              .map(
-                  (a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
+              .map((a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
               .toList()
           : current.appointments,
       insurances: updatePayload['insurances'] is List

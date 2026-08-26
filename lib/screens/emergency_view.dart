@@ -6,7 +6,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../l10n/app_strings.dart';
 import 'edit_profile.dart';
 
 class Formatters {
@@ -75,8 +74,6 @@ class _EmergencyViewState extends State<EmergencyView> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-
     if (_loading || _p == null) {
       return const Scaffold(
         body: Center(
@@ -90,11 +87,11 @@ class _EmergencyViewState extends State<EmergencyView> {
     final qrToken = p.qrToken;
 
     if (qrToken == null || qrToken.isEmpty) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(
           child: Text(
-            strings.qrTokenMissing,
-            style: const TextStyle(color: Colors.red),
+            "QR Token missing. Please refresh profile.",
+            style: TextStyle(color: Colors.red),
           ),
         ),
       );
@@ -113,7 +110,7 @@ class _EmergencyViewState extends State<EmergencyView> {
         backgroundColor: Colors.red.shade900,
         foregroundColor: Colors.white,
         title: Text(
-          strings.emergencyInfoFor(p.fullName),
+          "Emergency Info${p.fullName.isNotEmpty ? " - ${p.fullName}" : ""}",
         ),
         actions: [
           IconButton(
@@ -131,20 +128,22 @@ class _EmergencyViewState extends State<EmergencyView> {
         padding: const EdgeInsets.all(16),
         children: [
           if (p.fullName.isNotEmpty)
-            _infoTile(title: strings.name, subtitle: p.fullName),
+            _infoTile(title: "Name", subtitle: p.fullName),
           if (p.dob?.isNotEmpty == true)
-            _infoTile(title: strings.dob, subtitle: Formatters.dob(p.dob!)),
+            _infoTile(title: "DOB", subtitle: Formatters.dob(p.dob!)),
           if (e.allergies.isNotEmpty)
-            _infoTile(title: strings.allergies, subtitle: e.allergies),
+            _infoTile(title: "Allergies", subtitle: e.allergies),
           if (e.conditions.isNotEmpty)
-            _infoTile(title: strings.conditions, subtitle: e.conditions),
+            _infoTile(title: "Conditions", subtitle: e.conditions),
           if (e.implants.isNotEmpty)
-            _infoTile(title: strings.implants, subtitle: e.implants),
+            _infoTile(title: "Implants", subtitle: e.implants),
           if (e.procedures.isNotEmpty)
-            _infoTile(title: strings.procedures, subtitle: e.procedures),
+            _infoTile(title: "Procedures", subtitle: e.procedures),
           ...e.effectiveContacts.asMap().entries.map(
                 (entry) => _infoTile(
-                  title: strings.emergencyContact(entry.key + 1),
+                  title: entry.key == 0
+                      ? "Emergency Contact"
+                      : "Emergency Contact ${entry.key + 1}",
                   subtitle: [
                     if (entry.value.name.isNotEmpty) entry.value.name,
                     if (entry.value.phone.isNotEmpty)
@@ -154,29 +153,23 @@ class _EmergencyViewState extends State<EmergencyView> {
               ),
           const Divider(height: 32),
           if (p.meds.isNotEmpty) ...[
-            Text(
-              strings.medications,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            const Text(
+              "Medications",
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             ...p.meds.map(
               (m) => _infoTile(
                 title: m.name,
-                subtitle: [
-                  if (m.dose.isNotEmpty) m.dose,
-                  if (m.frequency.isNotEmpty) m.frequency,
-                  if (m.servingSize.isNotEmpty) "Serving: ${m.servingSize}",
-                  if (m.activeIngredients.isNotEmpty)
-                    "Supplement Facts: ${m.activeIngredients.take(3).join(", ")}",
-                ].join(" - "),
+                subtitle: "${m.dose} - ${m.frequency}",
                 dense: true,
               ),
             ),
           ],
           if (p.doctors.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(
-              strings.doctors,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            const Text(
+              "Doctors",
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             ...p.doctors.map(
               (d) => _infoTile(

@@ -116,15 +116,20 @@ exports.handler = async function (event) {
         });
       }
 
+      const firebasePhone = toFirebasePhone(adminUser.phone);
+
       console.log("rsm-login admin password verified, 2FA required", {
         id: adminUser.id,
         email: adminUser.email,
+        phoneTail: firebasePhone.slice(-4),
+        phoneLength: firebasePhone.length,
+        phoneHasPlus: firebasePhone.startsWith("+"),
       });
 
       return reply(200, {
         success: true,
         step: "firebase_2fa",
-        phone: toFirebasePhone(adminUser.phone),
+        phone: firebasePhone,
         role: "admin",
       });
     }
@@ -225,17 +230,22 @@ exports.handler = async function (event) {
       });
     }
 
+    const firebasePhone = toFirebasePhone(rsm.phone);
+
     console.log("rsm-login password verified, 2FA required", {
       id: rsm.id,
       email: rsm.email,
       role,
       active: rsm.active,
+      phoneTail: firebasePhone.slice(-4),
+      phoneLength: firebasePhone.length,
+      phoneHasPlus: firebasePhone.startsWith("+"),
     });
 
     return reply(200, {
       success: true,
       step: "firebase_2fa",
-      phone: toFirebasePhone(rsm.phone),
+      phone: firebasePhone,
       role,
     });
 

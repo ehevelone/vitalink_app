@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
+import '../services/persistent_file_store.dart';
+
 class ScanCard extends StatefulWidget {
   const ScanCard({super.key});
 
@@ -23,7 +25,12 @@ class _ScanCardState extends State<ScanCard> {
       if (!mounted) return;
 
       if (images != null && images.isNotEmpty) {
-        Navigator.pop(context, images.first);
+        final permanentPath = await PersistentFileStore.saveImageFile(
+          images.first,
+          folder: 'insurance_cards',
+        );
+        if (!mounted) return;
+        Navigator.pop(context, permanentPath);
       } else {
         Navigator.pop(context, null);
       }

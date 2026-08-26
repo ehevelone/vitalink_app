@@ -4,6 +4,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as image_lib;
 
+import '../services/persistent_file_store.dart';
+
 class VitalinkCameraCaptureScreen extends StatefulWidget {
   final String title;
   final String reviewTitle;
@@ -103,8 +105,12 @@ class _VitalinkCameraCaptureScreenState
     try {
       final file = await controller.takePicture();
       final optimizedPath = await _downsampleImage(file.path);
+      final permanentPath = await PersistentFileStore.saveImageFile(
+        optimizedPath,
+        folder: 'camera_captures',
+      );
       if (!mounted) return;
-      setState(() => _previewPath = optimizedPath);
+      setState(() => _previewPath = permanentPath);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,8 +128,7 @@ class _VitalinkCameraCaptureScreenState
       final image = image_lib.decodeImage(bytes);
       if (image == null) return path;
 
-      final longestSide =
-          image.width > image.height ? image.width : image.height;
+      final longestSide = image.width > image.height ? image.width : image.height;
       if (longestSide <= _maxSavedImageSide) return path;
 
       final resized = image_lib.copyResize(

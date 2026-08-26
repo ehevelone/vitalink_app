@@ -225,6 +225,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                       firstDate: DateTime(1900),
                       lastDate: DateTime.now(),
                     );
+                    if (!context.mounted) return;
                     if (picked != null) {
                       setState(() {
                         _dobCtrl.text =
@@ -240,8 +241,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration:
-                      const InputDecoration(labelText: "Address Line 1"),
+                  decoration: const InputDecoration(labelText: "Address Line 1"),
                 ),
                 const SizedBox(height: 12),
 

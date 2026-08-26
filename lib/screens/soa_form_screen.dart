@@ -37,6 +37,7 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
     final name = await store.getString('agentName');
     final phone = await store.getString('agentPhone');
     final id = await store.getString('agentLicense'); // using license as ID
+    if (!mounted) return;
     setState(() {
       _agentName = name;
       _agentPhone = phone;
@@ -52,7 +53,6 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
     final signature = await _sigController.toPngBytes();
     final pdf = pw.Document();
 
@@ -72,7 +72,8 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
                   text:
                       "Medicare Advantage Plans: ${_advantage ? 'Yes' : 'No'}"),
               pw.Bullet(
-                  text: "Prescription Drug Plan: ${_drugPlan ? 'Yes' : 'No'}"),
+                  text:
+                      "Prescription Drug Plan: ${_drugPlan ? 'Yes' : 'No'}"),
               pw.Bullet(
                   text: "Medicare Supplement: ${_supplement ? 'Yes' : 'No'}"),
               pw.Bullet(
@@ -82,9 +83,11 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
                   text:
                       "Hospital Indemnity: ${_hospitalIndemnity ? 'Yes' : 'No'}"),
               pw.SizedBox(height: 20),
+
               pw.Text("Beneficiary Signature:"),
               if (signature != null)
                 pw.Image(pw.MemoryImage(signature), width: 200, height: 80),
+
               pw.SizedBox(height: 40),
               pw.Text("Agent Information",
                   style: pw.TextStyle(
@@ -100,7 +103,8 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
 
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
 
-    messenger.showSnackBar(
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("✅ SOA form saved as PDF")),
     );
   }
@@ -120,7 +124,8 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
               CheckboxListTile(
                 value: _advantage,
                 onChanged: (v) => setState(() => _advantage = v ?? false),
-                title: const Text("Medicare Advantage (Part C) & Cost Plans"),
+                title:
+                    const Text("Medicare Advantage (Part C) & Cost Plans"),
               ),
               CheckboxListTile(
                 value: _drugPlan,
@@ -144,6 +149,7 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
                 title: const Text("Hospital Indemnity Products"),
               ),
               const SizedBox(height: 20),
+
               const Text("Beneficiary Signature:",
                   style: TextStyle(fontWeight: FontWeight.bold)),
               Container(
@@ -164,6 +170,7 @@ class _SoaFormScreenState extends State<SoaFormScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+
               ElevatedButton.icon(
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text("Save as PDF"),

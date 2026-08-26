@@ -217,6 +217,11 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     },
     android: {
       priority: "high",
+      notification: {
+        channelId: "vitalink_high_importance",
+        priority: "high",
+        defaultSound: true,
+      },
     },
     data: {
       click_action: "FLUTTER_NOTIFICATION_CLICK",

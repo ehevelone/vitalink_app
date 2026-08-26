@@ -2,15 +2,13 @@ name: vitalink
 description: A health records and insurance policy manager app
 publish_to: 'none'
 
-version: 2.0.15+107 # bumped
+version: 2.0.12+103 # bumped
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
-    sdk: flutter
-  flutter_localizations:
     sdk: flutter
 
   cupertino_icons: 1.0.8

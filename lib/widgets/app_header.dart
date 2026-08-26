@@ -49,8 +49,8 @@ class _AppHeaderState extends State<AppHeader> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: widget.backgroundColor ??
-          Theme.of(context).appBarTheme.backgroundColor,
+      backgroundColor:
+          widget.backgroundColor ?? Theme.of(context).appBarTheme.backgroundColor,
       title: Row(
         children: [
           Expanded(
@@ -73,6 +73,8 @@ class _AppHeaderState extends State<AppHeader> {
                         "assets/images/logo_icon.png", // ✅ use your actual logo
                         height: 16,
                         width: 16,
+                        cacheWidth: 48,
+                        cacheHeight: 48,
                         color: Colors.white70, // optional subtle tint
                       ),
                     ],

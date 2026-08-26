@@ -33,9 +33,9 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
 
     // listen for scroll-to-bottom
     _scrollCtrl.addListener(() {
-      final atBottom =
-          _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
-              !_scrollCtrl.position.outOfRange;
+      final atBottom = _scrollCtrl.offset >=
+              _scrollCtrl.position.maxScrollExtent &&
+          !_scrollCtrl.position.outOfRange;
       if (atBottom && !_canScroll) {
         setState(() => _canScroll = true);
       }
@@ -115,8 +115,8 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
           pageFormat: PdfPageFormat.a4,
           build: (context) => [
             pw.Text("HIPAA & SOA Authorization",
-                style:
-                    pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(
+                    fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             pw.Text(
               "I understand that by signing below, I authorize my licensed insurance agent to access, discuss, and use my Protected Health Information (PHI) "
@@ -131,27 +131,23 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
             pw.SizedBox(height: 20),
             pw.Text("Recipient (Agent):",
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Text(
-                "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
+            pw.Text("${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
             pw.SizedBox(height: 24),
             pw.Row(children: [
               pw.Text("Signature:  "),
               pw.Container(width: 150, height: 60, child: pw.Image(sigImg)),
             ]),
             pw.SizedBox(height: 8),
-            pw.Text(
-                "Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
+            pw.Text("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
             pw.SizedBox(height: 8),
-            pw.Text(
-                "Expires: ${DateTime.now().add(const Duration(days: 365)).toLocal().toString().split(' ')[0]}"),
+            pw.Text("Expires: ${DateTime.now().add(const Duration(days: 365)).toLocal().toString().split(' ')[0]}"),
             pw.NewPage(),
             pw.Text("Medication List",
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             if (_meds.isEmpty) pw.Text("No medications on file."),
             if (_meds.isNotEmpty)
               pw.TableHelper.fromTextArray(
-                headers: ["Medication", "Dosage", "Frequency"],
+                headers: const ["Medication", "Dosage", "Frequency"],
                 data: _meds
                     .map((m) => [
                           m["name"] ?? "",
@@ -162,12 +158,11 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
               ),
             pw.SizedBox(height: 16),
             pw.Text("Doctors List",
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             if (_doctors.isEmpty) pw.Text("No doctors on file."),
             if (_doctors.isNotEmpty)
               pw.TableHelper.fromTextArray(
-                headers: ["Name", "Specialty", "Phone"],
+                headers: const ["Name", "Specialty", "Phone"],
                 data: _doctors
                     .map((d) => [
                           d["name"] ?? "",
@@ -195,8 +190,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
       };
 
       final resp = await http.post(
-        Uri.parse(
-            "https://vitalink-app.netlify.app/.netlify/functions/send_form_email"),
+        Uri.parse("https://vitalink-app.netlify.app/.netlify/functions/send_form_email"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(payload),
       );
@@ -297,8 +291,7 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
                 children: [
                   Checkbox(
                     value: _acknowledged,
-                    onChanged: (v) =>
-                        setState(() => _acknowledged = v ?? false),
+                    onChanged: (v) => setState(() => _acknowledged = v ?? false),
                   ),
                   const Expanded(
                     child: Text(
