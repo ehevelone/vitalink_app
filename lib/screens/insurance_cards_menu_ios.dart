@@ -296,8 +296,6 @@ style: FilledButton.styleFrom(
                                   cacheWidth: 210,
                                   cacheHeight: 150,
                                   fit: BoxFit.cover,
-                                  cacheWidth: 210,
-                                  cacheHeight: 150,
                                 )
                               : const Icon(Icons.broken_image),
                           title: Text(

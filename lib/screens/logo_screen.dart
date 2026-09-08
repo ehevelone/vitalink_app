@@ -202,11 +202,11 @@ class _LogoScreenState extends State<LogoScreen> {
     _timer?.cancel();
 
     try {
-      final loggedIn = await AppState.isLoggedIn();
-      final role = await AppState.getRole();
       final args = ModalRoute.of(context)?.settings.arguments;
       final argSessionToken =
           args is Map ? args["userSessionToken"]?.toString() : null;
+      final loggedIn = await AppState.isLoggedIn();
+      final role = await AppState.getRole();
       final userSessionToken =
           await SecureStore().getString("userSessionToken") ?? argSessionToken;
 
