@@ -316,7 +316,23 @@ class ApiService {
       return {"success": false, "error": "User data missing"};
     }
 
-    return {"success": true, "user": res["user"]};
+    final user = Map<String, dynamic>.from(res["user"]);
+    final sessionToken = (user["session_token"] ??
+            res["session_token"] ??
+            res["sessionToken"] ??
+            res["token"])
+        ?.toString();
+
+    if (sessionToken == null || sessionToken.isEmpty) {
+      return {
+        "success": false,
+        "error": "Login session missing. Please try again.",
+      };
+    }
+
+    user["session_token"] = sessionToken;
+
+    return {"success": true, "user": user};
   }
 
   // -------------------------------------------------------------

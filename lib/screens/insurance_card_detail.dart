@@ -31,7 +31,7 @@ class InsuranceCardDetail extends StatefulWidget {
 
 class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   static const double _maxPickedImageSize = 2048;
-  static const int _pickedImageQuality = 88;
+  static const int _pickedImageQuality = 80;
 
   bool _showFront = true;
   final ImagePicker _picker = ImagePicker();

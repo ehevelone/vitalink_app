@@ -21,7 +21,7 @@ class InsurancePolicyView extends StatefulWidget {
 
 class _InsurancePolicyViewState extends State<InsurancePolicyView> {
   static const double _maxPickedImageSize = 2048;
-  static const int _pickedImageQuality = 88;
+  static const int _pickedImageQuality = 80;
 
   late final DataRepository _repo;
   final ImagePicker _picker = ImagePicker();

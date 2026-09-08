@@ -31,7 +31,7 @@ class _VitalinkCameraCaptureScreenState
     extends State<VitalinkCameraCaptureScreen> {
   static const Color _vitalinkBlue = Color(0xFF79CAE3);
   static const int _maxSavedImageSide = 2048;
-  static const int _jpegQuality = 88;
+  static const int _jpegQuality = 80;
 
   CameraController? _controller;
   List<CameraDescription> _cameras = [];

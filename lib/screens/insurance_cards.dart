@@ -170,9 +170,9 @@ class _InsuranceCardsScreenState
                                   File(path),
                                   width: 60,
                                   height: 44,
+                                  fit: BoxFit.cover,
                                   cacheWidth: 180,
                                   cacheHeight: 132,
-                                  fit: BoxFit.cover,
                                 )
                               : const Icon(
                                   Icons.credit_card,

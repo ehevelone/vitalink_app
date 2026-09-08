@@ -204,8 +204,11 @@ class _LogoScreenState extends State<LogoScreen> {
     try {
       final loggedIn = await AppState.isLoggedIn();
       final role = await AppState.getRole();
+      final args = ModalRoute.of(context)?.settings.arguments;
+      final argSessionToken =
+          args is Map ? args["userSessionToken"]?.toString() : null;
       final userSessionToken =
-          await SecureStore().getString("userSessionToken");
+          await SecureStore().getString("userSessionToken") ?? argSessionToken;
 
       if (!mounted) return;
 

@@ -178,8 +178,15 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (_) {}
 
       if (!mounted) return;
-
-      Navigator.pushReplacementNamed(context, "/logo");
+      Navigator.pushReplacementNamed(
+        context,
+        "/logo",
+        arguments: {
+          "justLoggedIn": true,
+          "role": "user",
+          "userSessionToken": sessionToken,
+        },
+      );
     } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
       final confirmed = await _showReplacePopup();
       if (confirmed) {

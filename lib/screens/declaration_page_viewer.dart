@@ -75,7 +75,11 @@ class _DeclarationPageViewerState extends State<DeclarationPageViewer> {
       panEnabled: true,
       minScale: 0.5,
       maxScale: 4,
-      child: Image.file(file),
+      child: Image.file(
+        file,
+        cacheWidth: 2048,
+        fit: BoxFit.contain,
+      ),
     );
   }
 }
