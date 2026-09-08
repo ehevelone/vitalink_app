@@ -24,16 +24,16 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   final SignatureController _sigCtrl = SignatureController(penStrokeWidth: 3);
   final ScrollController _scrollCtrl = ScrollController();
 
-String clean(String? value) {
-  if (value == null) return "";
+  String clean(String? value) {
+    if (value == null) return "";
 
-  String s = value
-      .replaceAll(RegExp(r'[\r\n]+'), ' ') // remove line breaks
-      .replaceAll('"', '""')               // escape quotes
-      .trim();
+    String s = value
+        .replaceAll(RegExp(r'[\r\n]+'), ' ') // remove line breaks
+        .replaceAll('"', '""') // escape quotes
+        .trim();
 
-  return '"$s"'; // 🔥 wrap everything in quotes
-}
+    return '"$s"'; // 🔥 wrap everything in quotes
+  }
 
   bool _saving = false;
   bool _acknowledged = false;
@@ -82,204 +82,200 @@ I understand:
 • This Scope of Appointment remains valid for twelve (12) months unless revoked.
 """;
 
- @override
-void initState() {
-  super.initState();
-  _loadData();
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
 
-  _scrollCtrl.addListener(() {
-    final atBottom =
-        _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
-            !_scrollCtrl.position.outOfRange;
-    if (atBottom && !_canScroll) {
-      setState(() => _canScroll = true);
-    }
-  });
-}
-
-Future<void> _loadData() async {
-  final store = SecureStore();
-  final repo = DataRepository(store);
-  final p = await repo.loadProfile();
-
-  String? agentEmail;
-  String? agentName;
-  String? agentPhone;
-
-  final userEmail = await AppState.getEmail();
-
-  if (userEmail != null && userEmail.isNotEmpty) {
-    final res = await ApiService.getUserAgent(userEmail);
-    if (res["success"] == true && res["agent"] != null) {
-      final agent = res["agent"];
-      agentEmail = agent["email"];
-      agentName = agent["name"];
-      agentPhone = agent["phone"];
-    }
-  }
-
-  if (!mounted) return;
-
-  setState(() {
-    _profile = p;
-    _agentEmail = agentEmail;
-    _agentName = agentName;
-    _agentPhone = agentPhone;
-  });
-}
-
-Future<File> _buildCsv(Profile p) async {
-  final buffer = StringBuffer();
-
-  final userEmail = await SecureStore().getString('userEmail') ?? "";
-
-  final parts = p.fullName.trim().split(' ');
-  final firstName = parts.isNotEmpty ? parts.first : "";
-  final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
-
-  // 🔥 Medications field
-  final medsStr = p.meds
-      .map((m) =>
-          "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
-      .join("; ");
-
-  // 🔥 Doctors field
-  final docsStr = p.doctors
-      .map((d) =>
-          "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}")
-      .join("; ");
-
-  // ✅ HEADER
-  buffer.writeln(
-    "First Name,Last Name,DOB,Address,City,State,Zip Code,Phone,Email,Medications,Doctors,Notes,Source"
-  );
-
-  // ✅ SINGLE ROW
-buffer.writeln(
-  "${clean(firstName)},"
-  "${clean(lastName)},"
-  "${clean(p.dob)},"
-  "${clean(p.address)},"
-  "${clean(p.city)},"
-  "${clean(p.state)},"
-  "${clean(p.zip)},"
-  "${clean(p.userPhone)},"
-  "${clean(userEmail)},"
-  "${clean(medsStr)},"
-  "${clean(docsStr)},"
-  "${clean("VitaLink Client | Meds: $medsStr | Doctors: $docsStr")},"
-  "${clean("VitaLink")}"
-);
-
-  final dir = await getTemporaryDirectory();
-  final file = File("${dir.path}/vitalink_user_info.csv");
-  await file.writeAsString(buffer.toString());
-  return file;
-}
-
-List<Map<String, String>> _pharmacyList(Profile p) {
-  final seen = <String>{};
-  final pharmacies = <Map<String, String>>[];
-
-  for (final med in p.meds) {
-    final text = med.prescriber.trim();
-
-    if (text.isEmpty || seen.contains(text.toLowerCase())) {
-      continue;
-    }
-
-    seen.add(text.toLowerCase());
-
-    final lines = text
-        .split(RegExp(r'[\r\n]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-
-    pharmacies.add({
-      "name": lines.isNotEmpty ? lines.first : text,
-      "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
+    _scrollCtrl.addListener(() {
+      final atBottom =
+          _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
+              !_scrollCtrl.position.outOfRange;
+      if (atBottom && !_canScroll) {
+        setState(() => _canScroll = true);
+      }
     });
   }
 
-  return pharmacies;
-}
+  Future<void> _loadData() async {
+    final store = SecureStore();
+    final repo = DataRepository(store);
+    final p = await repo.loadProfile();
 
-Future<void> _openSignaturePopup() async {
+    String? agentEmail;
+    String? agentName;
+    String? agentPhone;
 
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => AlertDialog(
-      title: const Text("Sign Authorization"),
-      content: SizedBox(
-        height: 200,
-        width: 300,
-        child: Signature(
-          controller: _sigCtrl,
-          backgroundColor: Colors.grey[200]!,
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => _sigCtrl.clear(),
-          child: const Text("Clear"),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_sigCtrl.isEmpty) return;
-            Navigator.pop(context);
-            _saveAndSend();
-          },
-          child: const Text("Submit"),
-        ),
-      ],
-    ),
-  );
-}
+    final userEmail = await AppState.getEmail();
 
-Future<void> _startSignatureFlow() async {
-  final readyToSign = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => _VitaLinkConfirmDialog(
-      title: "Almost ready!",
-      message:
-          "Before signing, please confirm your medications and doctors are current. Your agent uses this to help find you the best coverage.",
-      secondaryLabel: "Let me update first",
-      primaryLabel: "Everything looks good",
-      onSecondary: () => Navigator.pop(context, false),
-      onPrimary: () => Navigator.pop(context, true),
-    ),
-  );
+    if (userEmail != null && userEmail.isNotEmpty) {
+      final res = await ApiService.getUserAgent(userEmail);
+      if (res["success"] == true && res["agent"] != null) {
+        final agent = res["agent"];
+        agentEmail = agent["email"];
+        agentName = agent["name"];
+        agentPhone = agent["phone"];
+      }
+    }
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  if (readyToSign == true) {
-    await _openSignaturePopup();
-    return;
+    setState(() {
+      _profile = p;
+      _agentEmail = agentEmail;
+      _agentName = agentName;
+      _agentPhone = agentPhone;
+    });
   }
 
-  await showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => _VitaLinkNoticeDialog(
-      title: "No problem!",
-      message:
-          "Review your medications and doctors, then come back to sign when everything looks right.",
-      buttonLabel: "Review my info",
-      onPressed: () => Navigator.pop(context),
-    ),
-  );
+  Future<File> _buildCsv(Profile p) async {
+    final buffer = StringBuffer();
 
-  if (!mounted) return;
+    final userEmail = await SecureStore().getString('userEmail') ?? "";
 
-  Navigator.pushReplacementNamed(context, '/menu');
-}
+    final parts = p.fullName.trim().split(' ');
+    final firstName = parts.isNotEmpty ? parts.first : "";
+    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
+
+    // 🔥 Medications field
+    final medsStr = p.meds
+        .map((m) =>
+            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
+        .join("; ");
+
+    // 🔥 Doctors field
+    final docsStr = p.doctors
+        .map((d) =>
+            "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}")
+        .join("; ");
+
+    // ✅ HEADER
+    buffer.writeln(
+        "First Name,Last Name,DOB,Address,City,State,Zip Code,Phone,Email,Medications,Doctors,Notes,Source");
+
+    // ✅ SINGLE ROW
+    buffer.writeln("${clean(firstName)},"
+        "${clean(lastName)},"
+        "${clean(p.dob)},"
+        "${clean(p.address)},"
+        "${clean(p.city)},"
+        "${clean(p.state)},"
+        "${clean(p.zip)},"
+        "${clean(p.userPhone)},"
+        "${clean(userEmail)},"
+        "${clean(medsStr)},"
+        "${clean(docsStr)},"
+        "${clean("VitaLink Client | Meds: $medsStr | Doctors: $docsStr")},"
+        "${clean("VitaLink")}");
+
+    final dir = await getTemporaryDirectory();
+    final file = File("${dir.path}/vitalink_user_info.csv");
+    await file.writeAsString(buffer.toString());
+    return file;
+  }
+
+  List<Map<String, String>> _pharmacyList(Profile p) {
+    final seen = <String>{};
+    final pharmacies = <Map<String, String>>[];
+
+    for (final med in p.meds) {
+      final text = med.prescriber.trim();
+
+      if (text.isEmpty || seen.contains(text.toLowerCase())) {
+        continue;
+      }
+
+      seen.add(text.toLowerCase());
+
+      final lines = text
+          .split(RegExp(r'[\r\n]+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList();
+
+      pharmacies.add({
+        "name": lines.isNotEmpty ? lines.first : text,
+        "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
+      });
+    }
+
+    return pharmacies;
+  }
+
+  Future<void> _openSignaturePopup() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("Sign Authorization"),
+        content: SizedBox(
+          height: 200,
+          width: 300,
+          child: Signature(
+            controller: _sigCtrl,
+            backgroundColor: Colors.grey[200]!,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => _sigCtrl.clear(),
+            child: const Text("Clear"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_sigCtrl.isEmpty) return;
+              Navigator.pop(context);
+              _saveAndSend();
+            },
+            child: const Text("Submit"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startSignatureFlow() async {
+    final readyToSign = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _VitaLinkConfirmDialog(
+        title: "Almost ready!",
+        message:
+            "Before signing, please confirm your medications and doctors are current. Your agent uses this to help find you the best coverage.",
+        secondaryLabel: "Let me update first",
+        primaryLabel: "Everything looks good",
+        onSecondary: () => Navigator.pop(context, false),
+        onPrimary: () => Navigator.pop(context, true),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (readyToSign == true) {
+      await _openSignaturePopup();
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _VitaLinkNoticeDialog(
+        title: "No problem!",
+        message:
+            "Review your medications and doctors, then come back to sign when everything looks right.",
+        buttonLabel: "Review my info",
+        onPressed: () => Navigator.pop(context),
+      ),
+    );
+
+    if (!mounted) return;
+
+    Navigator.pushReplacementNamed(context, '/menu');
+  }
 
   Future<void> _saveAndSend() async {
     if (_sigCtrl.isEmpty || _profile == null) return;
@@ -371,14 +367,14 @@ Future<void> _startSignatureFlow() async {
               ),
             ]),
             pw.SizedBox(height: 8),
-            pw.Text("Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
+            pw.Text(
+                "Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
           ],
         ),
       );
 
       final dir = await getTemporaryDirectory();
-      final pdfFile =
-          File("${dir.path}/HIPAA_SOA_Authorization.pdf");
+      final pdfFile = File("${dir.path}/HIPAA_SOA_Authorization.pdf");
       await pdfFile.writeAsBytes(await pdf.save());
 
       final csvFile = await _buildCsv(_profile!);
@@ -414,22 +410,28 @@ Future<void> _startSignatureFlow() async {
           "signed_at": signedAt,
           "meds_reviewed_at": reviewedAt,
           "doctors_reviewed_at": reviewedAt,
-          "emergency_contacts": _profile!.emergency.effectiveContacts.map((c) => {
-                "name": c.name,
-                "phone": c.phone,
-              }).toList(),
+          "emergency_contacts": _profile!.emergency.effectiveContacts
+              .map((c) => {
+                    "name": c.name,
+                    "phone": c.phone,
+                  })
+              .toList(),
           "pharmacies": _pharmacyList(_profile!),
-          "medications": meds.map((m) => {
-                "name": m.name,
-                "dose": m.dose,
-                "frequency": m.frequency,
-                "pharmacy": m.prescriber,
-              }).toList(),
-          "providers": doctors.map((d) => {
-                "name": d.name,
-                "specialty": d.specialty,
-                "phone": d.phone,
-              }).toList(),
+          "medications": meds
+              .map((m) => {
+                    "name": m.name,
+                    "dose": m.dose,
+                    "frequency": m.frequency,
+                    "pharmacy": m.prescriber,
+                  })
+              .toList(),
+          "providers": doctors
+              .map((d) => {
+                    "name": d.name,
+                    "specialty": d.specialty,
+                    "phone": d.phone,
+                  })
+              .toList(),
           "attachments": [
             {
               "name": "HIPAA_SOA_Authorization.pdf",
@@ -448,12 +450,12 @@ Future<void> _startSignatureFlow() async {
       }
 
 // ✅ Mark reviewed so user stops getting notifications this cycle
-try {
-  final email = userEmail.trim();
-  if (email.isNotEmpty) {
-    await ApiService.markReviewed(email: email);
-  }
-} catch (_) {}
+      try {
+        final email = userEmail.trim();
+        if (email.isNotEmpty) {
+          await ApiService.markReviewed(email: email);
+        }
+      } catch (_) {}
 
       if (mounted) {
         showDialog(
@@ -523,28 +525,28 @@ try {
                   ),
                 ],
               ),
-SizedBox(
-  width: double.infinity,
-  child: FilledButton.icon(
-    onPressed: canSubmit ? _startSignatureFlow : null,
-    style: FilledButton.styleFrom(
-      backgroundColor: Colors.blue.shade700,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    ),
-    icon: const Icon(Icons.send),
-    label: const Text(
-      "Sign & Send My Information",
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: canSubmit ? _startSignatureFlow : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.send),
+                  label: const Text(
+                    "Sign & Send My Information",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -785,4 +787,3 @@ class _VitaLinkNoticeDialog extends StatelessWidget {
     );
   }
 }
-
