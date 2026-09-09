@@ -100,6 +100,18 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> checkAppUpdate({
+    required String platform,
+    required int currentBuild,
+    required String currentVersion,
+  }) {
+    return _postJson("check_app_update", {
+      "platform": platform,
+      "currentBuild": currentBuild,
+      "currentVersion": currentVersion,
+    });
+  }
+
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
     required List<Map<String, dynamic>> profiles,

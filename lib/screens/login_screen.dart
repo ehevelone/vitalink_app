@@ -97,8 +97,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child:
-                        const Text("NO", style: TextStyle(color: Colors.white)),
+                    child: const Text("NO",
+                        style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -120,10 +120,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordCtrl.text.trim();
     final deviceId = await DeviceId.getOrCreate();
 
-    final platform =
-        !mounted || Theme.of(context).platform == TargetPlatform.iOS
-            ? "ios"
-            : "android";
+    final platform = !mounted || Theme.of(context).platform == TargetPlatform.iOS
+        ? "ios"
+        : "android";
 
     final res = await ApiService.loginUser(
       email: email,
@@ -269,7 +268,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _emailCtrl,
                 onChanged: (_) => _clearError(),
                 decoration: const InputDecoration(labelText: "Email"),
-                validator: (v) => v == null || v.isEmpty ? "Enter email" : null,
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -280,7 +280,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword ? Icons.visibility_off : Icons.visibility,
+                      _showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
@@ -289,6 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter password" : null,
               ),
+
               if (_errorMessage != null) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -299,6 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
+
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -306,13 +310,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text("Forgot Password?"),
                 ),
               ),
+
               const SizedBox(height: 8),
+
               CheckboxListTile(
                 value: _rememberMe,
-                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                onChanged: (v) =>
+                    setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
+
               const SizedBox(height: 24),
+
               ElevatedButton(
                 onPressed: () => _login(),
                 child: const Text("Login"),

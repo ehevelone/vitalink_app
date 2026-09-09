@@ -11,6 +11,7 @@ import 'package:app_links/app_links.dart';
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
 import 'services/deep_link_service.dart';
+import 'widgets/app_update_gate.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -324,8 +325,10 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       debugShowCheckedModeBanner: false,
       home: const LandingScreen(),
       builder: (context, child) {
-        return SafeArea(
-          child: child ?? const SizedBox.shrink(),
+        return AppUpdateGate(
+          child: SafeArea(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
 
