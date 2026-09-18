@@ -85,7 +85,15 @@ const AndroidNotificationChannel vitalinkNotificationChannel =
 
 Future<void> _setupNotificationDisplay() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidSettings);
+  const iosSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  const initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
+  );
 
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
@@ -187,7 +195,6 @@ Future<void> _setupFCMGlobal() async {
         );
       }
     });
-
   } catch (e) {
     debugPrint("❌ FCM ERROR: $e");
   }
@@ -197,84 +204,101 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await runZonedGuarded(() async {
+    var appStarted = false;
 
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    try {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
 
-    await Firebase.initializeApp();
-    await _setupNotificationDisplay();
-    await _setupFCMGlobal();
+      await Firebase.initializeApp();
 
-    // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
-    _appLinks.uriLinkStream.listen((uri) {
-      final code = uri.queryParameters['code']?.toUpperCase();
-
-      if (uri.host != 'share' && code != null && code.isNotEmpty) {
-        VitaLinkDeepLink.code = code;
-        debugPrint("🔥 Deep link code received: $code");
+      try {
+        await _setupNotificationDisplay();
+      } catch (error, stack) {
+        debugPrint('Notification display setup failed: $error');
+        debugPrintStack(stackTrace: stack);
       }
-    });
 
-    // 🔥 HANDLE TAP WHEN APP IS CLOSED
-    Future<void> handleProfileShareLink(Uri uri) async {
-      if (uri.host != 'share') return;
+      await _setupFCMGlobal();
 
-      final shareCode = uri.queryParameters['code']?.toUpperCase();
-      if (shareCode == null || shareCode.isEmpty) return;
+      // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
+      _appLinks.uriLinkStream.listen((uri) {
+        final code = uri.queryParameters['code']?.toUpperCase();
 
-      VitaLinkDeepLink.shareCode = shareCode;
-      debugPrint("Profile share link code received: $shareCode");
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed('/profile_accept');
+        if (uri.host != 'share' && code != null && code.isNotEmpty) {
+          VitaLinkDeepLink.code = code;
+          debugPrint("🔥 Deep link code received: $code");
+        }
       });
-    }
 
-    final initialShareUri = await _appLinks.getInitialLink();
-    if (initialShareUri != null) {
-      await handleProfileShareLink(initialShareUri);
-    }
+      // 🔥 HANDLE TAP WHEN APP IS CLOSED
+      Future<void> handleProfileShareLink(Uri uri) async {
+        if (uri.host != 'share') return;
 
-    _appLinks.uriLinkStream.listen(handleProfileShareLink);
+        final shareCode = uri.queryParameters['code']?.toUpperCase();
+        if (shareCode == null || shareCode.isEmpty) return;
 
-    RemoteMessage? initialMessage =
-        await FirebaseMessaging.instance.getInitialMessage();
+        VitaLinkDeepLink.shareCode = shareCode;
+        debugPrint("Profile share link code received: $shareCode");
 
-    if (initialMessage != null) {
-      _captureProfileShareInvite(initialMessage);
-      final route = initialMessage.data["route"];
-
-      if (route != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamed(route);
+          navigatorKey.currentState?.pushNamed('/profile_accept');
         });
       }
-    }
 
-    FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler,
-    );
-
-    FirebaseMessaging.onMessage.listen((message) {
-      showGlobalNotificationPopup(message);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      _handleNotificationNavigation(message);
-      _captureProfileShareInvite(message);
-
-      final route = message.data["route"];
-
-      if (route != null) {
-        navigatorKey.currentState?.pushNamed(route);
+      final initialShareUri = await _appLinks.getInitialLink();
+      if (initialShareUri != null) {
+        await handleProfileShareLink(initialShareUri);
       }
-    });
 
-    runApp(const VitaLinkApp());
+      _appLinks.uriLinkStream.listen(handleProfileShareLink);
 
+      RemoteMessage? initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+
+      if (initialMessage != null) {
+        _captureProfileShareInvite(initialMessage);
+        final route = initialMessage.data["route"];
+
+        if (route != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            navigatorKey.currentState?.pushNamed(route);
+          });
+        }
+      }
+
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+
+      FirebaseMessaging.onMessage.listen((message) {
+        showGlobalNotificationPopup(message);
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        _handleNotificationNavigation(message);
+        _captureProfileShareInvite(message);
+
+        final route = message.data["route"];
+
+        if (route != null) {
+          navigatorKey.currentState?.pushNamed(route);
+        }
+      });
+
+      runApp(const VitaLinkApp());
+      appStarted = true;
+    } catch (error, stack) {
+      debugPrint('STARTUP ERROR: $error');
+      debugPrintStack(stackTrace: stack);
+    } finally {
+      if (!appStarted) {
+        runApp(const VitaLinkApp());
+      }
+    }
   }, (error, stack) {
     debugPrint('ZONED ERROR: $error');
   });
@@ -293,9 +317,7 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
     return MaterialApp(
       theme: ThemeData(
         useMaterial3: false,
-
         primaryColor: Colors.blue,
-
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
           enabledBorder: OutlineInputBorder(),
@@ -303,7 +325,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
             borderSide: BorderSide(color: Colors.blue, width: 2),
           ),
         ),
-
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -312,14 +333,12 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
             ),
           ),
         ),
-
         dialogTheme: const DialogThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
         ),
       ),
-
       navigatorKey: navigatorKey,
       title: 'VitaLink',
       debugShowCheckedModeBanner: false,
@@ -331,7 +350,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
           ),
         );
       },
-
       onGenerateRoute: (settings) {
         if (settings.name == '/insurance_cards') {
           int index = 0;
@@ -349,7 +367,6 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
 
         return null;
       },
-
       routes: {
         '/landing': (context) => const LandingScreen(),
         '/splash': (context) => const SplashScreen(),
