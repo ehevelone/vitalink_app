@@ -2,6 +2,13 @@
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const Stripe = require("stripe");
+const { getActivationPriceId } = require("./services/stripe-prices");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const ACTIVATION_AMOUNT_CENTS = 4995;
+
+class RegistrationError extends Error {}
 
 function reply(success, obj = {}) {
   return {
@@ -63,11 +70,11 @@ async function ensureUserSessionColumns() {
   `);
 }
 
-async function createUserSession(userId) {
+async function createUserSession(executor, userId) {
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
 
-  await db.query(
+  await executor.query(
     `
     UPDATE users
     SET session_token = $1,
@@ -78,6 +85,50 @@ async function createUserSession(userId) {
   );
 
   return token;
+}
+
+function getPaymentIntentId(value) {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+async function verifyLegacyStripeActivation(row) {
+  if (!row.stripe_session || !row.stripe_session.startsWith("cs_")) {
+    throw new RegistrationError("This purchase code needs manual review");
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(row.stripe_session, {
+    expand: ["line_items.data.price"]
+  });
+  const lineItems = session.line_items?.data || [];
+  const validLineItem = lineItems.length === 1 &&
+    lineItems[0].price?.id === getActivationPriceId() &&
+    lineItems[0].quantity === 1;
+
+  if (
+    session.mode !== "payment" ||
+    session.payment_status !== "paid" ||
+    session.currency !== "usd" ||
+    session.amount_total !== ACTIVATION_AMOUNT_CENTS ||
+    !validLineItem
+  ) {
+    throw new RegistrationError("This purchase could not be verified as paid");
+  }
+
+  const email = normalizeEmail(
+    session.customer_details?.email || session.customer_email
+  );
+  if (!email) {
+    throw new RegistrationError("This purchase is missing a verified email address");
+  }
+
+  return {
+    name: session.customer_details?.individual_name ||
+      session.customer_details?.name || row.name || null,
+    email,
+    paymentIntentId: getPaymentIntentId(session.payment_intent),
+    paidAt: new Date(session.created * 1000)
+  };
 }
 
 exports.handler = async (event) => {
@@ -120,72 +171,139 @@ if (event.httpMethod !== "POST") {
     // ✅ Hash password
     const password_hash = await bcrypt.hash(password, 10);
 
-    let agentId = null;
-    let purchaseCode = null;
+    const client = await db.connect();
+    let user;
+    let sessionToken;
 
-    // 🔎 Agent unlock code
-    const agentResult = await db.query(
-      `SELECT id, active FROM agents WHERE unlock_code = $1 LIMIT 1`,
-      [promoCode]
-    );
+    try {
+      await client.query("BEGIN");
 
-    if (agentResult.rows.length) {
-      const agent = agentResult.rows[0];
-      if (!agent.active) {
-        return reply(false, { error: "Agent subscription inactive ❌" });
-      }
-      agentId = agent.id;
-    } else {
-      // 🔎 Purchase Code
-      const purchaseResult = await db.query(
-        `SELECT code, redeemed FROM purchase_codes WHERE code = $1 LIMIT 1`,
+      let agentId = null;
+      let purchaseCode = null;
+      let activationId = null;
+
+      // Agent codes keep their existing precedence and behavior.
+      const agentResult = await client.query(
+        `SELECT id, active FROM agents WHERE unlock_code = $1 LIMIT 1`,
         [promoCode]
       );
 
-      if (purchaseResult.rows.length) {
-        const pc = purchaseResult.rows[0];
-        if (pc.redeemed) {
-          return reply(false, { error: "Purchase code already used ❌" });
+      if (agentResult.rows.length) {
+        const agent = agentResult.rows[0];
+        if (!agent.active) {
+          throw new RegistrationError("Agent subscription inactive");
         }
-
-        purchaseCode = pc.code;
-
-        await db.query(
-          `UPDATE purchase_codes SET redeemed = true, redeemed_at = now() WHERE code = $1`,
+        agentId = agent.id;
+      } else {
+        const activationResult = await client.query(
+          `SELECT id, code, name, email, stripe_session, purchase_type,
+                  payment_status, redeemed
+           FROM activation_codes
+           WHERE code = $1
+           LIMIT 1
+           FOR UPDATE`,
           [promoCode]
         );
-      } else {
-        return reply(false, { error: "Invalid agent or purchase promo code ❌" });
+
+        if (!activationResult.rows.length) {
+          throw new RegistrationError("Invalid agent or purchase activation code");
+        }
+
+        const activation = activationResult.rows[0];
+        if (activation.redeemed) {
+          throw new RegistrationError("Purchase activation code already used");
+        }
+
+        if (
+          activation.purchase_type !== "consumer_activation" ||
+          activation.payment_status !== "paid"
+        ) {
+          const verified = await verifyLegacyStripeActivation(activation);
+          await client.query(
+            `UPDATE activation_codes
+             SET name = $1,
+                 email = $2,
+                 purchase_type = 'consumer_activation',
+                 payment_intent_id = $3,
+                 payment_status = 'paid',
+                 paid_at = $4
+             WHERE id = $5`,
+            [
+              verified.name,
+              verified.email,
+              verified.paymentIntentId,
+              verified.paidAt,
+              activation.id
+            ]
+          );
+          activation.email = verified.email;
+          activation.purchase_type = "consumer_activation";
+          activation.payment_status = "paid";
+        }
+
+        if (normalizeEmail(activation.email) !== email) {
+          throw new RegistrationError(
+            "Registration email must match the email used for purchase"
+          );
+        }
+
+        activationId = activation.id;
+        purchaseCode = activation.code;
       }
+
+      const result = await client.query(
+        `INSERT INTO users (first_name, last_name, email, phone, password_hash, agent_id, purchase_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, email, first_name, last_name, agent_id, purchase_code`,
+        [
+          firstName,
+          lastName,
+          email,
+          normalizeUsPhone(phone),
+          password_hash,
+          agentId,
+          purchaseCode,
+        ]
+      );
+
+      user = result.rows[0];
+      sessionToken = await createUserSession(client, user.id);
+
+      await client.query(
+        `INSERT INTO user_devices (user_id, platform, created_at, updated_at)
+         VALUES ($1, $2, NOW(), NOW())
+         ON CONFLICT ON CONSTRAINT user_devices_user_id_unique
+         DO UPDATE SET platform = EXCLUDED.platform, updated_at = NOW()`,
+        [user.id, platform || "unknown"]
+      );
+
+      if (activationId !== null) {
+        const redeemed = await client.query(
+          `UPDATE activation_codes
+           SET redeemed = true,
+               redeemed_at = NOW(),
+               redeemed_by_user_id = $1
+           WHERE id = $2
+             AND redeemed IS NOT TRUE
+           RETURNING id`,
+          [user.id, activationId]
+        );
+
+        if (!redeemed.rows.length) {
+          throw new RegistrationError("Purchase activation code already used");
+        }
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      if (err instanceof RegistrationError) {
+        return reply(false, { error: err.message });
+      }
+      throw err;
+    } finally {
+      client.release();
     }
-
-    // ✅ Insert user
-    const result = await db.query(
-      `INSERT INTO users (first_name, last_name, email, phone, password_hash, agent_id, purchase_code)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, email, first_name, last_name, agent_id, purchase_code`,
-      [
-        firstName,
-        lastName,
-        email,
-        normalizeUsPhone(phone),
-        password_hash,
-        agentId,
-        purchaseCode,
-      ]
-    );
-
-    const user = result.rows[0];
-    const sessionToken = await createUserSession(user.id);
-
-    // ✅ Correct device upsert (1 device per user)
-    await db.query(
-      `INSERT INTO user_devices (user_id, platform, created_at, updated_at)
-       VALUES ($1, $2, NOW(), NOW())
-       ON CONFLICT ON CONSTRAINT user_devices_user_id_unique
-       DO UPDATE SET platform = EXCLUDED.platform, updated_at = NOW()`,
-      [user.id, platform || "unknown"]
-    );
 
     return reply(true, {
       message: "User registered successfully ✅",

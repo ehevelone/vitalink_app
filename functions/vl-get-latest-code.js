@@ -39,16 +39,21 @@ exports.handler = async function (event) {
     }
 
     const client = await pool.connect();
+    let result;
 
-    const result = await client.query(
-      `SELECT code
-       FROM activation_codes
-       WHERE stripe_session = $1
-       LIMIT 1`,
-      [sessionId]
-    );
-
-    client.release();
+    try {
+      result = await client.query(
+        `SELECT code
+         FROM activation_codes
+         WHERE stripe_session = $1
+           AND purchase_type = 'consumer_activation'
+           AND payment_status = 'paid'
+         LIMIT 1`,
+        [sessionId]
+      );
+    } finally {
+      client.release();
+    }
 
     console.log("DB result:", result.rows);
 

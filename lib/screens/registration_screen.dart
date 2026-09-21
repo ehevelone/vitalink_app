@@ -194,12 +194,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final code = _normalizeCode(_activationCodeCtrl.text);
       final email = _normalizeEmail(_emailCtrl.text);
 
-      final agentRes = await ApiService.resolveAgentByCode(code);
-
-      if (agentRes['success'] != true || agentRes['agent'] == null) {
-        throw Exception("Invalid or inactive activation code");
-      }
-
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
       final lastName =

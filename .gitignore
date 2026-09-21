@@ -42,6 +42,7 @@ app.*.map.json
 
 # Node
 node_modules/
+.netlify/
 
 # 🔒 Local-only auth files (FIXED PATH)
 functions/agent-login-2fa.js

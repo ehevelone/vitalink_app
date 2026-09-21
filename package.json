@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "node --test test-js/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
