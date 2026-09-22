@@ -76,10 +76,21 @@ class _DoctorsViewState extends State<DoctorsView> {
                       npiStatusIcon(d.verificationStatus),
                     ],
                   ),
-                  subtitle: Text(
-                    [d.specialty, d.clinic, d.phone]
-                        .where((s) => s.isNotEmpty)
-                        .join(" • "),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if ([d.specialty, d.clinic, d.phone]
+                          .any((value) => value.isNotEmpty))
+                        Text(
+                          [d.specialty, d.clinic, d.phone]
+                              .where((s) => s.isNotEmpty)
+                              .join(" • "),
+                        ),
+                      if (d.isPrimaryCareProvider) ...[
+                        const SizedBox(height: 3),
+                        primaryCareIndicator(),
+                      ],
+                    ],
                   ),
                 );
               },

@@ -65,7 +65,7 @@ function rowToCandidate(row) {
   };
 }
 
-async function findCachedCandidates({ entityType, name, city, state }) {
+async function findCachedCandidates({ entityType, name, city, state, phone }) {
   await ensureNpiCacheTable();
   const values = [entityType, normalizeText(name)];
   let stateFilter = "";
@@ -78,6 +78,12 @@ async function findCachedCandidates({ entityType, name, city, state }) {
     values.push(String(city).trim());
     cityFilter = `AND (LOWER(city) = LOWER($${values.length}) OR city IS NULL)`;
   }
+  let phoneFilter = "";
+  const phoneDigits = String(phone || "").replace(/\D/g, "").slice(-10);
+  if (phoneDigits.length === 10) {
+    values.push(phoneDigits);
+    phoneFilter = `AND RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g'), 10) = $${values.length}`;
+  }
   const result = await db.query(
     `
     SELECT *
@@ -86,6 +92,7 @@ async function findCachedCandidates({ entityType, name, city, state }) {
       AND normalized_name = $2
       ${stateFilter}
       ${cityFilter}
+      ${phoneFilter}
     ORDER BY confirmed_at DESC
     LIMIT 4
     `,

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitalink/models.dart';
+import 'package:vitalink/widgets/npi_verification_widgets.dart';
 
 void main() {
   test('legacy doctor and medication JSON remain backward compatible', () {
@@ -17,6 +18,7 @@ void main() {
     expect(doctor.verificationStatus, 'unverified');
     expect(doctor.npi, isNull);
     expect(doctor.npiCandidates, isEmpty);
+    expect(doctor.isPrimaryCareProvider, isFalse);
     expect(medication.pharmacyVerificationStatus, 'unverified');
     expect(medication.pharmacyNpi, isNull);
     expect(medication.pharmacyNpiCandidates, isEmpty);
@@ -33,6 +35,7 @@ void main() {
       ],
       verifiedAt: verifiedAt,
       verifiedBy: 'auto',
+      isPrimaryCareProvider: true,
     );
     final medication = Medication(
       name: 'Example',
@@ -43,7 +46,7 @@ void main() {
         {'npi': '0987654321', 'displayName': 'EXAMPLE PHARMACY'},
       ],
       pharmacyVerifiedAt: verifiedAt,
-      pharmacyVerifiedBy: 'agent:7',
+      pharmacyVerifiedBy: '7',
     );
 
     final restoredDoctor = Doctor.fromJson(doctor.toJson());
@@ -52,8 +55,29 @@ void main() {
     expect(restoredDoctor.npi, '1234567890');
     expect(restoredDoctor.verificationStatus, 'verified');
     expect(restoredDoctor.verifiedAt, verifiedAt);
+    expect(restoredDoctor.isPrimaryCareProvider, isTrue);
     expect(restoredMedication.pharmacyNpi, '0987654321');
     expect(restoredMedication.pharmacyVerificationStatus, 'verified');
-    expect(restoredMedication.pharmacyVerifiedBy, 'agent:7');
+    expect(restoredMedication.pharmacyVerifiedBy, '7');
+  });
+
+  test('provider specialty and primary-care role remain independent', () {
+    final doctor = Doctor(
+      name: 'Jane Smith',
+      specialty: 'Internal Medicine',
+      isPrimaryCareProvider: true,
+    );
+
+    final restored = Doctor.fromJson(doctor.toJson());
+
+    expect(restored.specialty, 'Internal Medicine');
+    expect(restored.isPrimaryCareProvider, isTrue);
+  });
+
+  test('every existing doctor type remains available for NPI narrowing', () {
+    expect(npiDoctorSpecialtyOptions, contains('Primary'));
+    expect(npiDoctorSpecialtyOptions, contains('Cardiologist'));
+    expect(npiDoctorSpecialtyOptions, contains('Pain Management'));
+    expect(npiDoctorSpecialtyOptions.last, 'Other');
   });
 }

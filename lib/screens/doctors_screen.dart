@@ -48,14 +48,16 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final specialty = TextEditingController(text: existing?.specialty ?? '');
     final clinic = TextEditingController(text: existing?.clinic ?? '');
     final phone = TextEditingController(text: existing?.phone ?? '');
+    var isPrimaryCareProvider = existing?.isPrimaryCareProvider ?? false;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(existing == null ? 'Add Doctor' : 'Edit Doctor'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(existing == null ? 'Add Doctor' : 'Edit Doctor'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
               Column(
                 children: [
                   TextField(
@@ -95,18 +97,27 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                   ),
                   const Divider(height: 1),
                 ],
-              ),
-            ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Primary care provider'),
+                  value: isPrimaryCareProvider,
+                  onChanged: (value) => setDialogState(
+                    () => isPrimaryCareProvider = value,
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Save')),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save')),
-        ],
       ),
     );
 
@@ -117,6 +128,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       specialty: specialty.text.trim(),
       clinic: clinic.text.trim(),
       phone: phone.text.trim(), // ← formatted before save
+      isPrimaryCareProvider: isPrimaryCareProvider,
+      npi: existing?.npi,
+      verificationStatus: existing?.verificationStatus ?? 'unverified',
+      npiCandidates: existing?.npiCandidates,
+      verifiedAt: existing?.verifiedAt,
+      verifiedBy: existing?.verifiedBy,
     );
 
     setState(() {
@@ -135,12 +152,11 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   Future<void> _verifyDoctor(int index) async {
     if (index < 0 || index >= _p!.doctors.length) return;
     final doctor = _p!.doctors[index];
-    final result = await _npiService.lookup(
+    var result = await _npiService.lookup(
       entityType: 'provider',
       name: doctor.name,
       city: _p!.city,
       state: _p!.state,
-      specialty: doctor.specialty,
     );
 
     doctor.npi = result.npi;
@@ -149,6 +165,37 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
     doctor.verifiedBy = result.isVerified ? result.verifiedBy ?? 'auto' : null;
     await _save();
+
+    if (result.status != 'needs_review' ||
+        result.candidates.isEmpty ||
+        !mounted) {
+      return;
+    }
+
+    final specialty = await showNpiSpecialtyPicker(
+      context: context,
+      doctorName: doctor.name,
+      initialValue: doctor.specialty,
+    );
+    if (specialty == null) return;
+
+    doctor.specialty = specialty.displayValue;
+    if (specialty.filterLabel != 'Other') {
+      result = await _npiService.lookup(
+        entityType: 'provider',
+        name: doctor.name,
+        city: _p!.city,
+        state: _p!.state,
+        specialty: specialty.filterLabel,
+      );
+      doctor.npi = result.npi;
+      doctor.verificationStatus = result.status;
+      doctor.npiCandidates = result.candidates;
+      doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
+      doctor.verifiedBy =
+          result.isVerified ? result.verifiedBy ?? 'auto' : null;
+      await _save();
+    }
 
     if (result.status != 'needs_review' ||
         result.candidates.isEmpty ||
@@ -230,11 +277,22 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                       npiStatusIcon(d.verificationStatus),
                     ],
                   ),
-                  subtitle: Text([
-                    if (d.specialty.isNotEmpty) d.specialty,
-                    if (d.clinic.isNotEmpty) d.clinic,
-                    if (d.phone.isNotEmpty) d.phone,
-                  ].join(" • ")),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if ([d.specialty, d.clinic, d.phone]
+                          .any((value) => value.isNotEmpty))
+                        Text([
+                          if (d.specialty.isNotEmpty) d.specialty,
+                          if (d.clinic.isNotEmpty) d.clinic,
+                          if (d.phone.isNotEmpty) d.phone,
+                        ].join(" • ")),
+                      if (d.isPrimaryCareProvider) ...[
+                        const SizedBox(height: 3),
+                        primaryCareIndicator(),
+                      ],
+                    ],
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () => _delete(i),

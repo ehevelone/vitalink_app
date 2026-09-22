@@ -42,6 +42,7 @@ Attached:
       phone: body.user_phone || "",
       dob: body.user_dob || "",
       medications: body.medications || [],
+      pharmacies: body.pharmacies || [],
       providers: body.providers || [],
     });
 
@@ -82,13 +83,13 @@ Attached:
     const info = await transporter.sendMail(mailOptions);
 
     // Update user record
-    if (body.user) {
+    if (body.user_email) {
       await db.query(
         `UPDATE users
          SET status = 'complete',
              last_review_year = EXTRACT(YEAR FROM CURRENT_DATE)
          WHERE LOWER(email) = LOWER($1)`,
-        [body.user]
+        [body.user_email]
       );
     }
 

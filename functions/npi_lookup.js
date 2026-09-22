@@ -1,4 +1,9 @@
-const { searchNpi } = require("./services/npi-registry");
+const {
+  candidatesMatchingPhone,
+  normalizePhone,
+  searchNpi,
+} = require("./services/npi-registry");
+const { taxonomiesForSpecialty } = require("./services/npi-taxonomies");
 const {
   authenticate,
   cacheConfirmedCandidate,
@@ -27,6 +32,24 @@ function uniqueCandidates(candidates) {
   });
 }
 
+async function searchRegistry({ entityType, name, city, state, postalCode, specialty }) {
+  const base = { entityType, name, city, state, postalCode };
+  if (entityType !== "provider" || !specialty) {
+    return searchNpi(base);
+  }
+
+  const taxonomies = taxonomiesForSpecialty(specialty);
+  if (!taxonomies.length) return searchNpi(base);
+
+  const descriptions = [...new Set(taxonomies.map((item) => item.description))];
+  const resultSets = await Promise.all(
+    descriptions.map((taxonomyDescription) =>
+      searchNpi({ ...base, taxonomyDescription }),
+    ),
+  );
+  return uniqueCandidates(resultSets.flat());
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return reply(200, {});
   if (event.httpMethod !== "POST") return reply(405, { success: false, error: "Method Not Allowed" });
@@ -38,17 +61,30 @@ exports.handler = async (event) => {
 
     const entityType = String(body.entityType || "").toLowerCase();
     const name = String(body.name || "").trim();
+    const phone = normalizePhone(body.phone);
     if (!["provider", "pharmacy"].includes(entityType) || name.length < 2) {
       return reply(400, { success: false, error: "A valid entity type and name are required" });
     }
 
-    const cached = await findCachedCandidates({
-      entityType,
-      name,
-      city: body.city,
-      state: body.state,
-    });
+    const cached = body.specialty
+      ? []
+      : await findCachedCandidates({
+          entityType,
+          name,
+          city: entityType === "pharmacy" && phone ? "" : body.city,
+          state: entityType === "pharmacy" && phone ? "" : body.state,
+          phone: entityType === "pharmacy" ? phone : "",
+        });
     if (cached.length) {
+      if (entityType === "pharmacy" && phone && cached.length === 1) {
+        return reply(200, {
+          success: true,
+          verificationStatus: "verified",
+          npi: cached[0].npi,
+          verifiedBy: "auto",
+          candidates: cached,
+        });
+      }
       return reply(200, {
         success: true,
         verificationStatus: "needs_review",
@@ -57,16 +93,28 @@ exports.handler = async (event) => {
       });
     }
 
-    const registryCandidates = await searchNpi({
+    const registryCandidates = await searchRegistry({
       entityType,
       name,
-      city: String(body.city || "").trim(),
-      state: String(body.state || "").trim().toUpperCase(),
-      postalCode: String(body.postalCode || "").trim(),
+      city:
+        entityType === "pharmacy" ? "" : String(body.city || "").trim(),
+      state:
+        entityType === "pharmacy"
+          ? ""
+          : String(body.state || "").trim().toUpperCase(),
+      postalCode:
+        entityType === "pharmacy"
+          ? ""
+          : String(body.postalCode || "").trim(),
+      specialty: String(body.specialty || "").trim(),
     });
 
-    if (registryCandidates.length === 1) {
-      const candidate = registryCandidates[0];
+    const phoneMatches = candidatesMatchingPhone(registryCandidates, phone);
+    const confidentCandidates =
+      entityType === "pharmacy" && phone ? phoneMatches : registryCandidates;
+
+    if (confidentCandidates.length === 1) {
+      const candidate = confidentCandidates[0];
       await cacheConfirmedCandidate({
         entityType,
         searchedName: name,
@@ -82,7 +130,8 @@ exports.handler = async (event) => {
       });
     }
 
-    const candidates = uniqueCandidates(registryCandidates).slice(0, 4);
+    const reviewPool = phoneMatches.length ? phoneMatches : registryCandidates;
+    const candidates = uniqueCandidates(reviewPool).slice(0, 4);
 
     return reply(200, {
       success: true,

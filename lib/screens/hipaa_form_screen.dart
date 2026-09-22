@@ -140,13 +140,13 @@ I understand:
     // 🔥 Medications field
     final medsStr = p.meds
         .map((m) =>
-            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
+            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}${m.prescriber.isNotEmpty ? " | Pharmacy: ${m.prescriber}" : ""}${m.pharmacyVerificationStatus == 'verified' && m.pharmacyNpi != null ? " | Pharmacy NPI: ${m.pharmacyNpi} (verified)" : ""}")
         .join("; ");
 
     // 🔥 Doctors field
     final docsStr = p.doctors
         .map((d) =>
-            "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}")
+            "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}${d.isPrimaryCareProvider ? " [Primary Care]" : ""}${d.verificationStatus == 'verified' && d.npi != null ? " [NPI: ${d.npi} verified]" : ""}")
         .join("; ");
 
     // ✅ HEADER
@@ -175,17 +175,12 @@ I understand:
   }
 
   List<Map<String, dynamic>> _pharmacyList(Profile p) {
-    final seen = <String>{};
     final pharmacies = <Map<String, dynamic>>[];
 
     for (final med in p.meds) {
       final text = med.prescriber.trim();
 
-      if (text.isEmpty || seen.contains(text.toLowerCase())) {
-        continue;
-      }
-
-      seen.add(text.toLowerCase());
+      if (text.isEmpty) continue;
 
       final lines = text
           .split(RegExp(r'[\r\n]+'))
@@ -193,16 +188,32 @@ I understand:
           .where((line) => line.isNotEmpty)
           .toList();
 
-      pharmacies.add({
+      final pharmacy = <String, dynamic>{
         "name": lines.isNotEmpty ? lines.first : text,
         "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
         if (med.pharmacyVerificationStatus == 'verified' &&
             med.pharmacyNpi != null)
           "npi": med.pharmacyNpi,
-      });
+      };
+      final key = text.toLowerCase();
+      final existingIndex = pharmacies.indexWhere(
+        (item) => item['_key'] == key,
+      );
+
+      if (existingIndex >= 0) {
+        if (pharmacy['npi'] != null) {
+          pharmacies[existingIndex]['npi'] = pharmacy['npi'];
+        }
+        continue;
+      }
+
+      pharmacy['_key'] = key;
+      pharmacies.add(pharmacy);
     }
 
-    return pharmacies;
+    return pharmacies
+        .map((pharmacy) => Map<String, dynamic>.from(pharmacy)..remove('_key'))
+        .toList();
   }
 
   Future<void> _openSignaturePopup() async {
@@ -350,7 +361,7 @@ I understand:
               ...doctors.map(
                 (d) => pw.Bullet(
                   text:
-                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
+                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.isPrimaryCareProvider ? " — Primary Care" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
                 ),
               ),
             pw.SizedBox(height: 16),
@@ -433,6 +444,7 @@ I understand:
                     "name": d.name,
                     "specialty": d.specialty,
                     "phone": d.phone,
+                    "is_primary_care_provider": d.isPrimaryCareProvider,
                     if (d.verificationStatus == 'verified' && d.npi != null)
                       "npi": d.npi,
                   })

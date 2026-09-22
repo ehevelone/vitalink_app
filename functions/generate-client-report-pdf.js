@@ -1,4 +1,8 @@
 const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+const {
+  formatPharmacySummary,
+  formatProviderSummary,
+} = require("./services/provider-verification-format");
 
 module.exports = async function generateClientReportPdf(client) {
   const pdfDoc = await PDFDocument.create();
@@ -51,15 +55,27 @@ module.exports = async function generateClientReportPdf(client) {
 
   y -= 20;
 
+  // ===== PHARMACIES =====
+  drawText("Pharmacies", 14);
+  y -= 5;
+
+  if (Array.isArray(client.pharmacies) && client.pharmacies.length) {
+    client.pharmacies.forEach((pharmacy, i) => {
+      drawText(`${i + 1}. ${formatPharmacySummary(pharmacy)}`);
+    });
+  } else {
+    drawText("No pharmacies listed.");
+  }
+
+  y -= 20;
+
   // ===== PROVIDERS =====
   drawText("Healthcare Providers", 14);
   y -= 5;
 
   if (Array.isArray(client.providers) && client.providers.length) {
     client.providers.forEach((p, i) => {
-      drawText(
-        `${i + 1}. ${p.name || "Unknown"} (${p.specialty || "N/A"}) — ${p.phone || ""}`
-      );
+      drawText(`${i + 1}. ${formatProviderSummary(p)}`);
     });
   } else {
     drawText("No providers listed.");

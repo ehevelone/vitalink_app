@@ -3,8 +3,10 @@ const assert = require("node:assert/strict");
 
 const {
   buildSearchParams,
+  candidatesMatchingPhone,
   getNpiByNumber,
   mapNppesResult,
+  normalizePhone,
   normalizeText,
   searchNpi,
   splitProviderName,
@@ -35,6 +37,18 @@ test("provider search includes location filters and NPI-1", () => {
   assert.equal(params.get("city"), "Omaha");
   assert.equal(params.get("state"), "NE");
   assert.equal(params.get("postal_code"), "68114");
+});
+
+test("specialty searches use the exact NPPES taxonomy description", () => {
+  const params = buildSearchParams({
+    entityType: "provider",
+    name: "Jane Smith",
+    taxonomyDescription: "Cardiovascular Disease",
+  });
+  assert.equal(
+    params.get("taxonomy_description"),
+    "Cardiovascular Disease",
+  );
 });
 
 test("pharmacy search uses organization name and NPI-2", () => {
@@ -114,4 +128,23 @@ test("number confirmation only accepts the requested NPI", async () => {
 
 test("cache keys normalize punctuation and spacing", () => {
   assert.equal(normalizeText("  Smith,  Jane M.D. "), "smith jane m d");
+});
+
+test("phone matching compares the final ten digits", () => {
+  assert.equal(normalizePhone("+1 (402) 555-1212 ext 9"), "4025551212");
+  assert.equal(normalizePhone("(402) 555-1212"), "4025551212");
+});
+
+test("pharmacy phone matching isolates a single chain location", () => {
+  const candidates = [
+    { npi: "1111111111", phone: "402-555-1111" },
+    { npi: "2222222222", phone: "(402) 555-2222" },
+    { npi: "3333333333", phone: "402-555-3333" },
+  ];
+  assert.deepEqual(
+    candidatesMatchingPhone(candidates, "+1 402 555 2222").map(
+      (candidate) => candidate.npi,
+    ),
+    ["2222222222"],
+  );
 });

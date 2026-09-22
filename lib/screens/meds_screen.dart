@@ -19,23 +19,6 @@ class MedsScreen extends StatefulWidget {
 }
 
 class _MedsScreenState extends State<MedsScreen> {
-  static const List<String> _doctorSpecialtyOptions = [
-    'Primary',
-    'Cardiologist',
-    'Orthopedic',
-    'Neurologist',
-    'Endocrinologist',
-    'Pulmonologist',
-    'Gastroenterologist',
-    'Nephrologist',
-    'Urologist',
-    'Oncologist',
-    'Dermatologist',
-    'Psychiatrist',
-    'Pain Management',
-    'Other',
-  ];
-
   late final DataRepository _repo;
   late final NpiVerificationService _npiService;
   Profile? _p;
@@ -193,6 +176,12 @@ class _MedsScreenState extends State<MedsScreen> {
         .trim();
   }
 
+  String _pharmacyPhone(String value) {
+    final match =
+        RegExp(r'\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}').firstMatch(value);
+    return match?.group(0)?.trim() ?? '';
+  }
+
   Future<void> _verifyPharmacy(int index) async {
     if (index < 0 || index >= _p!.meds.length) return;
     final medication = _p!.meds[index];
@@ -212,6 +201,7 @@ class _MedsScreenState extends State<MedsScreen> {
       name: name,
       city: _p!.city,
       state: _p!.state,
+      phone: _pharmacyPhone(medication.prescriber),
     );
     medication.pharmacyNpi = result.npi;
     medication.pharmacyVerificationStatus = result.status;
@@ -249,12 +239,11 @@ class _MedsScreenState extends State<MedsScreen> {
   Future<void> _verifyDoctor(int index) async {
     if (index < 0 || index >= _p!.doctors.length) return;
     final doctor = _p!.doctors[index];
-    final result = await _npiService.lookup(
+    var result = await _npiService.lookup(
       entityType: 'provider',
       name: doctor.name,
       city: _p!.city,
       state: _p!.state,
-      specialty: doctor.specialty,
     );
     doctor.npi = result.npi;
     doctor.verificationStatus = result.status;
@@ -268,6 +257,38 @@ class _MedsScreenState extends State<MedsScreen> {
         !mounted) {
       return;
     }
+
+    final specialty = await showNpiSpecialtyPicker(
+      context: context,
+      doctorName: doctor.name,
+      initialValue: doctor.specialty,
+    );
+    if (specialty == null) return;
+
+    doctor.specialty = specialty.displayValue;
+    if (specialty.filterLabel != 'Other') {
+      result = await _npiService.lookup(
+        entityType: 'provider',
+        name: doctor.name,
+        city: _p!.city,
+        state: _p!.state,
+        specialty: specialty.filterLabel,
+      );
+      doctor.npi = result.npi;
+      doctor.verificationStatus = result.status;
+      doctor.npiCandidates = result.candidates;
+      doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
+      doctor.verifiedBy =
+          result.isVerified ? result.verifiedBy ?? 'auto' : null;
+      await _save();
+    }
+
+    if (result.status != 'needs_review' ||
+        result.candidates.isEmpty ||
+        !mounted) {
+      return;
+    }
+
     final selected = await showNpiCandidatePicker(
       context: context,
       title: 'Which provider is ${doctor.name}?',
@@ -285,105 +306,6 @@ class _MedsScreenState extends State<MedsScreen> {
     doctor.verifiedAt = DateTime.now();
     doctor.verifiedBy = confirmed['verifiedBy']?.toString();
     await _save();
-  }
-
-  Future<String> _chooseDoctorSpecialty(String doctorName) async {
-    String selected = _doctorSpecialtyOptions.first;
-    final otherCtrl = TextEditingController();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'New Doctor Found',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                doctorName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'What type of doctor is this?',
-                style: TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: selected,
-                dropdownColor: const Color(0xFF111111),
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Doctor Type',
-                  labelStyle: TextStyle(color: Colors.white70),
-                ),
-                items: _doctorSpecialtyOptions
-                    .map(
-                      (option) => DropdownMenuItem(
-                        value: option,
-                        child: Text(option),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setDialogState(() => selected = value);
-                },
-              ),
-              if (selected == 'Other') ...[
-                const SizedBox(height: 10),
-                TextField(
-                  controller: otherCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Enter Doctor Type',
-                    labelStyle: TextStyle(color: Colors.white70),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, ''),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white70,
-              ),
-              child: const Text('Skip'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final specialty =
-                    selected == 'Other' ? otherCtrl.text.trim() : selected;
-                Navigator.pop(context, specialty);
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Save Type'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    otherCtrl.dispose();
-    return result?.trim() ?? '';
   }
 
   // ----------------------------
@@ -825,12 +747,11 @@ class _MedsScreenState extends State<MedsScreen> {
         if (normalizedParsed != normalizedProfile &&
             !_doctorExistsByNormalizedName(docName)) {
           final formatted = _toLastFirstFormat(docName);
-          final specialty = await _chooseDoctorSpecialty(formatted);
 
           setState(() {
             _p!.doctors.add(Doctor(
               name: formatted,
-              specialty: specialty,
+              specialty: '',
               clinic: "",
               phone: "",
             ));
@@ -920,16 +841,29 @@ class _MedsScreenState extends State<MedsScreen> {
                             shape: const Border(
                               bottom: BorderSide(color: Colors.black12),
                             ),
-                            title: Row(
+                            title: Text(m.name),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(child: Text(m.name)),
-                                if (_pharmacyName(m.prescriber).isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  npiStatusIcon(m.pharmacyVerificationStatus),
-                                ],
+                                Text("${m.dose} ${m.frequency}".trim()),
+                                if (_pharmacyName(m.prescriber).isNotEmpty)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          _pharmacyName(m.prescriber),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      npiStatusIcon(
+                                        m.pharmacyVerificationStatus,
+                                      ),
+                                    ],
+                                  ),
                               ],
                             ),
-                            subtitle: Text("${m.dose} ${m.frequency}".trim()),
                             onTap: () => _addOrEdit(existing: m, index: i),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),

@@ -1,5 +1,9 @@
 const crypto = require("crypto");
 const db = require("./db");
+const {
+  formatPharmacySummary,
+  formatProviderSummary,
+} = require("./provider-verification-format");
 
 const DOCUMENT_TYPES = Object.freeze({
   HIPAA: "hipaa",
@@ -79,7 +83,7 @@ function normalizeClientInput(input = {}) {
       : null;
   const doctorList =
     Array.isArray(input.doctors)
-      ? formatList(input.doctors, ["name", "specialty", "clinic", "phone"])
+      ? input.doctors.map(formatProviderSummary).filter(Boolean).join("; ") || null
       : null;
   const emergencyContacts =
     Array.isArray(input.vitalink_emergency_contacts)
@@ -87,7 +91,10 @@ function normalizeClientInput(input = {}) {
       : null;
   const pharmacies =
     Array.isArray(input.vitalink_pharmacy_list)
-      ? formatList(input.vitalink_pharmacy_list, ["name", "phone", "details"])
+      ? input.vitalink_pharmacy_list
+          .map(formatPharmacySummary)
+          .filter(Boolean)
+          .join("; ") || null
       : null;
 
   return {

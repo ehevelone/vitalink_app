@@ -77,6 +77,7 @@ class Doctor {
   List<Map<String, dynamic>> npiCandidates;
   DateTime? verifiedAt;
   String? verifiedBy;
+  bool isPrimaryCareProvider;
 
   Doctor({
     this.name = '',
@@ -88,6 +89,7 @@ class Doctor {
     List<Map<String, dynamic>>? npiCandidates,
     this.verifiedAt,
     this.verifiedBy,
+    this.isPrimaryCareProvider = false,
   }) : npiCandidates = npiCandidates ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -100,6 +102,7 @@ class Doctor {
         'npiCandidates': npiCandidates,
         'verifiedAt': verifiedAt?.toIso8601String(),
         'verifiedBy': verifiedBy,
+        'isPrimaryCareProvider': isPrimaryCareProvider,
       };
 
   factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
@@ -115,6 +118,7 @@ class Doctor {
             .toList(),
         verifiedAt: DateTime.tryParse(json['verifiedAt'] ?? ''),
         verifiedBy: json['verifiedBy'],
+        isPrimaryCareProvider: json['isPrimaryCareProvider'] == true,
       );
 }
 

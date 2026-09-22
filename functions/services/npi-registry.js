@@ -8,6 +8,23 @@ function normalizeText(value) {
     .replace(/\s+/g, " ");
 }
 
+function normalizePhone(value) {
+  const withoutExtension = String(value || "").replace(
+    /\s*(?:ext(?:ension)?\.?|x)\s*\d+\s*$/i,
+    "",
+  );
+  const digits = withoutExtension.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function candidatesMatchingPhone(candidates, phone) {
+  const target = normalizePhone(phone);
+  if (target.length !== 10) return [];
+  return (candidates || []).filter(
+    (candidate) => normalizePhone(candidate.phone) === target,
+  );
+}
+
 function splitProviderName(value) {
   const cleaned = String(value || "")
     .replace(/\b(dr|doctor|md|do|np|pa|aprn|fnp|pharmd)\.?\b/gi, " ")
@@ -66,7 +83,14 @@ function mapNppesResult(result) {
   };
 }
 
-function buildSearchParams({ entityType, name, city, state, postalCode }) {
+function buildSearchParams({
+  entityType,
+  name,
+  city,
+  state,
+  postalCode,
+  taxonomyDescription,
+}) {
   const params = new URLSearchParams({ version: "2.1", limit: "10" });
   params.set("enumeration_type", entityType === "pharmacy" ? "NPI-2" : "NPI-1");
 
@@ -81,6 +105,9 @@ function buildSearchParams({ entityType, name, city, state, postalCode }) {
   if (city) params.set("city", city);
   if (state) params.set("state", state);
   if (postalCode) params.set("postal_code", postalCode);
+  if (taxonomyDescription) {
+    params.set("taxonomy_description", taxonomyDescription);
+  }
   return params;
 }
 
@@ -120,8 +147,10 @@ async function getNpiByNumber(npi, fetchImpl = fetch) {
 
 module.exports = {
   buildSearchParams,
+  candidatesMatchingPhone,
   getNpiByNumber,
   mapNppesResult,
+  normalizePhone,
   normalizeText,
   searchNpi,
   splitProviderName,

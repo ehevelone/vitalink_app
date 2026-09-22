@@ -56,6 +56,7 @@ class NpiVerificationService {
     String? state,
     String? postalCode,
     String? specialty,
+    String? phone,
   }) async {
     if (name.trim().isEmpty) {
       return const NpiLookupResult(status: 'unverified');
@@ -69,6 +70,7 @@ class NpiVerificationService {
       state: state,
       postalCode: postalCode,
       specialty: specialty,
+      phone: phone,
     );
 
     if (response['success'] != true) {

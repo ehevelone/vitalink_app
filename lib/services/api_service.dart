@@ -108,6 +108,7 @@ class ApiService {
     String? state,
     String? postalCode,
     String? specialty,
+    String? phone,
   }) async {
     final body = {
       ...identity,
@@ -119,6 +120,7 @@ class ApiService {
         'postalCode': postalCode.trim(),
       if (specialty != null && specialty.trim().isNotEmpty)
         'specialty': specialty.trim(),
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
     };
     return identity['agentId'] != null
         ? _postJsonWithAgentSession('npi_lookup', body)
