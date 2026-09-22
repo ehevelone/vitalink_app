@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/npi_verification_service.dart';
+import '../widgets/npi_verification_widgets.dart';
 import 'vitalink_camera_capture_screen.dart';
 
 class MedsScreen extends StatefulWidget {
@@ -35,6 +37,7 @@ class _MedsScreenState extends State<MedsScreen> {
   ];
 
   late final DataRepository _repo;
+  late final NpiVerificationService _npiService;
   Profile? _p;
   bool _loading = true;
   bool _scanning = false;
@@ -43,6 +46,7 @@ class _MedsScreenState extends State<MedsScreen> {
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
+    _npiService = NpiVerificationService();
     _load();
   }
 
@@ -182,6 +186,107 @@ class _MedsScreenState extends State<MedsScreen> {
     return pharm.isNotEmpty ? pharm : pharmPhone;
   }
 
+  String _pharmacyName(String value) {
+    final firstLine = value.split(RegExp(r'[\r\n]+')).first.trim();
+    return firstLine
+        .replaceAll(RegExp(r'\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}'), '')
+        .trim();
+  }
+
+  Future<void> _verifyPharmacy(int index) async {
+    if (index < 0 || index >= _p!.meds.length) return;
+    final medication = _p!.meds[index];
+    final name = _pharmacyName(medication.prescriber);
+    if (name.isEmpty) {
+      medication.pharmacyNpi = null;
+      medication.pharmacyVerificationStatus = 'unverified';
+      medication.pharmacyNpiCandidates = [];
+      medication.pharmacyVerifiedAt = null;
+      medication.pharmacyVerifiedBy = null;
+      await _save();
+      return;
+    }
+
+    final result = await _npiService.lookup(
+      entityType: 'pharmacy',
+      name: name,
+      city: _p!.city,
+      state: _p!.state,
+    );
+    medication.pharmacyNpi = result.npi;
+    medication.pharmacyVerificationStatus = result.status;
+    medication.pharmacyNpiCandidates = result.candidates;
+    medication.pharmacyVerifiedAt = result.isVerified ? DateTime.now() : null;
+    medication.pharmacyVerifiedBy =
+        result.isVerified ? result.verifiedBy ?? 'auto' : null;
+    await _save();
+
+    if (result.status != 'needs_review' ||
+        result.candidates.isEmpty ||
+        !mounted) {
+      return;
+    }
+    final selected = await showNpiCandidatePicker(
+      context: context,
+      title: 'Which pharmacy is $name?',
+      candidates: result.candidates,
+    );
+    if (selected == null) return;
+
+    final confirmed = await _npiService.confirm(
+      entityType: 'pharmacy',
+      searchedName: name,
+      candidate: selected,
+    );
+    if (confirmed == null) return;
+    medication.pharmacyNpi = confirmed['npi']?.toString();
+    medication.pharmacyVerificationStatus = 'verified';
+    medication.pharmacyVerifiedAt = DateTime.now();
+    medication.pharmacyVerifiedBy = confirmed['verifiedBy']?.toString();
+    await _save();
+  }
+
+  Future<void> _verifyDoctor(int index) async {
+    if (index < 0 || index >= _p!.doctors.length) return;
+    final doctor = _p!.doctors[index];
+    final result = await _npiService.lookup(
+      entityType: 'provider',
+      name: doctor.name,
+      city: _p!.city,
+      state: _p!.state,
+      specialty: doctor.specialty,
+    );
+    doctor.npi = result.npi;
+    doctor.verificationStatus = result.status;
+    doctor.npiCandidates = result.candidates;
+    doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
+    doctor.verifiedBy = result.isVerified ? result.verifiedBy ?? 'auto' : null;
+    await _save();
+
+    if (result.status != 'needs_review' ||
+        result.candidates.isEmpty ||
+        !mounted) {
+      return;
+    }
+    final selected = await showNpiCandidatePicker(
+      context: context,
+      title: 'Which provider is ${doctor.name}?',
+      candidates: result.candidates,
+    );
+    if (selected == null) return;
+    final confirmed = await _npiService.confirm(
+      entityType: 'provider',
+      searchedName: doctor.name,
+      candidate: selected,
+    );
+    if (confirmed == null) return;
+    doctor.npi = confirmed['npi']?.toString();
+    doctor.verificationStatus = 'verified';
+    doctor.verifiedAt = DateTime.now();
+    doctor.verifiedBy = confirmed['verifiedBy']?.toString();
+    await _save();
+  }
+
   Future<String> _chooseDoctorSpecialty(String doctorName) async {
     String selected = _doctorSpecialtyOptions.first;
     final otherCtrl = TextEditingController();
@@ -290,6 +395,7 @@ class _MedsScreenState extends State<MedsScreen> {
     int? index,
     Map<String, dynamic>? prefill,
   }) async {
+    int? targetIndex = index;
     final nameCtrl =
         TextEditingController(text: prefill?['name'] ?? existing?.name ?? '');
     final doseCtrl =
@@ -405,12 +511,14 @@ class _MedsScreenState extends State<MedsScreen> {
     setState(() {
       if (existing == null) {
         _p!.meds.add(m);
+        targetIndex = _p!.meds.length - 1;
       } else {
         _p!.meds[index!] = m;
       }
     });
 
     await _save();
+    await _verifyPharmacy(targetIndex!);
   }
 
   // ----------------------------
@@ -683,7 +791,9 @@ class _MedsScreenState extends State<MedsScreen> {
             );
           });
           await _save();
+          await _verifyPharmacy(existingIndex);
         } else if (choice == "add") {
+          late final int addedIndex;
           setState(() {
             _p!.meds.add(Medication(
               name: scannedName,
@@ -693,8 +803,10 @@ class _MedsScreenState extends State<MedsScreen> {
               source: "Scanned",
               updatedAt: DateTime.now(),
             ));
+            addedIndex = _p!.meds.length - 1;
           });
           await _save();
+          await _verifyPharmacy(addedIndex);
         }
       } else {
         await _addOrEdit(prefill: {
@@ -725,6 +837,7 @@ class _MedsScreenState extends State<MedsScreen> {
           });
 
           await _save();
+          await _verifyDoctor(_p!.doctors.length - 1);
         }
       }
     } catch (e) {
@@ -807,7 +920,15 @@ class _MedsScreenState extends State<MedsScreen> {
                             shape: const Border(
                               bottom: BorderSide(color: Colors.black12),
                             ),
-                            title: Text(m.name),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(m.name)),
+                                if (_pharmacyName(m.prescriber).isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  npiStatusIcon(m.pharmacyVerificationStatus),
+                                ],
+                              ],
+                            ),
                             subtitle: Text("${m.dose} ${m.frequency}".trim()),
                             onTap: () => _addOrEdit(existing: m, index: i),
                             trailing: IconButton(

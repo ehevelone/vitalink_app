@@ -8,6 +8,11 @@ class Medication {
   String dose;
   String frequency;
   String prescriber;
+  String? pharmacyNpi;
+  String pharmacyVerificationStatus;
+  List<Map<String, dynamic>> pharmacyNpiCandidates;
+  DateTime? pharmacyVerifiedAt;
+  String? pharmacyVerifiedBy;
   String source;
   DateTime updatedAt;
 
@@ -16,15 +21,26 @@ class Medication {
     this.dose = '',
     this.frequency = '',
     this.prescriber = '',
+    this.pharmacyNpi,
+    this.pharmacyVerificationStatus = 'unverified',
+    List<Map<String, dynamic>>? pharmacyNpiCandidates,
+    this.pharmacyVerifiedAt,
+    this.pharmacyVerifiedBy,
     this.source = 'Manual',
     DateTime? updatedAt,
-  }) : updatedAt = updatedAt ?? DateTime.now();
+  })  : pharmacyNpiCandidates = pharmacyNpiCandidates ?? [],
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'dose': dose,
         'frequency': frequency,
         'prescriber': prescriber,
+        'pharmacyNpi': pharmacyNpi,
+        'pharmacyVerificationStatus': pharmacyVerificationStatus,
+        'pharmacyNpiCandidates': pharmacyNpiCandidates,
+        'pharmacyVerifiedAt': pharmacyVerifiedAt?.toIso8601String(),
+        'pharmacyVerifiedBy': pharmacyVerifiedBy,
         'source': source,
         'updatedAt': updatedAt.toIso8601String(),
       };
@@ -34,9 +50,17 @@ class Medication {
         dose: json['dose'] ?? '',
         frequency: json['frequency'] ?? '',
         prescriber: json['prescriber'] ?? '',
+        pharmacyNpi: json['pharmacyNpi'],
+        pharmacyVerificationStatus:
+            json['pharmacyVerificationStatus'] ?? 'unverified',
+        pharmacyNpiCandidates: (json['pharmacyNpiCandidates'] as List? ?? [])
+            .whereType<Map>()
+            .map((candidate) => Map<String, dynamic>.from(candidate))
+            .toList(),
+        pharmacyVerifiedAt: DateTime.tryParse(json['pharmacyVerifiedAt'] ?? ''),
+        pharmacyVerifiedBy: json['pharmacyVerifiedBy'],
         source: json['source'] ?? 'Manual',
-        updatedAt:
-            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -48,19 +72,34 @@ class Doctor {
   String specialty;
   String clinic;
   String phone;
+  String? npi;
+  String verificationStatus;
+  List<Map<String, dynamic>> npiCandidates;
+  DateTime? verifiedAt;
+  String? verifiedBy;
 
   Doctor({
     this.name = '',
     this.specialty = '',
     this.clinic = '',
     this.phone = '',
-  });
+    this.npi,
+    this.verificationStatus = 'unverified',
+    List<Map<String, dynamic>>? npiCandidates,
+    this.verifiedAt,
+    this.verifiedBy,
+  }) : npiCandidates = npiCandidates ?? [];
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'specialty': specialty,
         'clinic': clinic,
         'phone': phone,
+        'npi': npi,
+        'verificationStatus': verificationStatus,
+        'npiCandidates': npiCandidates,
+        'verifiedAt': verifiedAt?.toIso8601String(),
+        'verifiedBy': verifiedBy,
       };
 
   factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
@@ -68,6 +107,14 @@ class Doctor {
         specialty: json['specialty'] ?? '',
         clinic: json['clinic'] ?? '',
         phone: json['phone'] ?? '',
+        npi: json['npi'],
+        verificationStatus: json['verificationStatus'] ?? 'unverified',
+        npiCandidates: (json['npiCandidates'] as List? ?? [])
+            .whereType<Map>()
+            .map((candidate) => Map<String, dynamic>.from(candidate))
+            .toList(),
+        verifiedAt: DateTime.tryParse(json['verifiedAt'] ?? ''),
+        verifiedBy: json['verifiedBy'],
       );
 }
 
@@ -105,8 +152,7 @@ class UserAppointment {
         appointmentAt:
             DateTime.tryParse(json['appointmentAt'] ?? '') ?? DateTime.now(),
         notes: json['notes'] ?? '',
-        updatedAt:
-            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -174,8 +220,7 @@ class InsuranceCard {
         backImagePath: json['backImagePath'],
         imagePath: json['imagePath'],
         source: json['source'] ?? 'Manual',
-        updatedAt:
-            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
 
@@ -238,21 +283,19 @@ class Insurance {
         beneficiary: json['beneficiary'] ?? '',
         decPagePaths:
             (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
-        benefits: (json['benefits'] as List<dynamic>? ?? [])
-            .map((b) {
-              if (b is Map) {
-                return {
-                  'name': b['name']?.toString() ?? '',
-                  'value': b['value']?.toString() ?? '',
-                };
-              } else {
-                return {
-                  'name': b.toString(),
-                  'value': '',
-                };
-              }
-            })
-            .toList(),
+        benefits: (json['benefits'] as List<dynamic>? ?? []).map((b) {
+          if (b is Map) {
+            return {
+              'name': b['name']?.toString() ?? '',
+              'value': b['value']?.toString() ?? '',
+            };
+          } else {
+            return {
+              'name': b.toString(),
+              'value': '',
+            };
+          }
+        }).toList(),
         cards: (json['cards'] as List<dynamic>? ?? [])
             .map((c) => InsuranceCard.fromJson(c))
             .toList(),
@@ -372,16 +415,16 @@ class EmergencyInfo {
         parsedContacts.isNotEmpty ? parsedContacts.first.phone : legacyPhone;
 
     return EmergencyInfo(
-        contact: firstContact,
-        phone: firstPhone,
-        contacts: parsedContacts,
-        allergies: json['allergies'] ?? '',
-        conditions: json['conditions'] ?? '',
-        bloodType: json['bloodType'] ?? '',
-        implants: json['implants'] ?? '',
-        procedures: json['procedures'] ?? '',
-        organDonor: json['organDonor'] ?? false,
-      );
+      contact: firstContact,
+      phone: firstPhone,
+      contacts: parsedContacts,
+      allergies: json['allergies'] ?? '',
+      conditions: json['conditions'] ?? '',
+      bloodType: json['bloodType'] ?? '',
+      implants: json['implants'] ?? '',
+      procedures: json['procedures'] ?? '',
+      organDonor: json['organDonor'] ?? false,
+    );
   }
 }
 
@@ -569,8 +612,7 @@ class Profile {
         id: json['id'],
         fullName: json['fullName'] ?? '',
         dob: json['dob'],
-        updatedAt:
-            DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
         userPhone: json['userPhone'] ?? '',
         address: json['address'],
         city: json['city'],

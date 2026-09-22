@@ -100,6 +100,48 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> lookupNpi({
+    required Map<String, dynamic> identity,
+    required String entityType,
+    required String name,
+    String? city,
+    String? state,
+    String? postalCode,
+    String? specialty,
+  }) async {
+    final body = {
+      ...identity,
+      'entityType': entityType,
+      'name': name,
+      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      if (state != null && state.trim().isNotEmpty) 'state': state.trim(),
+      if (postalCode != null && postalCode.trim().isNotEmpty)
+        'postalCode': postalCode.trim(),
+      if (specialty != null && specialty.trim().isNotEmpty)
+        'specialty': specialty.trim(),
+    };
+    return identity['agentId'] != null
+        ? _postJsonWithAgentSession('npi_lookup', body)
+        : _postJsonWithUserSession('npi_lookup', body);
+  }
+
+  static Future<Map<String, dynamic>> confirmNpi({
+    required Map<String, dynamic> identity,
+    required String entityType,
+    required String searchedName,
+    required Map<String, dynamic> candidate,
+  }) async {
+    final body = {
+      ...identity,
+      'entityType': entityType,
+      'searchedName': searchedName,
+      'candidate': candidate,
+    };
+    return identity['agentId'] != null
+        ? _postJsonWithAgentSession('npi_confirm', body)
+        : _postJsonWithUserSession('npi_confirm', body);
+  }
+
   static Future<Map<String, dynamic>> checkAppUpdate({
     required String platform,
     required int currentBuild,

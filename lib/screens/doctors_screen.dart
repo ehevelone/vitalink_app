@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../services/npi_verification_service.dart';
 import '../utils/phone_formatter.dart'; // ← NEW
+import '../widgets/npi_verification_widgets.dart';
 
 class DoctorsScreen extends StatefulWidget {
   const DoctorsScreen({super.key});
@@ -14,6 +16,7 @@ class DoctorsScreen extends StatefulWidget {
 
 class _DoctorsScreenState extends State<DoctorsScreen> {
   late final DataRepository _repo;
+  late final NpiVerificationService _npiService;
   Profile? _p;
   bool _loading = true;
 
@@ -21,6 +24,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
+    _npiService = NpiVerificationService();
     _load();
   }
 
@@ -39,6 +43,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   }
 
   Future<void> _addOrEdit({Doctor? existing, int? index}) async {
+    int? targetIndex = index;
     final name = TextEditingController(text: existing?.name ?? '');
     final specialty = TextEditingController(text: existing?.specialty ?? '');
     final clinic = TextEditingController(text: existing?.clinic ?? '');
@@ -117,11 +122,59 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     setState(() {
       if (existing == null) {
         _p!.doctors.add(doc);
+        targetIndex = _p!.doctors.length - 1;
       } else {
         _p!.doctors[index!] = doc;
       }
     });
 
+    await _save();
+    await _verifyDoctor(targetIndex!);
+  }
+
+  Future<void> _verifyDoctor(int index) async {
+    if (index < 0 || index >= _p!.doctors.length) return;
+    final doctor = _p!.doctors[index];
+    final result = await _npiService.lookup(
+      entityType: 'provider',
+      name: doctor.name,
+      city: _p!.city,
+      state: _p!.state,
+      specialty: doctor.specialty,
+    );
+
+    doctor.npi = result.npi;
+    doctor.verificationStatus = result.status;
+    doctor.npiCandidates = result.candidates;
+    doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
+    doctor.verifiedBy = result.isVerified ? result.verifiedBy ?? 'auto' : null;
+    await _save();
+
+    if (result.status != 'needs_review' ||
+        result.candidates.isEmpty ||
+        !mounted) {
+      return;
+    }
+
+    final selected = await showNpiCandidatePicker(
+      context: context,
+      title: 'Which provider is ${doctor.name}?',
+      candidates: result.candidates,
+    );
+    if (selected == null) return;
+
+    final confirmed = await _npiService.confirm(
+      entityType: 'provider',
+      searchedName: doctor.name,
+      candidate: selected,
+    );
+    if (confirmed == null) return;
+
+    doctor.npi = confirmed['npi']?.toString();
+    doctor.verificationStatus = 'verified';
+    doctor.npiCandidates = result.candidates;
+    doctor.verifiedAt = DateTime.now();
+    doctor.verifiedBy = confirmed['verifiedBy']?.toString();
     await _save();
   }
 
@@ -170,7 +223,13 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                   shape: const Border(
                     bottom: BorderSide(color: Colors.black12),
                   ),
-                  title: Text(d.name),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(d.name)),
+                      const SizedBox(width: 6),
+                      npiStatusIcon(d.verificationStatus),
+                    ],
+                  ),
                   subtitle: Text([
                     if (d.specialty.isNotEmpty) d.specialty,
                     if (d.clinic.isNotEmpty) d.clinic,

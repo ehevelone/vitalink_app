@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart'; // ✅ needed for SecureStore
+import '../widgets/npi_verification_widgets.dart';
 
 class DoctorsView extends StatefulWidget {
   const DoctorsView({super.key});
@@ -64,8 +65,16 @@ class _DoctorsViewState extends State<DoctorsView> {
                   shape: const Border(
                     bottom: BorderSide(color: Colors.black12),
                   ),
-                  title: Text(
-                    d.name.isNotEmpty ? d.name : "Unnamed Doctor",
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          d.name.isNotEmpty ? d.name : "Unnamed Doctor",
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      npiStatusIcon(d.verificationStatus),
+                    ],
                   ),
                   subtitle: Text(
                     [d.specialty, d.clinic, d.phone]
