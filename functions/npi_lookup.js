@@ -41,10 +41,15 @@ async function searchRegistry({ entityType, name, city, state, postalCode, speci
   const taxonomies = taxonomiesForSpecialty(specialty);
   if (!taxonomies.length) return searchNpi(base);
 
-  const descriptions = [...new Set(taxonomies.map((item) => item.description))];
+  const taxonomyGroups = new Map();
+  for (const taxonomy of taxonomies) {
+    const codes = taxonomyGroups.get(taxonomy.description) || [];
+    codes.push(taxonomy.code);
+    taxonomyGroups.set(taxonomy.description, codes);
+  }
   const resultSets = await Promise.all(
-    descriptions.map((taxonomyDescription) =>
-      searchNpi({ ...base, taxonomyDescription }),
+    [...taxonomyGroups.entries()].map(([taxonomyDescription, taxonomyCodes]) =>
+      searchNpi({ ...base, taxonomyDescription, taxonomyCodes }),
     ),
   );
   return uniqueCandidates(resultSets.flat());

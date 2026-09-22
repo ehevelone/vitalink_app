@@ -1,6 +1,8 @@
-// Selected mappings from the NUCC Health Care Provider Taxonomy Code Set,
-// version 26.1 (July 2026). NPPES searches use the descriptions; codes are
-// retained beside them so the mapping stays auditable.
+// Selected mappings from the NUCC Health Care Provider Taxonomy Code Set.
+// NPPES searches use the descriptions; codes stay beside them for validation.
+const NPI_TAXONOMY_MAPPING_VERSION = "26.1";
+const NPI_TAXONOMY_MAPPING_RELEASE = "July 2026";
+
 const DOCTOR_SPECIALTY_TAXONOMIES = Object.freeze({
   Primary: [
     { code: "207Q00000X", description: "Family Medicine" },
@@ -44,6 +46,31 @@ const DOCTOR_SPECIALTY_TAXONOMIES = Object.freeze({
   Psychiatrist: [
     { code: "2084P0800X", description: "Psychiatry" },
   ],
+  "Psychologist / Clinical Psychologist": [
+    { code: "103T00000X", description: "Psychologist" },
+    { code: "103TC0700X", description: "Psychologist" },
+  ],
+  "Clinical Social Worker": [
+    { code: "1041C0700X", description: "Social Worker" },
+  ],
+  "Professional Counselor": [
+    { code: "101YP2500X", description: "Professional" },
+  ],
+  "Mental Health Counselor": [
+    { code: "101YM0800X", description: "Mental Health" },
+  ],
+  "Marriage & Family Therapist": [
+    { code: "106H00000X", description: "Marriage & Family Therapist" },
+  ],
+  "Psychiatric Nurse Practitioner": [
+    { code: "363LP0808X", description: "Psych/Mental Health" },
+  ],
+  "Addiction Counselor": [
+    {
+      code: "101YA0400X",
+      description: "Addiction (Substance Use Disorder)",
+    },
+  ],
   "Pain Management": [
     { code: "208VP0000X", description: "Pain Medicine" },
     { code: "207LP2900X", description: "Pain Medicine" },
@@ -57,5 +84,7 @@ function taxonomiesForSpecialty(specialty) {
 
 module.exports = {
   DOCTOR_SPECIALTY_TAXONOMIES,
+  NPI_TAXONOMY_MAPPING_RELEASE,
+  NPI_TAXONOMY_MAPPING_VERSION,
   taxonomiesForSpecialty,
 };

@@ -20,6 +20,13 @@ test("every filterable doctor dropdown option has an audited taxonomy mapping", 
     "Oncologist",
     "Dermatologist",
     "Psychiatrist",
+    "Psychologist / Clinical Psychologist",
+    "Clinical Social Worker",
+    "Professional Counselor",
+    "Mental Health Counselor",
+    "Marriage & Family Therapist",
+    "Psychiatric Nurse Practitioner",
+    "Addiction Counselor",
     "Pain Management",
   ];
 
@@ -31,6 +38,25 @@ test("every filterable doctor dropdown option has an audited taxonomy mapping", 
       assert.ok(mapping.description.length > 2);
     }
   }
+});
+
+test("mental health provider types map to exact audited taxonomy codes", () => {
+  assert.deepEqual(
+    taxonomiesForSpecialty("Psychologist / Clinical Psychologist").map(
+      (item) => item.code,
+    ),
+    ["103T00000X", "103TC0700X"],
+  );
+  assert.deepEqual(
+    taxonomiesForSpecialty("Clinical Social Worker").map((item) => item.code),
+    ["1041C0700X"],
+  );
+  assert.deepEqual(
+    taxonomiesForSpecialty("Psychiatric Nurse Practitioner").map(
+      (item) => item.code,
+    ),
+    ["363LP0808X"],
+  );
 });
 
 test("free-text Other is intentionally never sent as a taxonomy filter", () => {

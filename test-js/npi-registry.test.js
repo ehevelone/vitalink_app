@@ -109,6 +109,52 @@ test("deactivated and malformed records are excluded", async () => {
   assert.deepEqual(results.map((item) => item.npi), ["2222222222"]);
 });
 
+test("specialty lookup keeps only providers with an expected taxonomy code", async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      results: [
+        {
+          number: "1111111111",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "JANE", last_name: "SMITH" },
+          taxonomies: [
+            { primary: true, code: "208VP0000X", desc: "Pain Medicine" },
+          ],
+        },
+        {
+          number: "2222222222",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "JANE", last_name: "SMITH" },
+          taxonomies: [
+            { primary: true, code: "207R00000X", desc: "Internal Medicine" },
+            {
+              primary: false,
+              code: "1041C0700X",
+              desc: "Clinical Social Worker",
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const results = await searchNpi(
+    {
+      entityType: "provider",
+      name: "Jane Smith",
+      taxonomyDescription: "Clinical",
+      taxonomyCodes: ["1041C0700X"],
+    },
+    fakeFetch,
+  );
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].npi, "2222222222");
+  assert.equal(results[0].taxonomyCode, "1041C0700X");
+  assert.equal(results[0].taxonomy, "Clinical Social Worker");
+});
+
 test("number confirmation only accepts the requested NPI", async () => {
   const fakeFetch = async () => ({
     ok: true,

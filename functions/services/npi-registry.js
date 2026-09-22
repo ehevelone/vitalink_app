@@ -58,10 +58,24 @@ function primaryTaxonomy(taxonomies) {
   );
 }
 
-function mapNppesResult(result) {
+function matchingTaxonomy(taxonomies, expectedTaxonomyCodes = []) {
+  if (expectedTaxonomyCodes.length) {
+    const expected = new Set(expectedTaxonomyCodes);
+    const match = (taxonomies || []).find((taxonomy) =>
+      expected.has(String(taxonomy.code || "")),
+    );
+    if (match) return match;
+  }
+  return primaryTaxonomy(taxonomies);
+}
+
+function mapNppesResult(result, expectedTaxonomyCodes = []) {
   const basic = result.basic || {};
   const address = firstLocationAddress(result.addresses);
-  const taxonomy = primaryTaxonomy(result.taxonomies);
+  const taxonomy = matchingTaxonomy(
+    result.taxonomies,
+    expectedTaxonomyCodes,
+  );
   const isOrganization = result.enumeration_type === "NPI-2";
   const personName = [basic.first_name, basic.middle_name, basic.last_name]
     .filter(Boolean)
@@ -111,7 +125,11 @@ function buildSearchParams({
   return params;
 }
 
-async function fetchNppes(params, fetchImpl = fetch) {
+async function fetchNppes(
+  params,
+  fetchImpl = fetch,
+  expectedTaxonomyCodes = [],
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -123,9 +141,17 @@ async function fetchNppes(params, fetchImpl = fetch) {
       throw new Error(`NPPES returned ${response.status}`);
     }
     const payload = await response.json();
+    const expected = new Set(expectedTaxonomyCodes);
     return (payload.results || [])
       .filter((result) => result?.basic?.status !== "D")
-      .map(mapNppesResult)
+      .filter(
+        (result) =>
+          !expected.size ||
+          (result.taxonomies || []).some((taxonomy) =>
+            expected.has(String(taxonomy.code || "")),
+          ),
+      )
+      .map((result) => mapNppesResult(result, expectedTaxonomyCodes))
       .filter((candidate) => /^\d{10}$/.test(candidate.npi));
   } finally {
     clearTimeout(timeout);
@@ -133,7 +159,11 @@ async function fetchNppes(params, fetchImpl = fetch) {
 }
 
 async function searchNpi(input, fetchImpl = fetch) {
-  return fetchNppes(buildSearchParams(input), fetchImpl);
+  return fetchNppes(
+    buildSearchParams(input),
+    fetchImpl,
+    input.taxonomyCodes || [],
+  );
 }
 
 async function getNpiByNumber(npi, fetchImpl = fetch) {

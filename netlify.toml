@@ -16,6 +16,9 @@
     "speakeasy"
   ]
 
+[functions."scheduled-npi-taxonomy-validation"]
+  schedule = "0 14 2 1,7 *"
+
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]

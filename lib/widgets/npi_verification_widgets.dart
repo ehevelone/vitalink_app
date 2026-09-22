@@ -13,6 +13,13 @@ const List<String> npiDoctorSpecialtyOptions = [
   'Oncologist',
   'Dermatologist',
   'Psychiatrist',
+  'Psychologist / Clinical Psychologist',
+  'Clinical Social Worker',
+  'Professional Counselor',
+  'Mental Health Counselor',
+  'Marriage & Family Therapist',
+  'Psychiatric Nurse Practitioner',
+  'Addiction Counselor',
   'Pain Management',
   'Other',
 ];

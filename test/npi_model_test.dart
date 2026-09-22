@@ -77,6 +77,19 @@ void main() {
   test('every existing doctor type remains available for NPI narrowing', () {
     expect(npiDoctorSpecialtyOptions, contains('Primary'));
     expect(npiDoctorSpecialtyOptions, contains('Cardiologist'));
+    expect(
+      npiDoctorSpecialtyOptions,
+      contains('Psychologist / Clinical Psychologist'),
+    );
+    expect(npiDoctorSpecialtyOptions, contains('Clinical Social Worker'));
+    expect(npiDoctorSpecialtyOptions, contains('Professional Counselor'));
+    expect(npiDoctorSpecialtyOptions, contains('Mental Health Counselor'));
+    expect(npiDoctorSpecialtyOptions, contains('Marriage & Family Therapist'));
+    expect(
+      npiDoctorSpecialtyOptions,
+      contains('Psychiatric Nurse Practitioner'),
+    );
+    expect(npiDoctorSpecialtyOptions, contains('Addiction Counselor'));
     expect(npiDoctorSpecialtyOptions, contains('Pain Management'));
     expect(npiDoctorSpecialtyOptions.last, 'Other');
   });
