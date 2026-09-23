@@ -155,7 +155,7 @@ exports.handler = async function (event) {
 
     const current = await client.query(
       `
-      SELECT id, active
+      SELECT id, active, billing_owner, subscription_status, stripe_subscription_id
       FROM agents
       WHERE id = $1
         AND rsm_id = $2
@@ -181,6 +181,17 @@ exports.handler = async function (event) {
 
     const billingMode = normalizeBillingMode(rsm.billing_mode);
 
+    if (newActive && billingMode === "agent_paid" &&
+        !isAdminOverride(current.rows[0].subscription_status) &&
+        !(current.rows[0].stripe_subscription_id &&
+          current.rows[0].subscription_status === "active")) {
+      return reply(402, {
+        success: false,
+        requires_billing: true,
+        error: "This agent must complete individual billing before access can be activated."
+      });
+    }
+
     const update = await client.query(
       `
       UPDATE agents
@@ -190,7 +201,11 @@ exports.handler = async function (event) {
             WHEN $4 = 'agent_paid' THEN 'agent'
             ELSE 'rsm'
           END,
-          subscription_status = CASE WHEN $1 = false THEN 'inactive' ELSE 'active' END
+          subscription_status = CASE
+            WHEN $4 = 'agent_paid' THEN subscription_status
+            WHEN $1 = false THEN 'inactive'
+            ELSE 'active'
+          END
       WHERE id = $2
         AND rsm_id = $3
       RETURNING id, active, billing_owner, subscription_status

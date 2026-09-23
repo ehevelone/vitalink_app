@@ -251,6 +251,10 @@ Future<void> main() async {
 
       final initialShareUri = await _appLinks.getInitialLink();
       if (initialShareUri != null) {
+        final initialCode = initialShareUri.queryParameters['code']?.toUpperCase();
+        if (initialShareUri.host != 'share' && initialCode != null && initialCode.isNotEmpty) {
+          VitaLinkDeepLink.code = initialCode;
+        }
         await handleProfileShareLink(initialShareUri);
       }
 

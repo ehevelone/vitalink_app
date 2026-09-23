@@ -1,6 +1,7 @@
 // functions/agent-enroll-from-invite.js
 
 const { Pool } = require("pg");
+const { randomBytes } = require("crypto");
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_URL,
@@ -13,10 +14,8 @@ function generateAgentCode(prefix = "AGT", length = 8) {
 
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-
-  for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  const bytes = randomBytes(length);
+  for (let i = 0; i < length; i++) code += chars[bytes[i] % chars.length];
 
   return `${prefix}-${code}`;
 }
@@ -42,7 +41,8 @@ exports.handler = async function (event) {
       /* VALIDATE RSM */
 
       const rsm = await client.query(
-        `SELECT id
+        `SELECT id, billing_active, billing_mode, pricing_tier, subscription_status,
+                stripe_customer_id, stripe_subscription_id, stripe_subscription_item_id
          FROM rsms
          WHERE invite_code = $1
          AND role = 'rsm'
@@ -58,7 +58,19 @@ exports.handler = async function (event) {
         };
       }
 
-      const rsmId = rsm.rows[0].id;
+      const office = rsm.rows[0];
+      const override = [office.subscription_status, office.stripe_customer_id,
+        office.stripe_subscription_id, office.stripe_subscription_item_id]
+        .some(value => String(value || "").toLowerCase() === "admin_override");
+      if (office.billing_active !== true && !override) {
+        return { statusCode: 302, headers: { Location: `${SITE}/agent-access` } };
+      }
+
+      const rsmId = office.id;
+      const agentPaid = office.billing_mode === "agent_paid";
+
+      await client.query(`ALTER TABLE agents
+        ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'`);
 
       /* GENERATE AGENT CODE */
 
@@ -68,12 +80,16 @@ exports.handler = async function (event) {
 
       await client.query(
         `INSERT INTO agents
-          (unlock_code, active, role, rsm_id, created_at)
+          (unlock_code, active, role, rsm_id, billing_owner,
+           subscription_status, pricing_tier, created_at)
          VALUES
-          ($1, false, 'agent', $2, NOW())`,
+          ($1, false, 'agent', $2, $3, $4, $5, NOW())`,
         [
           agentCode,
-          rsmId
+          rsmId,
+          agentPaid ? "agent" : "agency",
+          agentPaid ? "pending_payment" : "active",
+          office.pricing_tier === "regular" ? "regular" : "founders"
         ]
       );
 
