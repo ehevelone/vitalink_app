@@ -19,12 +19,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _languageCode = 'system';
   bool _loading = true;
   bool _transferWorking = false;
+  bool _revocationWorking = false;
+  String? _authorizationAgent;
+  String? _revokedAt;
+  String? _agentNotifiedAt;
+  String? _authorizationError;
   final _transferService = DeviceTransferService();
 
   @override
   void initState() {
     super.initState();
     _loadLanguage();
+    _loadAuthorizationStatus();
+  }
+
+  Future<void> _loadAuthorizationStatus() async {
+    final userId = await SecureStore().getString('userId');
+    if (userId == null || userId.isEmpty) return;
+    final result = await ApiService.getAuthorizationStatus(userId: userId);
+    if (!mounted) return;
+    setState(() {
+      if (result['success'] == true) {
+        _authorizationAgent = result['agentName']?.toString();
+        _revokedAt = result['revokedAt']?.toString();
+        _agentNotifiedAt = result['agentNotifiedAt']?.toString();
+        _authorizationError = null;
+      } else {
+        _authorizationError = result['error']?.toString() ?? 'Unable to load permission status.';
+      }
+    });
+  }
+
+  Future<void> _sendRevocation() async {
+    final strings = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(strings.revocationConfirmTitle),
+        content: Text(_revokedAt != null
+            ? strings.agentNoticePending
+            : strings.revocationConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(_revokedAt != null
+                ? strings.retryAgentNotice
+                : strings.sendRevocation),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final userId = await SecureStore().getString('userId');
+    if (userId == null || userId.isEmpty) return;
+    setState(() => _revocationWorking = true);
+    try {
+      final result = await ApiService.sendAuthorizationRevocation(userId: userId);
+      if (!mounted) return;
+      if (result['success'] == true) {
+        setState(() {
+          _revokedAt = result['revokedAt']?.toString();
+          _agentNotifiedAt = DateTime.now().toIso8601String();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.revocationSent)),
+        );
+      } else {
+        if (result['recorded'] == true) {
+          await _loadAuthorizationStatus();
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result['recorded'] == true
+              ? strings.agentNoticePending
+              : result['error']?.toString() ?? 'Unable to send revocation.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _revocationWorking = false);
+    }
   }
 
   Future<void> _loadLanguage() async {
@@ -274,6 +352,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: _transferWorking ? null : _redeemTransfer,
                   child: Text(strings.haveTransferCode),
                 ),
+                const SizedBox(height: 28),
+                Text(strings.authorizationsTitle,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(strings.authorizationsBody,
+                    style: const TextStyle(color: Colors.black54)),
+                if (_authorizationAgent != null) ...[
+                  const SizedBox(height: 8),
+                  Text('${strings.myAgent}: $_authorizationAgent'),
+                ],
+                if (_authorizationError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_authorizationError!, style: const TextStyle(color: Colors.red)),
+                ],
+                const SizedBox(height: 16),
+                if (_revokedAt != null && _agentNotifiedAt != null)
+                  Text(strings.revocationAlreadySent)
+                else
+                  OutlinedButton(
+                    onPressed: _revocationWorking
+                        ? null
+                        : _sendRevocation,
+                    child: Text(_revokedAt != null
+                        ? strings.retryAgentNotice
+                        : strings.sendRevocation),
+                  ),
               ],
             ),
     );

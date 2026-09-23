@@ -555,6 +555,8 @@ async function recordVitalinkPackage({
   signedAt,
   medsReviewedAt,
   doctorsReviewedAt,
+  soaProductTypes,
+  newAuthorizationSigned,
 }) {
   await db.query(
     `
@@ -567,6 +569,7 @@ async function recordVitalinkPackage({
       doctors_reviewed_at = COALESCE($5, doctors_reviewed_at),
       hipaa_signed_at = COALESCE($1, hipaa_signed_at),
       soa_signed_at = COALESCE($1, soa_signed_at),
+      authorization_revoked_at = CASE WHEN $6 THEN NULL ELSE authorization_revoked_at END,
       updated_at = NOW()
     WHERE id = $2
       AND agent_id = $3
@@ -577,6 +580,7 @@ async function recordVitalinkPackage({
       crmAgentId,
       clean(medsReviewedAt),
       clean(doctorsReviewedAt),
+      Boolean(newAuthorizationSigned),
     ]
   );
 
@@ -614,6 +618,7 @@ async function recordVitalinkPackage({
         source: "vitalink_package",
         medsReviewedAt: clean(medsReviewedAt),
         doctorsReviewedAt: clean(doctorsReviewedAt),
+        soaProductTypes: Array.isArray(soaProductTypes) ? soaProductTypes : null,
       }),
     ]
   );
@@ -745,9 +750,9 @@ async function syncVitalinkPackageToCrm({
     signedAt,
     medsReviewedAt,
     doctorsReviewedAt,
+    soaProductTypes: packageData.soaProductTypes,
+    newAuthorizationSigned: packageData.newAuthorizationSigned,
   });
-
-  const pdfBase64 = packageData.hipaaSoaPdfBase64;
 
   const hipaa = await recordCrmClientDocument({
     crmAgentId: sync.crmAgentId,
@@ -755,7 +760,7 @@ async function syncVitalinkPackageToCrm({
     packageId: pkg.id,
     documentType: DOCUMENT_TYPES.HIPAA,
     documentName: "VitaLink HIPAA Authorization",
-    documentBase64: pdfBase64,
+    documentBase64: packageData.hipaaPdfBase64 || packageData.hipaaSoaPdfBase64,
     signedAt,
   });
 
@@ -765,7 +770,7 @@ async function syncVitalinkPackageToCrm({
     packageId: pkg.id,
     documentType: DOCUMENT_TYPES.SOA,
     documentName: "VitaLink Scope of Appointment",
-    documentBase64: pdfBase64,
+    documentBase64: packageData.soaPdfBase64 || packageData.hipaaSoaPdfBase64,
     signedAt,
   });
 

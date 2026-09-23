@@ -63,6 +63,29 @@ class AppStrings {
       _es ? 'Cargando traslado...' : 'Loading transfer...';
   String get copyCode => _es ? 'Copiar codigo' : 'Copy Code';
   String get copied => _es ? 'Copiado.' : 'Copied.';
+  String get authorizationsTitle =>
+      _es ? 'Permisos compartidos con mi agente' : 'Permissions Shared With My Agent';
+  String get authorizationsBody => _es
+      ? 'Puede retirar su autorizacion de informacion de salud y el alcance de la cita. La informacion ya compartida no se puede retirar.'
+      : 'You can withdraw your Health Information Authorization and Scope of Appointment. Information already shared cannot be taken back.';
+  String get sendRevocation =>
+      _es ? 'Enviar revocacion' : 'Send Revocation';
+  String get revocationConfirmTitle =>
+      _es ? 'Retirar ambos permisos?' : 'Withdraw Both Permissions?';
+  String get revocationConfirmBody => _es
+      ? 'Esto retirara su autorizacion de informacion de salud y el alcance de la cita, y avisara a su agente. No deshace la informacion ya compartida.'
+      : 'This withdraws your Health Information Authorization and Scope of Appointment and notifies your agent. It does not undo information already shared.';
+  String get revocationSent => _es
+      ? 'Revocacion registrada y enviada a su agente.'
+      : 'Withdrawal recorded and sent to your agent.';
+  String get revocationAlreadySent => _es
+      ? 'Estos permisos ya fueron retirados.'
+      : 'These permissions have already been withdrawn.';
+  String get agentNoticePending => _es
+      ? 'La revocacion se registro, pero el aviso al agente fallo. Vuelva a intentarlo.'
+      : 'Withdrawal was recorded, but the agent notice failed. Please retry.';
+  String get retryAgentNotice =>
+      _es ? 'Reenviar aviso al agente' : 'Retry Agent Notice';
 
   String welcome(String name) => _es ? 'Bienvenido $name' : 'Welcome $name';
   String get user => _es ? 'Usuario' : 'User';

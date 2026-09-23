@@ -746,6 +746,24 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> getAuthorizationStatus({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession('manage_authorizations', {
+      'action': 'status',
+      'userId': userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> sendAuthorizationRevocation({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession('manage_authorizations', {
+      'action': 'revoke',
+      'userId': userId,
+    });
+  }
+
   static Future<Map<String, dynamic>> createProfileUpdatePackage({
     required String userId,
     required String profileId,
