@@ -24,6 +24,7 @@ class _LogoScreenState extends State<LogoScreen> {
   bool _loading = true;
   bool _deviceRegistered = false;
   bool _navigated = false;
+  String? _routeError;
 
   @override
   void initState() {
@@ -41,18 +42,22 @@ class _LogoScreenState extends State<LogoScreen> {
   // 🔥 FIXED AGENT STATUS CHECK
   Future<bool> _checkAgentStatus() async {
     try {
-      final role = await AppState.getRole();
-      final userId = await SecureStore().getString("userId");
+      final role = await AppState.getRole().timeout(const Duration(seconds: 6));
+      final userId = await SecureStore()
+          .getString("userId")
+          .timeout(const Duration(seconds: 6));
 
       // 🔥 SAFER CHECK
       if (role == "agent" && userId == null) {
         return true;
       }
 
-      final email = await AppState.getEmail();
+      final email =
+          await AppState.getEmail().timeout(const Duration(seconds: 6));
       if (email == null || email.isEmpty) return true;
 
-      final res = await ApiService.getUserAgent(email);
+      final res = await ApiService.getUserAgent(email)
+          .timeout(const Duration(seconds: 10));
 
       if (res["success"] != true) return true;
 
@@ -197,18 +202,27 @@ class _LogoScreenState extends State<LogoScreen> {
   }
 
   Future<void> _openMenu() async {
-    if (_navigated) return; // 🔥 THIS LINE
-    _navigated = true; // 🔥 THIS LINE
+    if (_navigated) return;
+    _navigated = true;
+    if (_routeError != null) setState(() => _routeError = null);
     _timer?.cancel();
 
     try {
       final args = ModalRoute.of(context)?.settings.arguments;
       final argSessionToken =
           args is Map ? args["userSessionToken"]?.toString() : null;
-      final loggedIn = await AppState.isLoggedIn();
-      final role = await AppState.getRole();
-      final userSessionToken =
-          await SecureStore().getString("userSessionToken") ?? argSessionToken;
+      final freshAgentLogin = args is Map &&
+          args['justLoggedIn'] == true &&
+          args['role'] == 'agent' &&
+          (args['agentSessionToken']?.toString().isNotEmpty ?? false);
+      if (freshAgentLogin) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/agent_menu');
+        return;
+      }
+      final loggedIn =
+          await AppState.isLoggedIn().timeout(const Duration(seconds: 6));
+      final role = await AppState.getRole().timeout(const Duration(seconds: 6));
 
       if (!mounted) return;
 
@@ -217,26 +231,43 @@ class _LogoScreenState extends State<LogoScreen> {
         return;
       }
 
+      if (role == 'agent') {
+        Navigator.pushReplacementNamed(context, '/agent_menu');
+        return;
+      }
+
+      final userSessionToken = argSessionToken ??
+          await SecureStore()
+              .getString("userSessionToken")
+              .timeout(const Duration(seconds: 6));
+      if (!mounted) return;
+
       if (role == 'user' &&
           (userSessionToken == null || userSessionToken.isEmpty)) {
         Navigator.pushReplacementNamed(context, '/login');
         return;
       }
 
-      // 🔥 CHECK HERE
-      final allowed = await _checkAgentStatus();
-      if (!allowed) return;
-      if (!mounted) return;
-
-      if (role == 'agent') {
-        Navigator.pushReplacementNamed(context, '/agent_menu');
-        return;
+      if (role != 'user') {
+        throw StateError('No account type was saved for this login');
       }
 
-      Navigator.pushReplacementNamed(context, '/menu');
-    } catch (_) {
+      // 🔥 CHECK HERE
+      final allowed = await _checkAgentStatus();
+      if (!allowed) {
+        _navigated = false;
+        return;
+      }
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/landing');
+
+      Navigator.pushReplacementNamed(context, '/menu');
+    } catch (error) {
+      debugPrint('Logo navigation failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _navigated = false;
+        _routeError = 'Unable to open your account. Please try again.';
+      });
     }
   }
 
@@ -265,93 +296,111 @@ class _LogoScreenState extends State<LogoScreen> {
         child: SizedBox.expand(
           child: Center(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/vitalink-logo-1.png',
-                width: 220,
-                cacheWidth: 660,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 28),
-              if (_loading)
-                const CircularProgressIndicator(color: Colors.white70)
-              else if (hasName) ...[
-                Text(
-                  "Welcome, $name",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/vitalink-logo-1.png',
+                  width: 220,
+                  cacheWidth: 660,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 10),
-              ],
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white60,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: _openEmergencyScreen,
-                child: Container(
-                  width: 240,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade700,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.redAccent,
-                      width: 3,
+                const SizedBox(height: 28),
+                if (_loading)
+                  const CircularProgressIndicator(color: Colors.white70)
+                else if (hasName) ...[
+                  Text(
+                    "Welcome, $name",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent.withValues(alpha: 0.4),
-                        blurRadius: 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.white,
-                        size: 42,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "EMERGENCY",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        "TAP FOR INFO",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 10),
+                ],
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28),
+                  child: Text(
+                    "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                if (_routeError != null) ...[
+                  Text(
+                    _routeError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _openMenu,
+                    child: const Text('Try again'),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/landing'),
+                    child: const Text('Choose login'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                GestureDetector(
+                  onTap: _openEmergencyScreen,
+                  child: Container(
+                    width: 240,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade700,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.redAccent,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.redAccent.withValues(alpha: 0.4),
+                          blurRadius: 18,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.white,
+                          size: 42,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          "EMERGENCY",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          "TAP FOR INFO",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

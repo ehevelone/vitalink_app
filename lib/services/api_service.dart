@@ -37,7 +37,6 @@ class ApiService {
       debugPrint("🌐 FULL URL → $url");
 
       debugPrint("📡 POST → $url");
-      debugPrint("📦 BODY → $body");
 
       final res = await http.post(
         url,
@@ -46,7 +45,6 @@ class ApiService {
       );
 
       debugPrint("📥 STATUS ($path): ${res.statusCode}");
-      debugPrint("📥 RAW BODY ($path): ${res.body}");
 
       // 🔥 CRITICAL FIX:
       // Always return backend JSON — even on 403

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
@@ -35,22 +34,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _initLogin() async {
-    final store = SecureStore();
+    try {
+      final store = SecureStore();
+      final remember = await store
+          .getBool("rememberMeUser")
+          .timeout(const Duration(seconds: 6));
 
-    final remember = await store.getBool("rememberMeUser");
-
-    if (remember == true) {
-      final email = await store.getString("savedUserEmail") ?? "";
-      final pass = await store.getString("savedUserPassword") ?? "";
-
-      _emailCtrl.text = email;
-      _passwordCtrl.text = pass;
-      _rememberMe = true;
+      if (remember == true) {
+        final email = await store
+            .getString("savedUserEmail")
+            .timeout(const Duration(seconds: 6));
+        final pass = await store
+            .getString("savedUserPassword")
+            .timeout(const Duration(seconds: 6));
+        if (!mounted) return;
+        _emailCtrl.text = email ?? "";
+        _passwordCtrl.text = pass ?? "";
+        _rememberMe = true;
+      }
+    } catch (error) {
+      debugPrint('Unable to load saved user login: $error');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-
-    setState(() {
-      _loading = false;
-    });
   }
 
   Future<bool> _showReplacePopup() async {
@@ -97,8 +103,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       minimumSize: const Size(double.infinity, 50),
                     ),
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text("NO",
-                        style: TextStyle(color: Colors.white)),
+                    child:
+                        const Text("NO", style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
@@ -116,109 +122,132 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final email = _emailCtrl.text.trim().toLowerCase();
-    final password = _passwordCtrl.text.trim();
-    final deviceId = await DeviceId.getOrCreate();
+    var loginStage = 'device storage';
+    var sessionWriteStarted = false;
+    try {
+      final email = _emailCtrl.text.trim().toLowerCase();
+      final password = _passwordCtrl.text.trim();
+      final deviceId =
+          await DeviceId.getOrCreate().timeout(const Duration(seconds: 8));
 
-    final platform = !mounted || Theme.of(context).platform == TargetPlatform.iOS
-        ? "ios"
-        : "android";
+      final platform =
+          !mounted || Theme.of(context).platform == TargetPlatform.iOS
+              ? "ios"
+              : "android";
 
-    final res = await ApiService.loginUser(
-      email: email,
-      password: password,
-      platform: platform,
-      deviceId: deviceId,
-      replace: replace,
-    );
-
-    if (!mounted) return;
-
-    if (res["success"] == true) {
-      final user = res["user"];
-      final store = SecureStore();
-
-      await AppState.setLoggedIn(true);
-      await AppState.setRole("user");
-      await AppState.setEmail(user["email"]);
-
-      // ✅ FIX — STORE AS STRING
-      await store.setString("userId", user["id"].toString());
-
-      await store.setString("userEmail", user["email"]);
-
-      final sessionToken = user["session_token"]?.toString() ?? "";
-      if (sessionToken.isNotEmpty) {
-        await store.setString("userSessionToken", sessionToken);
-      } else {
-        await store.remove("userSessionToken");
-      }
-
-      if (_rememberMe) {
-        await store.setBool("rememberMeUser", true);
-        await store.setString("savedUserEmail", email);
-        await store.setString("savedUserPassword", password);
-      } else {
-        await store.setBool("rememberMeUser", false);
-        await store.remove("savedUserEmail");
-        await store.remove("savedUserPassword");
-      }
-
-      try {
-        final fcm = await FirebaseMessaging.instance.getToken();
-        if (fcm != null) {
-          final userId = await store.getString("userId");
-          if (userId != null) {
-            await ApiService.registerDeviceToken(
-              userId: userId,
-              fcmToken: fcm,
-            );
-          }
-        }
-      } catch (_) {}
+      loginStage = 'server';
+      final res = await ApiService.loginUser(
+        email: email,
+        password: password,
+        platform: platform,
+        deviceId: deviceId,
+        replace: replace,
+      ).timeout(const Duration(seconds: 20));
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(
-        context,
-        "/logo",
-        arguments: {
-          "justLoggedIn": true,
-          "role": "user",
-          "userSessionToken": sessionToken,
-        },
-      );
-    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
-      final confirmed = await _showReplacePopup();
-      if (confirmed) {
-        await _login(replace: true);
+
+      if (res["success"] == true) {
+        final user = res["user"];
+        final store = SecureStore();
+
+        loginStage = 'session storage';
+        sessionWriteStarted = true;
+        await store
+            .setString("userId", user["id"].toString())
+            .timeout(const Duration(seconds: 6));
+        await store
+            .setString("userEmail", user["email"])
+            .timeout(const Duration(seconds: 6));
+
+        final sessionToken = user["session_token"]?.toString() ?? "";
+        if (sessionToken.isEmpty) {
+          throw StateError('User session token missing');
+        }
+        await store
+            .setString("userSessionToken", sessionToken)
+            .timeout(const Duration(seconds: 6));
+        await AppState.setRole("user").timeout(const Duration(seconds: 6));
+        await AppState.setEmail(user["email"])
+            .timeout(const Duration(seconds: 6));
+        await AppState.setLoggedIn(true).timeout(const Duration(seconds: 6));
+
+        try {
+          if (_rememberMe) {
+            await store
+                .setBool("rememberMeUser", true)
+                .timeout(const Duration(seconds: 6));
+            await store
+                .setString("savedUserEmail", email)
+                .timeout(const Duration(seconds: 6));
+            await store
+                .setString("savedUserPassword", password)
+                .timeout(const Duration(seconds: 6));
+          } else {
+            await store
+                .setBool("rememberMeUser", false)
+                .timeout(const Duration(seconds: 6));
+            await store
+                .remove("savedUserEmail")
+                .timeout(const Duration(seconds: 6));
+            await store
+                .remove("savedUserPassword")
+                .timeout(const Duration(seconds: 6));
+          }
+        } catch (error) {
+          debugPrint('Unable to save optional user login details: $error');
+        }
+
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(
+          context,
+          "/logo",
+          arguments: {
+            "justLoggedIn": true,
+            "role": "user",
+            "userSessionToken": sessionToken,
+          },
+        );
+      } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
+        final confirmed = await _showReplacePopup();
+        if (confirmed) {
+          await _login(replace: true);
+        }
+      } else {
+        final store = SecureStore();
+
+        if (auto) {
+          await store.remove("savedUserPassword");
+          await store.setBool("rememberMeUser", false);
+        }
+
+        String msg = "Login failed";
+
+        if (res["status"] == 401) {
+          msg = "Incorrect password";
+        } else if (res["status"] == 404) {
+          msg = "Account not found";
+        } else if (res["error"] != null) {
+          msg = res["error"];
+        }
+
+        setState(() {
+          _errorMessage = msg;
+        });
       }
-    } else {
-      final store = SecureStore();
-
-      if (auto) {
-        await store.remove("savedUserPassword");
-        await store.setBool("rememberMeUser", false);
+    } catch (error) {
+      debugPrint('User login failed at $loginStage: $error');
+      if (sessionWriteStarted) {
+        try {
+          await AppState.clearAuth().timeout(const Duration(seconds: 6));
+        } catch (_) {}
       }
-
-      String msg = "Login failed";
-
-      if (res["status"] == 401) {
-        msg = "Incorrect password";
-      } else if (res["status"] == 404) {
-        msg = "Account not found";
-      } else if (res["error"] != null) {
-        msg = res["error"];
+      if (mounted) {
+        setState(() => _errorMessage = loginStage == 'server'
+            ? 'The login connection did not finish. Check your connection and try again.'
+            : 'This phone could not finish $loginStage. Your account is unchanged. Please restart VitaLink and try again.');
       }
-
-      setState(() {
-        _errorMessage = msg;
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -268,8 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _emailCtrl,
                 onChanged: (_) => _clearError(),
                 decoration: const InputDecoration(labelText: "Email"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter email" : null,
+                validator: (v) => v == null || v.isEmpty ? "Enter email" : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -280,9 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
@@ -291,7 +317,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? "Enter password" : null,
               ),
-
               if (_errorMessage != null) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -302,7 +327,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -310,18 +334,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text("Forgot Password?"),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               CheckboxListTile(
                 value: _rememberMe,
-                onChanged: (v) =>
-                    setState(() => _rememberMe = v ?? false),
+                onChanged: (v) => setState(() => _rememberMe = v ?? false),
                 title: const Text("Remember me"),
               ),
-
               const SizedBox(height: 24),
-
               ElevatedButton(
                 onPressed: () => _login(),
                 child: const Text("Login"),

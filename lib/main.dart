@@ -224,15 +224,37 @@ Future<void> main() async {
 
       await _setupFCMGlobal();
 
-      // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
-      _appLinks.uriLinkStream.listen((uri) {
-        final code = uri.queryParameters['code']?.toUpperCase();
+      String? lastRegistrationLink;
+      DateTime? lastRegistrationLinkAt;
+      void handleRegistrationLink(Uri uri) {
+        final link = VitaLinkRegistrationLink.fromUri(uri);
+        if (link == null) return;
 
-        if (uri.host != 'share' && code != null && code.isNotEmpty) {
-          VitaLinkDeepLink.code = code;
-          debugPrint("🔥 Deep link code received: $code");
+        final now = DateTime.now();
+        if (lastRegistrationLink == uri.toString() &&
+            lastRegistrationLinkAt != null &&
+            now.difference(lastRegistrationLinkAt!).inSeconds < 2) {
+          return;
         }
-      });
+        lastRegistrationLink = uri.toString();
+        lastRegistrationLinkAt = now;
+        VitaLinkDeepLink.code = link.code;
+
+        void openRegistration() {
+          navigatorKey.currentState?.pushNamed(
+            link.route,
+            arguments: {'code': link.code},
+          );
+        }
+
+        if (navigatorKey.currentState == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => openRegistration());
+        } else {
+          openRegistration();
+        }
+      }
+
+      _appLinks.uriLinkStream.listen(handleRegistrationLink);
 
       // 🔥 HANDLE TAP WHEN APP IS CLOSED
       Future<void> handleProfileShareLink(Uri uri) async {
@@ -251,10 +273,7 @@ Future<void> main() async {
 
       final initialShareUri = await _appLinks.getInitialLink();
       if (initialShareUri != null) {
-        final initialCode = initialShareUri.queryParameters['code']?.toUpperCase();
-        if (initialShareUri.host != 'share' && initialCode != null && initialCode.isNotEmpty) {
-          VitaLinkDeepLink.code = initialCode;
-        }
+        handleRegistrationLink(initialShareUri);
         await handleProfileShareLink(initialShareUri);
       }
 

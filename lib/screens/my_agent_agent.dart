@@ -374,6 +374,12 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 backgroundColor: Colors.white,
                               ),
                               const SizedBox(height: 12),
+                              const Text(
+                                "Ask clients to install VitaLink before scanning. If they scan first, they can return to the invitation page or enter this code manually.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 14, color: Colors.black87),
+                              ),
+                              const SizedBox(height: 12),
                               SelectableText(
                                 _deepLink!,
                                 textAlign: TextAlign.center,

@@ -134,14 +134,20 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Future<void> _loadProfile() async {
     try {
-      final p = await _repo.loadProfile();
-      final storedName = await _store.getString("userName");
+      final p = await _repo.loadProfile().timeout(const Duration(seconds: 12));
+      String? storedName;
+      try {
+        storedName = await _store
+            .getString("userName")
+            .timeout(const Duration(seconds: 6));
+      } catch (error) {
+        debugPrint('Unable to load saved display name: $error');
+      }
 
       String name = "";
 
       if (p.fullName.trim().isNotEmpty) {
         name = p.fullName.trim();
-        await _store.setString("userName", name);
       } else if (storedName != null && storedName.trim().isNotEmpty) {
         name = storedName.trim();
       } else {
@@ -155,6 +161,16 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         _displayName = name;
         _loading = false;
       });
+
+      if (p.fullName.trim().isNotEmpty) {
+        try {
+          await _store
+              .setString("userName", name)
+              .timeout(const Duration(seconds: 6));
+        } catch (error) {
+          debugPrint('Unable to save display name: $error');
+        }
+      }
 
       // 🔥 ADDED — refresh QR AFTER profile loads
       await _refreshQr();
@@ -198,7 +214,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       await _registerToken();
 
       await _tokenSub?.cancel();
-      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      _tokenSub =
+          FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         final userId = await _store.getString("userId");
 
         if (userId == null) return;

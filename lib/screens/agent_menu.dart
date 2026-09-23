@@ -15,7 +15,6 @@ class AgentMenuScreen extends StatefulWidget {
 }
 
 class _AgentMenuScreenState extends State<AgentMenuScreen> {
-  bool _loading = true;
   String agentName = "Agent";
   bool _notificationDialogOpen = false;
   bool _notificationPermissionDialogShown = false;
@@ -216,20 +215,15 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
   }
 
   Future<void> _loadData() async {
-    final store = SecureStore();
-    final storedName = await store.getString("agentName");
-
-    if (!mounted) return;
-
-    setState(() {
-      if (storedName != null && storedName.isNotEmpty) {
-        agentName = storedName;
-      } else {
-        agentName = "Agent";
-      }
-
-      _loading = false;
-    });
+    try {
+      final storedName = await SecureStore()
+          .getString("agentName")
+          .timeout(const Duration(seconds: 6));
+      if (!mounted || storedName == null || storedName.isEmpty) return;
+      setState(() => agentName = storedName);
+    } catch (error) {
+      debugPrint('Unable to load agent display name: $error');
+    }
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -296,95 +290,89 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                 ),
               ),
             ),
-            _loading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
+            Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     children: [
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          children: [
-                            _item(Icons.badge, "My Agent", '/my_agent_agent'),
-                            _item(Icons.person, "My Profile",
-                                '/my_profile_agent'),
-                            _item(
-                              Icons.document_scanner,
-                              "Business Card Scanner",
-                              '/my_profile_agent',
-                              arguments: {'autoScan': true},
-                            ),
+                      _item(Icons.badge, "My Agent", '/my_agent_agent'),
+                      _item(Icons.person, "My Profile", '/my_profile_agent'),
+                      _item(
+                        Icons.document_scanner,
+                        "Business Card Scanner",
+                        '/my_profile_agent',
+                        arguments: {'autoScan': true},
+                      ),
 
-                            // NEW BUTTON
-                            _item(Icons.groups, "My Clients", '/agent_clients'),
-                            _item(Icons.favorite, "Referral Center",
-                                '/agent_referrals'),
-                            _item(Icons.task_alt, "Notes / Tasks", '/agent_notes'),
-                            _item(Icons.medical_information, "Medications",
-                                '/meds'),
-                            _item(Icons.people, "Doctors", '/doctors'),
-                            _item(Icons.credit_card, "Insurance Cards",
-                                '/insurance_cards_menu'),
-                            _item(Icons.policy, "Insurance Policies",
-                                '/insurance_policies'),
-                          ],
-                        ),
-                      ),
-                      SafeArea(
-                        top: false,
-                        minimum: const EdgeInsets.only(bottom: 16),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red.shade900,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.warning_amber_rounded),
-                                  label: const Text(
-                                    "Emergency Info",
-                                    style: TextStyle(fontSize: 17),
-                                  ),
-                                  onPressed: () => Navigator.pushNamed(
-                                      context, '/emergency'),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red.shade100,
-                                    foregroundColor: Colors.red.shade700,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.logout),
-                                  label: const Text(
-                                    "Log Out",
-                                    style: TextStyle(fontSize: 17),
-                                  ),
-                                  onPressed: () => _logout(context),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      // NEW BUTTON
+                      _item(Icons.groups, "My Clients", '/agent_clients'),
+                      _item(Icons.favorite, "Referral Center",
+                          '/agent_referrals'),
+                      _item(Icons.task_alt, "Notes / Tasks", '/agent_notes'),
+                      _item(Icons.medical_information, "Medications", '/meds'),
+                      _item(Icons.people, "Doctors", '/doctors'),
+                      _item(Icons.credit_card, "Insurance Cards",
+                          '/insurance_cards_menu'),
+                      _item(Icons.policy, "Insurance Policies",
+                          '/insurance_policies'),
                     ],
                   ),
+                ),
+                SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade900,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            icon: const Icon(Icons.warning_amber_rounded),
+                            label: const Text(
+                              "Emergency Info",
+                              style: TextStyle(fontSize: 17),
+                            ),
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/emergency'),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade100,
+                              foregroundColor: Colors.red.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            icon: const Icon(Icons.logout),
+                            label: const Text(
+                              "Log Out",
+                              style: TextStyle(fontSize: 17),
+                            ),
+                            onPressed: () => _logout(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
