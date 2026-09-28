@@ -88,9 +88,21 @@ exports.handler = async (event) => {
       });
     }
 
+    const userResult = await db.query(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE LOWER(email) = LOWER($1)
+      ) AS exists
+      `,
+      [agent.email]
+    );
+
     return reply(200, {
       success: true,
       promoCode: agent.unlock_code, // 👈 mapped to existing Flutter field
+      userAccountExists: userResult.rows[0]?.exists === true,
       active: agent.active ?? false,
       agent: {
         id: agent.id,

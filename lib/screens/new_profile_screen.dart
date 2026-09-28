@@ -28,6 +28,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   final _implantsCtrl = TextEditingController();
   final _proceduresCtrl = TextEditingController();
   bool _organDonor = false;
+  bool _isVeteran = false;
+  bool _usesVaHealthcare = false;
 
   bool _saving = false;
 
@@ -50,7 +52,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
       initialDate: DateTime(1990),
     );
     if (date != null) {
-      _dobCtrl.text = "${date.month.toString().padLeft(2, '0')}/"
+      _dobCtrl.text =
+          "${date.month.toString().padLeft(2, '0')}/"
           "${date.day.toString().padLeft(2, '0')}/"
           "${date.year}";
     }
@@ -64,6 +67,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
     final newProfile = Profile(
       fullName: _nameCtrl.text.trim(),
       dob: _dobCtrl.text.trim(),
+      isVeteran: _isVeteran,
+      usesVaHealthcare: _isVeteran && _usesVaHealthcare,
       emergency: EmergencyInfo(
         contact: _contactCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
@@ -134,7 +139,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   TextField(
                     controller: _bloodCtrl,
                     decoration: const InputDecoration(
-                        labelText: "Blood Type (optional)"),
+                      labelText: "Blood Type (optional)",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
@@ -143,8 +149,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
 
               TextFormField(
                 controller: _contactCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Emergency Contact"),
+                decoration: const InputDecoration(
+                  labelText: "Emergency Contact",
+                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return "Required";
@@ -187,8 +194,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _conditionsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Medical Conditions"),
+                    decoration: const InputDecoration(
+                      labelText: "Medical Conditions",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
@@ -200,8 +208,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _implantsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Implanted Devices"),
+                    decoration: const InputDecoration(
+                      labelText: "Implanted Devices",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
@@ -212,14 +221,31 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _proceduresCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Major Procedures"),
+                    decoration: const InputDecoration(
+                      labelText: "Major Procedures",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
               ),
               const SizedBox(height: 12),
 
+              SwitchListTile(
+                value: _isVeteran,
+                onChanged: (v) => setState(() {
+                  _isVeteran = v;
+                  if (!v) _usesVaHealthcare = false;
+                }),
+                title: const Text("Veteran"),
+                activeThumbColor: Colors.blue,
+              ),
+              if (_isVeteran)
+                SwitchListTile(
+                  value: _usesVaHealthcare,
+                  onChanged: (v) => setState(() => _usesVaHealthcare = v),
+                  title: const Text("Do you use VA health care?"),
+                  activeThumbColor: Colors.blue,
+                ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),

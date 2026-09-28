@@ -153,7 +153,7 @@ I understand:
     // 🔥 Medications field
     final medsStr = p.meds
         .map((m) =>
-            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}${m.prescriber.isNotEmpty ? " | Pharmacy: ${m.prescriber}" : ""}${m.pharmacyVerificationStatus == 'verified' && m.pharmacyNpi != null ? " | Pharmacy NPI: ${m.pharmacyNpi} (verified)" : ""}")
+            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}${m.prescriber.isNotEmpty ? " | Pharmacy: ${m.prescriber}" : ""}${m.pharmacyFulfillmentType == 'mail_order' ? " | Mail order" : ""}${m.pharmacyVerificationStatus == 'verified' && m.pharmacyNpi != null ? " | Pharmacy NPI: ${m.pharmacyNpi} (verified)" : ""}")
         .join("; ");
 
     // 🔥 Doctors field
@@ -204,11 +204,13 @@ I understand:
       final pharmacy = <String, dynamic>{
         "name": lines.isNotEmpty ? lines.first : text,
         "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
+        if (med.pharmacyFulfillmentType != null)
+          "fulfillment_type": med.pharmacyFulfillmentType,
         if (med.pharmacyVerificationStatus == 'verified' &&
             med.pharmacyNpi != null)
           "npi": med.pharmacyNpi,
       };
-      final key = text.toLowerCase();
+      final key = '${text.toLowerCase()}|${med.pharmacyFulfillmentType ?? ''}';
       final existingIndex = pharmacies.indexWhere(
         (item) => item['_key'] == key,
       );
@@ -472,6 +474,8 @@ I understand:
                     "dose": m.dose,
                     "frequency": m.frequency,
                     "pharmacy": m.prescriber,
+                    if (m.pharmacyFulfillmentType != null)
+                      "pharmacy_fulfillment_type": m.pharmacyFulfillmentType,
                   })
               .toList(),
           "providers": doctors

@@ -129,6 +129,12 @@ async function ensureSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE profile_update_packages
+    ADD COLUMN IF NOT EXISTS pending_share_link_id UUID
+    REFERENCES profile_share_links(id) ON DELETE CASCADE
+  `);
+
+  await db.query(`
     ALTER TABLE profile_update_recipients
     ALTER COLUMN recipient_user_id TYPE TEXT USING recipient_user_id::TEXT
   `);
@@ -151,6 +157,12 @@ async function ensureSchema() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_profile_update_packages_expires
     ON profile_update_packages (expires_at)
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_profile_update_packages_pending_share
+    ON profile_update_packages (pending_share_link_id)
+    WHERE pending_share_link_id IS NOT NULL
   `);
 }
 

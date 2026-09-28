@@ -36,6 +36,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _proceduresCtrl = TextEditingController();
 
   bool _organDonor = false;
+  bool _isVeteran = false;
+  bool _usesVaHealthcare = false;
 
   @override
   void dispose() {
@@ -77,10 +79,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _dobCtrl.text = _p!.dob ?? '';
       _bloodCtrl.text = e.bloodType;
       final contacts = e.effectiveContacts;
-      _contactCtrl.text =
-          contacts.isNotEmpty ? contacts.first.name : e.contact;
-      _phoneCtrl.text =
-          contacts.isNotEmpty ? contacts.first.phone : e.phone;
+      _contactCtrl.text = contacts.isNotEmpty ? contacts.first.name : e.contact;
+      _phoneCtrl.text = contacts.isNotEmpty ? contacts.first.phone : e.phone;
       _extraContactCtrls.clear();
       _extraPhoneCtrls.clear();
       for (final contact in contacts.skip(1)) {
@@ -94,12 +94,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _proceduresCtrl.text = e.procedures;
 
       _organDonor = e.organDonor;
+      _isVeteran = _p!.isVeteran;
+      _usesVaHealthcare = _p!.usesVaHealthcare;
     });
   }
 
   bool _validFullName(String v) {
     final parts = v.trim().split(" ").where((p) => p.isNotEmpty).toList();
     return parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2;
+  }
+
+  Future<void> _changeVeteranStatus(bool value) async {
+    if (value) {
+      setState(() => _isVeteran = true);
+      return;
+    }
+
+    final removeStatus = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove Veteran status?'),
+        content: const Text(
+          'This will also remove the VA health care selection and VA emergency notice from this profile.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Veteran Status'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (removeStatus == true && mounted) {
+      setState(() {
+        _isVeteran = false;
+        _usesVaHealthcare = false;
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -120,6 +156,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _p = _p!.copyWith(
       fullName: _nameCtrl.text.trim(),
       dob: _dobCtrl.text.trim(),
+      isVeteran: _isVeteran,
+      usesVaHealthcare: _isVeteran && _usesVaHealthcare,
       emergency: _p!.emergency.copyWith(
         bloodType: _bloodCtrl.text.trim(),
         contact: _contactCtrl.text.trim(),
@@ -156,9 +194,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final contact = contactsToText.first;
       final agentLine = (agentName.isNotEmpty && agentPhone.isNotEmpty)
           ? "\n\nVitaLink was provided through ${_p!.fullName}'s insurance agent:\n"
-              "$agentName\n"
-              "$agentPhone\n"
-              "Contact the agent if you have questions or would like more information."
+                "$agentName\n"
+                "$agentPhone\n"
+                "Contact the agent if you have questions or would like more information."
           : "";
 
       final message =
@@ -225,10 +263,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       "sms:${_phoneDigits(contact.phone)}?body=${Uri.encodeComponent(message)}",
     );
 
-    await launchUrl(
-      smsUri,
-      mode: LaunchMode.externalApplication,
-    );
+    await launchUrl(smsUri, mode: LaunchMode.externalApplication);
   }
 
   void _addEmergencyContact() {
@@ -254,7 +289,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
 
     if (date != null) {
-      _dobCtrl.text = "${date.month.toString().padLeft(2, '0')}/"
+      _dobCtrl.text =
+          "${date.month.toString().padLeft(2, '0')}/"
           "${date.day.toString().padLeft(2, '0')}/"
           "${date.year}";
     }
@@ -263,9 +299,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -326,8 +360,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _contactCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Emergency Contact"),
+                decoration: const InputDecoration(
+                  labelText: "Emergency Contact",
+                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return "Required";
@@ -342,12 +377,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  PhoneNumberFormatter(),
-                ],
-                decoration: const InputDecoration(
-                  labelText: "Emergency Phone",
-                ),
+                inputFormatters: [PhoneNumberFormatter()],
+                decoration: const InputDecoration(labelText: "Emergency Phone"),
                 validator: (v) {
                   final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
                   if (digits.length != 10) {
@@ -375,8 +406,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 TextFormField(
                   controller: _extraContactCtrls[i],
-                  decoration:
-                      const InputDecoration(labelText: "Emergency Contact"),
+                  decoration: const InputDecoration(
+                    labelText: "Emergency Contact",
+                  ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return "Required";
@@ -391,9 +423,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextFormField(
                   controller: _extraPhoneCtrls[i],
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    PhoneNumberFormatter(),
-                  ],
+                  inputFormatters: [PhoneNumberFormatter()],
                   decoration: const InputDecoration(
                     labelText: "Emergency Phone",
                   ),
@@ -440,8 +470,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _implantsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Implanted Devices"),
+                    decoration: const InputDecoration(
+                      labelText: "Implanted Devices",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
@@ -451,13 +482,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _proceduresCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Major Procedures"),
+                    decoration: const InputDecoration(
+                      labelText: "Major Procedures",
+                    ),
                   ),
                   const Divider(height: 1),
                 ],
               ),
               const SizedBox(height: 24),
+              SwitchListTile(
+                value: _isVeteran,
+                onChanged: _changeVeteranStatus,
+                title: const Text("Veteran"),
+                activeThumbColor: Colors.blue,
+              ),
+              if (_isVeteran)
+                SwitchListTile(
+                  value: _usesVaHealthcare,
+                  onChanged: (v) => setState(() => _usesVaHealthcare = v),
+                  title: const Text("Do you use VA health care?"),
+                  activeThumbColor: Colors.blue,
+                ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),

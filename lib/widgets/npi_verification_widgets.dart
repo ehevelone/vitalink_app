@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 const List<String> npiDoctorSpecialtyOptions = [
   'Primary',
@@ -34,6 +35,75 @@ class NpiSpecialtySelection {
   });
 }
 
+Future<String?> showDoctorZipPrompt({
+  required BuildContext context,
+  required String doctorName,
+  String? registeredZip,
+}) async {
+  final formKey = GlobalKey<FormState>();
+  final homeZip = registeredZip?.trim() ?? '';
+  var zipValue = '';
+
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Where is this doctor?'),
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              homeZip.isEmpty
+                  ? 'Enter the ZIP code for $doctorName.'
+                  : 'We couldn\'t find $doctorName in your registered ZIP ($homeZip). Enter the ZIP code where the doctor is located.',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.search,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(5),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Doctor ZIP code',
+                hintText: '12345',
+              ),
+              validator: (value) => RegExp(r'^\d{5}$').hasMatch(value ?? '')
+                  ? null
+                  : 'Enter a 5-digit ZIP code',
+              onChanged: (value) => zipValue = value,
+              onFieldSubmitted: (value) {
+                if (formKey.currentState?.validate() == true) {
+                  Navigator.pop(dialogContext, value);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Leave unresolved'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState?.validate() == true) {
+              Navigator.pop(dialogContext, zipValue);
+            }
+          },
+          child: const Text('Search ZIP'),
+        ),
+      ],
+    ),
+  );
+  return result;
+}
+
 Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
   required BuildContext context,
   required String doctorName,
@@ -43,8 +113,8 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
   String selected = npiDoctorSpecialtyOptions.contains(normalizedInitial)
       ? normalizedInitial
       : normalizedInitial.isNotEmpty
-          ? 'Other'
-          : npiDoctorSpecialtyOptions.first;
+      ? 'Other'
+      : npiDoctorSpecialtyOptions.first;
   final otherController = TextEditingController(
     text: selected == 'Other' ? normalizedInitial : '',
   );
@@ -72,10 +142,8 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
               decoration: const InputDecoration(labelText: 'Doctor type'),
               items: npiDoctorSpecialtyOptions
                   .map(
-                    (option) => DropdownMenuItem(
-                      value: option,
-                      child: Text(option),
-                    ),
+                    (option) =>
+                        DropdownMenuItem(value: option, child: Text(option)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -100,8 +168,9 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
           ),
           FilledButton(
             onPressed: () {
-              final displayValue =
-                  selected == 'Other' ? otherController.text.trim() : selected;
+              final displayValue = selected == 'Other'
+                  ? otherController.text.trim()
+                  : selected;
               Navigator.pop(
                 dialogContext,
                 NpiSpecialtySelection(
@@ -121,6 +190,12 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
 }
 
 Widget npiStatusIcon(String status) {
+  if (status == 'va_verified') {
+    return const Tooltip(
+      message: 'VA provider verified',
+      child: Icon(Icons.military_tech, color: Colors.blue, size: 19),
+    );
+  }
   if (status == 'verified') {
     return const Tooltip(
       message: 'NPI verified',
@@ -160,6 +235,8 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
   required BuildContext context,
   required String title,
   required List<Map<String, dynamic>> candidates,
+  bool allowAlternateZip = false,
+  int candidateLimit = 4,
 }) {
   return showDialog<Map<String, dynamic>>(
     context: context,
@@ -172,31 +249,44 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Choose the matching record, or leave it unresolved.'),
+              Text(
+                candidates.isEmpty
+                    ? allowAlternateZip
+                          ? 'No matching records here. Try the pharmacy ZIP, or leave it unresolved.'
+                          : 'No matching records found. Leave it unresolved if none match.'
+                    : 'Choose the matching record, or leave it unresolved.',
+              ),
               const SizedBox(height: 12),
-              ...candidates.take(4).map((candidate) {
-                final address = [
-                  candidate['address1'],
-                  candidate['address2'],
-                  [
-                    candidate['city'],
-                    candidate['state'],
-                    candidate['postalCode']
-                  ]
-                      .where((value) =>
-                          value != null && value.toString().trim().isNotEmpty)
-                      .join(' '),
-                ]
-                    .where((value) =>
-                        value != null && value.toString().trim().isNotEmpty)
-                    .join('\n');
-                final details = [
-                  candidate['taxonomy'],
-                  candidate['credential'],
-                ]
-                    .where((value) =>
-                        value != null && value.toString().trim().isNotEmpty)
+              ...candidates.take(candidateLimit).map((candidate) {
+                final address =
+                    [
+                          candidate['address1'],
+                          candidate['address2'],
+                          [
+                                candidate['city'],
+                                candidate['state'],
+                                candidate['postalCode'],
+                              ]
+                              .where(
+                                (value) =>
+                                    value != null &&
+                                    value.toString().trim().isNotEmpty,
+                              )
+                              .join(' '),
+                        ]
+                        .where(
+                          (value) =>
+                              value != null &&
+                              value.toString().trim().isNotEmpty,
+                        )
+                        .join('\n');
+                final details = [candidate['taxonomy'], candidate['credential']]
+                    .where(
+                      (value) =>
+                          value != null && value.toString().trim().isNotEmpty,
+                    )
                     .join(' • ');
+                final isVaProvider = candidate['isVaProvider'] == true;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -217,7 +307,8 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                                 (candidate['displayName'] ?? 'Provider')
                                     .toString(),
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                             if (candidate['suggested'] == true)
@@ -226,6 +317,18 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                                 child: Text(
                                   'Previously confirmed',
                                   style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            if (isVaProvider)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Text(
+                                  'VA Provider',
+                                  style: TextStyle(
+                                    color: Colors.blue,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                           ],
@@ -238,6 +341,15 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                           const SizedBox(height: 4),
                           Text(address),
                         ],
+                        if (isVaProvider &&
+                            candidate['vaFacility']
+                                    ?.toString()
+                                    .trim()
+                                    .isNotEmpty ==
+                                true) ...[
+                          const SizedBox(height: 4),
+                          Text(candidate['vaFacility'].toString()),
+                        ],
                       ],
                     ),
                   ),
@@ -248,6 +360,14 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
         ),
       ),
       actions: [
+        if (allowAlternateZip)
+          TextButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              const <String, dynamic>{'_pickerAction': 'searchAnotherZip'},
+            ),
+            child: const Text('Search another ZIP'),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
           child: const Text('Leave unresolved'),

@@ -6,6 +6,7 @@ import '../services/secure_store.dart';
 import '../services/npi_verification_service.dart';
 import '../utils/phone_formatter.dart'; // ← NEW
 import '../widgets/npi_verification_widgets.dart';
+import '../widgets/working_overlay.dart';
 
 class DoctorsScreen extends StatefulWidget {
   const DoctorsScreen({super.key});
@@ -19,6 +20,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   late final NpiVerificationService _npiService;
   Profile? _p;
   bool _loading = true;
+  String? _workingMessage;
 
   @override
   void initState() {
@@ -44,11 +46,36 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
   Future<void> _addOrEdit({Doctor? existing, int? index}) async {
     int? targetIndex = index;
+    final verifiedCandidate = existing == null
+        ? null
+        : verifiedProviderCandidate(existing);
     final name = TextEditingController(text: existing?.name ?? '');
-    final specialty = TextEditingController(text: existing?.specialty ?? '');
+    final specialty = TextEditingController(
+      text: existing?.specialty.trim().isNotEmpty == true
+          ? existing!.specialty
+          : verifiedCandidate?['taxonomy']?.toString() ?? '',
+    );
     final clinic = TextEditingController(text: existing?.clinic ?? '');
     final phone = TextEditingController(text: existing?.phone ?? '');
     var isPrimaryCareProvider = existing?.isPrimaryCareProvider ?? false;
+    final registryDetails = verifiedCandidate == null
+        ? ''
+        : [
+                verifiedCandidate['taxonomy'],
+                [
+                      verifiedCandidate['address1'],
+                      verifiedCandidate['city'],
+                      verifiedCandidate['state'],
+                      verifiedCandidate['postalCode'],
+                    ]
+                    .where(
+                      (value) => value?.toString().trim().isNotEmpty == true,
+                    )
+                    .join(' '),
+                verifiedCandidate['phone'],
+              ]
+              .where((value) => value?.toString().trim().isNotEmpty == true)
+              .join('\n');
 
     final ok = await showDialog<bool>(
       context: context,
@@ -58,64 +85,89 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           content: SingleChildScrollView(
             child: Column(
               children: [
-              Column(
-                children: [
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Name'),
-                  ),
-                  const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: specialty,
-                    decoration: const InputDecoration(labelText: 'Specialty'),
-                  ),
-                  const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: clinic,
-                    decoration: const InputDecoration(labelText: 'Clinic'),
-                  ),
-                  const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: phone,
-                    decoration: const InputDecoration(labelText: 'Phone'),
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      PhoneNumberFormatter()
-                    ], // ← PHONE FORMATTING ADDED
-                  ),
-                  const Divider(height: 1),
-                ],
+                Column(
+                  children: [
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                ),
+                Column(
+                  children: [
+                    TextField(
+                      controller: specialty,
+                      decoration: const InputDecoration(labelText: 'Specialty'),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                ),
+                Column(
+                  children: [
+                    TextField(
+                      controller: clinic,
+                      decoration: const InputDecoration(labelText: 'Clinic'),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                ),
+                Column(
+                  children: [
+                    TextField(
+                      controller: phone,
+                      decoration: const InputDecoration(labelText: 'Phone'),
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        PhoneNumberFormatter(),
+                      ], // ← PHONE FORMATTING ADDED
+                    ),
+                    const Divider(height: 1),
+                  ],
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Primary care provider'),
                   value: isPrimaryCareProvider,
-                  onChanged: (value) => setDialogState(
-                    () => isPrimaryCareProvider = value,
-                  ),
+                  onChanged: (value) =>
+                      setDialogState(() => isPrimaryCareProvider = value),
                 ),
+                if (existing != null) ...[
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      existing.verificationStatus == 'verified' &&
+                              existing.npi != null
+                          ? 'NPI verified: ${existing.npi}'
+                          : existing.verificationStatus == 'va_verified'
+                          ? 'VA provider verified: ${existing.vaFacility ?? 'VA directory'}'
+                          : existing.verificationStatus == 'needs_review'
+                          ? 'NPI needs review. Save to review matches.'
+                          : 'NPI not verified. Save to retry lookup.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  if (registryDetails.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Registry record\n$registryDetails'),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Save')),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
           ],
         ),
       ),
@@ -134,9 +186,14 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       npiCandidates: existing?.npiCandidates,
       verifiedAt: existing?.verifiedAt,
       verifiedBy: existing?.verifiedBy,
+      isVaProvider: existing?.isVaProvider ?? false,
+      vaFacility: existing?.vaFacility,
+      vaServiceLine: existing?.vaServiceLine,
+      vaVerifiedAt: existing?.vaVerifiedAt,
     );
 
     setState(() {
+      _workingMessage = 'Saving and checking your doctor...';
       if (existing == null) {
         _p!.doctors.add(doc);
         targetIndex = _p!.doctors.length - 1;
@@ -145,55 +202,50 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       }
     });
 
-    await _save();
-    await _verifyDoctor(targetIndex!);
+    try {
+      await _save();
+      await _verifyDoctor(targetIndex!);
+    } finally {
+      if (mounted) setState(() => _workingMessage = null);
+    }
   }
 
   Future<void> _verifyDoctor(int index) async {
     if (index < 0 || index >= _p!.doctors.length) return;
     final doctor = _p!.doctors[index];
+    final registeredZip = _p!.zip?.trim() ?? '';
+    final hasRegisteredZip = RegExp(r'^\d{5}$').hasMatch(registeredZip);
+    var searchZip = hasRegisteredZip
+        ? registeredZip
+        : await showDoctorZipPrompt(context: context, doctorName: doctor.name);
+    if (searchZip == null || !mounted) return;
+
     var result = await _npiService.lookup(
       entityType: 'provider',
       name: doctor.name,
-      city: _p!.city,
+      postalCode: searchZip,
       state: _p!.state,
+      includeVa: _p!.isVeteran && _p!.usesVaHealthcare,
     );
 
-    doctor.npi = result.npi;
-    doctor.verificationStatus = result.status;
-    doctor.npiCandidates = result.candidates;
-    doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
-    doctor.verifiedBy = result.isVerified ? result.verifiedBy ?? 'auto' : null;
+    applyProviderLookupResult(doctor, result);
     await _save();
 
-    if (result.status != 'needs_review' ||
-        result.candidates.isEmpty ||
-        !mounted) {
-      return;
-    }
-
-    final specialty = await showNpiSpecialtyPicker(
-      context: context,
-      doctorName: doctor.name,
-      initialValue: doctor.specialty,
-    );
-    if (specialty == null) return;
-
-    doctor.specialty = specialty.displayValue;
-    if (specialty.filterLabel != 'Other') {
+    if (result.candidates.isEmpty && hasRegisteredZip && mounted) {
+      searchZip = await showDoctorZipPrompt(
+        context: context,
+        doctorName: doctor.name,
+        registeredZip: registeredZip,
+      );
+      if (searchZip == null || !mounted) return;
       result = await _npiService.lookup(
         entityType: 'provider',
         name: doctor.name,
-        city: _p!.city,
+        postalCode: searchZip,
         state: _p!.state,
-        specialty: specialty.filterLabel,
+        includeVa: _p!.isVeteran && _p!.usesVaHealthcare,
       );
-      doctor.npi = result.npi;
-      doctor.verificationStatus = result.status;
-      doctor.npiCandidates = result.candidates;
-      doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
-      doctor.verifiedBy =
-          result.isVerified ? result.verifiedBy ?? 'auto' : null;
+      applyProviderLookupResult(doctor, result);
       await _save();
     }
 
@@ -210,6 +262,26 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     );
     if (selected == null) return;
 
+    if (selected['npi'] == null && selected['isVaProvider'] == true) {
+      doctor.npi = null;
+      doctor.verificationStatus = 'va_verified';
+      doctor.npiCandidates = result.candidates;
+      doctor.verifiedAt = null;
+      doctor.verifiedBy = 'va_directory';
+      doctor.isVaProvider = true;
+      doctor.vaFacility = selected['vaFacility']?.toString();
+      doctor.vaServiceLine = selected['vaServiceLine']?.toString();
+      doctor.vaVerifiedAt = DateTime.now();
+      if (doctor.specialty.trim().isEmpty) {
+        doctor.specialty = selected['taxonomy']?.toString().trim() ?? '';
+      }
+      if (doctor.clinic.trim().isEmpty) {
+        doctor.clinic = doctor.vaFacility ?? '';
+      }
+      await _save();
+      return;
+    }
+
     final confirmed = await _npiService.confirm(
       entityType: 'provider',
       searchedName: doctor.name,
@@ -222,6 +294,13 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     doctor.npiCandidates = result.candidates;
     doctor.verifiedAt = DateTime.now();
     doctor.verifiedBy = confirmed['verifiedBy']?.toString();
+    doctor.isVaProvider = selected['isVaProvider'] == true;
+    doctor.vaFacility = selected['vaFacility']?.toString();
+    doctor.vaServiceLine = selected['vaServiceLine']?.toString();
+    doctor.vaVerifiedAt = doctor.isVaProvider ? DateTime.now() : null;
+    if (doctor.specialty.trim().isEmpty) {
+      doctor.specialty = confirmed['taxonomy']?.toString().trim() ?? '';
+    }
     await _save();
   }
 
@@ -233,11 +312,13 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         content: Text(_p!.doctors[i].name),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton.tonal(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Remove')),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
         ],
       ),
     );
@@ -258,51 +339,74 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Doctors")),
-      body: docs.isEmpty
-          ? const Center(child: Text("No doctors added."))
-          : ListView.separated(
-              itemCount: docs.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (_, i) {
-                final d = docs[i];
-                return ListTile(
-                  tileColor: Colors.transparent,
-                  shape: const Border(
-                    bottom: BorderSide(color: Colors.black12),
-                  ),
-                  title: Row(
-                    children: [
-                      Expanded(child: Text(d.name)),
-                      const SizedBox(width: 6),
-                      npiStatusIcon(d.verificationStatus),
-                    ],
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if ([d.specialty, d.clinic, d.phone]
-                          .any((value) => value.isNotEmpty))
-                        Text([
-                          if (d.specialty.isNotEmpty) d.specialty,
-                          if (d.clinic.isNotEmpty) d.clinic,
-                          if (d.phone.isNotEmpty) d.phone,
-                        ].join(" • ")),
-                      if (d.isPrimaryCareProvider) ...[
-                        const SizedBox(height: 3),
-                        primaryCareIndicator(),
-                      ],
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _delete(i),
-                  ),
-                  onTap: () => _addOrEdit(existing: d, index: i),
-                );
-              },
-            ),
+      body: Stack(
+        children: [
+          docs.isEmpty
+              ? const Center(child: Text("No doctors added."))
+              : ListView.separated(
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final d = docs[i];
+                    return ListTile(
+                      tileColor: Colors.transparent,
+                      shape: const Border(
+                        bottom: BorderSide(color: Colors.black12),
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(child: Text(d.name)),
+                          const SizedBox(width: 6),
+                          npiStatusIcon(d.verificationStatus),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if ([
+                            d.specialty,
+                            d.clinic,
+                            d.phone,
+                          ].any((value) => value.isNotEmpty))
+                            Text(
+                              [
+                                if (d.specialty.isNotEmpty) d.specialty,
+                                if (d.clinic.isNotEmpty) d.clinic,
+                                if (d.phone.isNotEmpty) d.phone,
+                              ].join(" • "),
+                            ),
+                          if (d.isPrimaryCareProvider) ...[
+                            const SizedBox(height: 3),
+                            primaryCareIndicator(),
+                          ],
+                          if (d.isVaProvider) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              d.vaFacility?.trim().isNotEmpty == true
+                                  ? 'VA Provider - ${d.vaFacility}'
+                                  : 'VA Provider',
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _delete(i),
+                      ),
+                      onTap: () => _addOrEdit(existing: d, index: i),
+                    );
+                  },
+                ),
+          if (_workingMessage != null)
+            WorkingOverlay(message: _workingMessage!),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _addOrEdit(),
+        onPressed: _workingMessage == null ? () => _addOrEdit() : null,
         child: const Icon(Icons.add),
       ),
     );

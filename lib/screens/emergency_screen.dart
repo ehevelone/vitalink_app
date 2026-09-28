@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -81,10 +82,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => QrScreen(
-              qrToken: token,
-              title: "Emergency Info",
-            ),
+            builder: (_) => QrScreen(qrToken: token, title: "Emergency Info"),
           ),
         );
         return;
@@ -127,28 +125,23 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => QrScreen(
-            qrToken: qrToken,
-            title: "Emergency Info",
-          ),
+          builder: (_) => QrScreen(qrToken: qrToken, title: "Emergency Info"),
         ),
       );
     } catch (e) {
       debugPrint("❌ QR LOAD FAILED: $e");
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load QR")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Failed to load QR")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading || _p == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final p = _p!;
@@ -205,75 +198,95 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               if (e.effectiveContacts.isEmpty)
                 const ListTile(
                   tileColor: Colors.transparent,
-                  shape: Border(
-                    bottom: BorderSide(color: Colors.black12),
-                  ),
+                  shape: Border(bottom: BorderSide(color: Colors.black12)),
                   title: Text("Emergency Contacts"),
                   subtitle: Text("N/A"),
                 ),
               ...e.effectiveContacts.asMap().entries.map(
-                    (entry) => ListTile(
-                      tileColor: Colors.transparent,
-                      shape: const Border(
-                        bottom: BorderSide(color: Colors.black12),
-                      ),
-                      title: Text(
-                        entry.key == 0
-                            ? "Emergency Contact"
-                            : "Emergency Contact ${entry.key + 1}",
-                      ),
-                      subtitle: Text([
-                        if (entry.value.name.isNotEmpty) entry.value.name,
-                        if (entry.value.phone.isNotEmpty)
-                          Formatters.phone(entry.value.phone),
-                      ].join(" - ")),
-                    ),
+                (entry) => ListTile(
+                  tileColor: Colors.transparent,
+                  shape: const Border(
+                    bottom: BorderSide(color: Colors.black12),
                   ),
+                  title: Text(
+                    entry.key == 0
+                        ? "Emergency Contact"
+                        : "Emergency Contact ${entry.key + 1}",
+                  ),
+                  subtitle: Text(
+                    [
+                      if (entry.value.name.isNotEmpty) entry.value.name,
+                      if (entry.value.phone.isNotEmpty)
+                        Formatters.phone(entry.value.phone),
+                    ].join(" - "),
+                  ),
+                ),
+              ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
+                title: const Text("Veteran"),
+                subtitle: Text(
+                  _p!.isVeteran ? "YES" : "NO",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _p!.isVeteran
+                        ? Colors.green.shade800
+                        : Colors.red.shade800,
+                    fontSize: 17,
+                  ),
                 ),
+              ),
+              if (_p!.isVeteran && _p!.usesVaHealthcare)
+                ListTile(
+                  tileColor: Colors.red.shade50,
+                  leading: Icon(
+                    Icons.health_and_safety,
+                    color: Colors.red.shade800,
+                  ),
+                  title: const Text(
+                    "VA Health Care Patient",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text(
+                    "For emergency care at a non-VA hospital, notify the VA as soon as possible and within 72 hours of when emergency care begins. Do not delay emergency treatment.",
+                  ),
+                  trailing: const Icon(Icons.phone),
+                  onTap: () => launchUrl(Uri.parse("tel:8447247842")),
+                ),
+              ListTile(
+                tileColor: Colors.transparent,
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Allergies"),
                 subtitle: Text(e.allergies.isNotEmpty ? e.allergies : "N/A"),
               ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Conditions"),
                 subtitle: Text(e.conditions.isNotEmpty ? e.conditions : "N/A"),
               ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Implanted Devices"),
                 subtitle: Text(e.implants.isNotEmpty ? e.implants : "N/A"),
               ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Major Procedures"),
                 subtitle: Text(e.procedures.isNotEmpty ? e.procedures : "N/A"),
               ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Blood Type"),
                 subtitle: Text(e.bloodType.isNotEmpty ? e.bloodType : "N/A"),
               ),
               ListTile(
                 tileColor: Colors.transparent,
-                shape: const Border(
-                  bottom: BorderSide(color: Colors.black12),
-                ),
+                shape: const Border(bottom: BorderSide(color: Colors.black12)),
                 title: const Text("Organ Donor"),
                 subtitle: Text(
                   e.organDonor ? "YES" : "NO",
@@ -300,20 +313,22 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...p.meds.map((m) => ListTile(
-                          tileColor: Colors.transparent,
-                          shape: const Border(
-                            bottom: BorderSide(color: Colors.black12),
-                          ),
-                          dense: true,
-                          title: Text(m.name.isNotEmpty ? m.name : "Unknown"),
-                          subtitle: Text(
-                            [
-                              if (m.dose.isNotEmpty) m.dose,
-                              if (m.frequency.isNotEmpty) m.frequency,
-                            ].join(" • "),
-                          ),
-                        )),
+                    ...p.meds.map(
+                      (m) => ListTile(
+                        tileColor: Colors.transparent,
+                        shape: const Border(
+                          bottom: BorderSide(color: Colors.black12),
+                        ),
+                        dense: true,
+                        title: Text(m.name.isNotEmpty ? m.name : "Unknown"),
+                        subtitle: Text(
+                          [
+                            if (m.dose.isNotEmpty) m.dose,
+                            if (m.frequency.isNotEmpty) m.frequency,
+                          ].join(" • "),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -330,19 +345,21 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...p.doctors.map((d) => ListTile(
-                          tileColor: Colors.transparent,
-                          shape: const Border(
-                            bottom: BorderSide(color: Colors.black12),
-                          ),
-                          dense: true,
-                          title: Text(d.name.isNotEmpty ? d.name : "Unknown"),
-                          subtitle: Text(
-                            d.phone.isNotEmpty
-                                ? Formatters.phone(d.phone)
-                                : "No phone",
-                          ),
-                        )),
+                    ...p.doctors.map(
+                      (d) => ListTile(
+                        tileColor: Colors.transparent,
+                        shape: const Border(
+                          bottom: BorderSide(color: Colors.black12),
+                        ),
+                        dense: true,
+                        title: Text(d.name.isNotEmpty ? d.name : "Unknown"),
+                        subtitle: Text(
+                          d.phone.isNotEmpty
+                              ? Formatters.phone(d.phone)
+                              : "No phone",
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -366,10 +383,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
               "VitaLink provides personal health information for emergency reference only. "
               "It does not replace professional medical care. Always rely on medical professionals.",
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade400,
-              ),
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
             ),
           ),
         ],

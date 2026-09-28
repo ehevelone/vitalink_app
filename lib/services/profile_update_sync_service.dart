@@ -18,7 +18,7 @@ class ProfileUpdateSyncService {
   final SecureStore _store;
 
   ProfileUpdateSyncService([SecureStore? store])
-      : _store = store ?? SecureStore();
+    : _store = store ?? SecureStore();
 
   Map<String, dynamic> buildPayload(
     Profile profile, {
@@ -39,6 +39,8 @@ class ProfileUpdateSyncService {
         'city': profile.city,
         'state': profile.state,
         'zip': profile.zip,
+        'isVeteran': profile.isVeteran,
+        'usesVaHealthcare': profile.usesVaHealthcare,
       },
       if (selected.contains('emergency'))
         'emergency': profile.emergency.toJson(),
@@ -58,6 +60,7 @@ class ProfileUpdateSyncService {
   Future<Map<String, dynamic>> publishProfileUpdate(
     Profile profile, {
     List<String> sections = defaultSections,
+    String? pendingShareId,
   }) async {
     final userId = await _store.getString('userId');
 
@@ -71,6 +74,7 @@ class ProfileUpdateSyncService {
         profileId: profile.id,
         profileName: profile.fullName,
         allowedSections: sections,
+        pendingShareId: pendingShareId,
         payload: await PersistentFileStore.attachProfileFileBytes(
           buildPayload(profile, sections: sections),
         ),

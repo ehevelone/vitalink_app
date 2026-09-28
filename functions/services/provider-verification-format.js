@@ -33,8 +33,11 @@ function formatPharmacySummary(pharmacy) {
   const phone = clean(pharmacy?.phone);
   const extra = clean(pharmacy?.details);
   const npi = verifiedNpi(pharmacy);
+  const fulfillmentType = clean(pharmacy?.fulfillment_type || pharmacy?.fulfillmentType);
 
   if (phone) details.push(phone);
+  if (fulfillmentType === "mail_order") details.push("Mail order");
+  if (fulfillmentType === "retail") details.push("Local pharmacy");
   if (extra) details.push(extra);
   if (npi) details.push(`NPI: ${npi} (verified)`);
 

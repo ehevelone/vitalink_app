@@ -3,7 +3,7 @@ package com.etnaturals.vitalinkapp
 import android.content.Intent
 import android.os.Bundle
 import android.provider.CalendarContract
-import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -12,8 +12,8 @@ class MainActivity: FlutterFragmentActivity() {
     private val calendarChannel = "com.etnaturals.vitalinkapp/calendar"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        WindowCompat.enableEdgeToEdge(window)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

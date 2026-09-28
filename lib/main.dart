@@ -238,17 +238,26 @@ Future<void> main() async {
         }
         lastRegistrationLink = uri.toString();
         lastRegistrationLinkAt = now;
-        VitaLinkDeepLink.code = link.code;
+        if (link.onboardingCode != null) {
+          VitaLinkDeepLink.clear();
+          VitaLinkDeepLink.onboardingCode = link.onboardingCode;
+        } else {
+          VitaLinkDeepLink.clearOnboardingCode();
+          VitaLinkDeepLink.code = link.code;
+        }
 
         void openRegistration() {
           navigatorKey.currentState?.pushNamed(
             link.route,
-            arguments: {'code': link.code},
+            arguments: link.onboardingCode != null
+                ? {'onboard': link.onboardingCode}
+                : {'code': link.code},
           );
         }
 
         if (navigatorKey.currentState == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => openRegistration());
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => openRegistration());
         } else {
           openRegistration();
         }

@@ -134,6 +134,9 @@ exports.handler = async (event) => {
         dob: data.dob || "",
         bloodType: emergency.bloodType || data.bloodType || "",
         organDonor: emergency.organDonor || data.organDonor || false,
+        isVeteran: data.isVeteran === true || data.is_veteran === true,
+        usesVaHealthcare:
+          data.usesVaHealthcare === true || data.uses_va_healthcare === true,
 
         emergencyContactName: contactName,
         emergencyContactPhone: contactPhone,

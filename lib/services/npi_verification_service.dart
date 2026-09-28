@@ -1,5 +1,6 @@
 import 'api_service.dart';
 import 'secure_store.dart';
+import '../models.dart';
 
 class NpiLookupResult {
   final String status;
@@ -29,11 +30,37 @@ class NpiLookupResult {
   }
 }
 
+Map<String, dynamic>? verifiedProviderCandidate(Doctor doctor) {
+  if (doctor.verificationStatus != 'verified' || doctor.npi == null) {
+    return null;
+  }
+  for (final candidate in doctor.npiCandidates) {
+    if (candidate['npi']?.toString() == doctor.npi) return candidate;
+  }
+  return null;
+}
+
+void applyProviderLookupResult(Doctor doctor, NpiLookupResult result) {
+  doctor.npi = result.npi;
+  doctor.verificationStatus = result.status;
+  doctor.npiCandidates = result.candidates;
+  doctor.verifiedAt = result.isVerified ? DateTime.now() : null;
+  doctor.verifiedBy = result.isVerified ? result.verifiedBy ?? 'auto' : null;
+  doctor.isVaProvider = false;
+  doctor.vaFacility = null;
+  doctor.vaServiceLine = null;
+  doctor.vaVerifiedAt = null;
+  if (result.isVerified && doctor.specialty.trim().isEmpty) {
+    doctor.specialty =
+        verifiedProviderCandidate(doctor)?['taxonomy']?.toString().trim() ?? '';
+  }
+}
+
 class NpiVerificationService {
   final SecureStore _store;
 
   NpiVerificationService([SecureStore? store])
-      : _store = store ?? SecureStore();
+    : _store = store ?? SecureStore();
 
   Future<Map<String, dynamic>> _identity() async {
     final agentId = await _store.getString('agentId');
@@ -57,6 +84,8 @@ class NpiVerificationService {
     String? postalCode,
     String? specialty,
     String? phone,
+    bool? mailOrder,
+    bool includeVa = false,
   }) async {
     if (name.trim().isEmpty) {
       return const NpiLookupResult(status: 'unverified');
@@ -71,6 +100,8 @@ class NpiVerificationService {
       postalCode: postalCode,
       specialty: specialty,
       phone: phone,
+      mailOrder: mailOrder,
+      includeVa: includeVa,
     );
 
     if (response['success'] != true) {

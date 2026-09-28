@@ -32,6 +32,25 @@ void main() {
     expect(link?.route, '/terms_user');
   });
 
+  test('assisted client onboarding QR opens user terms with onboarding code',
+      () {
+    final link = VitaLinkRegistrationLink.fromUri(
+      Uri.parse('vitalink://activate?onboard=VL-ONBOARD-123'),
+    );
+    expect(link?.route, '/terms_user');
+    expect(link?.onboardingCode, 'VL-ONBOARD-123');
+    expect(link?.code, isEmpty);
+  });
+
+  test('malformed assisted onboarding code is rejected', () {
+    expect(
+      VitaLinkRegistrationLink.fromUri(
+        Uri.parse('vitalink://activate?onboard=bad%20code'),
+      ),
+      isNull,
+    );
+  });
+
   test('legacy path activation link preserves its code', () {
     final link = VitaLinkRegistrationLink.fromUri(
       Uri.parse('vitalink://activate/AGT-OLD'),
@@ -64,7 +83,8 @@ void main() {
   });
 
   test('missing or malformed registration codes do not navigate', () {
-    expect(VitaLinkRegistrationLink.fromUri(Uri.parse('vitalink://activate')), isNull);
+    expect(VitaLinkRegistrationLink.fromUri(Uri.parse('vitalink://activate')),
+        isNull);
     expect(
       VitaLinkRegistrationLink.fromUri(
         Uri.parse('vitalink://activate?code=bad%20code&kind=agent'),

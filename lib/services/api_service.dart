@@ -26,8 +26,8 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-// 🔧 Internal POST helper (SAFE)
-// -------------------------------------------------------------
+  // 🔧 Internal POST helper (SAFE)
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
     Map<String, dynamic> body,
@@ -107,6 +107,8 @@ class ApiService {
     String? postalCode,
     String? specialty,
     String? phone,
+    bool? mailOrder,
+    bool includeVa = false,
   }) async {
     final body = {
       ...identity,
@@ -119,6 +121,8 @@ class ApiService {
       if (specialty != null && specialty.trim().isNotEmpty)
         'specialty': specialty.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (mailOrder != null) 'mailOrder': mailOrder,
+      if (includeVa) 'includeVa': true,
     };
     return identity['agentId'] != null
         ? _postJsonWithAgentSession('npi_lookup', body)
@@ -178,9 +182,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getUserProfiles(String userId) async {
-    return await _postJsonWithUserSession("get_profiles", {
-      "user_id": userId,
-    });
+    return await _postJsonWithUserSession("get_profiles", {"user_id": userId});
   }
 
   // -------------------------------------------------------------
@@ -193,9 +195,7 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔎 Get full agent profile
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentProfile({
-    required String email,
-  }) {
+  static Future<Map<String, dynamic>> getAgentProfile({required String email}) {
     return _postJsonWithAgentSession("get_agent_profile", {"email": email});
   }
 
@@ -297,19 +297,15 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-// 🔹 Agent login
-// -------------------------------------------------------------
+  // 🔹 Agent login
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
     required String password,
     String? deviceId,
     bool replace = false,
   }) async {
-    final body = {
-      "email": email,
-      "password": password,
-      "replace": replace,
-    };
+    final body = {"email": email, "password": password, "replace": replace};
 
     if (deviceId != null) {
       body["device_id"] = deviceId;
@@ -320,20 +316,16 @@ class ApiService {
     return res; // 🔥 DO NOT MODIFY RESPONSE
   }
 
-// -------------------------------------------------------------
-// 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
-// -------------------------------------------------------------
+  // -------------------------------------------------------------
+  // 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
+  // -------------------------------------------------------------
   static Future<Map<String, dynamic>> createAgentCheckout({
     required String email,
     String? agentId,
     String plan = "agent",
     String billing = "monthly",
   }) async {
-    final body = {
-      "email": email,
-      "plan": plan,
-      "billing": billing,
-    };
+    final body = {"email": email, "plan": plan, "billing": billing};
 
     if (agentId != null && agentId.isNotEmpty) {
       body["agentId"] = agentId;
@@ -344,7 +336,7 @@ class ApiService {
     return res;
   }
 
-// -------------------------------------------------------------
+  // -------------------------------------------------------------
   // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
@@ -371,11 +363,12 @@ class ApiService {
     }
 
     final user = Map<String, dynamic>.from(res["user"]);
-    final sessionToken = (user["session_token"] ??
-            res["session_token"] ??
-            res["sessionToken"] ??
-            res["token"])
-        ?.toString();
+    final sessionToken =
+        (user["session_token"] ??
+                res["session_token"] ??
+                res["sessionToken"] ??
+                res["token"])
+            ?.toString();
 
     if (sessionToken == null || sessionToken.isEmpty) {
       return {
@@ -416,8 +409,20 @@ class ApiService {
   // 🔎 Activation lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> lookupActivation(String code) {
-    return _postJson("vl-get-activation-details", {
-      "code": code,
+    return _postJson("vl-get-activation-details", {"code": code});
+  }
+
+  static Future<Map<String, dynamic>> getAssistedOnboarding(String code) {
+    return _postJson('get_assisted_onboarding', {'code': code});
+  }
+
+  static Future<Map<String, dynamic>> claimAssistedOnboarding({
+    required String code,
+    required String userId,
+  }) {
+    return _postJsonWithUserSession('claim_assisted_onboarding', {
+      'code': code,
+      'userId': userId,
     });
   }
 
@@ -600,44 +605,28 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔎 Mark agent as reviewed
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> markReviewed({
-    required String email,
-  }) {
-    return _postJson("mark_reviewed", {
-      "email": email.trim(),
-    });
+  static Future<Map<String, dynamic>> markReviewed({required String email}) {
+    return _postJson("mark_reviewed", {"email": email.trim()});
   }
 
   // -------------------------------------------------------------
   // 🔎 Resolve agent by code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
-    final res = await _postJson("resolve_agent_code", {
-      "code": code,
-    });
+    final res = await _postJson("resolve_agent_code", {"code": code});
 
     if (res["success"] != true || res["agent"] == null) {
-      return {
-        "success": false,
-        "error": res["error"] ?? "Invalid agent code",
-      };
+      return {"success": false, "error": res["error"] ?? "Invalid agent code"};
     }
 
-    return {
-      "success": true,
-      "agent": res["agent"],
-    };
+    return {"success": true, "agent": res["agent"]};
   }
 
   // -------------------------------------------------------------
   // 🆕 GET AGENT CLIENTS
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentClients({
-    required int agentId,
-  }) {
-    return _postJsonWithAgentSession("get_agent_clients", {
-      "agentId": agentId,
-    });
+  static Future<Map<String, dynamic>> getAgentClients({required int agentId}) {
+    return _postJsonWithAgentSession("get_agent_clients", {"agentId": agentId});
   }
 
   static Future<Map<String, dynamic>> getAgentItems({
@@ -767,6 +756,7 @@ class ApiService {
     required String profileId,
     required String profileName,
     required Map<String, dynamic> payload,
+    String? pendingShareId,
     List<String> allowedSections = const [
       "emergency",
       "medications",
@@ -779,6 +769,7 @@ class ApiService {
       "profileName": profileName,
       "allowedSections": allowedSections,
       "payload": payload,
+      if (pendingShareId != null) "pendingShareId": pendingShareId,
     });
   }
 
@@ -822,12 +813,8 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getMyReferrals({
-    required String userId,
-  }) {
-    return _postJsonWithUserSession("get_my_referrals", {
-      "userId": userId,
-    });
+  static Future<Map<String, dynamic>> getMyReferrals({required String userId}) {
+    return _postJsonWithUserSession("get_my_referrals", {"userId": userId});
   }
 
   static Future<Map<String, dynamic>> getAgentReferrals({

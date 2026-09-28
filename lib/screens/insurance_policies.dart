@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
+import '../widgets/working_overlay.dart';
 import 'insurance_policy_view.dart';
 import 'insurance_policy_form.dart';
 import 'vitalink_camera_capture_screen.dart';
@@ -22,6 +23,8 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
+  bool _captureInProgress = false;
+  String? _workingMessage;
 
   @override
   void initState() {
@@ -68,6 +71,9 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
   }
 
   Future<void> _scanPolicy() async {
+    if (_workingMessage != null || _captureInProgress) return;
+    setState(() => _captureInProgress = true);
+
     try {
       if (_p == null) return;
 
@@ -92,6 +98,13 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       }
 
       if (base64Images.isEmpty) return;
+
+      if (mounted) {
+        setState(() {
+          _captureInProgress = false;
+          _workingMessage = 'Processing and saving your insurance policy...';
+        });
+      }
 
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_insurance";
@@ -208,6 +221,13 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Policy scan failed: $e")),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _captureInProgress = false;
+          _workingMessage = null;
+        });
+      }
     }
   }
 
@@ -226,8 +246,15 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     );
 
     if (updated != null) {
-      setState(() => _p!.insurances.add(updated));
-      await _save();
+      setState(() {
+        _workingMessage = 'Saving your insurance policy...';
+        _p!.insurances.add(updated);
+      });
+      try {
+        await _save();
+      } finally {
+        if (mounted) setState(() => _workingMessage = null);
+      }
     }
   }
 
@@ -270,12 +297,16 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Insurance Policies")),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: ElevatedButton.icon(
-              onPressed: _scanPolicy,
+              onPressed: _workingMessage == null && !_captureInProgress
+                  ? _scanPolicy
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,
@@ -329,10 +360,16 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
                     },
                   ),
           ),
+            ],
+          ),
+          if (_workingMessage != null)
+            WorkingOverlay(message: _workingMessage!),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _addPolicy,
+        onPressed: _workingMessage == null && !_captureInProgress
+            ? _addPolicy
+            : null,
         child: const Icon(Icons.add),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitalink/models.dart';
+import 'package:vitalink/services/npi_verification_service.dart';
 import 'package:vitalink/widgets/npi_verification_widgets.dart';
 
 void main() {
@@ -19,9 +20,11 @@ void main() {
     expect(doctor.npi, isNull);
     expect(doctor.npiCandidates, isEmpty);
     expect(doctor.isPrimaryCareProvider, isFalse);
+    expect(doctor.isVaProvider, isFalse);
     expect(medication.pharmacyVerificationStatus, 'unverified');
     expect(medication.pharmacyNpi, isNull);
     expect(medication.pharmacyNpiCandidates, isEmpty);
+    expect(medication.pharmacyFulfillmentType, isNull);
   });
 
   test('verified NPI metadata survives a JSON round trip', () {
@@ -40,6 +43,7 @@ void main() {
     final medication = Medication(
       name: 'Example',
       prescriber: 'Example Pharmacy',
+      pharmacyFulfillmentType: 'mail_order',
       pharmacyNpi: '0987654321',
       pharmacyVerificationStatus: 'verified',
       pharmacyNpiCandidates: [
@@ -59,6 +63,46 @@ void main() {
     expect(restoredMedication.pharmacyNpi, '0987654321');
     expect(restoredMedication.pharmacyVerificationStatus, 'verified');
     expect(restoredMedication.pharmacyVerifiedBy, '7');
+    expect(restoredMedication.pharmacyFulfillmentType, 'mail_order');
+  });
+
+  test('Veteran and VA provider details survive JSON round trips', () {
+    final verifiedAt = DateTime.utc(2026, 9, 27, 12);
+    final profile = Profile(
+      fullName: 'Test Veteran',
+      isVeteran: true,
+      usesVaHealthcare: true,
+    );
+    final doctor = Doctor(
+      name: 'Hoa Nguyen',
+      verificationStatus: 'va_verified',
+      isVaProvider: true,
+      vaFacility: 'Nebraska/Western Iowa HCS (636)',
+      vaServiceLine: 'Primary Care',
+      vaVerifiedAt: verifiedAt,
+    );
+
+    final restoredProfile = Profile.fromJson(profile.toJson());
+    final restoredDoctor = Doctor.fromJson(doctor.toJson());
+
+    expect(restoredProfile.isVeteran, isTrue);
+    expect(restoredProfile.usesVaHealthcare, isTrue);
+    expect(restoredDoctor.isVaProvider, isTrue);
+    expect(restoredDoctor.vaFacility, 'Nebraska/Western Iowa HCS (636)');
+    expect(restoredDoctor.vaVerifiedAt, verifiedAt);
+  });
+
+  test('legacy Veteran profile keys remain compatible', () {
+    expect(Profile.fromJson({'id': '1', 'is_veteran': true}).isVeteran, isTrue);
+    expect(Profile.fromJson({'id': '2', 'veteran': true}).isVeteran, isTrue);
+    expect(
+      Profile.fromJson({
+        'id': '3',
+        'is_veteran': true,
+        'uses_va_healthcare': true,
+      }).usesVaHealthcare,
+      isTrue,
+    );
   });
 
   test('provider specialty and primary-care role remain independent', () {
@@ -73,6 +117,54 @@ void main() {
     expect(restored.specialty, 'Internal Medicine');
     expect(restored.isPrimaryCareProvider, isTrue);
   });
+
+  test(
+    'single verified NPI fills a blank specialty and retains registry details',
+    () {
+      final doctor = Doctor(name: 'Doty, Brandon');
+      applyProviderLookupResult(
+        doctor,
+        const NpiLookupResult(
+          status: 'verified',
+          npi: '1265221683',
+          verifiedBy: 'auto',
+          candidates: [
+            {
+              'npi': '1265221683',
+              'displayName': 'BRANDON DOTY',
+              'taxonomy': 'Internal Medicine',
+              'city': 'OMAHA',
+              'state': 'NE',
+            },
+          ],
+        ),
+      );
+
+      final restored = Doctor.fromJson(doctor.toJson());
+      expect(restored.specialty, 'Internal Medicine');
+      expect(restored.isPrimaryCareProvider, isFalse);
+      expect(restored.npi, '1265221683');
+      expect(verifiedProviderCandidate(restored)?['city'], 'OMAHA');
+    },
+  );
+
+  test(
+    'verified registry taxonomy does not overwrite a user-entered specialty',
+    () {
+      final doctor = Doctor(name: 'Jane Smith', specialty: 'My specialist');
+      applyProviderLookupResult(
+        doctor,
+        const NpiLookupResult(
+          status: 'verified',
+          npi: '1234567890',
+          candidates: [
+            {'npi': '1234567890', 'taxonomy': 'Internal Medicine'},
+          ],
+        ),
+      );
+      expect(doctor.specialty, 'My specialist');
+    },
+  );
 
   test('every existing doctor type remains available for NPI narrowing', () {
     expect(npiDoctorSpecialtyOptions, contains('Primary'));

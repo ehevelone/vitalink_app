@@ -55,6 +55,11 @@ exports.handler = async (event) => {
       [shareId]
     );
 
+    await db.query(
+      `DELETE FROM profile_update_packages WHERE pending_share_link_id = $1`,
+      [shareId]
+    );
+
     return reply(200, { success: true });
   } catch (err) {
     console.error("revoke_profile_share_link error:", err);

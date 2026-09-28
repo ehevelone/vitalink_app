@@ -8,6 +8,7 @@ const {
   mapNppesResult,
   normalizePhone,
   normalizeText,
+  providerCandidateMatchesName,
   searchNpi,
   splitProviderName,
 } = require("../functions/services/npi-registry");
@@ -21,6 +22,52 @@ test("provider names are split for both common formats", () => {
     firstName: "Jane",
     lastName: "Smith",
   });
+  assert.deepEqual(splitProviderName("Doty, Brandon"), {
+    firstName: "Brandon",
+    lastName: "Doty",
+  });
+  assert.deepEqual(splitProviderName("H, Nguyen"), {
+    firstName: "H",
+    lastName: "Nguyen",
+  });
+});
+
+test("provider candidate names must match the searched last name and first name or initial", () => {
+  const jenniferSmith = { displayName: "JENNIFER A SMITH" };
+  assert.equal(providerCandidateMatchesName(jenniferSmith, "Smith"), true);
+  assert.equal(providerCandidateMatchesName(jenniferSmith, "J Smith"), true);
+  assert.equal(providerCandidateMatchesName(jenniferSmith, "Smith, J"), true);
+  assert.equal(providerCandidateMatchesName(jenniferSmith, "Jane Smith"), false);
+  assert.equal(
+    providerCandidateMatchesName({ displayName: "JENNIFER B ROCHA" }, "Smith"),
+    false,
+  );
+});
+
+test("provider search removes alternate-name results that do not match the displayed name", async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      results: [
+        {
+          number: "1111111111",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "JENNIFER", last_name: "SMITH" },
+        },
+        {
+          number: "2222222222",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "JENNIFER", last_name: "ROCHA" },
+        },
+      ],
+    }),
+  });
+
+  const results = await searchNpi(
+    { entityType: "provider", name: "J Smith", postalCode: "68114" },
+    fakeFetch,
+  );
+  assert.deepEqual(results.map((item) => item.npi), ["1111111111"]);
 });
 
 test("provider search includes location filters and NPI-1", () => {
@@ -37,6 +84,18 @@ test("provider search includes location filters and NPI-1", () => {
   assert.equal(params.get("city"), "Omaha");
   assert.equal(params.get("state"), "NE");
   assert.equal(params.get("postal_code"), "68114");
+});
+
+test("provider searches with only a first initial defer that match to the local filter", () => {
+  const params = buildSearchParams({
+    entityType: "provider",
+    name: "S Dunning",
+    postalCode: "68114",
+  });
+  assert.equal(params.get("first_name"), null);
+  assert.equal(params.get("last_name"), "Dunning");
+  assert.equal(params.get("postal_code"), "68114");
+  assert.equal(params.get("limit"), "200");
 });
 
 test("specialty searches use the exact NPPES taxonomy description", () => {
@@ -153,6 +212,35 @@ test("specialty lookup keeps only providers with an expected taxonomy code", asy
   assert.equal(results[0].npi, "2222222222");
   assert.equal(results[0].taxonomyCode, "1041C0700X");
   assert.equal(results[0].taxonomy, "Clinical Social Worker");
+});
+
+test("mail-order taxonomy filtering distinguishes retail and fulfillment NPIs", async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({ results: [
+      {
+        number: '1111111111', enumeration_type: 'NPI-2',
+        basic: { status: 'A', organization_name: 'EXAMPLE PHARMACY RETAIL' },
+        taxonomies: [{ code: '3336C0003X', desc: 'Community/Retail Pharmacy' }],
+      },
+      {
+        number: '2222222222', enumeration_type: 'NPI-2',
+        basic: { status: 'A', organization_name: 'EXAMPLE PHARMACY MAIL' },
+        taxonomies: [{ code: '3336M0002X', desc: 'Mail Order Pharmacy' }],
+      },
+    ] }),
+  });
+  const mail = await searchNpi({
+    entityType: 'pharmacy', name: 'Example Pharmacy*',
+    taxonomyDescription: 'Mail Order Pharmacy', taxonomyCodes: ['3336M0002X'],
+  }, fakeFetch);
+  const local = await searchNpi({
+    entityType: 'pharmacy', name: 'Example Pharmacy',
+    excludedTaxonomyCodes: ['3336M0002X'],
+  }, fakeFetch);
+  assert.deepEqual(mail.map((item) => item.npi), ['2222222222']);
+  assert.equal(mail[0].taxonomy, 'Mail Order Pharmacy');
+  assert.deepEqual(local.map((item) => item.npi), ['1111111111']);
 });
 
 test("number confirmation only accepts the requested NPI", async () => {

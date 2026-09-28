@@ -1,13 +1,26 @@
 class VitaLinkRegistrationLink {
   final String code;
   final String route;
+  final String? onboardingCode;
 
-  const VitaLinkRegistrationLink(this.code, this.route);
+  const VitaLinkRegistrationLink(this.code, this.route, {this.onboardingCode});
 
   static VitaLinkRegistrationLink? fromUri(Uri uri) {
     if (uri.scheme != 'vitalink' ||
         !const {'activate', 'register', 'agent'}.contains(uri.host)) {
       return null;
+    }
+
+    final onboardingCode = uri.queryParameters['onboard']?.trim().toUpperCase();
+    if (uri.host == 'activate' && onboardingCode != null) {
+      if (!RegExp(r'^[A-Z0-9-]{1,64}$').hasMatch(onboardingCode)) {
+        return null;
+      }
+      return VitaLinkRegistrationLink(
+        '',
+        '/terms_user',
+        onboardingCode: onboardingCode,
+      );
     }
 
     final queryCode = uri.queryParameters['code'];
@@ -31,10 +44,15 @@ class VitaLinkRegistrationLink {
 
 class VitaLinkDeepLink {
   static String? code;
+  static String? onboardingCode;
   static String? shareCode;
 
   static void setCode(String? value) {
     code = value;
+  }
+
+  static void clearOnboardingCode() {
+    onboardingCode = null;
   }
 
   static void setShareCode(String? value) {

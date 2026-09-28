@@ -34,12 +34,32 @@ function splitProviderName(value) {
   if (cleaned.includes(",")) {
     const [last, ...rest] = cleaned.split(",");
     const firstName = rest.join(" ").trim().split(/\s+/)[0];
-    if (firstName) return { firstName, lastName: last.trim() };
+    const commaLeft = last.trim();
+    if (commaLeft.length === 1 && firstName.length > 1) {
+      return { firstName: commaLeft, lastName: firstName };
+    }
+    if (firstName) return { firstName, lastName: commaLeft };
   }
 
   const parts = cleaned.replace(/,/g, " ").split(/\s+/).filter(Boolean);
   if (parts.length < 2) return { firstName: "", lastName: cleaned };
   return { firstName: parts[0], lastName: parts.at(-1) };
+}
+
+function providerCandidateMatchesName(candidate, searchedName) {
+  const { firstName, lastName } = splitProviderName(searchedName);
+  const candidateName = normalizeText(candidate?.displayName);
+  const normalizedLast = normalizeText(lastName);
+  const normalizedFirst = normalizeText(firstName).split(" ")[0] || "";
+  if (!candidateName || !normalizedLast) return false;
+
+  const lastMatches = candidateName === normalizedLast ||
+    candidateName.endsWith(` ${normalizedLast}`);
+  if (!lastMatches) return false;
+  if (!normalizedFirst) return true;
+
+  const candidateFirst = candidateName.split(" ")[0] || "";
+  return candidateFirst.startsWith(normalizedFirst);
 }
 
 function firstLocationAddress(addresses) {
@@ -105,14 +125,20 @@ function buildSearchParams({
   postalCode,
   taxonomyDescription,
 }) {
-  const params = new URLSearchParams({ version: "2.1", limit: "10" });
+  const params = new URLSearchParams({
+    version: "2.1",
+    limit: entityType === "pharmacy" ? "200" : "10",
+  });
   params.set("enumeration_type", entityType === "pharmacy" ? "NPI-2" : "NPI-1");
 
   if (entityType === "pharmacy") {
     params.set("organization_name", name);
   } else {
     const { firstName, lastName } = splitProviderName(name);
-    if (firstName) params.set("first_name", firstName);
+    if (firstName.length === 1) params.set("limit", "200");
+    // NPPES is inconsistent with one-letter first-name searches. Search the
+    // last name and let the local candidate filter enforce the initial.
+    if (firstName.length > 1) params.set("first_name", firstName);
     if (lastName) params.set("last_name", lastName);
   }
 
@@ -129,6 +155,7 @@ async function fetchNppes(
   params,
   fetchImpl = fetch,
   expectedTaxonomyCodes = [],
+  excludedTaxonomyCodes = [],
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -142,8 +169,15 @@ async function fetchNppes(
     }
     const payload = await response.json();
     const expected = new Set(expectedTaxonomyCodes);
+    const excluded = new Set(excludedTaxonomyCodes);
     return (payload.results || [])
       .filter((result) => result?.basic?.status !== "D")
+      .filter(
+        (result) =>
+          !(result.taxonomies || []).some((taxonomy) =>
+            excluded.has(String(taxonomy.code || "")),
+          ),
+      )
       .filter(
         (result) =>
           !expected.size ||
@@ -159,11 +193,16 @@ async function fetchNppes(
 }
 
 async function searchNpi(input, fetchImpl = fetch) {
-  return fetchNppes(
+  const candidates = await fetchNppes(
     buildSearchParams(input),
     fetchImpl,
     input.taxonomyCodes || [],
+    input.excludedTaxonomyCodes || [],
   );
+  return input.entityType === "provider"
+    ? candidates.filter((candidate) =>
+        providerCandidateMatchesName(candidate, input.name))
+    : candidates;
 }
 
 async function getNpiByNumber(npi, fetchImpl = fetch) {
@@ -182,6 +221,7 @@ module.exports = {
   mapNppesResult,
   normalizePhone,
   normalizeText,
+  providerCandidateMatchesName,
   searchNpi,
   splitProviderName,
 };

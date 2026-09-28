@@ -134,73 +134,56 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     if (!mounted) return;
 
+    if (res['success'] != true) {
+      final message =
+          (res['error'] ?? 'Unable to create share link.').toString();
+      setState(() {
+        _saving = false;
+        _message = message;
+      });
+      _showMessage(message);
+      return;
+    }
+
+    final accepted = res['accepted'] == true;
+    final share = Map<String, dynamic>.from(res['share'] as Map? ?? {});
+    final shareId = share['id']?.toString();
+    final update = !accepted && (shareId == null || shareId.isEmpty)
+        ? <String, dynamic>{'success': false}
+        : await ProfileUpdateSyncService().publishProfileUpdate(
+            profile,
+            sections: _selectedSections,
+            pendingShareId: accepted ? null : shareId,
+          );
+
+    if (!mounted) return;
+
+    final prepared = update['success'] == true &&
+        (update['staged'] == true || (update['recipients'] ?? 0) > 0);
+    final message = prepared
+        ? accepted
+            ? 'Profile connection is active. Current profile sent.'
+            : 'Share code ready. Give it to the recipient; the profile will be available when they accept.'
+        : 'Share code created, but the profile could not be sent. Tap Send Current Profile Update to retry.';
+
     setState(() {
       _saving = false;
-      if (res['success'] == true) {
-        _lastInviteCode = res['inviteCode']?.toString();
-        _message = res['accepted'] == true
-            ? 'Profile connection is active.'
-            : 'Share code created. Give this code to the family member or caregiver.';
-      } else {
-        _message = (res['error'] ?? 'Unable to create share link.').toString();
-      }
+      _lastInviteCode = res['inviteCode']?.toString();
+      _message = message;
     });
-
-    if (res['success'] == true) {
-      if (res['accepted'] == true) {
-        final update = await ProfileUpdateSyncService().publishProfileUpdate(
-          profile,
-          sections: _selectedSections,
-        );
-
-        if (!mounted) return;
-
-        if (update['success'] == true && (update['recipients'] ?? 0) > 0) {
-          setState(() {
-            _message = 'Profile connection is active. Current profile sent.';
-          });
-        }
-      }
-      await _loadShares();
-    }
+    _showMessage(message);
+    await _loadShares();
   }
 
-  Future<void> _acceptInvite() async {
-    final code = _inviteCtrl.text.trim();
+  void _acceptInvite() {
+    final code = _inviteCtrl.text.trim().toUpperCase();
 
     if (code.isEmpty) {
       _showMessage('Enter the share code first.');
       return;
     }
 
-    setState(() {
-      _saving = true;
-      _message = null;
-    });
-
-    final userId = await _store.getString('userId');
-
-    if (!mounted) return;
-
-    if (userId == null || userId.isEmpty) {
-      _showMessage('Please log in again before accepting a profile share.');
-      setState(() => _saving = false);
-      return;
-    }
-
-    final res = await ApiService.acceptProfileShareLink(
-      userId: userId,
-      inviteCode: code,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _saving = false;
-      _message = res['success'] == true
-          ? 'Profile share accepted. Updates will appear in Profile Updates.'
-          : (res['error'] ?? 'Unable to accept share code.').toString();
-    });
+    Navigator.pushNamed(context, '/profile_accept', arguments: code);
   }
 
   Future<void> _confirmRevokeShare(Map<String, dynamic> share) async {
@@ -296,8 +279,12 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   }
 
   Future<void> _sendCurrentProfileUpdate() async {
-    if (!_shares.any((share) => share['status']?.toString() == 'accepted')) {
-      _showMessage('A shared profile must be accepted before updates can be sent.');
+    if (_selectedSections.isEmpty) {
+      _showMessage('Choose at least one section to send.');
+      return;
+    }
+    if (_shares.isEmpty) {
+      _showMessage('Create a share code first.');
       return;
     }
 
@@ -307,32 +294,55 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
 
     final profile = await _repo.loadProfile();
-    final res = await ProfileUpdateSyncService().publishProfileUpdate(
-      profile,
-      sections: _selectedSections,
-    );
+    final sync = ProfileUpdateSyncService();
+    final accepted = _shares.any((share) => share['status'] == 'accepted');
+    var sent = false;
+    var staged = false;
+    var failed = false;
+
+    if (accepted) {
+      final res = await sync.publishProfileUpdate(
+        profile,
+        sections: _selectedSections,
+      );
+      sent = res['success'] == true && (res['recipients'] ?? 0) > 0;
+      failed = failed || !sent;
+    }
+
+    for (final share in _shares.where((item) => item['status'] == 'pending')) {
+      final shareId = share['id']?.toString();
+      if (shareId == null || shareId.isEmpty) continue;
+      final res = await sync.publishProfileUpdate(
+        profile,
+        sections: _selectedSections,
+        pendingShareId: shareId,
+      );
+      final prepared = res['success'] == true &&
+          (res['staged'] == true || (res['recipients'] ?? 0) > 0);
+      staged = staged || prepared;
+      failed = failed || !prepared;
+    }
 
     if (!mounted) return;
 
     setState(() {
       _saving = false;
-      if (res['success'] == true && (res['recipients'] ?? 0) > 0) {
-        _message = 'Current profile update sent.';
-      } else {
-        _message = (res['message'] ??
-                res['error'] ??
-                'No connected recipients are ready for this update.')
-            .toString();
-      }
+      _message = failed
+          ? sent || staged
+              ? 'Some shares were prepared, but others failed. Check your connection and try again.'
+              : 'Profile upload failed. Check your connection and try again.'
+          : 'Current profile sent or prepared for pending invites.';
     });
+    _showMessage(_message!);
 
-    if (res['success'] == true && (res['recipients'] ?? 0) > 0 && mounted) {
+    if (!failed && (sent || staged) && mounted) {
       await showDialog<void>(
         context: context,
         builder: (context) => _VitaLinkDialog(
           title: 'Profile Sent',
-          message:
-              'The current profile update was sent to connected profiles.',
+          message: sent
+              ? 'The current profile update was sent to connected profiles.'
+              : 'The current profile is prepared for pending invites.',
           actions: [
             _DialogButton(
               label: 'OK',

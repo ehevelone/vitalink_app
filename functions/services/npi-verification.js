@@ -65,7 +65,7 @@ function rowToCandidate(row) {
   };
 }
 
-async function findCachedCandidates({ entityType, name, city, state, phone }) {
+async function findCachedCandidates({ entityType, name, city, state, postalCode, phone }) {
   await ensureNpiCacheTable();
   const values = [entityType, normalizeText(name)];
   let stateFilter = "";
@@ -77,6 +77,12 @@ async function findCachedCandidates({ entityType, name, city, state, phone }) {
   if (city) {
     values.push(String(city).trim());
     cityFilter = `AND (LOWER(city) = LOWER($${values.length}) OR city IS NULL)`;
+  }
+  let postalFilter = "";
+  const zip = String(postalCode || "").match(/^\d{5}/)?.[0];
+  if (zip) {
+    values.push(zip);
+    postalFilter = `AND LEFT(COALESCE(postal_code, ''), 5) = $${values.length}`;
   }
   let phoneFilter = "";
   const phoneDigits = String(phone || "").replace(/\D/g, "").slice(-10);
@@ -92,6 +98,7 @@ async function findCachedCandidates({ entityType, name, city, state, phone }) {
       AND normalized_name = $2
       ${stateFilter}
       ${cityFilter}
+      ${postalFilter}
       ${phoneFilter}
     ORDER BY confirmed_at DESC
     LIMIT 4

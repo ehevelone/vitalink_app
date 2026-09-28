@@ -58,6 +58,7 @@ exports.handler = async (event) => {
     const sessionToken = clean(body.sessionToken);
     const profileId = clean(body.profileId || body.profile_id);
     const profileName = clean(body.profileName || body.profile_name);
+    const pendingShareId = clean(body.pendingShareId);
     const allowedSections = normalizeSections(body.allowedSections);
     const payload = body.payload;
 
@@ -70,6 +71,121 @@ exports.handler = async (event) => {
         success: false,
         error: "Missing profile or update payload",
       });
+    }
+
+    if (pendingShareId) {
+      if (!/^[0-9a-f-]{36}$/i.test(pendingShareId)) {
+        return reply(400, { success: false, error: "Invalid share id" });
+      }
+
+      const client = await db.connect();
+      let committed = false;
+      let readyRecipient = null;
+      let packageId;
+      try {
+        await client.query("BEGIN");
+        const shareRes = await client.query(
+          `
+          SELECT id, recipient_user_id, allowed_sections, status
+          FROM profile_share_links
+          WHERE id = $1
+            AND owner_user_id = $2
+            AND profile_id = $3
+            AND status IN ('pending', 'accepted')
+            AND revoked_at IS NULL
+          FOR UPDATE
+          `,
+          [pendingShareId, userId, profileId]
+        );
+
+        if (!shareRes.rows.length) {
+          await client.query("ROLLBACK");
+          return reply(404, { success: false, error: "Share link not found" });
+        }
+
+        const share = shareRes.rows[0];
+        const sections = allowedSections.filter(section =>
+          normalizeSections(share.allowed_sections).includes(section)
+        );
+        if (!sections.length) {
+          await client.query("ROLLBACK");
+          return reply(400, { success: false, error: "No matching share permissions" });
+        }
+
+        const staged = share.status === "pending";
+        if (staged) {
+          await client.query(
+            `DELETE FROM profile_update_packages WHERE pending_share_link_id = $1`,
+            [pendingShareId]
+          );
+        }
+
+        packageId = crypto.randomUUID();
+        const filteredPayload = filterPayloadForSections(payload, sections);
+        const encryptedPayload = encrypt(JSON.stringify({
+          profileId,
+          profileName,
+          allowedSections: sections,
+          payload: filteredPayload,
+          createdAt: new Date().toISOString(),
+        }));
+
+        await client.query(
+          `
+          INSERT INTO profile_update_packages (
+            id, owner_user_id, profile_id, profile_name,
+            allowed_sections, encrypted_payload, pending_share_link_id, expires_at
+          )
+          VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,NOW() + INTERVAL '7 days')
+          `,
+          [packageId, userId, profileId, profileName,
+            JSON.stringify(sections), encryptedPayload,
+            staged ? pendingShareId : null]
+        );
+
+        if (!staged) {
+          if (!share.recipient_user_id) {
+            await client.query("ROLLBACK");
+            return reply(409, { success: false, error: "Share recipient missing" });
+          }
+          readyRecipient = share.recipient_user_id;
+          await client.query(
+            `
+            INSERT INTO profile_update_recipients (
+              id, package_id, recipient_user_id, share_link_id
+            ) VALUES ($1,$2,$3,$4)
+            `,
+            [crypto.randomUUID(), packageId, readyRecipient, pendingShareId]
+          );
+        }
+
+        await client.query("COMMIT");
+        committed = true;
+
+        let push = null;
+        if (readyRecipient) {
+          try {
+            push = await sendProfileUpdatePush({
+              recipientUserIds: [readyRecipient], packageId, profileName,
+            });
+          } catch (error) {
+            console.error("Profile update notification failed:", error);
+          }
+        }
+
+        return reply(200, {
+          success: true,
+          staged,
+          recipients: readyRecipient ? 1 : 0,
+          packageIds: [packageId],
+          push,
+        });
+      } catch (error) {
+        if (!committed) await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     }
 
     const recipientsRes = await db.query(

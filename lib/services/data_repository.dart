@@ -33,11 +33,7 @@ class DataRepository {
 
         for (final item in decoded) {
           try {
-            profiles.add(
-              Profile.fromJson(
-                Map<String, dynamic>.from(item),
-              ),
-            );
+            profiles.add(Profile.fromJson(Map<String, dynamic>.from(item)));
           } catch (_) {
             // skip bad entry only
           }
@@ -156,9 +152,7 @@ class DataRepository {
     };
   }
 
-  Future<void> importDeviceTransferPayload(
-    Map<String, dynamic> payload,
-  ) async {
+  Future<void> importDeviceTransferPayload(Map<String, dynamic> payload) async {
     final rawProfiles = payload['profiles'];
 
     if (rawProfiles is! List || rawProfiles.isEmpty) {
@@ -186,10 +180,7 @@ class DataRepository {
     await _syncName(profiles[activeIndex]);
   }
 
-  Future<void> saveProfile(
-    Profile profile, {
-    bool publishUpdate = true,
-  }) async {
+  Future<void> saveProfile(Profile profile, {bool publishUpdate = true}) async {
     final profiles = await _loadProfilesInternal();
 
     if (profiles.isEmpty) {
@@ -226,11 +217,13 @@ class DataRepository {
   Future<void> applySharedProfileUpdate(
     Map<String, dynamic> updatePayload,
   ) async {
-    updatePayload =
-        await PersistentFileStore.restoreProfileFileBytes(updatePayload);
+    updatePayload = await PersistentFileStore.restoreProfileFileBytes(
+      updatePayload,
+    );
 
-    final profileMap =
-        Map<String, dynamic>.from(updatePayload['profile'] as Map? ?? {});
+    final profileMap = Map<String, dynamic>.from(
+      updatePayload['profile'] as Map? ?? {},
+    );
 
     final profileId = (profileMap['id'] ?? updatePayload['profileId'] ?? '')
         .toString()
@@ -245,10 +238,11 @@ class DataRepository {
         ? profiles[idx]
         : Profile(
             id: profileId,
-            fullName: (profileMap['fullName'] ??
-                    updatePayload['profileName'] ??
-                    'Shared Profile')
-                .toString(),
+            fullName:
+                (profileMap['fullName'] ??
+                        updatePayload['profileName'] ??
+                        'Shared Profile')
+                    .toString(),
           );
 
     final updated = current.copyWith(
@@ -259,6 +253,12 @@ class DataRepository {
       city: profileMap['city'] ?? current.city,
       state: profileMap['state'] ?? current.state,
       zip: profileMap['zip'] ?? current.zip,
+      isVeteran: profileMap.containsKey('isVeteran')
+          ? profileMap['isVeteran'] == true
+          : current.isVeteran,
+      usesVaHealthcare: profileMap.containsKey('usesVaHealthcare')
+          ? profileMap['usesVaHealthcare'] == true
+          : current.usesVaHealthcare,
       updatedAt: DateTime.now(),
       emergency: updatePayload['emergency'] is Map
           ? EmergencyInfo.fromJson(
@@ -267,33 +267,37 @@ class DataRepository {
           : current.emergency,
       meds: updatePayload['meds'] is List
           ? (updatePayload['meds'] as List)
-              .whereType<Map>()
-              .map((m) => Medication.fromJson(Map<String, dynamic>.from(m)))
-              .toList()
+                .whereType<Map>()
+                .map((m) => Medication.fromJson(Map<String, dynamic>.from(m)))
+                .toList()
           : current.meds,
       doctors: updatePayload['doctors'] is List
           ? (updatePayload['doctors'] as List)
-              .whereType<Map>()
-              .map((d) => Doctor.fromJson(Map<String, dynamic>.from(d)))
-              .toList()
+                .whereType<Map>()
+                .map((d) => Doctor.fromJson(Map<String, dynamic>.from(d)))
+                .toList()
           : current.doctors,
       appointments: updatePayload['appointments'] is List
           ? (updatePayload['appointments'] as List)
-              .whereType<Map>()
-              .map((a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)),
+                )
+                .toList()
           : current.appointments,
       insurances: updatePayload['insurances'] is List
           ? (updatePayload['insurances'] as List)
-              .whereType<Map>()
-              .map((i) => Insurance.fromJson(Map<String, dynamic>.from(i)))
-              .toList()
+                .whereType<Map>()
+                .map((i) => Insurance.fromJson(Map<String, dynamic>.from(i)))
+                .toList()
           : current.insurances,
       orphanCards: updatePayload['orphanCards'] is List
           ? (updatePayload['orphanCards'] as List)
-              .whereType<Map>()
-              .map((c) => InsuranceCard.fromJson(Map<String, dynamic>.from(c)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (c) => InsuranceCard.fromJson(Map<String, dynamic>.from(c)),
+                )
+                .toList()
           : current.orphanCards,
     );
 

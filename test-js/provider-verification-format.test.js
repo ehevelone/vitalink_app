@@ -50,6 +50,16 @@ test("verified pharmacy NPI appears in human output", () => {
   assert.match(text, /NPI: 0987654321 \(verified\)/);
 });
 
+test("mail-order classification appears without implying an unverified NPI", () => {
+  const text = formatPharmacySummary({
+    name: "Example Pharmacy",
+    fulfillment_type: "mail_order",
+    npi_candidates: [{ npi: "0987654321" }],
+  });
+  assert.match(text, /Mail order/);
+  assert.doesNotMatch(text, /NPI:/);
+});
+
 test("client report PDF remains valid with verified provider and pharmacy data", async () => {
   const buffer = await generateClientReportPdf({
     name: "Example Client",
