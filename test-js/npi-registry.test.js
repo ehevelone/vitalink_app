@@ -8,6 +8,8 @@ const {
   mapNppesResult,
   normalizePhone,
   normalizeText,
+  nppesProviderLastName,
+  providerLastNameVariants,
   providerCandidateMatchesName,
   searchNpi,
   splitProviderName,
@@ -30,6 +32,60 @@ test("provider names are split for both common formats", () => {
     firstName: "H",
     lastName: "Nguyen",
   });
+  assert.deepEqual(splitProviderName("Karmen Van De Walle"), {
+    firstName: "Karmen",
+    lastName: "Van De Walle",
+  });
+});
+
+test("compound provider surnames use the spacing expected by NPPES", () => {
+  assert.equal(nppesProviderLastName("VanDeWalle"), "Van De Walle");
+  assert.equal(nppesProviderLastName("DeWalle"), "De Walle");
+  assert.equal(nppesProviderLastName("McDonald"), "McDonald");
+  assert.deepEqual(providerLastNameVariants("O'Connor"), [
+    "O'Connor",
+    "O Connor",
+    "oconnor",
+  ]);
+  assert.deepEqual(providerLastNameVariants("Smith-Jones"), [
+    "Smith-Jones",
+    "Smith Jones",
+    "smithjones",
+  ]);
+
+  const params = buildSearchParams({
+    entityType: "provider",
+    name: "Karmen VanDeWalle",
+    postalCode: "68601",
+  });
+  assert.equal(params.get("last_name"), "Van De Walle");
+});
+
+test("provider search retries punctuation and spacing variants in the same location", async () => {
+  const searchedLastNames = [];
+  const fakeFetch = async (url) => {
+    const lastName = new URL(url).searchParams.get("last_name");
+    searchedLastNames.push(lastName);
+    return {
+      ok: true,
+      json: async () => ({
+        results: lastName === "O Connor" ? [{
+          number: "3333333333",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "JANE", last_name: "O CONNOR" },
+        }] : [],
+      }),
+    };
+  };
+
+  const results = await searchNpi({
+    entityType: "provider",
+    name: "Jane O'Connor",
+    postalCode: "68114",
+  }, fakeFetch);
+
+  assert.deepEqual(searchedLastNames, ["O'Connor", "O Connor"]);
+  assert.deepEqual(results.map((item) => item.npi), ["3333333333"]);
 });
 
 test("provider candidate names must match the searched last name and first name or initial", () => {
@@ -38,6 +94,13 @@ test("provider candidate names must match the searched last name and first name 
   assert.equal(providerCandidateMatchesName(jenniferSmith, "J Smith"), true);
   assert.equal(providerCandidateMatchesName(jenniferSmith, "Smith, J"), true);
   assert.equal(providerCandidateMatchesName(jenniferSmith, "Jane Smith"), false);
+  assert.equal(
+    providerCandidateMatchesName(
+      { displayName: "KARMEN SUE VAN DE WALLE" },
+      "Karmen VanDeWalle",
+    ),
+    true,
+  );
   assert.equal(
     providerCandidateMatchesName({ displayName: "JENNIFER B ROCHA" }, "Smith"),
     false,

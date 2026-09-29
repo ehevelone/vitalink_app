@@ -57,6 +57,16 @@ test("mental health provider types map to exact audited taxonomy codes", () => {
     ),
     ["363LP0808X"],
   );
+  assert.deepEqual(
+    taxonomiesForSpecialty("Professional Counselor").map((item) => item.code),
+    ["101YP2500X", "101Y00000X"],
+  );
+  assert.deepEqual(
+    taxonomiesForSpecialty("Mental Health Counselor").map(
+      (item) => item.code,
+    ),
+    ["101YM0800X", "101Y00000X"],
+  );
 });
 
 test("free-text Other is intentionally never sent as a taxonomy filter", () => {

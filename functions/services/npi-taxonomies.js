@@ -55,9 +55,11 @@ const DOCTOR_SPECIALTY_TAXONOMIES = Object.freeze({
   ],
   "Professional Counselor": [
     { code: "101YP2500X", description: "Professional" },
+    { code: "101Y00000X", description: "Counselor" },
   ],
   "Mental Health Counselor": [
     { code: "101YM0800X", description: "Mental Health" },
+    { code: "101Y00000X", description: "Counselor" },
   ],
   "Marriage & Family Therapist": [
     { code: "106H00000X", description: "Marriage & Family Therapist" },

@@ -4,12 +4,12 @@ const Module = require('node:module');
 const path = require('node:path');
 const registry = require('../functions/services/npi-registry');
 
-function lookupWith(searchNpi, cached = []) {
+function lookupWith(searchNpi, cached = [], taxonomyResolver = () => []) {
   const absolutePath = path.resolve(__dirname, '../functions/npi_lookup.js');
   const originalLoad = Module._load;
   Module._load = function (request, parent, isMain) {
     if (request === './services/npi-registry') return { ...registry, searchNpi };
-    if (request === './services/npi-taxonomies') return { taxonomiesForSpecialty: () => [] };
+    if (request === './services/npi-taxonomies') return { taxonomiesForSpecialty: taxonomyResolver };
     if (request === './services/npi-verification') {
       return {
         authenticate: async () => ({ actor: 'test' }),
@@ -259,4 +259,30 @@ test('provider search does not widen when the requested ZIP has no results', asy
   assert.equal(searches[0].postalCode, '68114');
   assert.equal(result.verificationStatus, 'unverified');
   assert.deepEqual(result.candidates, []);
+});
+
+test('provider search retries without specialty when the specialty has no match', async () => {
+  const searches = [];
+  const handler = lookupWith(async (scope) => {
+    searches.push(scope);
+    if (scope.taxonomyDescription) return [];
+    return [{
+      ...candidate('1689454357', 'Columbus', 'NE', '68601'),
+      displayName: 'KARMEN SUE VAN DE WALLE',
+      taxonomy: 'Counselor',
+    }];
+  }, [], () => [{ code: '101YM0800X', description: 'Mental Health Counselor' }]);
+
+  const result = await run(handler, {
+    entityType: 'provider',
+    name: 'Karmen VanDeWalle',
+    postalCode: '68601',
+    specialty: 'Mental Health Counselor',
+  });
+
+  assert.equal(searches.length, 2);
+  assert.equal(searches[0].taxonomyDescription, 'Mental Health Counselor');
+  assert.equal(searches[1].taxonomyDescription, undefined);
+  assert.deepEqual(searches.map((scope) => scope.postalCode), ['68601', '68601']);
+  assert.equal(result.candidates[0].npi, '1689454357');
 });

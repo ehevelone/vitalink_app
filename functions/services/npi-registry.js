@@ -43,7 +43,45 @@ function splitProviderName(value) {
 
   const parts = cleaned.replace(/,/g, " ").split(/\s+/).filter(Boolean);
   if (parts.length < 2) return { firstName: "", lastName: cleaned };
-  return { firstName: parts[0], lastName: parts.at(-1) };
+  const surnameParticles = new Set([
+    "da", "de", "del", "della", "den", "der", "di", "la", "le", "st",
+    "van", "von",
+  ]);
+  let lastNameStart = parts.length - 1;
+  while (
+    lastNameStart > 1 &&
+    surnameParticles.has(parts[lastNameStart - 1].toLowerCase())
+  ) {
+    lastNameStart -= 1;
+  }
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(lastNameStart).join(" "),
+  };
+}
+
+function nppesProviderLastName(value) {
+  const original = String(value || "").trim();
+  const spaced = original.replace(/([a-z])([A-Z])/g, "$1 $2");
+  const firstPart = spaced.split(/\s+/)[0]?.toLowerCase() || "";
+  const compoundPrefixes = new Set([
+    "da", "de", "del", "della", "di", "la", "le", "st", "van", "vande",
+    "von",
+  ]);
+  return spaced.includes(" ") && compoundPrefixes.has(firstPart)
+    ? spaced
+    : original;
+}
+
+function providerLastNameVariants(value) {
+  const original = String(value || "").trim();
+  const variants = [
+    nppesProviderLastName(original),
+    original,
+    original.replace(/[-']/g, " ").replace(/\s+/g, " ").trim(),
+    normalizeText(original).replace(/\s+/g, ""),
+  ];
+  return [...new Set(variants.filter(Boolean))];
 }
 
 function providerCandidateMatchesName(candidate, searchedName) {
@@ -53,8 +91,10 @@ function providerCandidateMatchesName(candidate, searchedName) {
   const normalizedFirst = normalizeText(firstName).split(" ")[0] || "";
   if (!candidateName || !normalizedLast) return false;
 
-  const lastMatches = candidateName === normalizedLast ||
-    candidateName.endsWith(` ${normalizedLast}`);
+  const candidateLastKey = candidateName.replace(/\s+/g, "");
+  const searchedLastKey = normalizedLast.replace(/\s+/g, "");
+  const lastMatches = candidateLastKey === searchedLastKey ||
+    candidateLastKey.endsWith(searchedLastKey);
   if (!lastMatches) return false;
   if (!normalizedFirst) return true;
 
@@ -124,6 +164,7 @@ function buildSearchParams({
   state,
   postalCode,
   taxonomyDescription,
+  providerLastName,
 }) {
   const params = new URLSearchParams({
     version: "2.1",
@@ -139,7 +180,12 @@ function buildSearchParams({
     // NPPES is inconsistent with one-letter first-name searches. Search the
     // last name and let the local candidate filter enforce the initial.
     if (firstName.length > 1) params.set("first_name", firstName);
-    if (lastName) params.set("last_name", lastName);
+    if (lastName) {
+      params.set(
+        "last_name",
+        providerLastName || nppesProviderLastName(lastName),
+      );
+    }
   }
 
   if (city) params.set("city", city);
@@ -193,16 +239,28 @@ async function fetchNppes(
 }
 
 async function searchNpi(input, fetchImpl = fetch) {
-  const candidates = await fetchNppes(
-    buildSearchParams(input),
-    fetchImpl,
-    input.taxonomyCodes || [],
-    input.excludedTaxonomyCodes || [],
-  );
-  return input.entityType === "provider"
-    ? candidates.filter((candidate) =>
-        providerCandidateMatchesName(candidate, input.name))
-    : candidates;
+  if (input.entityType !== "provider") {
+    return fetchNppes(
+      buildSearchParams(input),
+      fetchImpl,
+      input.taxonomyCodes || [],
+      input.excludedTaxonomyCodes || [],
+    );
+  }
+
+  const { lastName } = splitProviderName(input.name);
+  for (const providerLastName of providerLastNameVariants(lastName)) {
+    const candidates = await fetchNppes(
+      buildSearchParams({ ...input, providerLastName }),
+      fetchImpl,
+      input.taxonomyCodes || [],
+      input.excludedTaxonomyCodes || [],
+    );
+    const matching = candidates.filter((candidate) =>
+      providerCandidateMatchesName(candidate, input.name));
+    if (matching.length) return matching;
+  }
+  return [];
 }
 
 async function getNpiByNumber(npi, fetchImpl = fetch) {
@@ -221,6 +279,8 @@ module.exports = {
   mapNppesResult,
   normalizePhone,
   normalizeText,
+  nppesProviderLastName,
+  providerLastNameVariants,
   providerCandidateMatchesName,
   searchNpi,
   splitProviderName,

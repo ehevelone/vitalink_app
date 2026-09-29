@@ -141,7 +141,8 @@ async function searchRegistry({ entityType, name, city, state, postalCode, speci
       searchNpi({ ...base, taxonomyDescription, taxonomyCodes }),
     ),
   );
-  return uniqueCandidates(resultSets.flat());
+  const narrowed = uniqueCandidates(resultSets.flat());
+  return narrowed.length ? narrowed : searchNpi(base);
 }
 
 exports.handler = async (event) => {
