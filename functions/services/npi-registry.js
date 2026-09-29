@@ -106,7 +106,14 @@ function providerLastNameVariants(value) {
     ...compoundSurnameVariants(original),
     normalizeText(original).replace(/\s+/g, ""),
   ];
-  return [...new Set(variants.filter(Boolean))];
+  const seen = new Set();
+  return variants.filter((variant) => {
+    if (!variant) return false;
+    const key = variant.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function providerCandidateMatchesName(candidate, searchedName) {

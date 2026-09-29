@@ -230,4 +230,44 @@ void main() {
     expect(selectedProvider?['npi'], '1275201147');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('provider picker can request a more specific ZIP', (
+    tester,
+  ) async {
+    Map<String, dynamic>? pickerResult;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                pickerResult = await showNpiCandidatePicker(
+                  context: context,
+                  title: 'Which provider is Smith?',
+                  candidates: const [
+                    {
+                      'npi': '1234567890',
+                      'displayName': 'JANE SMITH',
+                      'postalCode': '68124',
+                      'distanceMiles': 4.2,
+                    },
+                  ],
+                  allowAlternateZip: true,
+                );
+              },
+              child: const Text('Resolve provider'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Resolve provider'));
+    await tester.pumpAndSettle();
+    expect(find.text('About 4.2 miles away'), findsOneWidget);
+    expect(find.text('Search another ZIP'), findsOneWidget);
+    await tester.tap(find.text('Search another ZIP'));
+    await tester.pumpAndSettle();
+    expect(pickerResult?['_pickerAction'], 'searchAnotherZip');
+  });
 }

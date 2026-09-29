@@ -58,6 +58,7 @@ test("compound provider surnames use the spacing expected by NPPES", () => {
     "van dewalle",
     "vande walle",
   ]);
+  assert.deepEqual(providerLastNameVariants("Nguyen"), ["Nguyen"]);
 
   const params = buildSearchParams({
     entityType: "provider",

@@ -41,6 +41,7 @@ Future<String?> showDoctorZipPrompt({
   required BuildContext context,
   required String doctorName,
   String? registeredZip,
+  bool refiningSearch = false,
 }) async {
   final formKey = GlobalKey<FormState>();
   final homeZip = registeredZip?.trim() ?? '';
@@ -57,7 +58,9 @@ Future<String?> showDoctorZipPrompt({
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              homeZip.isEmpty
+              refiningSearch
+                  ? 'Enter a specific ZIP code to narrow the results for $doctorName.'
+                  : homeZip.isEmpty
                   ? 'Enter the ZIP code for $doctorName.'
                   : 'We couldn\'t find $doctorName in your registered ZIP ($homeZip). Enter the ZIP code where the doctor is located.',
             ),
@@ -337,6 +340,9 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                           value != null && value.toString().trim().isNotEmpty,
                     )
                     .join(' • ');
+                final distance = candidate['distanceMiles'] is num
+                    ? (candidate['distanceMiles'] as num).toDouble()
+                    : null;
                 final isVaProvider = candidate['isVaProvider'] == true;
 
                 return Padding(
@@ -387,6 +393,14 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                         if (details.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(details),
+                        ],
+                        if (distance != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            distance < 0.1
+                                ? 'In your ZIP code'
+                                : 'About ${distance.toStringAsFixed(1)} miles away',
+                          ),
                         ],
                         if (address.isNotEmpty) ...[
                           const SizedBox(height: 4),

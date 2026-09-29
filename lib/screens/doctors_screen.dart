@@ -354,22 +354,57 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       await _save();
     }
 
-    if (result.status != 'needs_review' ||
-        result.candidates.isEmpty ||
-        !mounted) {
-      if (result.candidates.isEmpty && mounted) {
-        await _showDoctorLookupMessage(
-          'We could not find ${doctor.name} in that ZIP code. Check the name and ZIP, then try again.',
-        );
+    Map<String, dynamic>? selected;
+    while (mounted) {
+      if (result.status != 'needs_review' || result.candidates.isEmpty) {
+        if (result.candidates.isEmpty) {
+          await _showDoctorLookupMessage(
+            'We could not find ${doctor.name} within 15 miles of that ZIP code. Check the name and ZIP, then try again.',
+          );
+        }
+        return;
       }
-      return;
+
+      if (!mounted) return;
+      selected = await showNpiCandidatePicker(
+        context: context,
+        title: 'Which provider is ${doctor.name}?',
+        candidates: result.candidates,
+        allowAlternateZip: true,
+      );
+      if (selected == null) return;
+      if (selected['_pickerAction'] != 'searchAnotherZip') break;
+
+      if (!mounted) return;
+      final alternateZip = await showDoctorZipPrompt(
+        context: context,
+        doctorName: doctor.name,
+        refiningSearch: true,
+      );
+      if (alternateZip == null || !mounted) return;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+      searchZip = alternateZip;
+      result = await _npiService.lookup(
+        entityType: 'provider',
+        name: doctor.name,
+        postalCode: searchZip,
+        state: _p!.state,
+        includeVa: _p!.isVeteran,
+      );
+      if (result.hasError) {
+        await _showDoctorLookupMessage(
+          result.error == 'Unauthorized'
+              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
+              : 'VitaLink could not reach the provider search. Please try again.',
+          title: 'Could not check doctor',
+        );
+        return;
+      }
+      applyProviderLookupResult(doctor, result);
+      await _save();
     }
 
-    final selected = await showNpiCandidatePicker(
-      context: context,
-      title: 'Which provider is ${doctor.name}?',
-      candidates: result.candidates,
-    );
     if (selected == null) return;
 
     if (selected['npi'] == null && selected['isVaProvider'] == true) {

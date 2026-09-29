@@ -244,10 +244,16 @@ test('provider search uses only the requested ZIP and requires confirmation', as
   assert.equal(result.candidates.length, 1);
 });
 
-test('provider search does not widen when the requested ZIP has no results', async () => {
+test('provider search widens to 15 miles when the requested ZIP has no results', async () => {
   const searches = [];
   const handler = lookupWith(async (scope) => {
     searches.push(scope);
+    if (scope.postalCode === '681*') {
+      return [{
+        ...candidate('2222222222', 'Omaha', 'NE', '68124'),
+        displayName: 'Jane Smith',
+      }];
+    }
     return [];
   });
   const result = await run(handler, {
@@ -255,8 +261,28 @@ test('provider search does not widen when the requested ZIP has no results', asy
     name: 'Smith',
     postalCode: '68114',
   });
-  assert.equal(searches.length, 1);
   assert.equal(searches[0].postalCode, '68114');
+  assert.ok(searches.some((scope) => scope.postalCode === '681*'));
+  assert.equal(result.verificationStatus, 'needs_review');
+  assert.equal(result.candidates[0].npi, '2222222222');
+  assert.ok(result.candidates[0].distanceMiles < 15);
+});
+
+test('provider radius search excludes records farther than 15 miles', async () => {
+  const handler = lookupWith(async (scope) => {
+    if (String(scope.postalCode || '').endsWith('*')) {
+      return [{
+        ...candidate('3333333333', 'Lincoln', 'NE', '68502'),
+        displayName: 'Jane Smith',
+      }];
+    }
+    return [];
+  });
+  const result = await run(handler, {
+    entityType: 'provider',
+    name: 'Smith',
+    postalCode: '68114',
+  });
   assert.equal(result.verificationStatus, 'unverified');
   assert.deepEqual(result.candidates, []);
 });

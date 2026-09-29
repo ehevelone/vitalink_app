@@ -6,6 +6,11 @@ const {
 } = require("./services/npi-registry");
 const { taxonomiesForSpecialty } = require("./services/npi-taxonomies");
 const {
+  candidatesWithinRadius,
+  nearbyZipPrefixes,
+  normalizeZip,
+} = require("./services/zip-radius");
+const {
   mergeProviderCandidates,
   searchVaProviders,
 } = require("./services/va-provider-registry");
@@ -121,7 +126,7 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
   return { candidates: nearby, phoneMatched: false };
 }
 
-async function searchRegistry({ entityType, name, city, state, postalCode, specialty }) {
+async function searchRegistryScope({ entityType, name, city, state, postalCode, specialty }) {
   const base = { entityType, name, city, state, postalCode };
   if (entityType !== "provider" || !specialty) {
     return searchNpi(base);
@@ -144,6 +149,33 @@ async function searchRegistry({ entityType, name, city, state, postalCode, speci
   const narrowed = uniqueCandidates(resultSets.flat());
   const allNameMatches = await searchNpi(base);
   return uniqueCandidates([...narrowed, ...allNameMatches]);
+}
+
+async function searchRegistry(options) {
+  const exact = await searchRegistryScope(options);
+  const originZip = normalizeZip(options.postalCode);
+  if (!originZip) return exact;
+
+  const exactLocation = exact.filter(
+    (candidate) => normalizeZip(candidate.postalCode) === originZip,
+  );
+  if (exactLocation.length) return exactLocation;
+
+  const prefixes = nearbyZipPrefixes(originZip, 15);
+  if (!prefixes.length) return exact;
+  const nearbySets = await Promise.all(prefixes.map((prefix) =>
+    searchRegistryScope({
+      ...options,
+      city: "",
+      state: "",
+      postalCode: `${prefix}*`,
+    }),
+  ));
+  return candidatesWithinRadius(
+    uniqueCandidates(nearbySets.flat()),
+    originZip,
+    15,
+  );
 }
 
 exports.handler = async (event) => {
