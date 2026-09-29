@@ -75,6 +75,13 @@ function matchesLocation(candidate, scope) {
 
 function isVaPharmacyName(value) {
   const name = normalizeText(value);
+  if (
+    ["va", "vamc", "veterans affairs", "veterans administration"].includes(
+      name,
+    )
+  ) {
+    return true;
+  }
   return (
     /\bva\b/.test(name) ||
     /\bvamc\b/.test(name) ||
