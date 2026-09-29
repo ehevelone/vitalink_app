@@ -52,6 +52,12 @@ test("compound provider surnames use the spacing expected by NPPES", () => {
     "Smith Jones",
     "smithjones",
   ]);
+  assert.deepEqual(providerLastNameVariants("vandewalle"), [
+    "vandewalle",
+    "van de walle",
+    "van dewalle",
+    "vande walle",
+  ]);
 
   const params = buildSearchParams({
     entityType: "provider",
@@ -86,6 +92,38 @@ test("provider search retries punctuation and spacing variants in the same locat
 
   assert.deepEqual(searchedLastNames, ["O'Connor", "O Connor"]);
   assert.deepEqual(results.map((item) => item.npi), ["3333333333"]);
+});
+
+test("provider search expands an all-lowercase compound surname", async () => {
+  const searchedLastNames = [];
+  const fakeFetch = async (url) => {
+    const lastName = new URL(url).searchParams.get("last_name");
+    searchedLastNames.push(lastName);
+    return {
+      ok: true,
+      json: async () => ({
+        results: lastName === "van de walle" ? [{
+          number: "1689454357",
+          enumeration_type: "NPI-1",
+          basic: {
+            status: "A",
+            first_name: "KARMEN",
+            middle_name: "SUE",
+            last_name: "VAN DE WALLE",
+          },
+        }] : [],
+      }),
+    };
+  };
+
+  const results = await searchNpi({
+    entityType: "provider",
+    name: "karmen vandewalle",
+    postalCode: "68601",
+  }, fakeFetch);
+
+  assert.deepEqual(searchedLastNames, ["vandewalle", "van de walle"]);
+  assert.deepEqual(results.map((item) => item.npi), ["1689454357"]);
 });
 
 test("provider candidate names must match the searched last name and first name or initial", () => {

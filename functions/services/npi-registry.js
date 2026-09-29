@@ -73,12 +73,37 @@ function nppesProviderLastName(value) {
     : original;
 }
 
+function compoundSurnameVariants(value) {
+  const collapsed = normalizeText(value).replace(/\s+/g, "");
+  const particles = [
+    "van", "von", "della", "vande", "del", "den", "der", "da", "de",
+    "di", "la", "le", "st",
+  ];
+
+  function expand(remainder) {
+    const expanded = [];
+    for (const particle of particles) {
+      if (!remainder.startsWith(particle)) continue;
+      const tail = remainder.slice(particle.length);
+      if (tail.length < 4) continue;
+      for (const nested of expand(tail)) {
+        expanded.push(`${particle} ${nested}`);
+      }
+      expanded.push(`${particle} ${tail}`);
+    }
+    return expanded;
+  }
+
+  return expand(collapsed);
+}
+
 function providerLastNameVariants(value) {
   const original = String(value || "").trim();
   const variants = [
     nppesProviderLastName(original),
     original,
     original.replace(/[-']/g, " ").replace(/\s+/g, " ").trim(),
+    ...compoundSurnameVariants(original),
     normalizeText(original).replace(/\s+/g, ""),
   ];
   return [...new Set(variants.filter(Boolean))];
