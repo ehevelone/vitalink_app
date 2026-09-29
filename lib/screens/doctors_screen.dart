@@ -46,36 +46,62 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
   Future<void> _addOrEdit({Doctor? existing, int? index}) async {
     int? targetIndex = index;
-    final verifiedCandidate = existing == null
-        ? null
-        : verifiedProviderCandidate(existing);
-    final name = TextEditingController(text: existing?.name ?? '');
+    final verifiedCandidate =
+        existing == null ? null : verifiedProviderCandidate(existing);
+    final isVerifiedRecord =
+        existing?.verificationStatus == 'verified' && existing?.npi != null ||
+            existing?.verificationStatus == 'va_verified';
+    final verifiedName = verifiedCandidate?['displayName']?.toString().trim();
+    final name = TextEditingController(
+      text: verifiedName?.isNotEmpty == true
+          ? verifiedName
+          : existing?.name ?? '',
+    );
     final specialty = TextEditingController(
       text: existing?.specialty.trim().isNotEmpty == true
           ? existing!.specialty
           : verifiedCandidate?['taxonomy']?.toString() ?? '',
     );
-    final clinic = TextEditingController(text: existing?.clinic ?? '');
+    final verifiedClinic = verifiedCandidate?['vaFacility']?.toString().trim();
+    final clinic = TextEditingController(
+      text: existing?.clinic.trim().isNotEmpty == true
+          ? existing!.clinic
+          : verifiedClinic?.isNotEmpty == true
+              ? verifiedClinic
+              : existing?.vaFacility ?? '',
+    );
     final phone = TextEditingController(text: existing?.phone ?? '');
     var isPrimaryCareProvider = existing?.isPrimaryCareProvider ?? false;
-    final registryDetails = verifiedCandidate == null
+    final recordName =
+        verifiedCandidate?['displayName']?.toString().trim().isNotEmpty == true
+            ? verifiedCandidate!['displayName'].toString().trim()
+            : existing?.name.trim() ?? '';
+    final recordSpecialty =
+        verifiedCandidate?['taxonomy']?.toString().trim().isNotEmpty == true
+            ? verifiedCandidate!['taxonomy'].toString().trim()
+            : existing?.specialty.trim() ?? '';
+    final recordCredential =
+        verifiedCandidate?['credential']?.toString().trim() ?? '';
+    final recordClinic =
+        verifiedCandidate?['vaFacility']?.toString().trim().isNotEmpty == true
+            ? verifiedCandidate!['vaFacility'].toString().trim()
+            : existing?.vaFacility?.trim().isNotEmpty == true
+                ? existing!.vaFacility!.trim()
+                : existing?.clinic.trim() ?? '';
+    final recordAddress = verifiedCandidate == null
         ? ''
         : [
-                verifiedCandidate['taxonomy'],
-                [
-                      verifiedCandidate['address1'],
-                      verifiedCandidate['city'],
-                      verifiedCandidate['state'],
-                      verifiedCandidate['postalCode'],
-                    ]
-                    .where(
-                      (value) => value?.toString().trim().isNotEmpty == true,
-                    )
-                    .join(' '),
-                verifiedCandidate['phone'],
-              ]
-              .where((value) => value?.toString().trim().isNotEmpty == true)
-              .join('\n');
+            verifiedCandidate['address1'],
+            verifiedCandidate['city'],
+            verifiedCandidate['state'],
+            formatRegistryPostalCode(verifiedCandidate['postalCode']),
+          ]
+            .where((value) => value?.toString().trim().isNotEmpty == true)
+            .join(' ');
+    final recordPhone =
+        verifiedCandidate?['phone']?.toString().trim().isNotEmpty == true
+            ? verifiedCandidate!['phone'].toString().trim()
+            : existing?.phone.trim() ?? '';
 
     final ok = await showDialog<bool>(
       context: context,
@@ -85,46 +111,30 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           content: SingleChildScrollView(
             child: Column(
               children: [
-                Column(
-                  children: [
-                    TextField(
-                      controller: name,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                    ),
-                    const Divider(height: 1),
-                  ],
-                ),
-                Column(
-                  children: [
-                    TextField(
-                      controller: specialty,
-                      decoration: const InputDecoration(labelText: 'Specialty'),
-                    ),
-                    const Divider(height: 1),
-                  ],
-                ),
-                Column(
-                  children: [
-                    TextField(
-                      controller: clinic,
-                      decoration: const InputDecoration(labelText: 'Clinic'),
-                    ),
-                    const Divider(height: 1),
-                  ],
-                ),
-                Column(
-                  children: [
-                    TextField(
-                      controller: phone,
-                      decoration: const InputDecoration(labelText: 'Phone'),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        PhoneNumberFormatter(),
-                      ], // ← PHONE FORMATTING ADDED
-                    ),
-                    const Divider(height: 1),
-                  ],
-                ),
+                if (!isVerifiedRecord) ...[
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                  ),
+                  const Divider(height: 1),
+                  TextField(
+                    controller: specialty,
+                    decoration: const InputDecoration(labelText: 'Specialty'),
+                  ),
+                  const Divider(height: 1),
+                  TextField(
+                    controller: clinic,
+                    decoration: const InputDecoration(labelText: 'Clinic'),
+                  ),
+                  const Divider(height: 1),
+                  TextField(
+                    controller: phone,
+                    decoration: const InputDecoration(labelText: 'Phone'),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [PhoneNumberFormatter()],
+                  ),
+                  const Divider(height: 1),
+                ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Primary care provider'),
@@ -141,19 +151,55 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                               existing.npi != null
                           ? 'NPI verified: ${existing.npi}'
                           : existing.verificationStatus == 'va_verified'
-                          ? 'VA provider verified: ${existing.vaFacility ?? 'VA directory'}'
-                          : existing.verificationStatus == 'needs_review'
-                          ? 'NPI needs review. Save to review matches.'
-                          : 'NPI not verified. Save to retry lookup.',
+                              ? 'VA provider verified: ${existing.vaFacility ?? 'VA directory'}'
+                              : existing.verificationStatus == 'needs_review'
+                                  ? 'NPI needs review. Save to review matches.'
+                                  : 'NPI not verified. Save to retry lookup.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
-                  if (registryDetails.isNotEmpty) ...[
+                  if (isVerifiedRecord) ...[
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Registry record\n$registryDetails'),
+                      child: Text(
+                        'Registry record',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        recordName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    if (recordSpecialty.isNotEmpty ||
+                        recordCredential.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          [recordSpecialty, recordCredential]
+                              .where((value) => value.isNotEmpty)
+                              .join(' • '),
+                        ),
+                      ),
+                    if (recordClinic.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(recordClinic),
+                      ),
+                    if (recordAddress.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(recordAddress),
+                      ),
+                    if (recordPhone.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(recordPhone),
+                      ),
                   ],
                 ],
               ],
@@ -174,6 +220,11 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     );
 
     if (ok != true) return;
+
+    // Let the edit dialog finish its reverse transition before another dialog
+    // (ZIP prompt or provider picker) can be opened by verification.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return;
 
     final doc = Doctor(
       name: name.text.trim(),
@@ -204,10 +255,39 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
     try {
       await _save();
-      await _verifyDoctor(targetIndex!);
+      if (!isVerifiedRecord) {
+        await _verifyDoctor(targetIndex!);
+      }
+    } catch (_) {
+      if (mounted) {
+        await _showDoctorLookupMessage(
+          'We could not check this doctor right now. Your information was saved, so you can try again.',
+          title: 'Could not check doctor',
+        );
+      }
     } finally {
       if (mounted) setState(() => _workingMessage = null);
     }
+  }
+
+  Future<void> _showDoctorLookupMessage(
+    String message, {
+    String title = 'Doctor not verified',
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _verifyDoctor(int index) async {
@@ -219,14 +299,28 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         ? registeredZip
         : await showDoctorZipPrompt(context: context, doctorName: doctor.name);
     if (searchZip == null || !mounted) return;
+    if (!hasRegisteredZip) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+    }
 
     var result = await _npiService.lookup(
       entityType: 'provider',
       name: doctor.name,
       postalCode: searchZip,
       state: _p!.state,
-      includeVa: _p!.isVeteran && _p!.usesVaHealthcare,
+      includeVa: _p!.isVeteran,
     );
+
+    if (result.hasError) {
+      await _showDoctorLookupMessage(
+        result.error == 'Unauthorized'
+            ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
+            : 'VitaLink could not reach the provider search. Please try again.',
+        title: 'Could not check doctor',
+      );
+      return;
+    }
 
     applyProviderLookupResult(doctor, result);
     await _save();
@@ -238,13 +332,24 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         registeredZip: registeredZip,
       );
       if (searchZip == null || !mounted) return;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
       result = await _npiService.lookup(
         entityType: 'provider',
         name: doctor.name,
         postalCode: searchZip,
         state: _p!.state,
-        includeVa: _p!.isVeteran && _p!.usesVaHealthcare,
+        includeVa: _p!.isVeteran,
       );
+      if (result.hasError) {
+        await _showDoctorLookupMessage(
+          result.error == 'Unauthorized'
+              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
+              : 'VitaLink could not reach the provider search. Please try again.',
+          title: 'Could not check doctor',
+        );
+        return;
+      }
       applyProviderLookupResult(doctor, result);
       await _save();
     }
@@ -252,6 +357,11 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     if (result.status != 'needs_review' ||
         result.candidates.isEmpty ||
         !mounted) {
+      if (result.candidates.isEmpty && mounted) {
+        await _showDoctorLookupMessage(
+          'We could not find ${doctor.name} in that ZIP code. Check the name and ZIP, then try again.',
+        );
+      }
       return;
     }
 
@@ -298,8 +408,22 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     doctor.vaFacility = selected['vaFacility']?.toString();
     doctor.vaServiceLine = selected['vaServiceLine']?.toString();
     doctor.vaVerifiedAt = doctor.isVaProvider ? DateTime.now() : null;
+    final confirmedName = confirmed['displayName']?.toString().trim() ?? '';
+    if (confirmedName.isNotEmpty) {
+      doctor.name = confirmedName;
+    }
     if (doctor.specialty.trim().isEmpty) {
       doctor.specialty = confirmed['taxonomy']?.toString().trim() ?? '';
+    }
+    if (doctor.phone.trim().isEmpty) {
+      doctor.phone = confirmed['phone']?.toString().trim() ?? '';
+    }
+    if (doctor.clinic.trim().isEmpty) {
+      final confirmedFacility =
+          confirmed['vaFacility']?.toString().trim() ?? '';
+      final selectedFacility = selected['vaFacility']?.toString().trim() ?? '';
+      doctor.clinic =
+          confirmedFacility.isNotEmpty ? confirmedFacility : selectedFacility;
     }
     await _save();
   }

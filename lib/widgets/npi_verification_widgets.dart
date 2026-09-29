@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/npi_verification_service.dart';
+
 const List<String> npiDoctorSpecialtyOptions = [
   'Primary',
   'Cardiologist',
@@ -104,6 +106,57 @@ Future<String?> showDoctorZipPrompt({
   return result;
 }
 
+Future<String?> showPharmacyZipPrompt({required BuildContext context}) async {
+  final formKey = GlobalKey<FormState>();
+  var zipValue = '';
+
+  return showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Pharmacy ZIP code'),
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.search,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(5),
+          ],
+          decoration: const InputDecoration(
+            labelText: 'ZIP code',
+            hintText: '12345',
+          ),
+          validator: (value) => RegExp(r'^\d{5}$').hasMatch(value ?? '')
+              ? null
+              : 'Enter a five-digit ZIP code.',
+          onChanged: (value) => zipValue = value,
+          onFieldSubmitted: (value) {
+            if (formKey.currentState?.validate() == true) {
+              Navigator.pop(dialogContext, value);
+            }
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState?.validate() == true) {
+              Navigator.pop(dialogContext, zipValue);
+            }
+          },
+          child: const Text('Search'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
   required BuildContext context,
   required String doctorName,
@@ -113,8 +166,8 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
   String selected = npiDoctorSpecialtyOptions.contains(normalizedInitial)
       ? normalizedInitial
       : normalizedInitial.isNotEmpty
-      ? 'Other'
-      : npiDoctorSpecialtyOptions.first;
+          ? 'Other'
+          : npiDoctorSpecialtyOptions.first;
   final otherController = TextEditingController(
     text: selected == 'Other' ? normalizedInitial : '',
   );
@@ -168,9 +221,8 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
           ),
           FilledButton(
             onPressed: () {
-              final displayValue = selected == 'Other'
-                  ? otherController.text.trim()
-                  : selected;
+              final displayValue =
+                  selected == 'Other' ? otherController.text.trim() : selected;
               Navigator.pop(
                 dialogContext,
                 NpiSpecialtySelection(
@@ -252,34 +304,33 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
               Text(
                 candidates.isEmpty
                     ? allowAlternateZip
-                          ? 'No matching records here. Try the pharmacy ZIP, or leave it unresolved.'
-                          : 'No matching records found. Leave it unresolved if none match.'
+                        ? 'No matching records here. Try the pharmacy ZIP, or leave it unresolved.'
+                        : 'No matching records found. Leave it unresolved if none match.'
                     : 'Choose the matching record, or leave it unresolved.',
               ),
               const SizedBox(height: 12),
               ...candidates.take(candidateLimit).map((candidate) {
-                final address =
-                    [
-                          candidate['address1'],
-                          candidate['address2'],
-                          [
-                                candidate['city'],
-                                candidate['state'],
-                                candidate['postalCode'],
-                              ]
-                              .where(
-                                (value) =>
-                                    value != null &&
-                                    value.toString().trim().isNotEmpty,
-                              )
-                              .join(' '),
-                        ]
-                        .where(
-                          (value) =>
-                              value != null &&
-                              value.toString().trim().isNotEmpty,
-                        )
-                        .join('\n');
+                final address = [
+                  candidate['address1'],
+                  candidate['address2'],
+                  [
+                    candidate['city'],
+                    candidate['state'],
+                    formatRegistryPostalCode(
+                      candidate['postalCode'],
+                    ),
+                  ]
+                      .where(
+                        (value) =>
+                            value != null && value.toString().trim().isNotEmpty,
+                      )
+                      .join(' '),
+                ]
+                    .where(
+                      (value) =>
+                          value != null && value.toString().trim().isNotEmpty,
+                    )
+                    .join('\n');
                 final details = [candidate['taxonomy'], candidate['credential']]
                     .where(
                       (value) =>

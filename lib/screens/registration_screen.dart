@@ -417,6 +417,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       await repo.saveProfile(profile);
 
+      // Keep legacy demographic keys aligned with the active Profile while
+      // older screens finish transitioning to the Profile model.
+      await store.setString('profileName', profile.fullName);
+      await store.setString('profilePhone', profile.userPhone);
+      await store.setString('profileAddress', profile.address ?? '');
+      await store.setString('profileCity', profile.city ?? '');
+      await store.setString('profileState', profile.state ?? '');
+      await store.setString('profileZip', profile.zip ?? '');
+
       if (_loadedOnboardingCode != null) {
         final claim = await ApiService.claimAssistedOnboarding(
           code: _loadedOnboardingCode!,

@@ -73,6 +73,15 @@ function matchesLocation(candidate, scope) {
   return true;
 }
 
+function isVaPharmacyName(value) {
+  const name = normalizeText(value);
+  return (
+    /\bva\b/.test(name) ||
+    /\bvamc\b/.test(name) ||
+    /\bveterans?\b/.test(name)
+  ) && /\b(pharmacy|pharm)\b/.test(name);
+}
+
 async function searchPharmacy({ name, city, state, postalCode, phone }) {
   const zip = String(postalCode || "").match(/^\d{5}/)?.[0] || "";
   const scopes = [];
@@ -84,9 +93,17 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
 
   let nearby = [];
   for (const scope of scopes) {
+    const vaPharmacy = isVaPharmacyName(name);
     const results = uniqueCandidates(await searchNpi({
-      entityType: "pharmacy", name, ...scope,
-      excludedTaxonomyCodes: ["3336M0002X"],
+      entityType: "pharmacy",
+      name: vaPharmacy ? "" : name,
+      ...scope,
+      ...(vaPharmacy
+        ? {
+            taxonomyDescription: "Department of Veterans Affairs (VA) Pharmacy",
+            taxonomyCodes: ["332100000X"],
+          }
+        : { excludedTaxonomyCodes: ["3336M0002X"] }),
     }))
       .filter((candidate) => matchesLocation(candidate, scope));
     const matchingPhone = candidatesMatchingPhone(results, phone);
@@ -136,6 +153,7 @@ exports.handler = async (event) => {
     const state = normalizeState(body.state);
     const postalCode = String(body.postalCode || "").trim();
     const mailOrder = entityType === "pharmacy" && body.mailOrder === true;
+    const vaPharmacy = entityType === "pharmacy" && isVaPharmacyName(name);
     const includeVa = entityType === "provider" && body.includeVa === true;
     if (!["provider", "pharmacy"].includes(entityType) || name.length < 2) {
       return reply(400, { success: false, error: "A valid entity type and name are required" });
@@ -144,7 +162,7 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "A valid pharmacy name is required" });
     }
 
-    const cachedResults = body.specialty || mailOrder || includeVa || (entityType === "pharmacy" && !phone && !city && !state && !postalCode)
+    const cachedResults = body.specialty || mailOrder || includeVa || vaPharmacy || (entityType === "pharmacy" && !phone && !city && !state && !postalCode)
       ? []
       : await findCachedCandidates({
           entityType,
@@ -179,7 +197,9 @@ exports.handler = async (event) => {
     }
 
     const pharmacyResult = entityType === "pharmacy"
-      ? mailOrder
+      ? vaPharmacy
+        ? await searchPharmacy({ name, city, state, postalCode, phone })
+        : mailOrder
         ? {
             candidates: uniqueCandidates(await searchNpi({
               entityType: "pharmacy",

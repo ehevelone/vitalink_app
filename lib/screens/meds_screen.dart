@@ -2,7 +2,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../models.dart';
@@ -218,50 +217,6 @@ class _MedsScreenState extends State<MedsScreen> {
     );
   }
 
-  Future<String?> _askPharmacyZip() async {
-    final controller = TextEditingController();
-    String? error;
-    final zip = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Pharmacy ZIP code'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(5),
-            ],
-            decoration: InputDecoration(
-              labelText: 'ZIP code',
-              errorText: error,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (controller.text.length != 5) {
-                  setDialogState(() => error = 'Enter a five-digit ZIP code.');
-                  return;
-                }
-                Navigator.pop(dialogContext, controller.text);
-              },
-              child: const Text('Search'),
-            ),
-          ],
-        ),
-      ),
-    );
-    controller.dispose();
-    return zip;
-  }
-
   Future<void> _verifyPharmacy(int index) async {
     if (index < 0 || index >= _p!.meds.length) return;
     final medication = _p!.meds[index];
@@ -307,6 +262,10 @@ class _MedsScreenState extends State<MedsScreen> {
       phone: _pharmacyPhone(medication.prescriber),
       mailOrder: pharmacyType == 'mail_order',
     );
+    if (result.hasError) {
+      await _showVerificationError('pharmacy', result.error);
+      return;
+    }
     while (mounted) {
       medication.pharmacyNpi = result.npi;
       medication.pharmacyVerificationStatus = result.status;
@@ -327,13 +286,21 @@ class _MedsScreenState extends State<MedsScreen> {
       );
       if (selected == null || !mounted) return;
       if (selected['_pickerAction'] == 'searchAnotherZip') {
-        final zip = await _askPharmacyZip();
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        final zip = await showPharmacyZipPrompt(context: context);
         if (zip == null || !mounted) return;
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
         result = await _npiService.lookup(
           entityType: 'pharmacy',
           name: name,
           postalCode: zip,
         );
+        if (result.hasError) {
+          await _showVerificationError('pharmacy', result.error);
+          return;
+        }
         continue;
       }
 
@@ -352,6 +319,28 @@ class _MedsScreenState extends State<MedsScreen> {
     }
   }
 
+  Future<void> _showVerificationError(String item, String? error) async {
+    if (!mounted) return;
+    final unauthorized = error == 'Unauthorized';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Could not check $item'),
+        content: Text(
+          unauthorized
+              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry.'
+              : 'VitaLink could not reach the provider search. Please try again.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _verifyDoctor(int index) async {
     if (index < 0 || index >= _p!.doctors.length) return;
     final doctor = _p!.doctors[index];
@@ -366,7 +355,13 @@ class _MedsScreenState extends State<MedsScreen> {
       entityType: 'provider',
       name: doctor.name,
       postalCode: searchZip,
+      state: _p!.state,
+      includeVa: _p!.isVeteran,
     );
+    if (result.hasError) {
+      await _showVerificationError('doctor', result.error);
+      return;
+    }
     applyProviderLookupResult(doctor, result);
     await _save();
 
@@ -381,7 +376,13 @@ class _MedsScreenState extends State<MedsScreen> {
         entityType: 'provider',
         name: doctor.name,
         postalCode: searchZip,
+        state: _p!.state,
+        includeVa: _p!.isVeteran,
       );
+      if (result.hasError) {
+        await _showVerificationError('doctor', result.error);
+        return;
+      }
       applyProviderLookupResult(doctor, result);
       await _save();
     }
@@ -560,35 +561,34 @@ class _MedsScreenState extends State<MedsScreen> {
     }
 
     try {
-
-    if (existing != null &&
-        _pharmacyName(existing.prescriber).toLowerCase() !=
-            _pharmacyName(pharmacyCtrl.text).toLowerCase() &&
-        !pharmacyTypeChanged) {
-      pharmacyType = null;
-    }
-
-    final m = Medication(
-      name: nameCtrl.text.trim(),
-      dose: doseCtrl.text.trim(),
-      frequency: freqCtrl.text.trim(),
-      prescriber: pharmacyCtrl.text.trim(),
-      pharmacyFulfillmentType: pharmacyType,
-      source: existing?.source ?? (prefill != null ? 'Scanned' : 'Manual'),
-      updatedAt: DateTime.now(),
-    );
-
-    setState(() {
-      if (existing == null) {
-        _p!.meds.add(m);
-        targetIndex = _p!.meds.length - 1;
-      } else {
-        _p!.meds[index!] = m;
+      if (existing != null &&
+          _pharmacyName(existing.prescriber).toLowerCase() !=
+              _pharmacyName(pharmacyCtrl.text).toLowerCase() &&
+          !pharmacyTypeChanged) {
+        pharmacyType = null;
       }
-    });
 
-    await _save();
-    await _verifyPharmacy(targetIndex!);
+      final m = Medication(
+        name: nameCtrl.text.trim(),
+        dose: doseCtrl.text.trim(),
+        frequency: freqCtrl.text.trim(),
+        prescriber: pharmacyCtrl.text.trim(),
+        pharmacyFulfillmentType: pharmacyType,
+        source: existing?.source ?? (prefill != null ? 'Scanned' : 'Manual'),
+        updatedAt: DateTime.now(),
+      );
+
+      setState(() {
+        if (existing == null) {
+          _p!.meds.add(m);
+          targetIndex = _p!.meds.length - 1;
+        } else {
+          _p!.meds[index!] = m;
+        }
+      });
+
+      await _save();
+      await _verifyPharmacy(targetIndex!);
     } finally {
       if (ownsWorkingOverlay && mounted) {
         setState(() => _manualWorking = false);

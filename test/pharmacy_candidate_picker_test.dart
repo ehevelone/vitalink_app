@@ -106,4 +106,128 @@ void main() {
     await tester.pumpAndSettle();
     expect(selectedZip, '90210');
   });
+
+  testWidgets('pharmacy ZIP prompt closes without a controller exception', (
+    tester,
+  ) async {
+    String? selectedZip;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                selectedZip = await showPharmacyZipPrompt(context: context);
+              },
+              child: const Text('Find pharmacy'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Find pharmacy'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '68105');
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+
+    expect(selectedZip, '68105');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('alternate pharmacy ZIP dialogs hand off without overlap', (
+    tester,
+  ) async {
+    String? selectedZip;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                final selection = await showNpiCandidatePicker(
+                  context: context,
+                  title: 'Which pharmacy is Walgreens?',
+                  candidates: const [],
+                  allowAlternateZip: true,
+                );
+                if (selection?['_pickerAction'] != 'searchAnotherZip') return;
+                await Future<void>.delayed(const Duration(milliseconds: 250));
+                if (!context.mounted) return;
+                selectedZip = await showPharmacyZipPrompt(context: context);
+              },
+              child: const Text('Resolve pharmacy'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Resolve pharmacy'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search another ZIP'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextFormField), '68105');
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+
+    expect(selectedZip, '68105');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('doctor ZIP prompt hands off to provider results', (
+    tester,
+  ) async {
+    Map<String, dynamic>? selectedProvider;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                final zip = await showDoctorZipPrompt(
+                  context: context,
+                  doctorName: 'H, Nguyen',
+                  registeredZip: '68114',
+                );
+                if (zip == null) return;
+                await Future<void>.delayed(const Duration(milliseconds: 250));
+                if (!context.mounted) return;
+                selectedProvider = await showNpiCandidatePicker(
+                  context: context,
+                  title: 'Which provider is H, Nguyen?',
+                  candidates: const [
+                    {
+                      'npi': '1275201147',
+                      'displayName': 'HOA THUY NGUYEN',
+                      'credential': 'APRN-NP',
+                      'taxonomy': 'Nurse Practitioner',
+                      'city': 'OMAHA',
+                      'state': 'NE',
+                      'postalCode': '681051850',
+                      'phone': '402-591-4500',
+                    },
+                  ],
+                );
+              },
+              child: const Text('Resolve doctor'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Resolve doctor'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '68105');
+    await tester.tap(find.text('Search ZIP'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('HOA THUY NGUYEN'), findsOneWidget);
+    await tester.tap(find.text('HOA THUY NGUYEN'));
+    await tester.pumpAndSettle();
+
+    expect(selectedProvider?['npi'], '1275201147');
+    expect(tester.takeException(), isNull);
+  });
 }

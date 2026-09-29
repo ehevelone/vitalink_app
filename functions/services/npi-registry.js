@@ -132,7 +132,7 @@ function buildSearchParams({
   params.set("enumeration_type", entityType === "pharmacy" ? "NPI-2" : "NPI-1");
 
   if (entityType === "pharmacy") {
-    params.set("organization_name", name);
+    if (String(name || "").trim()) params.set("organization_name", name);
   } else {
     const { firstName, lastName } = splitProviderName(name);
     if (firstName.length === 1) params.set("limit", "200");

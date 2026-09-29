@@ -1,5 +1,9 @@
 const { getNpiByNumber } = require("./services/npi-registry");
 const {
+  mergeProviderCandidates,
+  searchVaProviders,
+} = require("./services/va-provider-registry");
+const {
   authenticate,
   cacheConfirmedCandidate,
 } = require("./services/npi-verification");
@@ -34,8 +38,22 @@ exports.handler = async (event) => {
     }
 
     // Never trust candidate details supplied by the app; re-read the NPI from CMS.
-    const candidate = await getNpiByNumber(npi);
+    let candidate = await getNpiByNumber(npi);
     if (!candidate) return reply(404, { success: false, error: "NPI was not found" });
+
+    // CMS is the source of truth for the NPI. When the selected lookup result
+    // also matched the VA directory, independently re-check that directory so
+    // the confirmed response retains its facility without trusting app input.
+    if (entityType === "provider" && body.candidate?.isVaProvider === true) {
+      const vaCandidates = await searchVaProviders({
+        name: searchedName,
+        state: candidate.state,
+      }).catch((error) => {
+        console.warn("VA confirmation lookup failed:", error.message);
+        return [];
+      });
+      candidate = mergeProviderCandidates([candidate], vaCandidates)[0];
+    }
 
     await cacheConfirmedCandidate({
       entityType,

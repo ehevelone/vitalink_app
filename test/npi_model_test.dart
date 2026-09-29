@@ -4,6 +4,29 @@ import 'package:vitalink/services/npi_verification_service.dart';
 import 'package:vitalink/widgets/npi_verification_widgets.dart';
 
 void main() {
+  test(
+    'NPI lookup prefers the active user session on a dual-account device',
+    () {
+      final identity = selectNpiIdentity(
+        agentId: '42',
+        agentToken: 'saved-agent-token',
+        userId: '84',
+        userToken: 'active-user-token',
+      );
+
+      expect(identity, {'userId': '84'});
+    },
+  );
+
+  test('NPI lookup still supports an agent-only session', () {
+    final identity = selectNpiIdentity(
+      agentId: '42',
+      agentToken: 'active-agent-token',
+    );
+
+    expect(identity, {'agentId': 42});
+  });
+
   test('legacy doctor and medication JSON remain backward compatible', () {
     final doctor = Doctor.fromJson({
       'name': 'Jane Smith',
@@ -165,6 +188,11 @@ void main() {
       expect(doctor.specialty, 'My specialist');
     },
   );
+
+  test('registry ZIP+4 is formatted for provider display', () {
+    expect(formatRegistryPostalCode('681051850'), '68105-1850');
+    expect(formatRegistryPostalCode('68105'), '68105');
+  });
 
   test('every existing doctor type remains available for NPI narrowing', () {
     expect(npiDoctorSpecialtyOptions, contains('Primary'));

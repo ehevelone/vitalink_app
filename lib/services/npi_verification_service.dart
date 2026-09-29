@@ -2,20 +2,44 @@ import 'api_service.dart';
 import 'secure_store.dart';
 import '../models.dart';
 
+Map<String, dynamic> selectNpiIdentity({
+  String? agentId,
+  String? agentToken,
+  String? userId,
+  String? userToken,
+}) {
+  if (userId != null &&
+      userId.isNotEmpty &&
+      userToken != null &&
+      userToken.isNotEmpty) {
+    return {'userId': userId};
+  }
+  if (agentId != null &&
+      agentId.isNotEmpty &&
+      agentToken != null &&
+      agentToken.isNotEmpty) {
+    return {'agentId': int.tryParse(agentId)};
+  }
+  return {'userId': userId};
+}
+
 class NpiLookupResult {
   final String status;
   final String? npi;
   final List<Map<String, dynamic>> candidates;
   final String? verifiedBy;
+  final String? error;
 
   const NpiLookupResult({
     required this.status,
     this.npi,
     this.candidates = const [],
     this.verifiedBy,
+    this.error,
   });
 
   bool get isVerified => status == 'verified' && npi != null;
+  bool get hasError => status == 'error';
 
   factory NpiLookupResult.fromJson(Map<String, dynamic> json) {
     return NpiLookupResult(
@@ -26,6 +50,7 @@ class NpiLookupResult {
           .map((item) => Map<String, dynamic>.from(item))
           .toList(),
       verifiedBy: json['verifiedBy']?.toString(),
+      error: json['error']?.toString(),
     );
   }
 }
@@ -38,6 +63,15 @@ Map<String, dynamic>? verifiedProviderCandidate(Doctor doctor) {
     if (candidate['npi']?.toString() == doctor.npi) return candidate;
   }
   return null;
+}
+
+String formatRegistryPostalCode(Object? value) {
+  final raw = value?.toString().trim() ?? '';
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.length == 9) {
+    return '${digits.substring(0, 5)}-${digits.substring(5)}';
+  }
+  return raw;
 }
 
 void applyProviderLookupResult(Doctor doctor, NpiLookupResult result) {
@@ -60,20 +94,22 @@ class NpiVerificationService {
   final SecureStore _store;
 
   NpiVerificationService([SecureStore? store])
-    : _store = store ?? SecureStore();
+      : _store = store ?? SecureStore();
 
   Future<Map<String, dynamic>> _identity() async {
     final agentId = await _store.getString('agentId');
     final agentToken = await _store.getString('agentSessionToken');
     final userId = await _store.getString('userId');
+    final userToken = await _store.getString('userSessionToken');
 
-    if (agentId != null &&
-        agentId.isNotEmpty &&
-        agentToken != null &&
-        agentToken.isNotEmpty) {
-      return {'agentId': int.tryParse(agentId)};
-    }
-    return {'userId': userId};
+    // Doctors and medications belong to the user profile. Agents may also
+    // have a user account on the same device, so prefer that active session.
+    return selectNpiIdentity(
+      agentId: agentId,
+      agentToken: agentToken,
+      userId: userId,
+      userToken: userToken,
+    );
   }
 
   Future<NpiLookupResult> lookup({
@@ -105,7 +141,10 @@ class NpiVerificationService {
     );
 
     if (response['success'] != true) {
-      return const NpiLookupResult(status: 'unverified');
+      return NpiLookupResult(
+        status: 'error',
+        error: response['error']?.toString() ?? 'Provider lookup failed',
+      );
     }
     return NpiLookupResult.fromJson(response);
   }

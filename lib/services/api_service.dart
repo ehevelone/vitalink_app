@@ -185,6 +185,16 @@ class ApiService {
     return await _postJsonWithUserSession("get_profiles", {"user_id": userId});
   }
 
+  static Future<Map<String, dynamic>> getUserDemographics({
+    required String userId,
+    required String profileId,
+  }) {
+    return _postJsonWithUserSession("get_user_demographics", {
+      "userId": userId,
+      "profileId": profileId,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------

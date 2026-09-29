@@ -152,6 +152,39 @@ test('local pharmacy search excludes mail-order taxonomy', async () => {
   assert.deepEqual(searches[0].excludedTaxonomyCodes, ['3336M0002X']);
 });
 
+test('VA Pharmacy searches the official VA pharmacy taxonomy by ZIP', async () => {
+  const searches = [];
+  const handler = lookupWith(async (scope) => {
+    searches.push(scope);
+    return [{
+      npi: '1366491524',
+      displayName: 'OMAHA VAMC',
+      taxonomy: 'Department of Veterans Affairs (VA) Pharmacy',
+      city: 'OMAHA',
+      state: 'NE',
+      postalCode: '681051850',
+      phone: '4029954903',
+    }];
+  });
+
+  const result = await run(handler, {
+    name: 'VA Pharmacy',
+    state: 'NE',
+    postalCode: '68105',
+    mailOrder: false,
+  });
+
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0].name, '');
+  assert.equal(
+    searches[0].taxonomyDescription,
+    'Department of Veterans Affairs (VA) Pharmacy',
+  );
+  assert.deepEqual(searches[0].taxonomyCodes, ['332100000X']);
+  assert.equal(searches[0].postalCode, '68105');
+  assert.equal(result.candidates[0].npi, '1366491524');
+});
+
 test('mail-order wildcard-only name is rejected', async () => {
   const handler = lookupWith(async () => []);
   const response = await handler({
