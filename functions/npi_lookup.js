@@ -142,7 +142,8 @@ async function searchRegistry({ entityType, name, city, state, postalCode, speci
     ),
   );
   const narrowed = uniqueCandidates(resultSets.flat());
-  return narrowed.length ? narrowed : searchNpi(base);
+  const allNameMatches = await searchNpi(base);
+  return uniqueCandidates([...narrowed, ...allNameMatches]);
 }
 
 exports.handler = async (event) => {

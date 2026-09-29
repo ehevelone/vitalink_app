@@ -90,29 +90,39 @@ test("provider search retries punctuation and spacing variants in the same locat
     postalCode: "68114",
   }, fakeFetch);
 
-  assert.deepEqual(searchedLastNames, ["O'Connor", "O Connor"]);
+  assert.deepEqual(searchedLastNames, ["O'Connor", "O Connor", "oconnor"]);
   assert.deepEqual(results.map((item) => item.npi), ["3333333333"]);
 });
 
-test("provider search expands an all-lowercase compound surname", async () => {
+test("provider search returns every exact spelling of a lowercase compound surname", async () => {
   const searchedLastNames = [];
   const fakeFetch = async (url) => {
-    const lastName = new URL(url).searchParams.get("last_name");
+    const params = new URL(url).searchParams;
+    const lastName = params.get("last_name");
     searchedLastNames.push(lastName);
+    const results = [];
+    if (lastName === "vandewalle") {
+      results.push({
+        number: "1619882255",
+        enumeration_type: "NPI-1",
+        basic: { status: "A", first_name: "MICHELLE", last_name: "VANDEWALLE" },
+      });
+    }
+    if (lastName === "van de walle") {
+      results.push({
+        number: "1689454357",
+        enumeration_type: "NPI-1",
+        basic: {
+          status: "A",
+          first_name: "KARMEN",
+          middle_name: "SUE",
+          last_name: "VAN DE WALLE",
+        },
+      });
+    }
     return {
       ok: true,
-      json: async () => ({
-        results: lastName === "van de walle" ? [{
-          number: "1689454357",
-          enumeration_type: "NPI-1",
-          basic: {
-            status: "A",
-            first_name: "KARMEN",
-            middle_name: "SUE",
-            last_name: "VAN DE WALLE",
-          },
-        }] : [],
-      }),
+      json: async () => ({ results }),
     };
   };
 
@@ -122,8 +132,12 @@ test("provider search expands an all-lowercase compound surname", async () => {
     postalCode: "68601",
   }, fakeFetch);
 
-  assert.deepEqual(searchedLastNames, ["vandewalle", "van de walle"]);
-  assert.deepEqual(results.map((item) => item.npi), ["1689454357"]);
+  assert.deepEqual(searchedLastNames, [
+    "vandewalle", "van de walle", "van dewalle", "vande walle",
+  ]);
+  assert.deepEqual(results.map((item) => item.npi), [
+    "1619882255", "1689454357",
+  ]);
 });
 
 test("provider candidate names must match the searched last name and first name or initial", () => {

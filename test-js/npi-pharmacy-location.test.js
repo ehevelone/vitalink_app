@@ -286,3 +286,33 @@ test('provider search retries without specialty when the specialty has no match'
   assert.deepEqual(searches.map((scope) => scope.postalCode), ['68601', '68601']);
   assert.equal(result.candidates[0].npi, '1689454357');
 });
+
+test('provider specialty search also returns other exact surname-variant matches', async () => {
+  const searches = [];
+  const karmen = {
+    ...candidate('1689454357', 'Columbus', 'NE', '68601'),
+    displayName: 'KARMEN SUE VAN DE WALLE',
+    taxonomy: 'Counselor',
+  };
+  const michelle = {
+    ...candidate('1619882255', 'Columbus', 'NE', '68601'),
+    displayName: 'MICHELLE VANDEWALLE',
+    taxonomy: 'Case Manager/Care Coordinator',
+  };
+  const handler = lookupWith(async (scope) => {
+    searches.push(scope);
+    return scope.taxonomyDescription ? [karmen] : [michelle, karmen];
+  }, [], () => [{ code: '101Y00000X', description: 'Counselor' }]);
+
+  const result = await run(handler, {
+    entityType: 'provider',
+    name: 'karmen vandewalle',
+    postalCode: '68601',
+    specialty: 'Mental Health Counselor',
+  });
+
+  assert.equal(searches.length, 2);
+  assert.deepEqual(result.candidates.map((item) => item.npi), [
+    '1689454357', '1619882255',
+  ]);
+});

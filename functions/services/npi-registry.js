@@ -127,6 +127,16 @@ function providerCandidateMatchesName(candidate, searchedName) {
   return candidateFirst.startsWith(normalizedFirst);
 }
 
+function providerCandidateMatchesLastName(candidate, searchedName) {
+  const { lastName } = splitProviderName(searchedName);
+  const candidateKey = normalizeText(candidate?.displayName).replace(/\s+/g, "");
+  const searchedKey = normalizeText(lastName).replace(/\s+/g, "");
+  return Boolean(
+    candidateKey && searchedKey &&
+    (candidateKey === searchedKey || candidateKey.endsWith(searchedKey)),
+  );
+}
+
 function firstLocationAddress(addresses) {
   return (
     (addresses || []).find((address) => address.address_purpose === "LOCATION") ||
@@ -190,6 +200,7 @@ function buildSearchParams({
   postalCode,
   taxonomyDescription,
   providerLastName,
+  omitProviderFirstName = false,
 }) {
   const params = new URLSearchParams({
     version: "2.1",
@@ -204,7 +215,9 @@ function buildSearchParams({
     if (firstName.length === 1) params.set("limit", "200");
     // NPPES is inconsistent with one-letter first-name searches. Search the
     // last name and let the local candidate filter enforce the initial.
-    if (firstName.length > 1) params.set("first_name", firstName);
+    if (!omitProviderFirstName && firstName.length > 1) {
+      params.set("first_name", firstName);
+    }
     if (lastName) {
       params.set(
         "last_name",
@@ -274,7 +287,32 @@ async function searchNpi(input, fetchImpl = fetch) {
   }
 
   const { lastName } = splitProviderName(input.name);
-  for (const providerLastName of providerLastNameVariants(lastName)) {
+  const lastNameVariants = providerLastNameVariants(lastName);
+  if (lastNameVariants.length > 1) {
+    const resultSets = await Promise.all(lastNameVariants.map(
+      (providerLastName) => fetchNppes(
+        buildSearchParams({
+          ...input,
+          providerLastName,
+          omitProviderFirstName: true,
+        }),
+        fetchImpl,
+        input.taxonomyCodes || [],
+        input.excludedTaxonomyCodes || [],
+      ),
+    ));
+    const seen = new Set();
+    return resultSets.flat()
+      .filter((candidate) =>
+        providerCandidateMatchesLastName(candidate, input.name))
+      .filter((candidate) => {
+        if (seen.has(candidate.npi)) return false;
+        seen.add(candidate.npi);
+        return true;
+      });
+  }
+
+  for (const providerLastName of lastNameVariants) {
     const candidates = await fetchNppes(
       buildSearchParams({ ...input, providerLastName }),
       fetchImpl,
