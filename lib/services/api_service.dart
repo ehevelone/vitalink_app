@@ -270,6 +270,7 @@ class ApiService {
     required String password,
     required String platform,
     required String deviceId,
+    String? fcmToken,
     bool replace = false,
     String replacementReason = "replaced",
   }) async {
@@ -278,6 +279,7 @@ class ApiService {
       "password": password,
       "platform": platform,
       "device_id": deviceId,
+      if (fcmToken != null && fcmToken.isNotEmpty) "fcm_token": fcmToken,
       "replace": replace,
       "replacement_reason": replacementReason,
     });

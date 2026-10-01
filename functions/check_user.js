@@ -43,6 +43,7 @@ exports.handler = async (event) => {
 
     const body = JSON.parse(event.body || "{}");
     const { email, password, device_id: deviceId, replace, platform } = body;
+    const fcmToken = String(body.fcm_token || body.deviceToken || "").trim();
     const replacementReason = ["lost", "stolen", "replaced"].includes(body.replacement_reason)
       ? body.replacement_reason
       : "replaced";
@@ -64,6 +65,49 @@ exports.handler = async (event) => {
     if (!passwordCheck.valid) return reply(false, { error: "Invalid password" }, 401);
     if (passwordCheck.legacy) {
       await db.query("UPDATE users SET password_hash=$1 WHERE id=$2", [await hashPassword(password), user.id]);
+    }
+
+    if (fcmToken) {
+      try {
+        const matchingInstallation = await db.query(
+          `SELECT id, device_id
+           FROM user_devices
+           WHERE user_id=$1 AND device_token=$2 AND device_status='active'
+           ORDER BY updated_at DESC
+           LIMIT 1`,
+          [user.id, fcmToken]
+        );
+
+        if (
+          matchingInstallation.rows.length &&
+          matchingInstallation.rows[0].device_id !== deviceId
+        ) {
+          await db.query(
+            `UPDATE user_devices
+             SET device_id=NULL, device_token=NULL, device_status='replaced',
+               revoked_at=NOW(), revocation_reason='installation_id_merged', updated_at=NOW()
+             WHERE user_id=$1 AND device_id=$2 AND id<>$3`,
+            [user.id, deviceId, matchingInstallation.rows[0].id]
+          );
+          await db.query(
+            `UPDATE user_devices
+             SET device_id=$1, last_seen_at=NOW(), updated_at=NOW()
+             WHERE id=$2`,
+            [deviceId, matchingInstallation.rows[0].id]
+          );
+          await recordDeviceEvent(
+            user.id,
+            deviceId,
+            "installation_id_recovered",
+            "matching_notification_token",
+            platform
+          );
+        }
+      } catch (_) {
+        // Identity repair is opportunistic. Continue to the normal recovery
+        // flow without logging device identifiers or notification tokens.
+        console.error("Installation identity repair failed");
+      }
     }
 
     const sameDevice = await db.query(
@@ -135,13 +179,15 @@ exports.handler = async (event) => {
 
     await db.query(
       `INSERT INTO user_devices
-        (user_id, agent_id, device_id, platform, device_status, last_seen_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'active',NOW(),NOW(),NOW())
+        (user_id, agent_id, device_id, device_token, platform, device_status, last_seen_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,'active',NOW(),NOW(),NOW())
        ON CONFLICT (user_id, device_id) WHERE user_id IS NOT NULL AND device_id IS NOT NULL
-       DO UPDATE SET agent_id=EXCLUDED.agent_id, platform=EXCLUDED.platform,
+       DO UPDATE SET agent_id=EXCLUDED.agent_id,
+         device_token=COALESCE(EXCLUDED.device_token,user_devices.device_token),
+         platform=EXCLUDED.platform,
          device_status='active', revoked_at=NULL, revocation_reason=NULL,
          last_seen_at=NOW(), updated_at=NOW()`,
-      [user.id, user.agent_id || null, deviceId, platform || "unknown"]
+      [user.id, user.agent_id || null, deviceId, fcmToken || null, platform || "unknown"]
     );
     await recordDeviceEvent(user.id, deviceId, replace === true ? "replacement_activated" : "login", replacementReason, platform);
 

@@ -1,19 +1,33 @@
 import 'dart:math';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'secure_store.dart';
 
 class DeviceId {
   static const String _key = 'deviceId';
+  static const String _fallbackKey = 'vitalinkInstallationId';
 
   /// Returns a stable per-install device id stored in SecureStore.
   static Future<String> getOrCreate() async {
     final store = SecureStore();
+    final prefs = await SharedPreferences.getInstance();
 
     final existing = await store.getString(_key);
-    if (existing != null && existing.trim().isNotEmpty) return existing;
+    if (existing != null && existing.trim().isNotEmpty) {
+      await prefs.setString(_fallbackKey, existing);
+      return existing;
+    }
+
+    final fallback = prefs.getString(_fallbackKey);
+    if (fallback != null && fallback.trim().isNotEmpty) {
+      await store.setString(_key, fallback);
+      return fallback;
+    }
 
     final fresh = _generate();
     await store.setString(_key, fresh);
+    await prefs.setString(_fallbackKey, fresh);
     return fresh;
   }
 

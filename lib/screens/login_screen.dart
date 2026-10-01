@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                "New Device Detected",
+                "New App Installation Detected",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                "This account is already active on another device.\n\n"
+                "This account is already active in another VitaLink installation.\n\n"
                 "If you still have the old device, use Transfer Profile to New Device before continuing. Account recovery does not restore medications, doctors, insurance information, or other records stored only on that device.",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70),
@@ -193,6 +193,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailCtrl.text.trim().toLowerCase();
     final password = _passwordCtrl.text.trim();
     final deviceId = await DeviceId.getOrCreate();
+    String? fcmToken;
+    try {
+      fcmToken = await FirebaseMessaging.instance.getToken();
+    } catch (_) {}
 
     final platform =
         !mounted || Theme.of(context).platform == TargetPlatform.iOS
@@ -204,6 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
       password: password,
       platform: platform,
       deviceId: deviceId,
+      fcmToken: fcmToken,
       replace: replace,
       replacementReason: replacementReason,
     );
