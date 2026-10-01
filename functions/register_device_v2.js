@@ -38,6 +38,23 @@ exports.handler = async (event) => {
       return reply(403, { success: false, error: "DEVICE_REVOKED" });
     }
 
+      if (!current.rows.length) {
+        const otherActive = await db.query(
+          `SELECT id
+           FROM user_devices
+           WHERE user_id=$1 AND device_status='active'
+             AND COALESCE(device_id,'')<>$2
+           LIMIT 1`,
+          [userId, deviceId]
+        );
+        if (otherActive.rows.length) {
+          return reply(409, {
+            success: false,
+            error: "DEVICE_ACTIVE",
+          });
+        }
+      }
+
     await db.query(
       `UPDATE user_devices SET device_token=NULL, updated_at=NOW()
        WHERE device_token=$1 AND NOT (user_id=$2 AND device_id=$3)`,

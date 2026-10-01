@@ -128,10 +128,11 @@ exports.handler = async (event) => {
 
     if (
       recoverInstallation &&
-      !sameDevice.rows.length &&
       activeDevices.rows.length
     ) {
-      const currentRecord = activeDevices.rows[0];
+      const currentRecord = sameDevice.rows.length
+        ? sameDevice.rows[0]
+        : activeDevices.rows[0];
       await db.query(
         `UPDATE user_devices
          SET device_status='replaced', device_token=NULL, revoked_at=NOW(),
