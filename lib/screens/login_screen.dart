@@ -141,8 +141,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                "This account is already active in another VitaLink installation.\n\n"
-                "If you still have the old device, use Transfer Profile to New Device before continuing. Account recovery does not restore medications, doctors, insurance information, or other records stored only on that device.",
+                "VitaLink found another installation for this account.\n\n"
+                "If this is the same phone after an update or reinstall, confirm it below. If you are moving to a different phone, use Transfer Profile to New Device first. Account recovery does not restore information stored only on another device.",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70),
               ),
@@ -152,9 +152,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   backgroundColor: Colors.green,
                   minimumSize: const Size(double.infinity, 50),
                 ),
+                onPressed: () => Navigator.pop(ctx, "current_installation"),
+                child: const Text("This Is My Current Phone",
+                    style: TextStyle(color: Colors.black)),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
                 onPressed: () => Navigator.pop(ctx, "replaced"),
                 child: const Text("I Created a Transfer Code",
-                    style: TextStyle(color: Colors.black)),
+                    style: TextStyle(color: Colors.white)),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -181,6 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login({
     bool replace = false,
     bool auto = false,
+    bool recoverInstallation = false,
     String replacementReason = "replaced",
   }) async {
     if (!auto && !_formKey.currentState!.validate()) return;
@@ -209,6 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
       platform: platform,
       deviceId: deviceId,
       fcmToken: fcmToken,
+      recoverInstallation: recoverInstallation,
       replace: replace,
       replacementReason: replacementReason,
     );
@@ -293,6 +305,8 @@ class _LoginScreenState extends State<LoginScreen> {
         if (lostOrStolen != null) {
           await _login(replace: true, replacementReason: lostOrStolen);
         }
+      } else if (choice == "current_installation") {
+        await _login(recoverInstallation: true);
       } else if (choice == "replaced") {
         await _login(replace: true, replacementReason: "replaced");
       }

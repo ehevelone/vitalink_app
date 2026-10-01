@@ -44,6 +44,7 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
     const { email, password, device_id: deviceId, replace, platform } = body;
     const fcmToken = String(body.fcm_token || body.deviceToken || "").trim();
+    const recoverInstallation = body.recover_installation === true;
     const replacementReason = ["lost", "stolen", "replaced"].includes(body.replacement_reason)
       ? body.replacement_reason
       : "replaced";
@@ -124,6 +125,36 @@ exports.handler = async (event) => {
        ORDER BY updated_at DESC`,
       [user.id, deviceId]
     );
+
+    if (
+      recoverInstallation &&
+      !sameDevice.rows.length &&
+      activeDevices.rows.length
+    ) {
+      const currentRecord = activeDevices.rows[0];
+      await db.query(
+        `UPDATE user_devices
+         SET device_status='replaced', device_token=NULL, revoked_at=NOW(),
+           revocation_reason='installation_id_merged', updated_at=NOW()
+         WHERE user_id=$1 AND device_status='active' AND id<>$2`,
+        [user.id, currentRecord.id]
+      );
+      await db.query(
+        `UPDATE user_devices
+         SET device_id=$1, device_token=COALESCE($2,device_token),
+           platform=$3, last_seen_at=NOW(), updated_at=NOW()
+         WHERE id=$4 AND user_id=$5 AND device_status='active'`,
+        [deviceId, fcmToken || null, platform || "unknown", currentRecord.id, user.id]
+      );
+      await recordDeviceEvent(
+        user.id,
+        deviceId,
+        "installation_id_recovered",
+        "authenticated_current_phone_confirmation",
+        platform
+      );
+      activeDevices.rows.length = 0;
+    }
 
     if (activeDevices.rows.length && replace !== true) {
       return reply(false, {

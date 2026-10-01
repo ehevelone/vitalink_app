@@ -271,6 +271,7 @@ class ApiService {
     required String platform,
     required String deviceId,
     String? fcmToken,
+    bool recoverInstallation = false,
     bool replace = false,
     String replacementReason = "replaced",
   }) async {
@@ -280,6 +281,7 @@ class ApiService {
       "platform": platform,
       "device_id": deviceId,
       if (fcmToken != null && fcmToken.isNotEmpty) "fcm_token": fcmToken,
+      "recover_installation": recoverInstallation,
       "replace": replace,
       "replacement_reason": replacementReason,
     });
