@@ -192,9 +192,13 @@ class _LoginScreenState extends State<LoginScreen> {
     bool replace = false,
     bool auto = false,
     bool recoverInstallation = false,
+    bool validateForm = true,
     String replacementReason = "replaced",
   }) async {
-    if (!auto && !_formKey.currentState!.validate()) return;
+    if (!auto && validateForm) {
+      final formState = _formKey.currentState;
+      if (formState == null || !formState.validate()) return;
+    }
 
     setState(() {
       _loading = true;
@@ -303,12 +307,23 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
         if (lostOrStolen != null) {
-          await _login(replace: true, replacementReason: lostOrStolen);
+          await _login(
+            replace: true,
+            validateForm: false,
+            replacementReason: lostOrStolen,
+          );
         }
       } else if (choice == "current_installation") {
-        await _login(recoverInstallation: true);
+        await _login(
+          recoverInstallation: true,
+          validateForm: false,
+        );
       } else if (choice == "replaced") {
-        await _login(replace: true, replacementReason: "replaced");
+        await _login(
+          replace: true,
+          validateForm: false,
+          replacementReason: "replaced",
+        );
       }
     } else if (res["error"] == "DEVICE_REVOKED") {
       await DeviceSecurityService.disableCurrentDevice(
