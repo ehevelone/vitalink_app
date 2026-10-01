@@ -106,8 +106,6 @@ exports.handler = async (event) => {
       });
     }
 
-    console.log("🔥 Saving profiles for UUID:", id);
-
     let saved = 0;
 
     for (const p of profiles) {
@@ -180,7 +178,7 @@ exports.handler = async (event) => {
         saved++;
 
       } catch (err) {
-        console.error("❌ SAVE FAILED:", err, p);
+        console.error("save_user_profiles item failed:", err);
       }
     }
 
@@ -194,7 +192,7 @@ exports.handler = async (event) => {
 
     return reply(500, {
       success: false,
-      error: err.message || "Server error",
+      error: "Server error",
     });
   }
 };

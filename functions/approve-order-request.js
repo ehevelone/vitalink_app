@@ -117,7 +117,7 @@ exports.handler = async (event) => {
       });
     }
 
-    console.log("✅ TOKENS STORED IN PROFILES:", order_id, qr.length);
+    console.log("Profile QR tokens stored", { count: qr.length });
 
     return reply(200, {
       success: true,

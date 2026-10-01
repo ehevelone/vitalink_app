@@ -116,9 +116,6 @@ exports.handler = async function (event) {
     const dbPhone = normalizePhone(user.phone);
     const firebasePhone = normalizePhone(decoded.phone_number);
 
-    console.log("DB PHONE:", dbPhone);
-    console.log("FIREBASE PHONE:", firebasePhone);
-
     if (dbPhone !== firebasePhone) {
       client.release();
       return {

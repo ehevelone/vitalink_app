@@ -5,6 +5,13 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 
 class PersistentFileStore {
+  static Future<void> deleteIfLocal(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
+  }
+
   static Future<String> saveImageFile(
     String sourcePath, {
     required String folder,
@@ -34,8 +41,7 @@ class PersistentFileStore {
     await targetDir.create(recursive: true);
 
     final safeExtension = extension.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    final fileName =
-        '${DateTime.now().microsecondsSinceEpoch}.$safeExtension';
+    final fileName = '${DateTime.now().microsecondsSinceEpoch}.$safeExtension';
     final target = File('${targetDir.path}${Platform.pathSeparator}$fileName');
 
     await target.writeAsBytes(bytes, flush: true);
@@ -169,9 +175,12 @@ class PersistentFileStore {
     Map card,
     Future<void> Function(List<Object> location, String? path) collect,
   ) async {
-    await collect([...baseLocation, 'frontImagePath'], card['frontImagePath']?.toString());
-    await collect([...baseLocation, 'backImagePath'], card['backImagePath']?.toString());
-    await collect([...baseLocation, 'imagePath'], card['imagePath']?.toString());
+    await collect([...baseLocation, 'frontImagePath'],
+        card['frontImagePath']?.toString());
+    await collect(
+        [...baseLocation, 'backImagePath'], card['backImagePath']?.toString());
+    await collect(
+        [...baseLocation, 'imagePath'], card['imagePath']?.toString());
   }
 
   static void _setLocation(

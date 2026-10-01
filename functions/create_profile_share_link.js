@@ -7,7 +7,6 @@ const {
   normalizeSections,
   parseBody,
   reply,
-  sendProfileShareInvitePush,
   verifyUserSession,
 } = require("./services/profile-share-sync");
 
@@ -66,8 +65,6 @@ exports.handler = async (event) => {
     }
 
     const inviteCode = createInviteCode();
-    const status = recipientUserId ? "accepted" : "pending";
-
     const result = await db.query(
       `
       INSERT INTO profile_share_links (
@@ -81,9 +78,10 @@ exports.handler = async (event) => {
         allowed_sections,
         status,
         invite_code,
-        accepted_at
+        accepted_at,
+        expires_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,CASE WHEN $9='accepted' THEN NOW() ELSE NULL END)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,'pending',$9,NULL,NOW()+INTERVAL '6 hours')
       RETURNING *
       `,
       [
@@ -95,25 +93,15 @@ exports.handler = async (event) => {
         profileId || null,
         profileName,
         JSON.stringify(allowedSections),
-        status,
         inviteCode,
       ]
     );
-
-    const push = recipientUserId
-      ? await sendProfileShareInvitePush({
-          recipientUserId,
-          inviteCode,
-          profileName,
-        })
-      : { devicesTargeted: 0, successCount: 0, failureCount: 0 };
 
     return reply(200, {
       success: true,
       share: result.rows[0],
       inviteCode,
-      accepted: status === "accepted",
-      push,
+      accepted: false,
     });
   } catch (err) {
     console.error("create_profile_share_link error:", err);

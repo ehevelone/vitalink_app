@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../services/device_id.dart';
+import '../services/device_security_service.dart';
+import '../services/device_transfer_service.dart';
 import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,6 +27,69 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _errorMessage;
 
+  Future<void> _restoreTransferAfterLogin() async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Load Your VitaLink Profiles'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Transfer code'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Load Profiles'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (code == null || code.isEmpty) return;
+    try {
+      await DeviceTransferService().redeemTransfer(code);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Transfer Complete'),
+          content: const Text(
+            'Your VitaLink profiles and locally stored information are now on this device.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Transfer Not Loaded'),
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -34,87 +100,89 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _initLogin() async {
-    try {
-      final store = SecureStore();
-      final remember = await store
-          .getBool("rememberMeUser")
-          .timeout(const Duration(seconds: 6));
+    final store = SecureStore();
 
-      if (remember == true) {
-        final email = await store
-            .getString("savedUserEmail")
-            .timeout(const Duration(seconds: 6));
-        final pass = await store
-            .getString("savedUserPassword")
-            .timeout(const Duration(seconds: 6));
-        if (!mounted) return;
-        _emailCtrl.text = email ?? "";
-        _passwordCtrl.text = pass ?? "";
-        _rememberMe = true;
-      }
-    } catch (error) {
-      debugPrint('Unable to load saved user login: $error');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    final remember = await store.getBool("rememberMeUser");
+
+    if (remember == true) {
+      final email = await store.getString("savedUserEmail") ?? "";
+      final pass = await store.getString("savedUserPassword") ?? "";
+
+      _emailCtrl.text = email;
+      _passwordCtrl.text = pass;
+      _rememberMe = true;
     }
+
+    setState(() {
+      _loading = false;
+    });
   }
 
-  Future<bool> _showReplacePopup() async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            backgroundColor: const Color(0xFF1A1A1A),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "New Device Detected",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "This account is already active on another device.\n\nDo you want to switch to this device?",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text("YES",
-                        style: TextStyle(color: Colors.black)),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child:
-                        const Text("NO", style: TextStyle(color: Colors.white)),
-                  ),
-                ],
+  Future<String?> _showReplacePopup() async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFF1A1A1A),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "New Device Detected",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              const Text(
+                "This account is already active on another device.\n\n"
+                "If you still have the old device, use Transfer Profile to New Device before continuing. Account recovery does not restore medications, doctors, insurance information, or other records stored only on that device.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                onPressed: () => Navigator.pop(ctx, "replaced"),
+                child: const Text("I Created a Transfer Code",
+                    style: TextStyle(color: Colors.black)),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                onPressed: () => Navigator.pop(ctx, "lost_stolen"),
+                child: const Text("It Was Lost or Stolen",
+                    style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+            ],
           ),
-        ) ??
-        false;
+        ),
+      ),
+    );
   }
 
-  Future<void> _login({bool replace = false, bool auto = false}) async {
+  Future<void> _login({
+    bool replace = false,
+    bool auto = false,
+    String replacementReason = "replaced",
+  }) async {
     if (!auto && !_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -122,132 +190,146 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    var loginStage = 'device storage';
-    var sessionWriteStarted = false;
-    try {
-      final email = _emailCtrl.text.trim().toLowerCase();
-      final password = _passwordCtrl.text.trim();
-      final deviceId =
-          await DeviceId.getOrCreate().timeout(const Duration(seconds: 8));
+    final email = _emailCtrl.text.trim().toLowerCase();
+    final password = _passwordCtrl.text.trim();
+    final deviceId = await DeviceId.getOrCreate();
 
-      final platform =
-          !mounted || Theme.of(context).platform == TargetPlatform.iOS
-              ? "ios"
-              : "android";
+    final platform =
+        !mounted || Theme.of(context).platform == TargetPlatform.iOS
+            ? "ios"
+            : "android";
 
-      loginStage = 'server';
-      final res = await ApiService.loginUser(
-        email: email,
-        password: password,
-        platform: platform,
-        deviceId: deviceId,
-        replace: replace,
-      ).timeout(const Duration(seconds: 20));
+    final res = await ApiService.loginUser(
+      email: email,
+      password: password,
+      platform: platform,
+      deviceId: deviceId,
+      replace: replace,
+      replacementReason: replacementReason,
+    );
+
+    if (!mounted) return;
+
+    if (res["success"] == true) {
+      final user = res["user"];
+      final store = SecureStore();
+      await DeviceSecurityService.clearLocalRevocationForReplacement();
+
+      await AppState.setLoggedIn(true);
+      await AppState.setRole("user");
+      await AppState.setEmail(user["email"]);
+
+      // ✅ FIX — STORE AS STRING
+      await store.setString("userId", user["id"].toString());
+
+      await store.setString("userEmail", user["email"]);
+
+      final sessionToken = user["session_token"]?.toString() ?? "";
+      if (sessionToken.isNotEmpty) {
+        await store.setString("userSessionToken", sessionToken);
+      } else {
+        await store.remove("userSessionToken");
+      }
+
+      if (_rememberMe) {
+        await store.setBool("rememberMeUser", true);
+        await store.setString("savedUserEmail", email);
+        await store.setString("savedUserPassword", password);
+      } else {
+        await store.setBool("rememberMeUser", false);
+        await store.remove("savedUserEmail");
+        await store.remove("savedUserPassword");
+      }
+
+      try {
+        final fcm = await FirebaseMessaging.instance.getToken();
+        if (fcm != null) {
+          final userId = await store.getString("userId");
+          if (userId != null) {
+            await ApiService.registerDeviceToken(
+              userId: userId,
+              fcmToken: fcm,
+            );
+          }
+        }
+      } catch (_) {}
 
       if (!mounted) return;
 
-      if (res["success"] == true) {
-        final user = res["user"];
-        final store = SecureStore();
-
-        loginStage = 'session storage';
-        sessionWriteStarted = true;
-        await store
-            .setString("userId", user["id"].toString())
-            .timeout(const Duration(seconds: 6));
-        await store
-            .setString("userEmail", user["email"])
-            .timeout(const Duration(seconds: 6));
-
-        final sessionToken = user["session_token"]?.toString() ?? "";
-        if (sessionToken.isEmpty) {
-          throw StateError('User session token missing');
-        }
-        await store
-            .setString("userSessionToken", sessionToken)
-            .timeout(const Duration(seconds: 6));
-        await AppState.setRole("user").timeout(const Duration(seconds: 6));
-        await AppState.setEmail(user["email"])
-            .timeout(const Duration(seconds: 6));
-        await AppState.setLoggedIn(true).timeout(const Duration(seconds: 6));
-
-        try {
-          if (_rememberMe) {
-            await store
-                .setBool("rememberMeUser", true)
-                .timeout(const Duration(seconds: 6));
-            await store
-                .setString("savedUserEmail", email)
-                .timeout(const Duration(seconds: 6));
-            await store
-                .setString("savedUserPassword", password)
-                .timeout(const Duration(seconds: 6));
-          } else {
-            await store
-                .setBool("rememberMeUser", false)
-                .timeout(const Duration(seconds: 6));
-            await store
-                .remove("savedUserEmail")
-                .timeout(const Duration(seconds: 6));
-            await store
-                .remove("savedUserPassword")
-                .timeout(const Duration(seconds: 6));
-          }
-        } catch (error) {
-          debugPrint('Unable to save optional user login details: $error');
-        }
-
+      if (replace && replacementReason == 'replaced') {
+        await _restoreTransferAfterLogin();
         if (!mounted) return;
-        Navigator.pushReplacementNamed(
-          context,
-          "/logo",
-          arguments: {
-            "justLoggedIn": true,
-            "role": "user",
-            "userSessionToken": sessionToken,
-          },
+      }
+      Navigator.pushReplacementNamed(context, "/logo");
+    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
+      final choice = await _showReplacePopup();
+      if (choice == "lost_stolen") {
+        if (!mounted) return;
+        final lostOrStolen = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Disable the old device?"),
+            content: const Text(
+              "The old device will be disabled the next time it connects. Information stored outside VitaLink, including screenshots or exported files, cannot be recalled.",
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel")),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, "lost"),
+                  child: const Text("Lost")),
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, "stolen"),
+                  child: const Text("Stolen")),
+            ],
+          ),
         );
-      } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
-        final confirmed = await _showReplacePopup();
-        if (confirmed) {
-          await _login(replace: true);
+        if (lostOrStolen != null) {
+          await _login(replace: true, replacementReason: lostOrStolen);
         }
-      } else {
-        final store = SecureStore();
-
-        if (auto) {
-          await store.remove("savedUserPassword");
-          await store.setBool("rememberMeUser", false);
-        }
-
-        String msg = "Login failed";
-
-        if (res["status"] == 401) {
-          msg = "Incorrect password";
-        } else if (res["status"] == 404) {
-          msg = "Account not found";
-        } else if (res["error"] != null) {
-          msg = res["error"];
-        }
-
-        setState(() {
-          _errorMessage = msg;
-        });
+      } else if (choice == "replaced") {
+        await _login(replace: true, replacementReason: "replaced");
       }
-    } catch (error) {
-      debugPrint('User login failed at $loginStage: $error');
-      if (sessionWriteStarted) {
-        try {
-          await AppState.clearAuth().timeout(const Duration(seconds: 6));
-        } catch (_) {}
+    } else if (res["error"] == "DEVICE_REVOKED") {
+      await DeviceSecurityService.disableCurrentDevice(
+        reason: res["reason"]?.toString(),
+      );
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+          context, '/device_disabled', (_) => false);
+    } else if (res["error"] == "TRANSFER_REQUIRED") {
+      setState(() {
+        _errorMessage =
+            "Create a transfer code on the old device before replacing it.";
+      });
+    } else {
+      final store = SecureStore();
+
+      if (auto) {
+        await store.remove("savedUserPassword");
+        await store.setBool("rememberMeUser", false);
       }
-      if (mounted) {
-        setState(() => _errorMessage = loginStage == 'server'
-            ? 'The login connection did not finish. Check your connection and try again.'
-            : 'This phone could not finish $loginStage. Your account is unchanged. Please restart VitaLink and try again.');
+
+      String msg = "Login failed";
+
+      if (res["status"] == 401) {
+        msg = "Incorrect password";
+      } else if (res["status"] == 404) {
+        msg = "Account not found";
+      } else if (res["error"] != null) {
+        msg = res["error"];
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+
+      setState(() {
+        _errorMessage = msg;
+      });
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
     }
   }
 

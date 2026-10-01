@@ -16,8 +16,11 @@
     "speakeasy"
   ]
 
-[functions."scheduled-npi-taxonomy-validation"]
-  schedule = "0 14 2 1,7 *"
+[functions."purge_expired_temporary_data"]
+  schedule = "@hourly"
+
+[functions."monitor_temporary_data_cleanup"]
+  schedule = "17 */3 * * *"
 
 [[headers]]
   for = "/.netlify/functions/*"

@@ -4,6 +4,7 @@ import '../models.dart';
 import 'api_service.dart';
 import 'persistent_file_store.dart';
 import 'secure_store.dart';
+import 'profile_share_crypto_service.dart';
 
 class ProfileUpdateSyncService {
   static const List<String> defaultSections = [
@@ -16,9 +17,10 @@ class ProfileUpdateSyncService {
   ];
 
   final SecureStore _store;
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
 
   ProfileUpdateSyncService([SecureStore? store])
-    : _store = store ?? SecureStore();
+      : _store = store ?? SecureStore();
 
   Map<String, dynamic> buildPayload(
     Profile profile, {
@@ -39,8 +41,6 @@ class ProfileUpdateSyncService {
         'city': profile.city,
         'state': profile.state,
         'zip': profile.zip,
-        'isVeteran': profile.isVeteran,
-        'usesVaHealthcare': profile.usesVaHealthcare,
       },
       if (selected.contains('emergency'))
         'emergency': profile.emergency.toJson(),
@@ -60,7 +60,6 @@ class ProfileUpdateSyncService {
   Future<Map<String, dynamic>> publishProfileUpdate(
     Profile profile, {
     List<String> sections = defaultSections,
-    String? pendingShareId,
   }) async {
     final userId = await _store.getString('userId');
 
@@ -69,15 +68,52 @@ class ProfileUpdateSyncService {
     }
 
     try {
+      final sharesResult = await ApiService.getProfileShareLinks(
+        userId: userId,
+        profileId: profile.id,
+      );
+      final shares = sharesResult['shares'] is List
+          ? (sharesResult['shares'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .where((item) => item['status']?.toString() == 'accepted')
+              .toList()
+          : <Map<String, dynamic>>[];
+      final packages = <Map<String, dynamic>>[];
+
+      for (final share in shares) {
+        final shareId = share['id']?.toString() ?? '';
+        final key = shareId.isEmpty ? null : await _crypto.loadKey(shareId);
+        if (key == null || key.isEmpty) continue;
+        final allowed = (share['allowed_sections'] as List? ?? const [])
+            .map((item) => item.toString())
+            .where(sections.contains)
+            .toList();
+        if (allowed.isEmpty) continue;
+        final payload = await PersistentFileStore.attachProfileFileBytes(
+          buildPayload(profile, sections: allowed),
+        );
+        packages.add({
+          'shareId': shareId,
+          'allowedSections': allowed,
+          'encryptedPayload': await _crypto.encryptJson({
+            'profileId': profile.id,
+            'profileName': profile.fullName,
+            'allowedSections': allowed,
+            'payload': payload,
+            'createdAt': DateTime.now().toIso8601String(),
+          }, key),
+        });
+      }
+
+      if (packages.isEmpty) {
+        return {'success': true, 'recipients': 0};
+      }
       return ApiService.createProfileUpdatePackage(
         userId: userId,
         profileId: profile.id,
         profileName: profile.fullName,
-        allowedSections: sections,
-        pendingShareId: pendingShareId,
-        payload: await PersistentFileStore.attachProfileFileBytes(
-          buildPayload(profile, sections: sections),
-        ),
+        packages: packages,
       );
     } catch (e) {
       debugPrint('Profile update publish failed: $e');

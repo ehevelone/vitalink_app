@@ -28,8 +28,6 @@ exports.handler = async function (event) {
     const params = event.queryStringParameters || {};
     const sessionId = params.session_id;
 
-    console.log("Session requested:", sessionId);
-
     if (!sessionId) {
       return {
         statusCode: 400,
@@ -39,23 +37,16 @@ exports.handler = async function (event) {
     }
 
     const client = await pool.connect();
-    let result;
 
-    try {
-      result = await client.query(
-        `SELECT code
-         FROM activation_codes
-         WHERE stripe_session = $1
-           AND purchase_type = 'consumer_activation'
-           AND payment_status = 'paid'
-         LIMIT 1`,
-        [sessionId]
-      );
-    } finally {
-      client.release();
-    }
+    const result = await client.query(
+      `SELECT code
+       FROM activation_codes
+       WHERE stripe_session = $1
+       LIMIT 1`,
+      [sessionId]
+    );
 
-    console.log("DB result:", result.rows);
+    client.release();
 
     if (result.rows.length === 0) {
       return {

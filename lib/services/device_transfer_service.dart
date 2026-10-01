@@ -5,9 +5,12 @@ import 'package:path_provider/path_provider.dart';
 
 import 'api_service.dart';
 import 'data_repository.dart';
+import 'device_id.dart';
+import 'profile_share_crypto_service.dart';
 import 'secure_store.dart';
 
 class DeviceTransferService {
+  static const int _chunkSize = 1500000;
   DeviceTransferService({
     DataRepository? repository,
     SecureStore? store,
@@ -16,30 +19,70 @@ class DeviceTransferService {
 
   final DataRepository _repository;
   final SecureStore _store;
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
 
   Future<Map<String, dynamic>> createTransfer() async {
     final userId = await _requireUserId();
+    final deviceId = await DeviceId.getOrCreate();
     final payload = await _repository.exportDeviceTransferPayload();
     final files = await _collectLocalFiles(payload);
+    final shareKeys = await _collectShareKeys(userId, payload);
+    final key = _crypto.generateKey();
+    final encryptedPayload = await _crypto.encryptJson({
+      ...payload,
+      'files': files,
+      'shareKeys': shareKeys,
+    }, key);
+    final chunks = <String>[];
+    for (var offset = 0;
+        offset < encryptedPayload.length;
+        offset += _chunkSize) {
+      final end = offset + _chunkSize < encryptedPayload.length
+          ? offset + _chunkSize
+          : encryptedPayload.length;
+      chunks.add(encryptedPayload.substring(offset, end));
+    }
 
     final result = await ApiService.createDeviceTransfer(
       userId: userId,
-      payload: {
-        ...payload,
-        'files': files,
-      },
+      deviceId: deviceId,
+      chunkCount: chunks.length,
     );
 
     if (result['success'] != true) {
       throw Exception(result['error'] ?? 'Unable to create transfer.');
     }
 
-    return result;
+    final serverCode = result['transferCode']?.toString() ?? '';
+    final transferId = result['transferId']?.toString() ?? '';
+    if (serverCode.isEmpty || transferId.isEmpty) {
+      throw Exception('Unable to create transfer code.');
+    }
+    for (var i = 0; i < chunks.length; i += 1) {
+      final upload = await ApiService.uploadDeviceTransferChunk(
+        userId: userId,
+        deviceId: deviceId,
+        transferId: transferId,
+        chunkIndex: i,
+        chunkData: chunks[i],
+      );
+      if (upload['success'] != true) {
+        throw Exception(upload['error'] ?? 'Unable to upload transfer data.');
+      }
+    }
+    return {
+      ...result,
+      'transferCode': _crypto.makeToken(serverCode, key),
+    };
   }
 
   Future<Map<String, dynamic>> checkPendingTransfer() async {
     final userId = await _requireUserId();
-    final result = await ApiService.checkDeviceTransfer(userId: userId);
+    final deviceId = await DeviceId.getOrCreate();
+    final result = await ApiService.checkDeviceTransfer(
+      userId: userId,
+      deviceId: deviceId,
+    );
 
     if (result['success'] != true) {
       throw Exception(result['error'] ?? 'Unable to check transfer status.');
@@ -50,25 +93,73 @@ class DeviceTransferService {
 
   Future<void> redeemTransfer(String code) async {
     final userId = await _requireUserId();
+    final deviceId = await DeviceId.getOrCreate();
+    final parsed = _crypto.parseToken(code);
     final result = await ApiService.redeemDeviceTransfer(
       userId: userId,
-      transferCode: code,
+      deviceId: deviceId,
+      transferCode: parsed.code,
     );
 
     if (result['success'] != true) {
       throw Exception(result['error'] ?? 'Unable to load transfer.');
     }
 
-    final payload = Map<String, dynamic>.from(result['payload'] as Map? ?? {});
+    final transferId = result['transferId']?.toString() ?? '';
+    final chunkCount = result['chunkCount'] is int
+        ? result['chunkCount'] as int
+        : int.tryParse(result['chunkCount']?.toString() ?? '') ?? 0;
+    if (transferId.isEmpty || chunkCount < 1) {
+      throw Exception('This transfer package is not available.');
+    }
+    final encryptedBuffer = StringBuffer();
+    for (var i = 0; i < chunkCount; i += 1) {
+      final chunk = await ApiService.getDeviceTransferChunk(
+        userId: userId,
+        deviceId: deviceId,
+        transferId: transferId,
+        chunkIndex: i,
+      );
+      if (chunk['success'] != true || chunk['chunkData'] == null) {
+        throw Exception(chunk['error'] ?? 'Unable to download transfer data.');
+      }
+      encryptedBuffer.write(chunk['chunkData']);
+    }
+    final payload = await _crypto.decryptJson(
+      encryptedBuffer.toString(),
+      parsed.encodedKey,
+    );
     final files = Map<String, dynamic>.from(payload['files'] as Map? ?? {});
+    final shareKeys = Map<String, dynamic>.from(
+      payload['shareKeys'] as Map? ?? {},
+    );
     final restoredPaths = await _restoreLocalFiles(files);
     payload.remove('files');
+    payload.remove('shareKeys');
 
     if (restoredPaths.isNotEmpty) {
       _rewriteTransferredPaths(payload, restoredPaths);
     }
 
     await _repository.importDeviceTransferPayload(payload);
+    for (final entry in shareKeys.entries) {
+      final encodedKey = entry.value?.toString() ?? '';
+      if (encodedKey.isNotEmpty) {
+        await _crypto.storeKey(entry.key, encodedKey);
+      }
+    }
+    if (transferId.isNotEmpty) {
+      final completed = await ApiService.completeDeviceTransfer(
+        userId: userId,
+        deviceId: deviceId,
+        transferId: transferId,
+      );
+      if (completed['success'] != true) {
+        throw Exception(
+          completed['error'] ?? 'Profile loaded, but transfer cleanup failed.',
+        );
+      }
+    }
   }
 
   Future<String> _requireUserId() async {
@@ -77,6 +168,43 @@ class DeviceTransferService {
       throw Exception('Please log in before moving VitaLink to a new device.');
     }
     return userId;
+  }
+
+  Future<Map<String, String>> _collectShareKeys(
+    String userId,
+    Map<String, dynamic> payload,
+  ) async {
+    final keys = <String, String>{};
+    final profiles = payload['profiles'] as List? ?? const [];
+
+    for (final raw in profiles.whereType<Map>()) {
+      final profile = Map<String, dynamic>.from(raw);
+      final recipientShareId =
+          profile['sharedRelationshipId']?.toString() ?? '';
+      if (recipientShareId.isNotEmpty) {
+        final key = await _crypto.loadKey(recipientShareId);
+        if (key != null && key.isNotEmpty) keys[recipientShareId] = key;
+      }
+
+      final profileId = profile['id']?.toString() ?? '';
+      if (profileId.isEmpty) continue;
+      try {
+        final result = await ApiService.getProfileShareLinks(
+          userId: userId,
+          profileId: profileId,
+        );
+        final shares = result['shares'] as List? ?? const [];
+        for (final share in shares.whereType<Map>()) {
+          final shareId = share['id']?.toString() ?? '';
+          if (shareId.isEmpty) continue;
+          final key = await _crypto.loadKey(shareId);
+          if (key != null && key.isNotEmpty) keys[shareId] = key;
+        }
+      } catch (_) {
+        // Profile data can still transfer if a sharing key is unavailable.
+      }
+    }
+    return keys;
   }
 
   Future<Map<String, String>> _collectLocalFiles(

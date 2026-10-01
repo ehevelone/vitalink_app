@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
+import '../services/profile_share_crypto_service.dart';
 import '../services/profile_update_sync_service.dart';
 import '../services/secure_store.dart';
 
@@ -17,6 +18,7 @@ class ProfileSharingScreen extends StatefulWidget {
 class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   final SecureStore _store = SecureStore();
   final DataRepository _repo = DataRepository();
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _inviteCtrl = TextEditingController();
@@ -81,14 +83,24 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     if (!mounted) return;
 
-    setState(() {
-      _loadingShares = false;
-      if (res['success'] == true && res['shares'] is List) {
-        _shares = (res['shares'] as List)
+    final shares = res['success'] == true && res['shares'] is List
+        ? (res['shares'] as List)
             .whereType<Map>()
             .map((s) => Map<String, dynamic>.from(s))
-            .toList();
+            .toList()
+        : <Map<String, dynamic>>[];
+    for (final share in shares) {
+      final shareId = share['id']?.toString() ?? '';
+      final inviteCode = share['invite_code']?.toString() ?? '';
+      final key = shareId.isEmpty ? null : await _crypto.loadKey(shareId);
+      if (inviteCode.isNotEmpty && key != null && key.isNotEmpty) {
+        share['invite_token'] = _crypto.makeInviteToken(inviteCode, key);
       }
+    }
+    if (!mounted) return;
+    setState(() {
+      _loadingShares = false;
+      _shares = shares;
     });
   }
 
@@ -134,66 +146,100 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     if (!mounted) return;
 
-    if (res['success'] != true) {
-      final message =
-          (res['error'] ?? 'Unable to create share link.').toString();
+    if (res['success'] == true) {
+      final share = Map<String, dynamic>.from(res['share'] as Map? ?? {});
+      final shareId = share['id']?.toString() ?? '';
+      final inviteCode = res['inviteCode']?.toString() ?? '';
+      if (shareId.isEmpty || inviteCode.isEmpty) {
+        setState(() {
+          _saving = false;
+          _message = 'Unable to finish creating this share code.';
+        });
+        return;
+      }
+      final key = await _crypto.createAndStoreKey(shareId);
+      final inviteToken = _crypto.makeInviteToken(inviteCode, key);
+      if (!mounted) return;
       setState(() {
         _saving = false;
-        _message = message;
+        _lastInviteCode = inviteToken;
+        _message =
+            'Share code created. Give it to the caregiver in person within 6 hours.';
       });
-      _showMessage(message);
-      return;
+      await _loadShares();
+    } else {
+      setState(() {
+        _saving = false;
+        _message = (res['error'] ?? 'Unable to create share link.').toString();
+      });
     }
-
-    final accepted = res['accepted'] == true;
-    final share = Map<String, dynamic>.from(res['share'] as Map? ?? {});
-    final shareId = share['id']?.toString();
-    final update = !accepted && (shareId == null || shareId.isEmpty)
-        ? <String, dynamic>{'success': false}
-        : await ProfileUpdateSyncService().publishProfileUpdate(
-            profile,
-            sections: _selectedSections,
-            pendingShareId: accepted ? null : shareId,
-          );
-
-    if (!mounted) return;
-
-    final prepared = update['success'] == true &&
-        (update['staged'] == true || (update['recipients'] ?? 0) > 0);
-    final message = prepared
-        ? accepted
-            ? 'Profile connection is active. Current profile sent.'
-            : 'Share code ready. Give it to the recipient; the profile will be available when they accept.'
-        : 'Share code created, but the profile could not be sent. Tap Send Current Profile Update to retry.';
-
-    setState(() {
-      _saving = false;
-      _lastInviteCode = res['inviteCode']?.toString();
-      _message = message;
-    });
-    _showMessage(message);
-    await _loadShares();
   }
 
-  void _acceptInvite() {
-    final code = _inviteCtrl.text.trim().toUpperCase();
+  Future<void> _acceptInvite() async {
+    final token = _inviteCtrl.text.trim();
 
-    if (code.isEmpty) {
+    if (token.isEmpty) {
       _showMessage('Enter the share code first.');
       return;
     }
 
-    Navigator.pushNamed(context, '/profile_accept', arguments: code);
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    final userId = await _store.getString('userId');
+
+    if (!mounted) return;
+
+    if (userId == null || userId.isEmpty) {
+      _showMessage('Please log in again before accepting a profile share.');
+      setState(() => _saving = false);
+      return;
+    }
+
+    late final ({String inviteCode, String encodedKey}) parsed;
+    try {
+      parsed = _crypto.parseInviteToken(token);
+    } on FormatException catch (e) {
+      setState(() {
+        _saving = false;
+        _message = e.message;
+      });
+      return;
+    }
+
+    final res = await ApiService.acceptProfileShareLink(
+      userId: userId,
+      inviteCode: parsed.inviteCode,
+    );
+
+    if (!mounted) return;
+
+    if (res['success'] == true) {
+      final share = Map<String, dynamic>.from(res['share'] as Map? ?? {});
+      final shareId = share['id']?.toString() ?? '';
+      if (shareId.isNotEmpty) {
+        await _crypto.storeKey(shareId, parsed.encodedKey);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _message = res['success'] == true
+          ? 'Profile share accepted. Updates will appear in Profile Updates.'
+          : (res['error'] ?? 'Unable to accept share code.').toString();
+    });
   }
 
   Future<void> _confirmRevokeShare(Map<String, dynamic> share) async {
-    final label = _shareLabel(share);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => _VitaLinkDialog(
         title: 'Revoke Access?',
-        message:
-            'This will stop $label from receiving future updates for this shared profile.',
+        message: 'This caregiver will no longer receive new or updated '
+            'information for this profile. Information previously shared may '
+            'remain on their device and cannot be recalled.',
         actions: [
           _DialogButton(
             label: 'Cancel',
@@ -201,7 +247,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
             onPressed: () => Navigator.pop(context, false),
           ),
           _DialogButton(
-            label: 'Revoke Access',
+            label: 'Stop Sharing Updates',
             danger: true,
             onPressed: () => Navigator.pop(context, true),
           ),
@@ -249,42 +295,27 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
 
     if (res['success'] == true) {
+      await _crypto.deleteKey(shareId);
       await _loadShares();
     }
   }
 
   Future<void> _sendInvite(Map<String, dynamic> share) async {
-    final inviteCode = share['invite_code']?.toString();
+    final inviteCode = share['invite_token']?.toString();
 
     if (inviteCode == null || inviteCode.isEmpty) {
       _showMessage('This share does not have an invite code.');
       return;
     }
 
-    final profileName = share['profile_name']?.toString().trim();
-    final link = 'vitalink://share?code=$inviteCode';
-    final text = [
-      'I shared a VitaLink profile with you.',
-      '',
-      'Tap this link on your phone to accept it:',
-      link,
-      '',
-      'Share code: $inviteCode',
-      if (profileName != null && profileName.isNotEmpty) '',
-      if (profileName != null && profileName.isNotEmpty)
-        'Profile: $profileName',
-    ].join('\n');
-
-    await Share.share(text, subject: 'VitaLink Profile Share');
+    await Clipboard.setData(ClipboardData(text: inviteCode));
+    _showMessage('Share code copied. Give it to the caregiver in person.');
   }
 
   Future<void> _sendCurrentProfileUpdate() async {
-    if (_selectedSections.isEmpty) {
-      _showMessage('Choose at least one section to send.');
-      return;
-    }
-    if (_shares.isEmpty) {
-      _showMessage('Create a share code first.');
+    if (!_shares.any((share) => share['status']?.toString() == 'accepted')) {
+      _showMessage(
+          'A shared profile must be accepted before updates can be sent.');
       return;
     }
 
@@ -294,55 +325,31 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     });
 
     final profile = await _repo.loadProfile();
-    final sync = ProfileUpdateSyncService();
-    final accepted = _shares.any((share) => share['status'] == 'accepted');
-    var sent = false;
-    var staged = false;
-    var failed = false;
-
-    if (accepted) {
-      final res = await sync.publishProfileUpdate(
-        profile,
-        sections: _selectedSections,
-      );
-      sent = res['success'] == true && (res['recipients'] ?? 0) > 0;
-      failed = failed || !sent;
-    }
-
-    for (final share in _shares.where((item) => item['status'] == 'pending')) {
-      final shareId = share['id']?.toString();
-      if (shareId == null || shareId.isEmpty) continue;
-      final res = await sync.publishProfileUpdate(
-        profile,
-        sections: _selectedSections,
-        pendingShareId: shareId,
-      );
-      final prepared = res['success'] == true &&
-          (res['staged'] == true || (res['recipients'] ?? 0) > 0);
-      staged = staged || prepared;
-      failed = failed || !prepared;
-    }
+    final res = await ProfileUpdateSyncService().publishProfileUpdate(
+      profile,
+      sections: _selectedSections,
+    );
 
     if (!mounted) return;
 
     setState(() {
       _saving = false;
-      _message = failed
-          ? sent || staged
-              ? 'Some shares were prepared, but others failed. Check your connection and try again.'
-              : 'Profile upload failed. Check your connection and try again.'
-          : 'Current profile sent or prepared for pending invites.';
+      if (res['success'] == true && (res['recipients'] ?? 0) > 0) {
+        _message = 'Current profile update sent.';
+      } else {
+        _message = (res['message'] ??
+                res['error'] ??
+                'No connected recipients are ready for this update.')
+            .toString();
+      }
     });
-    _showMessage(_message!);
 
-    if (!failed && (sent || staged) && mounted) {
+    if (res['success'] == true && (res['recipients'] ?? 0) > 0 && mounted) {
       await showDialog<void>(
         context: context,
         builder: (context) => _VitaLinkDialog(
           title: 'Profile Sent',
-          message: sent
-              ? 'The current profile update was sent to connected profiles.'
-              : 'The current profile is prepared for pending invites.',
+          message: 'The current profile update was sent to connected profiles.',
           actions: [
             _DialogButton(
               label: 'OK',
@@ -571,7 +578,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   Widget _shareRow(Map<String, dynamic> share) {
     final label = _shareLabel(share);
     final status = share['status']?.toString() ?? 'pending';
-    final inviteCode = share['invite_code']?.toString();
+    final inviteCode = share['invite_token']?.toString();
     final sections = share['allowed_sections'];
     final sectionText = sections is List && sections.isNotEmpty
         ? sections.map((s) => s.toString().replaceAll('_', ' ')).join(', ')
@@ -608,6 +615,11 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               'Code: $inviteCode',
               style: const TextStyle(color: Color(0xFF78C7E7)),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Expires 6 hours after it was created',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
           ],
           const SizedBox(height: 10),
           Wrap(
@@ -621,7 +633,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                     side: const BorderSide(color: Color(0xFF78C7E7)),
                   ),
                   onPressed: _saving ? null : () => _sendInvite(share),
-                  child: const Text('Send Invite'),
+                  child: const Text('Copy Share Code'),
                 ),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(

@@ -33,7 +33,11 @@ class DataRepository {
 
         for (final item in decoded) {
           try {
-            profiles.add(Profile.fromJson(Map<String, dynamic>.from(item)));
+            profiles.add(
+              Profile.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            );
           } catch (_) {
             // skip bad entry only
           }
@@ -108,16 +112,17 @@ class DataRepository {
     final idx = await _getActiveIndex(list);
     final p = list[idx];
 
-    // Older releases created profile IDs in formats that are no longer used.
-    // Migrate only the identifier; replacing the Profile would erase all of
-    // the member's locally stored health and emergency information.
+    // ==========================================================
+    // 🔥 CRITICAL FIX — VALIDATE ID
+    // ==========================================================
     if (p.id.isEmpty || p.id.length < 30) {
-      final previousId = p.id;
-      p.id = Profile().id;
-      p.updatedAt = DateTime.now();
-      await saveProfile(p, publishUpdate: false);
-      debugPrint('Migrated legacy profile ID $previousId to ${p.id}');
-      return p;
+      debugPrint("INVALID PROFILE ID DETECTED - RESETTING");
+
+      final newProfile = Profile(); // generates proper UUID
+      await saveProfile(newProfile, publishUpdate: false);
+
+      await _syncName(newProfile);
+      return newProfile;
     }
 
     // ==========================================================
@@ -129,7 +134,7 @@ class DataRepository {
       await saveProfile(p, publishUpdate: false); // forces clean rewrite
     }
 
-    // 🔥 always sync name to backup storage
+    // Keep the local account display name aligned with the active profile.
     await _syncName(p);
 
     return p;
@@ -151,7 +156,9 @@ class DataRepository {
     };
   }
 
-  Future<void> importDeviceTransferPayload(Map<String, dynamic> payload) async {
+  Future<void> importDeviceTransferPayload(
+    Map<String, dynamic> payload,
+  ) async {
     final rawProfiles = payload['profiles'];
 
     if (rawProfiles is! List || rawProfiles.isEmpty) {
@@ -178,7 +185,10 @@ class DataRepository {
     await _syncName(profiles[activeIndex]);
   }
 
-  Future<void> saveProfile(Profile profile, {bool publishUpdate = true}) async {
+  Future<void> saveProfile(
+    Profile profile, {
+    bool publishUpdate = true,
+  }) async {
     final profiles = await _loadProfilesInternal();
 
     if (profiles.isEmpty) {
@@ -215,13 +225,11 @@ class DataRepository {
   Future<void> applySharedProfileUpdate(
     Map<String, dynamic> updatePayload,
   ) async {
-    updatePayload = await PersistentFileStore.restoreProfileFileBytes(
-      updatePayload,
-    );
+    updatePayload =
+        await PersistentFileStore.restoreProfileFileBytes(updatePayload);
 
-    final profileMap = Map<String, dynamic>.from(
-      updatePayload['profile'] as Map? ?? {},
-    );
+    final profileMap =
+        Map<String, dynamic>.from(updatePayload['profile'] as Map? ?? {});
 
     final profileId = (profileMap['id'] ?? updatePayload['profileId'] ?? '')
         .toString()
@@ -243,6 +251,9 @@ class DataRepository {
           );
 
     final updated = current.copyWith(
+      sharedRelationshipId: updatePayload['_shareRelationshipId']?.toString() ??
+          current.sharedRelationshipId,
+      sharedAccessStatus: 'active',
       fullName: profileMap['fullName'] ?? current.fullName,
       dob: profileMap['dob'] ?? current.dob,
       userPhone: profileMap['userPhone'] ?? current.userPhone,
@@ -250,12 +261,6 @@ class DataRepository {
       city: profileMap['city'] ?? current.city,
       state: profileMap['state'] ?? current.state,
       zip: profileMap['zip'] ?? current.zip,
-      isVeteran: profileMap.containsKey('isVeteran')
-          ? profileMap['isVeteran'] == true
-          : current.isVeteran,
-      usesVaHealthcare: profileMap.containsKey('usesVaHealthcare')
-          ? profileMap['usesVaHealthcare'] == true
-          : current.usesVaHealthcare,
       updatedAt: DateTime.now(),
       emergency: updatePayload['emergency'] is Map
           ? EmergencyInfo.fromJson(
@@ -278,8 +283,7 @@ class DataRepository {
           ? (updatePayload['appointments'] as List)
               .whereType<Map>()
               .map(
-                (a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)),
-              )
+                  (a) => UserAppointment.fromJson(Map<String, dynamic>.from(a)))
               .toList()
           : current.appointments,
       insurances: updatePayload['insurances'] is List
@@ -291,9 +295,7 @@ class DataRepository {
       orphanCards: updatePayload['orphanCards'] is List
           ? (updatePayload['orphanCards'] as List)
               .whereType<Map>()
-              .map(
-                (c) => InsuranceCard.fromJson(Map<String, dynamic>.from(c)),
-              )
+              .map((c) => InsuranceCard.fromJson(Map<String, dynamic>.from(c)))
               .toList()
           : current.orphanCards,
     );
@@ -347,6 +349,7 @@ class DataRepository {
     final profiles = await _loadProfilesInternal();
     if (index < 0 || index >= profiles.length) return;
 
+    await _deleteProfileFiles(profiles[index]);
     profiles.removeAt(index);
 
     int newActive = 0;
@@ -360,5 +363,100 @@ class DataRepository {
     if (profiles.isNotEmpty) {
       await _syncName(profiles[newActive]);
     }
+  }
+
+  Future<void> _deleteProfileFiles(Profile profile) async {
+    final paths = <String>{};
+    void collect(dynamic value) {
+      if (value is Map) {
+        for (final entry in value.entries) {
+          final key = entry.key.toString();
+          final child = entry.value;
+          if (key == 'imagePath' ||
+              key == 'frontImagePath' ||
+              key == 'backImagePath' ||
+              key == 'decPagePaths') {
+            if (child is String && child.isNotEmpty) paths.add(child);
+            if (child is List) {
+              paths
+                  .addAll(child.whereType<String>().where((p) => p.isNotEmpty));
+            }
+          }
+          collect(child);
+        }
+      } else if (value is List) {
+        for (final item in value) {
+          collect(item);
+        }
+      }
+    }
+
+    collect(profile.toJson());
+    for (final path in paths) {
+      await PersistentFileStore.deleteIfLocal(path);
+    }
+  }
+
+  Future<void> clearLocalProfiles() async {
+    final profiles = await _loadProfilesInternal();
+    final paths = <String>{};
+
+    void collect(dynamic value) {
+      if (value is Map) {
+        for (final entry in value.entries) {
+          final key = entry.key.toString();
+          final child = entry.value;
+          if (key == 'imagePath' ||
+              key == 'frontImagePath' ||
+              key == 'backImagePath' ||
+              key == 'decPagePaths') {
+            if (child is String && child.isNotEmpty) paths.add(child);
+            if (child is List) {
+              paths
+                  .addAll(child.whereType<String>().where((p) => p.isNotEmpty));
+            }
+          }
+          collect(child);
+        }
+      } else if (value is List) {
+        for (final item in value) {
+          collect(item);
+        }
+      }
+    }
+
+    collect(profiles.map((p) => p.toJson()).toList());
+    for (final path in paths) {
+      await PersistentFileStore.deleteIfLocal(path);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_profilesKey);
+    await prefs.remove(_activeIndexKey);
+    await _store.remove('userName');
+    await _store.remove('qr_url');
+  }
+
+  Future<void> applySharedAccessStatuses(
+    List<Map<String, dynamic>> relationships,
+  ) async {
+    final profiles = await _loadProfilesInternal();
+    var changed = false;
+    for (var i = 0; i < profiles.length; i += 1) {
+      final relationshipId = profiles[i].sharedRelationshipId;
+      if (relationshipId == null || relationshipId.isEmpty) continue;
+      final match = relationships.cast<Map<String, dynamic>?>().firstWhere(
+            (item) => item?['shareId']?.toString() == relationshipId,
+            orElse: () => null,
+          );
+      if (match == null) continue;
+      final status = match['status']?.toString() ?? 'revoked';
+      final nextStatus = status == 'accepted' ? 'active' : 'revoked';
+      if (profiles[i].sharedAccessStatus != nextStatus) {
+        profiles[i] = profiles[i].copyWith(sharedAccessStatus: nextStatus);
+        changed = true;
+      }
+    }
+    if (changed) await _saveProfilesInternal(profiles);
   }
 }

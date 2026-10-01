@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/profile_share_crypto_service.dart';
 import '../services/secure_store.dart';
 
 class ProfileUpdatesScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class ProfileUpdatesScreen extends StatefulWidget {
 class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
   final SecureStore _store = SecureStore();
   final DataRepository _repo = DataRepository();
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
 
   bool _loading = true;
   String? _error;
@@ -46,11 +48,23 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
     if (!mounted) return;
 
     if (res['success'] == true && res['packages'] is List) {
+      final decrypted = <Map<String, dynamic>>[];
+      for (final raw in (res['packages'] as List).whereType<Map>()) {
+        final item = Map<String, dynamic>.from(raw);
+        final shareId = item['shareId']?.toString() ?? '';
+        final encryptedPayload = item['encryptedPayload']?.toString() ?? '';
+        final key = shareId.isEmpty ? null : await _crypto.loadKey(shareId);
+        if (key == null || key.isEmpty || encryptedPayload.isEmpty) continue;
+        try {
+          item['payload'] = await _crypto.decryptJson(encryptedPayload, key);
+          decrypted.add(item);
+        } catch (_) {
+          // A revoked, replaced, or malformed share cannot be read on this device.
+        }
+      }
+      if (!mounted) return;
       setState(() {
-        _packages = (res['packages'] as List)
-            .whereType<Map>()
-            .map((p) => Map<String, dynamic>.from(p))
-            .toList();
+        _packages = decrypted;
         _loading = false;
       });
       return;
@@ -68,6 +82,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
         Map<String, dynamic>.from(item['payload'] as Map? ?? {});
     final updatePayload =
         Map<String, dynamic>.from(packagePayload['payload'] as Map? ?? {});
+    updatePayload['_shareRelationshipId'] = item['shareId']?.toString();
 
     if (packageId.isEmpty || updatePayload.isEmpty) {
       _showMessage('This update could not be applied.');
@@ -105,9 +120,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
       return 'Emergency profile';
     }
 
-    return sections
-        .map((s) => s.toString().replaceAll('_', ' '))
-        .join(', ');
+    return sections.map((s) => s.toString().replaceAll('_', ' ')).join(', ');
   }
 
   @override
@@ -226,7 +239,8 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
+        border:
+            Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
       ),
       child: child,
     );

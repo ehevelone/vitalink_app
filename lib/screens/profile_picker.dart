@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/profile_share_crypto_service.dart';
 import '../services/secure_store.dart';
 
 class ProfilePickerScreen extends StatefulWidget {
@@ -14,6 +16,8 @@ class ProfilePickerScreen extends StatefulWidget {
 
 class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   late final DataRepository _repo;
+  final SecureStore _store = SecureStore();
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
   List<Profile> _profiles = [];
   int _active = 0;
   bool _loading = true;
@@ -65,6 +69,17 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
     );
 
     if (ok != true) return;
+    final shareId = _profiles[index].sharedRelationshipId;
+    if (shareId != null && shareId.isNotEmpty) {
+      final userId = await _store.getString('userId');
+      if (userId != null && userId.isNotEmpty) {
+        await ApiService.removeSharedProfileCopy(
+          userId: userId,
+          shareId: shareId,
+        );
+      }
+      await _crypto.deleteKey(shareId);
+    }
     await _repo.deleteProfileAt(index);
     await _load();
   }
@@ -102,33 +117,46 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                   final index = entry.key;
                   final p = entry.value;
                   final isActive = index == _active;
+                  final sharingEnded = p.sharedAccessStatus == 'revoked';
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
-                      tileColor: Colors.transparent,
+                      tileColor: sharingEnded
+                          ? Colors.grey.shade200
+                          : Colors.transparent,
                       shape: const Border(
                         bottom: BorderSide(color: Colors.black12),
                       ),
                       leading: Icon(
                         Icons.person,
-                        color: isActive ? Colors.green : Colors.grey,
+                        color: sharingEnded
+                            ? Colors.grey
+                            : (isActive ? Colors.green : Colors.grey),
                         size: 32,
                       ),
                       title: Text(
                         p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile",
-                        style: const TextStyle(fontSize: 18),
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: sharingEnded ? Colors.grey.shade600 : null,
+                        ),
                       ),
-                      subtitle: isActive
+                      subtitle: sharingEnded
                           ? const Text(
-                              "Currently Active",
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              'Sharing ended. You can keep this disabled copy or delete it.',
+                              style: TextStyle(color: Colors.redAccent),
                             )
-                          : null,
-                      onTap: () => _switchTo(index),
+                          : isActive
+                              ? const Text(
+                                  "Currently Active",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                )
+                              : null,
+                      onTap: sharingEnded ? null : () => _switchTo(index),
                       trailing: IconButton(
                         icon: const Icon(
                           Icons.delete_outline,

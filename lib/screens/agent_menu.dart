@@ -19,10 +19,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
   String agentName = "Agent";
   bool _showRegisterUserAccount = false;
   bool _openingUserRegistration = false;
-  bool _notificationDialogOpen = false;
   bool _notificationPermissionDialogShown = false;
-  StreamSubscription<RemoteMessage>? _messageSub;
-  StreamSubscription<RemoteMessage>? _openedSub;
   StreamSubscription<String>? _tokenSub;
 
   @override
@@ -30,6 +27,54 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     super.initState();
     _loadData();
     _setupAgentNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAgentAgreement());
+  }
+
+  Future<void> _checkAgentAgreement() async {
+    final store = SecureStore();
+    final agentId = int.tryParse(await store.getString('agentId') ?? '');
+    if (agentId == null) return;
+    final status = await ApiService.getAgentAgreement(agentId);
+    if (!mounted || status['success'] != true || status['current'] == true) {
+      return;
+    }
+
+    var checked = false;
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Agent Agreement Update'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'You are solely responsible for compliance with applicable CMS and state marketing rules. Client relationship confirmations and messaging consent must always be completed by the client/user, never by the agent. Messaging is allowed only for confirmed clients with active consent. VitaLink records an audit trail of these actions.',
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: checked,
+                  onChanged: (value) =>
+                      setDialogState(() => checked = value ?? false),
+                  title: const Text(
+                      'I understand and agree to these agent responsibilities.'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: checked ? () => Navigator.pop(ctx, true) : null,
+              child: const Text('Accept'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted == true) await ApiService.acceptAgentAgreement(agentId);
   }
 
   Future<void> _registerAgentToken() async {
@@ -67,29 +112,16 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       await _registerAgentToken();
 
       _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((_) {
         _registerAgentToken();
       });
-
-      _messageSub = FirebaseMessaging.onMessage.listen((message) {
-        _showForegroundNotification(message);
-      });
-
-      _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        _handleAgentNotification(message);
-      });
-
-      final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null) {
-        _handleAgentNotification(initial);
-      }
     } catch (e) {
       debugPrint("Agent FCM setup error: $e");
     }
@@ -112,7 +144,10 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
           ),
           title: const Text(
             "Allow Notifications",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: const Text(
             "VitaLink needs notifications turned on so you can receive referral alerts, profile updates, and client messages.",
@@ -139,77 +174,6 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
           ],
         ),
       );
-    });
-  }
-
-  void _handleAgentNotification(RemoteMessage message) {
-    final route = message.data["route"]?.toString();
-    if (!mounted || route == null || route.isEmpty) return;
-
-    Navigator.pushNamed(context, route);
-  }
-
-  void _showForegroundNotification(RemoteMessage message) {
-    if (!mounted || _notificationDialogOpen) return;
-
-    final title =
-        message.notification?.title ??
-        message.data["title"] ??
-        "New Notification";
-    final body =
-        message.notification?.body ??
-        message.data["body"] ??
-        "You have a new notification";
-    final route = message.data["route"]?.toString();
-
-    _notificationDialogOpen = true;
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF111111),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(body, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (Navigator.canPop(context)) Navigator.pop(context);
-              _notificationDialogOpen = false;
-            },
-            child: const Text(
-              "Dismiss",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.lightBlueAccent,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: () {
-              if (Navigator.canPop(context)) Navigator.pop(context);
-              _notificationDialogOpen = false;
-              if (route != null && route.isNotEmpty && mounted) {
-                Navigator.pushNamed(context, route);
-              }
-            },
-            child: const Text(
-              "Open",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    ).then((_) {
-      _notificationDialogOpen = false;
     });
   }
 
@@ -364,13 +328,14 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
     if (!context.mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil('/landing', (route) => false);
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/landing',
+      (route) => false,
+    );
   }
 
   @override
   void dispose() {
-    _messageSub?.cancel();
-    _openedSub?.cancel();
     _tokenSub?.cancel();
     super.dispose();
   }
@@ -415,16 +380,11 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
+                              horizontal: 16, vertical: 10),
                           children: [
                             _item(Icons.badge, "My Agent", '/my_agent_agent'),
-                            _item(
-                              Icons.person,
-                              "My Profile",
-                              '/my_profile_agent',
-                            ),
+                            _item(Icons.person, "My Profile",
+                                '/my_profile_agent'),
                             _item(
                               Icons.document_scanner,
                               "Business Card Scanner",
@@ -434,32 +394,17 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
                             // NEW BUTTON
                             _item(Icons.groups, "My Clients", '/agent_clients'),
-                            _item(
-                              Icons.favorite,
-                              "Referral Center",
-                              '/agent_referrals',
-                            ),
-                            _item(
-                              Icons.task_alt,
-                              "Notes / Tasks",
-                              '/agent_notes',
-                            ),
-                            _item(
-                              Icons.medical_information,
-                              "Medications",
-                              '/meds',
-                            ),
+                            _item(Icons.favorite, "Referral Center",
+                                '/agent_referrals'),
+                            _item(Icons.task_alt, "Notes / Tasks",
+                                '/agent_notes'),
+                            _item(Icons.medical_information, "Medications",
+                                '/meds'),
                             _item(Icons.people, "Doctors", '/doctors'),
-                            _item(
-                              Icons.credit_card,
-                              "Insurance Cards",
-                              '/insurance_cards_menu',
-                            ),
-                            _item(
-                              Icons.policy,
-                              "Insurance Policies",
-                              '/insurance_policies',
-                            ),
+                            _item(Icons.credit_card, "Insurance Cards",
+                                '/insurance_cards_menu'),
+                            _item(Icons.policy, "Insurance Policies",
+                                '/insurance_policies'),
                           ],
                         ),
                       ),
@@ -478,8 +423,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                       backgroundColor: Colors.blue.shade700,
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
+                                          vertical: 16),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -515,8 +459,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                     backgroundColor: Colors.red.shade900,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(30),
                                     ),
@@ -527,9 +470,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                     style: TextStyle(fontSize: 17),
                                   ),
                                   onPressed: () => Navigator.pushNamed(
-                                    context,
-                                    '/emergency',
-                                  ),
+                                      context, '/emergency'),
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -540,8 +481,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                     backgroundColor: Colors.red.shade100,
                                     foregroundColor: Colors.red.shade700,
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(30),
                                     ),
@@ -566,10 +506,17 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
     );
   }
 
-  Widget _item(IconData icon, String text, String route, {Object? arguments}) {
+  Widget _item(
+    IconData icon,
+    String text,
+    String route, {
+    Object? arguments,
+  }) {
     return ListTile(
       tileColor: Colors.transparent,
-      shape: const Border(bottom: BorderSide(color: Colors.black12)),
+      shape: const Border(
+        bottom: BorderSide(color: Colors.black12),
+      ),
       leading: Icon(icon, color: Colors.blue),
       title: Text(text, style: const TextStyle(fontSize: 18)),
       onTap: () => Navigator.pushNamed(context, route, arguments: arguments),

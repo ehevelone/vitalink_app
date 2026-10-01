@@ -1,58 +1,9 @@
-class VitaLinkRegistrationLink {
-  final String code;
-  final String route;
-  final String? onboardingCode;
-
-  const VitaLinkRegistrationLink(this.code, this.route, {this.onboardingCode});
-
-  static VitaLinkRegistrationLink? fromUri(Uri uri) {
-    if (uri.scheme != 'vitalink' ||
-        !const {'activate', 'register', 'agent'}.contains(uri.host)) {
-      return null;
-    }
-
-    final onboardingCode = uri.queryParameters['onboard']?.trim().toUpperCase();
-    if (uri.host == 'activate' && onboardingCode != null) {
-      if (!RegExp(r'^[A-Z0-9-]{1,64}$').hasMatch(onboardingCode)) {
-        return null;
-      }
-      return VitaLinkRegistrationLink(
-        '',
-        '/terms_user',
-        onboardingCode: onboardingCode,
-      );
-    }
-
-    final queryCode = uri.queryParameters['code'];
-    final legacyCode = uri.host == 'activate' && uri.pathSegments.isNotEmpty
-        ? uri.pathSegments.first
-        : null;
-    final code = (queryCode ?? legacyCode ?? '').trim().toUpperCase();
-    if (code.isEmpty || !RegExp(r'^[A-Z0-9-]{1,64}$').hasMatch(code)) {
-      return null;
-    }
-
-    final kind = uri.queryParameters['kind']?.toLowerCase();
-    final isAgent = kind == 'agent' ||
-        (kind == null && const {'register', 'agent'}.contains(uri.host));
-    return VitaLinkRegistrationLink(
-      code,
-      isAgent ? '/terms_agent' : '/terms_user',
-    );
-  }
-}
-
 class VitaLinkDeepLink {
   static String? code;
-  static String? onboardingCode;
   static String? shareCode;
 
   static void setCode(String? value) {
     code = value;
-  }
-
-  static void clearOnboardingCode() {
-    onboardingCode = null;
   }
 
   static void setShareCode(String? value) {

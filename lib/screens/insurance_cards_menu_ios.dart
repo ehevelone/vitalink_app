@@ -8,7 +8,6 @@ import '../services/data_repository.dart';
 import '../services/api_service.dart';
 import '../services/persistent_file_store.dart';
 import '../services/secure_store.dart';
-import '../widgets/working_overlay.dart';
 import 'insurance_card_detail.dart';
 
 class IOSCardScanScreen extends StatefulWidget {
@@ -26,8 +25,6 @@ class _IOSCardScanScreenState
   Profile? _p;
   bool _loading = true;
   bool _error = false;
-  bool _captureInProgress = false;
-  bool _scanning = false;
 
   @override
   void initState() {
@@ -62,9 +59,6 @@ class _IOSCardScanScreenState
   }
 
   Future<void> _scanCard() async {
-    if (_scanning || _captureInProgress) return;
-    setState(() => _captureInProgress = true);
-
     try {
       final status = await Permission.camera.request();
 
@@ -122,13 +116,6 @@ class _IOSCardScanScreenState
 
       if (images.isEmpty) return;
 
-      if (mounted) {
-        setState(() {
-          _captureInProgress = false;
-          _scanning = true;
-        });
-      }
-
       final front = await PersistentFileStore.saveImageFile(
         images[0],
         folder: 'insurance_cards',
@@ -181,13 +168,6 @@ class _IOSCardScanScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Scanner error: $e")),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _captureInProgress = false;
-          _scanning = false;
-        });
-      }
     }
   }
 
@@ -265,16 +245,14 @@ class _IOSCardScanScreenState
 
     return Scaffold(
       appBar: AppBar(title: const Text("Insurance Cards")),
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
           Padding(
             padding: const EdgeInsets.all(12),
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _scanning || _captureInProgress ? null : _scanCard,
+                onPressed: _scanCard,
 style: FilledButton.styleFrom(
   backgroundColor: Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
   foregroundColor: Colors.white,
@@ -367,12 +345,6 @@ style: FilledButton.styleFrom(
                     },
                   ),
           ),
-            ],
-          ),
-          if (_scanning)
-            const WorkingOverlay(
-              message: 'Processing and saving your insurance card...',
-            ),
         ],
       ),
     );

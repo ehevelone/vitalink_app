@@ -83,8 +83,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
       final stored = await store.getString("agentPromoCode");
       if (_promoCode == null && stored != null) {
         _promoCode = stored;
-        _deepLink =
-            "https://myvitalink.app/agent-success.html?code=$stored";
+        _deepLink = "https://myvitalink.app/agent-success.html?code=$stored";
       }
     } catch (_) {
       await _loadStoredAgentInfo(store);
@@ -101,8 +100,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     _agentNpn = await store.getString("agentNpn");
     _agencyName = await store.getString("agencyName");
     _agencyAddress = await store.getString("agencyAddress");
-    _businessCardImageBase64 =
-        await store.getString("agentBusinessCardImage");
+    _businessCardImageBase64 = await store.getString("agentBusinessCardImage");
   }
 
   Future<void> _copyInviteLink() async {
@@ -119,8 +117,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
 
     setState(() => _loading = true);
 
-    final res =
-        await ApiService.sendNotification(agentEmail: _agentEmail!);
+    final res = await ApiService.sendNotification(agentEmail: _agentEmail!);
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -345,9 +342,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                         child: _agentCardDisplay(displayName),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
                     if (_promoCode != null && _deepLink != null)
                       Card(
                         color: const Color(0xfff7eff9),
@@ -372,12 +367,6 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                 size: 210,
                                 version: QrVersions.auto,
                                 backgroundColor: Colors.white,
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                "Ask clients to install VitaLink before scanning. If they scan first, they can return to the invitation page or enter this code manually.",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, color: Colors.black87),
                               ),
                               const SizedBox(height: 12),
                               SelectableText(
@@ -414,9 +403,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                           ),
                         ),
                       ),
-
                     const SizedBox(height: 28),
-
                     _actionButton(
                       icon: Icons.document_scanner,
                       label: "Scan Business Card",

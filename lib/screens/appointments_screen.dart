@@ -9,7 +9,6 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../widgets/working_overlay.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
@@ -457,11 +456,22 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Appointments'),
+        actions: [
+          if (_syncing)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+        ],
       ),
-      body: Stack(
-        children: [
-          appointments.isEmpty
-              ? const Center(
+      body: appointments.isEmpty
+          ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
@@ -469,8 +479,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-                )
-              : ListView.separated(
+            )
+          : ListView.separated(
               itemCount: appointments.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, index) {
@@ -501,13 +511,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       : () => _addOrEdit(existing: item, index: originalIndex),
                 );
               },
-                ),
-          if (_syncing)
-            const WorkingOverlay(message: 'Saving your appointment...'),
-        ],
-      ),
+            ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _syncing ? null : () => _addOrEdit(),
+        onPressed: () => _addOrEdit(),
         child: const Icon(Icons.add),
       ),
     );

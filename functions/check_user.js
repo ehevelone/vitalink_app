@@ -1,7 +1,13 @@
-// functions/check_user.js
 const db = require("./services/db");
 const crypto = require("crypto");
 const { hashPassword, verifyPassword } = require("./services/passwords");
+const { ensureAccountAccessSchema } = require("./services/account-access");
+const {
+  ensureDeviceSecuritySchema,
+  recordDeviceEvent,
+  notifyRevokedDevices,
+} = require("./services/device-security");
+const { ensureSchema: ensureDeviceTransferSchema } = require("./services/device-transfer");
 
 const headers = {
   "Content-Type": "application/json",
@@ -9,137 +15,137 @@ const headers = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-function reply(success, obj = {}, code = 200) {
-  return {
-    statusCode: code,
-    headers,
-    body: JSON.stringify({ success, ...obj }),
-  };
-}
+const reply = (success, obj = {}, code = 200) => ({
+  statusCode: code,
+  headers,
+  body: JSON.stringify({ success, ...obj }),
+});
 
 async function ensureUserSessionColumns() {
-  await db.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_token TEXT,
-    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
-  `);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS session_token TEXT, ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ`);
 }
 
 async function createUserSession(userId) {
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
-
-  await db.query(
-    `
-    UPDATE users
-    SET session_token = $1,
-        session_expires = $2
-    WHERE id = $3
-    `,
-    [token, expires, userId]
-  );
-
+  await db.query(`UPDATE users SET session_token=$1, session_expires=$2 WHERE id=$3`, [token, expires, userId]);
   return token;
 }
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod === "OPTIONS") {
-      return { statusCode: 200, headers, body: "" };
-    }
-
-    if (event.httpMethod !== "POST") {
-      return reply(false, { error: "Method Not Allowed" }, 405);
-    }
+    if (event.httpMethod === "OPTIONS") return { statusCode: 200, headers, body: "" };
+    if (event.httpMethod !== "POST") return reply(false, { error: "Method Not Allowed" }, 405);
 
     await ensureUserSessionColumns();
+    await ensureAccountAccessSchema();
+    await ensureDeviceSecuritySchema();
 
-    const { email, password, device_id, replace } =
-      JSON.parse(event.body || "{}");
+    const body = JSON.parse(event.body || "{}");
+    const { email, password, device_id: deviceId, replace, platform } = body;
+    const replacementReason = ["lost", "stolen", "replaced"].includes(body.replacement_reason)
+      ? body.replacement_reason
+      : "replaced";
 
-    console.log("DEVICE RECEIVED:", device_id);
-
-    if (!email || !password) {
-      return reply(false, { error: "Email and password required" }, 400);
+    if (!email || !password || !deviceId) {
+      return reply(false, { error: "Email, password, and device are required" }, 400);
     }
 
     const result = await db.query(
-      `SELECT id, email, password_hash, first_name, last_name, agent_id
-       FROM users
-       WHERE LOWER(email) = LOWER($1)
-       LIMIT 1`,
+      `SELECT id, email, password_hash, first_name, last_name, agent_id,
+              access_sponsor, relationship_status, messaging_consent_status
+       FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`,
       [email.trim()]
     );
-
-    if (!result.rows.length) {
-      return reply(false, { error: "User not found" }, 404);
-    }
+    if (!result.rows.length) return reply(false, { error: "User not found" }, 404);
 
     const user = result.rows[0];
     const passwordCheck = await verifyPassword(password, user.password_hash);
-    const valid = passwordCheck.valid;
-
-    if (!valid) {
-      return reply(false, { error: "Invalid password" }, 401);
-    }
-
+    if (!passwordCheck.valid) return reply(false, { error: "Invalid password" }, 401);
     if (passwordCheck.legacy) {
-      await db.query(
-        `
-        UPDATE users
-        SET password_hash = $1
-        WHERE id = $2
-        `,
-        [await hashPassword(password), user.id]
-      );
+      await db.query("UPDATE users SET password_hash=$1 WHERE id=$2", [await hashPassword(password), user.id]);
     }
 
-    // 🔒 DEVICE ENFORCEMENT ONLY IF NO AGENT
-    if (!user.agent_id && device_id) {
-      const deviceResult = await db.query(
-        `SELECT id, device_id
-         FROM user_devices
-         WHERE user_id = $1
-         LIMIT 1`,
-        [user.id]
-      );
+    const sameDevice = await db.query(
+      `SELECT * FROM user_devices WHERE user_id=$1 AND device_id=$2 LIMIT 1`,
+      [user.id, deviceId]
+    );
+    if (sameDevice.rows.length && sameDevice.rows[0].device_status !== "active") {
+      return reply(false, { error: "DEVICE_REVOKED", reason: sameDevice.rows[0].revocation_reason }, 403);
+    }
 
-      if (!deviceResult.rows.length) {
-        await db.query(
-          `INSERT INTO user_devices (user_id, device_id, created_at, updated_at)
-           VALUES ($1, $2, NOW(), NOW())`,
-          [user.id, device_id]
+    const activeDevices = await db.query(
+      `SELECT * FROM user_devices
+       WHERE user_id=$1 AND device_status='active' AND COALESCE(device_id,'')<>$2
+       ORDER BY updated_at DESC`,
+      [user.id, deviceId]
+    );
+
+    if (activeDevices.rows.length && replace !== true) {
+      return reply(false, {
+        error: "DEVICE_ACTIVE",
+        activeDevice: {
+          platform: activeDevices.rows[0].platform,
+          lastSeenAt: activeDevices.rows[0].last_seen_at || activeDevices.rows[0].updated_at,
+        },
+      }, 403);
+    }
+
+    if (activeDevices.rows.length && replace === true) {
+      if (replacementReason === "replaced") {
+        await ensureDeviceTransferSchema();
+        const transfer = await db.query(
+          `SELECT p.id
+           FROM device_transfer_packages p
+           WHERE p.user_id=$1 AND p.status='pending' AND p.expires_at>NOW()
+             AND p.chunk_count>0
+             AND p.chunk_count=(
+               SELECT COUNT(*)::INTEGER
+               FROM device_transfer_chunks c
+               WHERE c.transfer_id=p.id
+             )
+           ORDER BY p.created_at DESC
+           LIMIT 1`,
+          [user.id]
         );
-      } else {
-        const existingDevice = deviceResult.rows[0].device_id;
-
-        if (!existingDevice) {
-          await db.query(
-            `UPDATE user_devices
-             SET device_id = $1, updated_at = NOW()
-             WHERE user_id = $2`,
-            [device_id, user.id]
-          );
-        } else if (existingDevice !== device_id) {
-          if (replace === true) {
-            await db.query(
-              `UPDATE user_devices
-               SET device_id = $1, updated_at = NOW()
-               WHERE user_id = $2`,
-              [device_id, user.id]
-            );
-          } else {
-            return reply(false, { error: "DEVICE_ACTIVE" }, 403);
-          }
+        if (!transfer.rows.length) {
+          return reply(false, {
+            error: "TRANSFER_REQUIRED",
+            message: "Create a transfer code on the old device before replacing it.",
+          }, 409);
         }
       }
+      await db.query(
+        `UPDATE user_devices
+         SET device_status=$1, revoked_at=NOW(), revocation_reason=$2, updated_at=NOW()
+         WHERE user_id=$3 AND device_status='active' AND COALESCE(device_id,'')<>$4`,
+        [replacementReason === "replaced" ? "replaced" : replacementReason, replacementReason, user.id, deviceId]
+      );
+      for (const oldDevice of activeDevices.rows) {
+        await recordDeviceEvent(
+          user.id,
+          oldDevice.device_id,
+          replacementReason === "replaced" ? "device_replaced" : "device_revoked",
+          replacementReason,
+          oldDevice.platform
+        );
+      }
+      await notifyRevokedDevices(activeDevices.rows, replacementReason);
     }
 
-    // ✅ Agent users skip device enforcement completely
+    await db.query(
+      `INSERT INTO user_devices
+        (user_id, agent_id, device_id, platform, device_status, last_seen_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'active',NOW(),NOW(),NOW())
+       ON CONFLICT (user_id, device_id) WHERE user_id IS NOT NULL AND device_id IS NOT NULL
+       DO UPDATE SET agent_id=EXCLUDED.agent_id, platform=EXCLUDED.platform,
+         device_status='active', revoked_at=NULL, revocation_reason=NULL,
+         last_seen_at=NOW(), updated_at=NOW()`,
+      [user.id, user.agent_id || null, deviceId, platform || "unknown"]
+    );
+    await recordDeviceEvent(user.id, deviceId, replace === true ? "replacement_activated" : "login", replacementReason, platform);
 
     const sessionToken = await createUserSession(user.id);
-
     return reply(true, {
       user: {
         id: user.id,
@@ -147,12 +153,14 @@ exports.handler = async (event) => {
         firstName: user.first_name,
         lastName: user.last_name,
         agent_id: user.agent_id,
+        access_sponsor: user.access_sponsor,
+        relationship_status: user.relationship_status,
+        messaging_consent_status: user.messaging_consent_status,
         session_token: sessionToken,
       },
     });
-
   } catch (err) {
-    console.error("❌ check_user error:", err);
+    console.error("check_user error:", err);
     return reply(false, { error: "Server error" }, 500);
   }
 };

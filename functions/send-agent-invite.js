@@ -23,8 +23,6 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
 
-    console.log("BODY:", body);
-
     if (!body.email || !body.agent_id || !body.agent_name) {
       return {
         statusCode: 400,
@@ -59,9 +57,6 @@ exports.handler = async (event) => {
     // ⏳ Expiration (24 hours)
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    console.log("🔎 INSERTING INVITE:", body.email);
-    console.log("AGENT ID:", body.agent_id, typeof body.agent_id);
-
     // 💾 Store invite
     const insert = await db.query(
       `INSERT INTO agent_invites (client_email, new_agent_id, token_hash, expires_at)
@@ -74,8 +69,6 @@ exports.handler = async (event) => {
         expiresAt
       ]
     );
-
-    console.log("✅ INSERT RESULT:", insert.rows);
 
     // 🔗 Build link
     const link = `https://vitalink-app.netlify.app/.netlify/functions/accept-agent-invite?token=${token}`;

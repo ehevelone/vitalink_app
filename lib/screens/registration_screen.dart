@@ -3,13 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../l10n/app_strings.dart';
-import '../models.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
 import '../services/deep_link_service.dart';
 import '../services/secure_store.dart';
+import '../services/device_id.dart';
 import '../widgets/password_rules.dart';
 import '../widgets/safe_bottom_button.dart';
 import '../utils/phone_formatter.dart';
@@ -42,11 +41,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _activationCodeCtrl = TextEditingController();
-  final _onboardingCodeCtrl = TextEditingController();
-  String? _loadedOnboardingCode;
-  Map<String, dynamic>? _onboardingPayload;
-  String? _onboardingMessage;
-  bool _onboardingLookupRunning = false;
 
   bool _loading = false;
   bool _showPassword = false;
@@ -56,6 +50,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _lookupRunning = false;
   bool _argsLoaded = false;
   bool _agentAccountPrefilled = false;
+  String _relationshipType = 'client';
+  String? _accessCodeType;
 
   @override
   void didChangeDependencies() {
@@ -65,38 +61,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _argsLoaded = true;
 
     final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map && args['fromAgentAccount'] == true) {
-      _agentAccountPrefilled = true;
-      _nameCtrl.text = args['name']?.toString() ?? '';
-      _emailCtrl.text = args['email']?.toString() ?? '';
-      _phoneCtrl.text = args['phone']?.toString() ?? '';
-      _activationCodeCtrl.text =
-          args['code']?.toString().trim().toUpperCase() ?? '';
-
-      final password = args['password']?.toString() ?? '';
-      _passwordCtrl.text = password;
-      _confirmCtrl.text = password;
-      _activationLoaded = _activationCodeCtrl.text.isNotEmpty;
-      return;
-    }
-
-    final onboardingCode =
-        (args is Map ? args['onboard'] : null)
-            ?.toString()
-            .trim()
-            .toUpperCase() ??
-        VitaLinkDeepLink.onboardingCode?.trim().toUpperCase();
-    if (onboardingCode != null && onboardingCode.isNotEmpty) {
-      _onboardingCodeCtrl.text = onboardingCode;
-      VitaLinkDeepLink.clearOnboardingCode();
-      _lookupAssistedOnboarding();
-      return;
-    }
-
     String? code;
 
     if (args is Map && args['code'] != null) {
       code = args['code'].toString().trim().toUpperCase();
+    }
+
+    if (args is Map && args['fromAgentAccount'] == true) {
+      _agentAccountPrefilled = true;
+      _accessCodeType = 'agent';
+      _nameCtrl.text = args['name']?.toString() ?? "";
+      _emailCtrl.text = args['email']?.toString() ?? "";
+      _phoneCtrl.text = args['phone']?.toString() ?? "";
+
+      final password = args['password']?.toString() ?? "";
+      _passwordCtrl.text = password;
+      _confirmCtrl.text = password;
     }
 
     code ??= VitaLinkDeepLink.code?.trim().toUpperCase();
@@ -108,7 +88,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         VitaLinkDeepLink.clear();
       }
 
-      _lookupActivation();
+      if (_agentAccountPrefilled) {
+        _activationLoaded = true;
+      } else {
+        _lookupActivation();
+      }
     }
   }
 
@@ -127,116 +111,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _activationCodeCtrl.dispose();
-    _onboardingCodeCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _lookupAssistedOnboarding() async {
-    final code = _normalizeCode(_onboardingCodeCtrl.text);
-    if (code.isEmpty || _onboardingLookupRunning) return;
-    setState(() {
-      _onboardingLookupRunning = true;
-      _loadedOnboardingCode = null;
-      _onboardingPayload = null;
-      _onboardingMessage = null;
-    });
-
-    try {
-      final result = await ApiService.getAssistedOnboarding(code);
-      if (!mounted) return;
-      if (result['success'] != true) {
-        setState(
-          () => _onboardingMessage =
-              (result['error'] ??
-                      AppStrings.of(context).assistedOnboardingExpired)
-                  .toString(),
-        );
-        return;
-      }
-
-      final payload = Map<String, dynamic>.from(
-        result['payload'] as Map? ?? {},
-      );
-      final profile = Map<String, dynamic>.from(
-        payload['profile'] as Map? ?? {},
-      );
-      final activationCode = (payload['activationCode'] ?? '')
-          .toString()
-          .trim();
-      if (payload['version'] != 'vitalink.assisted_onboarding.v1' ||
-          profile.isEmpty ||
-          activationCode.isEmpty) {
-        setState(
-          () => _onboardingMessage =
-              'This onboarding information is incomplete. Ask your agent for a new code.',
-        );
-        return;
-      }
-      if (_normalizeCode(_onboardingCodeCtrl.text) != code) return;
-
-      setState(() {
-        _loadedOnboardingCode = code;
-        _onboardingPayload = payload;
-        _onboardingMessage = AppStrings.of(context).assistedOnboardingLoaded;
-        _activationCodeCtrl.text = activationCode;
-        _nameCtrl.text = (profile['fullName'] ?? '').toString();
-        _emailCtrl.text = (profile['email'] ?? '').toString();
-        _phoneCtrl.text = (profile['userPhone'] ?? '').toString();
-        _addressCtrl.text = (profile['address'] ?? '').toString();
-        _cityCtrl.text = (profile['city'] ?? '').toString();
-        _stateCtrl.text = (profile['state'] ?? '').toString();
-        _zipCtrl.text = (profile['zip'] ?? '').toString();
-        _activationLoaded = true;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _onboardingMessage =
-              'Could not load this onboarding code. Please try again.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _onboardingLookupRunning = false);
-    }
-  }
-
-  List<String> _onboardingReviewLines() {
-    final payload = _onboardingPayload;
-    if (payload == null) return [];
-    final profile = Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
-    final emergency = Map<String, dynamic>.from(
-      payload['emergency'] as Map? ?? {},
-    );
-    final contacts = (emergency['contacts'] as List? ?? [])
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
-    final strings = AppStrings.of(context);
-    final lines = <String>[];
-    void add(String label, Object? value) {
-      final text = value?.toString().trim() ?? '';
-      if (text.isNotEmpty) lines.add('$label: $text');
-    }
-
-    add(strings.dateOfBirth, profile['dob']);
-    if (profile['isVeteran'] == true) add('Veteran', 'Yes');
-    if (profile['usesVaHealthcare'] == true) add('Uses VA health care', 'Yes');
-    for (var i = 0; i < contacts.length; i++) {
-      final contact = contacts[i];
-      add(
-        strings.emergencyContactNumber(i + 1),
-        [contact['name'], contact['phone']]
-            .map((value) => value?.toString().trim() ?? '')
-            .where((value) => value.isNotEmpty)
-            .join(' - '),
-      );
-    }
-    add(strings.bloodType, emergency['bloodType']);
-    add(strings.allergies, emergency['allergies']);
-    add(strings.conditions, emergency['conditions']);
-    add(strings.implantedDevices, emergency['implants']);
-    add(strings.majorProcedures, emergency['procedures']);
-    return lines;
   }
 
   Future<void> _lookupActivation() async {
@@ -249,14 +124,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _lookupRunning = true;
 
     try {
-      final res = await ApiService.lookupActivation(code);
+      final access = await ApiService.validateAccessCode(code);
 
       if (!mounted) return;
 
-      if (res['success'] == true) {
+      if (access['success'] == true) {
+        final type = access['type']?.toString();
+        var name = '';
+        var email = '';
+        if (type == 'personal') {
+          final details = await ApiService.lookupActivation(code);
+          if (details['success'] == true) {
+            name = (details['name'] ?? '').toString();
+            email = (details['email'] ?? '').toString();
+          }
+        }
+        if (!mounted) return;
         setState(() {
-          _nameCtrl.text = (res['name'] ?? "").toString();
-          _emailCtrl.text = (res['email'] ?? "").toString();
+          _accessCodeType = type;
+          if (name.isNotEmpty) _nameCtrl.text = name;
+          if (email.isNotEmpty) _emailCtrl.text = email;
           _activationLoaded = true;
         });
       }
@@ -311,7 +198,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
 
     final tld = email.split(".").last;
-    const commonTypos = {"coim", "comm", "conm", "cmo", "ocm", "cpm", "gom"};
+    const commonTypos = {
+      "coim",
+      "comm",
+      "conm",
+      "cmo",
+      "ocm",
+      "cpm",
+      "gom",
+    };
     if (commonTypos.contains(tld)) {
       return "Check the email ending. Did you mean .com?";
     }
@@ -320,14 +215,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Future<void> _register() async {
-    if (_onboardingCodeCtrl.text.trim().isNotEmpty &&
-        _loadedOnboardingCode != _normalizeCode(_onboardingCodeCtrl.text)) {
-      setState(
-        () => _onboardingMessage =
-            'Load your onboarding code before completing registration.',
-      );
-      return;
-    }
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
@@ -338,11 +225,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final code = _normalizeCode(_activationCodeCtrl.text);
       final email = _normalizeEmail(_emailCtrl.text);
 
+      final agentRes = await ApiService.validateAccessCode(code);
+
+      if (agentRes['success'] != true) {
+        throw Exception("Invalid or inactive activation code");
+      }
+      _accessCodeType = agentRes['type']?.toString();
+
       final nameParts = _nameCtrl.text.trim().split(" ");
       final firstName = nameParts.first;
-      final lastName = nameParts.length > 1
-          ? nameParts.sublist(1).join(" ")
-          : "User";
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(" ") : "User";
 
       final registerRes = await ApiService.registerUser(
         firstName: firstName,
@@ -352,6 +245,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         password: _passwordCtrl.text.trim(),
         promoCode: code,
         platform: Platform.isIOS ? "ios" : "android",
+        deviceId: await DeviceId.getOrCreate(),
+        relationshipType:
+            _accessCodeType == 'agent' ? _relationshipType : 'personal',
       );
 
       if (registerRes['success'] != true) {
@@ -380,9 +276,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final profile = await repo.loadProfile();
 
       profile.fullName = _nameCtrl.text.trim();
-      profile.emergency = profile.emergency.copyWith(
-        phone: _phoneCtrl.text.trim(),
-      );
+      profile.emergency =
+          profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
       profile.userPhone = _phoneCtrl.text.trim();
 
       // ✅ SAVE ADDRESS DATA
@@ -391,50 +286,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.state = _stateCtrl.text.trim();
       profile.zip = _zipCtrl.text.trim();
 
-      if (_onboardingPayload != null) {
-        final assistedProfile = Map<String, dynamic>.from(
-          _onboardingPayload!['profile'] as Map? ?? {},
-        );
-        final dob = assistedProfile['dob']?.toString().trim();
-        if (dob != null && dob.isNotEmpty) profile.dob = dob;
-        profile.isVeteran =
-            assistedProfile['isVeteran'] == true ||
-            assistedProfile['is_veteran'] == true;
-        profile.usesVaHealthcare =
-            profile.isVeteran &&
-            (assistedProfile['usesVaHealthcare'] == true ||
-                assistedProfile['uses_va_healthcare'] == true);
-        final emergency = Map<String, dynamic>.from(
-          _onboardingPayload!['emergency'] as Map? ?? {},
-        );
-        if (emergency.isNotEmpty) {
-          profile.emergency = EmergencyInfo.fromJson(emergency);
-        }
-      }
-
       profile.registered = true;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
-
-      // Keep legacy demographic keys aligned with the active Profile while
-      // older screens finish transitioning to the Profile model.
-      await store.setString('profileName', profile.fullName);
-      await store.setString('profilePhone', profile.userPhone);
-      await store.setString('profileAddress', profile.address ?? '');
-      await store.setString('profileCity', profile.city ?? '');
-      await store.setString('profileState', profile.state ?? '');
-      await store.setString('profileZip', profile.zip ?? '');
-
-      if (_loadedOnboardingCode != null) {
-        final claim = await ApiService.claimAssistedOnboarding(
-          code: _loadedOnboardingCode!,
-          userId: user['id'].toString(),
-        );
-        if (claim['success'] != true) {
-          debugPrint('Assisted onboarding claim failed after registration');
-        }
-      }
 
       await AppState.setLoggedIn(true);
       await AppState.setRole('user');
@@ -443,16 +298,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       if (_agentAccountPrefilled) {
-        Navigator.pushNamedAndRemoveUntil(context, '/menu', (_) => false);
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/account_access', (_) => false);
       } else {
-        Navigator.pushReplacementNamed(context, '/menu');
+        Navigator.pushReplacementNamed(context, '/account_access');
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Registration failed: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registration failed: $e")),
+      );
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -493,55 +349,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-              ] else ...[
-                Text(
-                  AppStrings.of(context).assistedOnboardingPromptTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(AppStrings.of(context).assistedOnboardingPromptBody),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _onboardingCodeCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.of(context).onboardingCode,
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (_) {
-                    setState(() {
-                      _loadedOnboardingCode = null;
-                      _onboardingPayload = null;
-                      _onboardingMessage = null;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: ElevatedButton(
-                    onPressed: _loading || _onboardingLookupRunning
-                        ? null
-                        : _lookupAssistedOnboarding,
-                    child: Text(AppStrings.of(context).loadMyInfo),
-                  ),
-                ),
-                if (_onboardingMessage != null) ...[
-                  const SizedBox(height: 8),
-                  Text(_onboardingMessage!),
-                ],
-                if (_onboardingReviewLines().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    AppStrings.of(context).reviewAgentEnteredDetails,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ..._onboardingReviewLines().map(Text.new),
-                ],
-                const SizedBox(height: 20),
               ],
               const Text(
                 "ENTER YOUR ACTIVATION CODE",
@@ -566,6 +373,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              if (_accessCodeType != 'personal') ...[
+                const Text(
+                  'YOUR CONNECTION',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'client',
+                      icon: Icon(Icons.verified_user_outlined),
+                      label: Text('Current client'),
+                    ),
+                    ButtonSegment(
+                      value: 'prospect',
+                      icon: Icon(Icons.person_search_outlined),
+                      label: Text('Not a client yet'),
+                    ),
+                  ],
+                  selected: {_relationshipType},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _relationshipType = selection.first),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This helps VitaLink apply the correct communication permissions. The client/user will confirm this after registration.',
+                  style: TextStyle(color: Colors.black54, height: 1.35),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               TextFormField(
                 controller: _nameCtrl,
@@ -638,9 +476,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _showPassword ? Icons.visibility : Icons.visibility_off,
-                    ),
+                    icon: Icon(_showPassword
+                        ? Icons.visibility
+                        : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _showPassword = !_showPassword;
@@ -662,11 +500,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 decoration: InputDecoration(
                   labelText: "Confirm Password",
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _showConfirmPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
+                    icon: Icon(_showConfirmPassword
+                        ? Icons.visibility
+                        : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _showConfirmPassword = !_showConfirmPassword;

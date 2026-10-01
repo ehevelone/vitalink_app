@@ -1,6 +1,7 @@
 const db = require("./services/db");
 const {
   clean,
+  cleanupExpiredShareInvites,
   ensureSchema,
   parseBody,
   reply,
@@ -15,6 +16,7 @@ exports.handler = async (event) => {
     }
 
     await ensureSchema();
+    await cleanupExpiredShareInvites();
 
     const body = parseBody(event);
     const userId = clean(body.userId || body.user_id);

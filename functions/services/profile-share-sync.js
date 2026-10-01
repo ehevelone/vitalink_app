@@ -1,7 +1,6 @@
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const db = require("./db");
-const { encrypt, decrypt } = require("../encrypt");
 
 const corsHeaders = {
   "Content-Type": "application/json",
@@ -83,11 +82,36 @@ async function ensureSchema() {
       profile_name TEXT,
       allowed_sections JSONB NOT NULL DEFAULT '["emergency"]'::jsonb,
       status TEXT NOT NULL DEFAULT 'pending',
-      invite_code TEXT UNIQUE NOT NULL,
+      invite_code TEXT UNIQUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       accepted_at TIMESTAMPTZ,
-      revoked_at TIMESTAMPTZ
+      revoked_at TIMESTAMPTZ,
+      recipient_removed_at TIMESTAMPTZ,
+      expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '6 hours'
     )
+  `);
+
+  await db.query(`
+    ALTER TABLE profile_share_links
+    ADD COLUMN IF NOT EXISTS recipient_removed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
+    ALTER TABLE profile_share_links
+    ALTER COLUMN invite_code DROP NOT NULL
+  `);
+
+  await db.query(`
+    UPDATE profile_share_links
+    SET expires_at = created_at + INTERVAL '6 hours'
+    WHERE status = 'pending' AND expires_at IS NULL
+  `);
+
+  await db.query(`
+    UPDATE profile_share_links
+    SET invite_code = NULL, expires_at = NULL
+    WHERE status <> 'pending' AND invite_code IS NOT NULL
   `);
 
   await db.query(`
@@ -129,12 +153,6 @@ async function ensureSchema() {
   `);
 
   await db.query(`
-    ALTER TABLE profile_update_packages
-    ADD COLUMN IF NOT EXISTS pending_share_link_id UUID
-    REFERENCES profile_share_links(id) ON DELETE CASCADE
-  `);
-
-  await db.query(`
     ALTER TABLE profile_update_recipients
     ALTER COLUMN recipient_user_id TYPE TEXT USING recipient_user_id::TEXT
   `);
@@ -150,6 +168,11 @@ async function ensureSchema() {
   `);
 
   await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_profile_share_links_expiry
+    ON profile_share_links (status, expires_at)
+  `);
+
+  await db.query(`
     CREATE INDEX IF NOT EXISTS idx_profile_update_recipients_user
     ON profile_update_recipients (recipient_user_id, status)
   `);
@@ -158,20 +181,38 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_profile_update_packages_expires
     ON profile_update_packages (expires_at)
   `);
-
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS idx_profile_update_packages_pending_share
-    ON profile_update_packages (pending_share_link_id)
-    WHERE pending_share_link_id IS NOT NULL
-  `);
 }
 
 async function cleanupExpiredPackages() {
-  await db.query(`
+  const result = await db.query(`
     DELETE FROM profile_update_packages
-    WHERE expires_at < NOW()
-       OR status = 'delivered'
+    WHERE expires_at <= NOW()
+       OR status IN ('delivered', 'consumed', 'completed')
+       OR (
+         NOT EXISTS (
+           SELECT 1 FROM profile_update_recipients pur
+           WHERE pur.package_id = profile_update_packages.id
+         )
+         AND created_at <= NOW() - INTERVAL '1 hour'
+       )
   `);
+  return result.rowCount || 0;
+}
+
+async function cleanupExpiredShareInvites() {
+  const cleared = await db.query(`
+    UPDATE profile_share_links
+    SET invite_code = NULL, expires_at = NULL
+    WHERE status <> 'pending' AND invite_code IS NOT NULL
+  `);
+  const deleted = await db.query(`
+    DELETE FROM profile_share_links
+    WHERE status = 'pending' AND expires_at <= NOW()
+  `);
+  return {
+    clearedCodes: cleared.rowCount || 0,
+    expiredInvites: deleted.rowCount || 0,
+  };
 }
 
 function initFirebase() {
@@ -252,46 +293,32 @@ async function sendProfileUpdatePush({ recipientUserIds, packageId, profileName 
   };
 }
 
-async function sendProfileShareInvitePush({ recipientUserId, inviteCode, profileName }) {
-  if (!recipientUserId || !inviteCode || !initFirebase()) {
+async function sendProfileShareAcceptedPush({ ownerUserId, profileName }) {
+  if (!ownerUserId || !initFirebase()) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
-
   const devicesRes = await db.query(
-    `
-    SELECT id, user_id, device_token
-    FROM user_devices
-    WHERE user_id::TEXT = $1
-      AND device_token IS NOT NULL
-      AND TRIM(device_token) <> ''
-      AND TRIM(device_token) <> 'NO_TOKEN'
-    `,
-    [String(recipientUserId)]
+    `SELECT device_token FROM user_devices
+     WHERE user_id::TEXT=$1 AND device_status='active'
+       AND device_token IS NOT NULL AND TRIM(device_token) <> ''
+       AND TRIM(device_token) <> 'NO_TOKEN'`,
+    [String(ownerUserId)]
   );
-
-  const tokens = [...new Set(
-    devicesRes.rows
-      .map(row => clean(row.device_token))
-      .filter(Boolean)
-  )];
-
+  const tokens = [...new Set(devicesRes.rows.map((row) => clean(row.device_token)).filter(Boolean))];
   if (!tokens.length) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
-
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
     notification: {
-      title: "Profile shared with you",
-      body: `${profileName || "A VitaLink profile"} was shared with you.`,
+      title: "Caregiver connected",
+      body: `Open VitaLink to send ${profileName || "the shared profile"}.`,
     },
     data: {
-      route: "/profile_accept",
-      type: "profile_share_invite",
-      inviteCode,
+      route: "/profile_sharing",
+      type: "profile_share_accepted",
     },
   });
-
   return {
     devicesTargeted: tokens.length,
     successCount: response.successCount,
@@ -300,20 +327,19 @@ async function sendProfileShareInvitePush({ recipientUserId, inviteCode, profile
 }
 
 function createInviteCode() {
-  return `VL-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  return `VL-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 }
 
 module.exports = {
   clean,
   cleanupExpiredPackages,
+  cleanupExpiredShareInvites,
   createInviteCode,
-  decrypt,
-  encrypt,
   ensureSchema,
   normalizeSections,
   parseBody,
   reply,
-  sendProfileShareInvitePush,
+  sendProfileShareAcceptedPush,
   sendProfileUpdatePush,
   verifyUserSession,
 };

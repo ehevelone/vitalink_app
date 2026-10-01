@@ -2,17 +2,19 @@
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const Stripe = require("stripe");
-const { getActivationPriceId } = require("./services/stripe-prices");
+const { ensureAccountAccessSchema } = require("./services/account-access");
+const { ensureDeviceSecuritySchema, recordDeviceEvent } = require("./services/device-security");
+const {
+  checkAccessCodeLimit,
+  clearAccessCodeFailures,
+  rateLimitScope,
+  recordAccessCodeFailure,
+  requestIp,
+} = require("./services/access-code-rate-limit");
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const ACTIVATION_AMOUNT_CENTS = 4995;
-
-class RegistrationError extends Error {}
-
-function reply(success, obj = {}) {
+function reply(success, obj = {}, statusCode = 200) {
   return {
-    statusCode: 200,
+    statusCode,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ success, ...obj }),
   };
@@ -70,11 +72,11 @@ async function ensureUserSessionColumns() {
   `);
 }
 
-async function createUserSession(executor, userId) {
+async function createUserSession(userId) {
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
 
-  await executor.query(
+  await db.query(
     `
     UPDATE users
     SET session_token = $1,
@@ -85,50 +87,6 @@ async function createUserSession(executor, userId) {
   );
 
   return token;
-}
-
-function getPaymentIntentId(value) {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
-async function verifyLegacyStripeActivation(row) {
-  if (!row.stripe_session || !row.stripe_session.startsWith("cs_")) {
-    throw new RegistrationError("This purchase code needs manual review");
-  }
-
-  const session = await stripe.checkout.sessions.retrieve(row.stripe_session, {
-    expand: ["line_items.data.price"]
-  });
-  const lineItems = session.line_items?.data || [];
-  const validLineItem = lineItems.length === 1 &&
-    lineItems[0].price?.id === getActivationPriceId() &&
-    lineItems[0].quantity === 1;
-
-  if (
-    session.mode !== "payment" ||
-    session.payment_status !== "paid" ||
-    session.currency !== "usd" ||
-    session.amount_total !== ACTIVATION_AMOUNT_CENTS ||
-    !validLineItem
-  ) {
-    throw new RegistrationError("This purchase could not be verified as paid");
-  }
-
-  const email = normalizeEmail(
-    session.customer_details?.email || session.customer_email
-  );
-  if (!email) {
-    throw new RegistrationError("This purchase is missing a verified email address");
-  }
-
-  return {
-    name: session.customer_details?.individual_name ||
-      session.customer_details?.name || row.name || null,
-    email,
-    paymentIntentId: getPaymentIntentId(session.payment_intent),
-    paidAt: new Date(session.created * 1000)
-  };
 }
 
 exports.handler = async (event) => {
@@ -153,11 +111,15 @@ if (event.httpMethod !== "POST") {
     }
 
     const body = JSON.parse(event.body || "{}");
-    const { firstName, lastName, phone, password, platform } = body;
+    const { firstName, lastName, phone, password, platform, deviceId } = body;
+    const relationshipType = body.relationshipType === "prospect" ? "prospect" : "client";
     const email = normalizeEmail(body.email);
     const promoCode = normalizeCode(body.promoCode);
 
     await ensureUserSessionColumns();
+    await ensureAccountAccessSchema();
+    await ensureDeviceSecuritySchema();
+    await db.query(`ALTER TABLE activation_codes ADD COLUMN IF NOT EXISTS redeemed BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS redeemed_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS redeemed_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
 
     if (!firstName || !lastName || !email || !password || !promoCode) {
       return reply(false, { error: "Missing required fields" });
@@ -168,141 +130,114 @@ if (event.httpMethod !== "POST") {
       return reply(false, { error: emailError });
     }
 
+    const codeScope = rateLimitScope("registration-code", requestIp(event));
+    const codeLimit = await checkAccessCodeLimit(codeScope);
+    if (!codeLimit.allowed) {
+      return reply(false, {
+        error: "Too many incorrect codes. Try again in 15 minutes.",
+        retryAfterSeconds: codeLimit.retryAfterSeconds,
+      }, 429);
+    }
+
     // ✅ Hash password
     const password_hash = await bcrypt.hash(password, 10);
 
-    const client = await db.connect();
-    let user;
-    let sessionToken;
+    let agentId = null;
+    let purchaseCode = null;
 
-    try {
-      await client.query("BEGIN");
+    // 🔎 Agent unlock code
+    const agentResult = await db.query(
+      `SELECT id, active FROM agents WHERE unlock_code = $1 LIMIT 1`,
+      [promoCode]
+    );
 
-      let agentId = null;
-      let purchaseCode = null;
-      let activationId = null;
-
-      // Agent codes keep their existing precedence and behavior.
-      const agentResult = await client.query(
-        `SELECT id, active FROM agents WHERE unlock_code = $1 LIMIT 1`,
+    if (agentResult.rows.length) {
+      const agent = agentResult.rows[0];
+      if (!agent.active) {
+        const failure = await recordAccessCodeFailure(codeScope, promoCode);
+        return reply(false, {
+          error: failure.locked
+            ? "Too many incorrect codes. Try again in 15 minutes."
+            : "That access code is not valid",
+        }, failure.locked ? 429 : 200);
+      }
+      agentId = agent.id;
+    } else {
+      // Personal access code issued by the VitaLink website.
+      const purchaseResult = await db.query(
+        `SELECT code, redeemed FROM activation_codes WHERE code = $1 LIMIT 1`,
         [promoCode]
       );
 
-      if (agentResult.rows.length) {
-        const agent = agentResult.rows[0];
-        if (!agent.active) {
-          throw new RegistrationError("Agent subscription inactive");
+      if (purchaseResult.rows.length) {
+        const pc = purchaseResult.rows[0];
+        if (pc.redeemed) {
+          const failure = await recordAccessCodeFailure(codeScope, promoCode);
+          return reply(false, {
+            error: failure.locked
+              ? "Too many incorrect codes. Try again in 15 minutes."
+              : "That access code has already been used",
+          }, failure.locked ? 429 : 200);
         }
-        agentId = agent.id;
+
+        purchaseCode = pc.code;
+
       } else {
-        const activationResult = await client.query(
-          `SELECT id, code, name, email, stripe_session, purchase_type,
-                  payment_status, redeemed
-           FROM activation_codes
-           WHERE code = $1
-           LIMIT 1
-           FOR UPDATE`,
-          [promoCode]
-        );
-
-        if (!activationResult.rows.length) {
-          throw new RegistrationError("Invalid agent or purchase activation code");
-        }
-
-        const activation = activationResult.rows[0];
-        if (activation.redeemed) {
-          throw new RegistrationError("Purchase activation code already used");
-        }
-
-        if (
-          activation.purchase_type !== "consumer_activation" ||
-          activation.payment_status !== "paid"
-        ) {
-          const verified = await verifyLegacyStripeActivation(activation);
-          await client.query(
-            `UPDATE activation_codes
-             SET name = $1,
-                 email = $2,
-                 purchase_type = 'consumer_activation',
-                 payment_intent_id = $3,
-                 payment_status = 'paid',
-                 paid_at = $4
-             WHERE id = $5`,
-            [
-              verified.name,
-              verified.email,
-              verified.paymentIntentId,
-              verified.paidAt,
-              activation.id
-            ]
-          );
-          activation.email = verified.email;
-          activation.purchase_type = "consumer_activation";
-          activation.payment_status = "paid";
-        }
-
-        if (normalizeEmail(activation.email) !== email) {
-          throw new RegistrationError(
-            "Registration email must match the email used for purchase"
-          );
-        }
-
-        activationId = activation.id;
-        purchaseCode = activation.code;
+        const failure = await recordAccessCodeFailure(codeScope, promoCode);
+        return reply(false, {
+          error: failure.locked
+            ? "Too many incorrect codes. Try again in 15 minutes."
+            : "That access code is not valid",
+        }, failure.locked ? 429 : 200);
       }
+    }
 
-      const result = await client.query(
-        `INSERT INTO users (first_name, last_name, email, phone, password_hash, agent_id, purchase_code)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, email, first_name, last_name, agent_id, purchase_code`,
-        [
-          firstName,
-          lastName,
-          email,
-          normalizeUsPhone(phone),
-          password_hash,
-          agentId,
-          purchaseCode,
-        ]
+    await clearAccessCodeFailures(codeScope);
+
+    // ✅ Insert user
+    const result = await db.query(
+      `INSERT INTO users
+        (first_name, last_name, email, phone, password_hash, agent_id, purchase_code,
+         access_sponsor, relationship_status, messaging_consent_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id, email, first_name, last_name, agent_id, purchase_code,
+         access_sponsor, relationship_status, messaging_consent_status`,
+      [
+        firstName,
+        lastName,
+        email,
+        normalizeUsPhone(phone),
+        password_hash,
+        agentId,
+        purchaseCode,
+        agentId ? "agent" : "personal",
+        agentId ? (relationshipType === "prospect" ? "pending_prospect_confirmation" : "pending_confirmation") : "not_applicable",
+        agentId ? "pending" : "not_applicable",
+      ]
+    );
+
+    const user = result.rows[0];
+    if (purchaseCode) {
+      await db.query(
+        `UPDATE activation_codes
+         SET redeemed=true, redeemed_at=NOW(), redeemed_user_id=$1
+         WHERE code=$2`,
+        [user.id, purchaseCode]
       );
+    }
+    const sessionToken = await createUserSession(user.id);
 
-      user = result.rows[0];
-      sessionToken = await createUserSession(client, user.id);
-
-      await client.query(
-        `INSERT INTO user_devices (user_id, platform, created_at, updated_at)
-         VALUES ($1, $2, NOW(), NOW())
-         ON CONFLICT ON CONSTRAINT user_devices_user_id_unique
-         DO UPDATE SET platform = EXCLUDED.platform, updated_at = NOW()`,
-        [user.id, platform || "unknown"]
+    // ✅ Correct device upsert (1 device per user)
+    if (deviceId) {
+      await db.query(
+        `INSERT INTO user_devices
+          (user_id, agent_id, device_id, platform, device_status, last_seen_at, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,'active',NOW(),NOW(),NOW())
+         ON CONFLICT (user_id, device_id) WHERE user_id IS NOT NULL AND device_id IS NOT NULL
+         DO UPDATE SET platform=EXCLUDED.platform, device_status='active', last_seen_at=NOW(), updated_at=NOW()`,
+        [user.id, agentId, deviceId, platform || "unknown"]
       );
-
-      if (activationId !== null) {
-        const redeemed = await client.query(
-          `UPDATE activation_codes
-           SET redeemed = true,
-               redeemed_at = NOW(),
-               redeemed_by_user_id = $1
-           WHERE id = $2
-             AND redeemed IS NOT TRUE
-           RETURNING id`,
-          [user.id, activationId]
-        );
-
-        if (!redeemed.rows.length) {
-          throw new RegistrationError("Purchase activation code already used");
-        }
-      }
-
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      if (err instanceof RegistrationError) {
-        return reply(false, { error: err.message });
-      }
-      throw err;
-    } finally {
-      client.release();
+      await recordDeviceEvent(user.id, deviceId, "registration", null, platform);
     }
 
     return reply(true, {

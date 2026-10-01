@@ -8,11 +8,18 @@ CREATE TABLE IF NOT EXISTS profile_share_links (
   profile_name TEXT,
   allowed_sections JSONB NOT NULL DEFAULT '["emergency"]'::jsonb,
   status TEXT NOT NULL DEFAULT 'pending',
-  invite_code TEXT UNIQUE NOT NULL,
+  invite_code TEXT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   accepted_at TIMESTAMPTZ,
-  revoked_at TIMESTAMPTZ
+  revoked_at TIMESTAMPTZ,
+  recipient_removed_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '6 hours'
 );
+
+ALTER TABLE profile_share_links
+ALTER COLUMN invite_code DROP NOT NULL,
+ADD COLUMN IF NOT EXISTS recipient_removed_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS profile_update_packages (
   id UUID PRIMARY KEY,
@@ -52,6 +59,9 @@ ON profile_share_links (owner_user_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_profile_share_links_recipient
 ON profile_share_links (recipient_user_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_profile_share_links_expiry
+ON profile_share_links (status, expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_profile_update_recipients_user
 ON profile_update_recipients (recipient_user_id, status);

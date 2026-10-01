@@ -5,15 +5,6 @@ import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../utils/phone_formatter.dart';
 
-String profileValueOrFallback(String? profileValue, String fallback) {
-  final value = profileValue?.trim() ?? '';
-  return value.isNotEmpty ? value : fallback;
-}
-
-String _mapText(Map<String, dynamic> values, String key) {
-  return values[key]?.toString().trim() ?? '';
-}
-
 class ProfileUserScreen extends StatefulWidget {
   const ProfileUserScreen({super.key});
 
@@ -39,8 +30,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   bool _loading = false;
   String _currentEmail = "";
-  bool _isVeteran = false;
-  bool _usesVaHealthcare = false;
 
   @override
   void initState() {
@@ -51,99 +40,19 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   Future<void> _loadLocalProfile() async {
     final store = SecureStore();
 
-    final userId = await store.getString('userId') ?? '';
-    final savedEmail = await store.getString('userEmail') ?? "";
-    final savedName = await store.getString('profileName') ?? "";
-    final savedPhone = await store.getString('profilePhone') ?? "";
+    final email = await store.getString('userEmail') ?? "";
+    final name = await store.getString('profileName') ?? "";
+    final phone = await store.getString('profilePhone') ?? "";
 
-    final savedAddress = await store.getString('profileAddress') ?? "";
-    final savedCity = await store.getString('profileCity') ?? "";
-    final savedState = await store.getString('profileState') ?? "";
-    final savedZip = await store.getString('profileZip') ?? "";
+    final address = await store.getString('profileAddress') ?? "";
+    final city = await store.getString('profileCity') ?? "";
+    final state = await store.getString('profileState') ?? "";
+    final zip = await store.getString('profileZip') ?? "";
 
+    // ✅ LOAD DOB FROM PROFILE MODEL (ONLY ONCE)
     final repo = DataRepository();
     final profile = await repo.loadProfile();
-
-    var remote = <String, dynamic>{};
-    if (userId.isNotEmpty) {
-      try {
-        final response = await ApiService.getUserDemographics(
-          userId: userId,
-          profileId: profile.id,
-        );
-        if (response['success'] == true && response['demographics'] is Map) {
-          remote = Map<String, dynamic>.from(response['demographics'] as Map);
-        }
-      } catch (error) {
-        debugPrint('Demographic recovery unavailable: $error');
-      }
-    }
-
-    final email = profileValueOrFallback(
-      savedEmail,
-      _mapText(remote, 'email'),
-    );
-    final name = profileValueOrFallback(
-      profile.fullName,
-      profileValueOrFallback(savedName, _mapText(remote, 'fullName')),
-    );
-    final phone = profileValueOrFallback(
-      profile.userPhone,
-      profileValueOrFallback(savedPhone, _mapText(remote, 'userPhone')),
-    );
-    final dob = profileValueOrFallback(profile.dob, _mapText(remote, 'dob'));
-    final address = profileValueOrFallback(
-      profile.address,
-      profileValueOrFallback(savedAddress, _mapText(remote, 'address')),
-    );
-    final city = profileValueOrFallback(
-      profile.city,
-      profileValueOrFallback(savedCity, _mapText(remote, 'city')),
-    );
-    final state = profileValueOrFallback(
-      profile.state,
-      profileValueOrFallback(savedState, _mapText(remote, 'state')),
-    );
-    final zip = profileValueOrFallback(
-      profile.zip,
-      profileValueOrFallback(savedZip, _mapText(remote, 'zip')),
-    );
-    final isVeteran = profile.isVeteran || remote['isVeteran'] == true;
-    final usesVaHealthcare =
-        profile.usesVaHealthcare || remote['usesVaHealthcare'] == true;
-
-    final needsProfileRepair =
-        profile.fullName.trim().isEmpty && name.isNotEmpty ||
-        profile.userPhone.trim().isEmpty && phone.isNotEmpty ||
-        (profile.dob?.trim().isEmpty ?? true) && dob.isNotEmpty ||
-        (profile.address?.trim().isEmpty ?? true) && address.isNotEmpty ||
-        (profile.city?.trim().isEmpty ?? true) && city.isNotEmpty ||
-        (profile.state?.trim().isEmpty ?? true) && state.isNotEmpty ||
-        (profile.zip?.trim().isEmpty ?? true) && zip.isNotEmpty ||
-        profile.isVeteran != isVeteran ||
-        profile.usesVaHealthcare != usesVaHealthcare;
-
-    if (needsProfileRepair) {
-      if (profile.fullName.trim().isEmpty) profile.fullName = name;
-      if (profile.userPhone.trim().isEmpty) profile.userPhone = phone;
-      if (profile.dob?.trim().isEmpty ?? true) profile.dob = dob;
-      if (profile.address?.trim().isEmpty ?? true) profile.address = address;
-      if (profile.city?.trim().isEmpty ?? true) profile.city = city;
-      if (profile.state?.trim().isEmpty ?? true) profile.state = state;
-      if (profile.zip?.trim().isEmpty ?? true) profile.zip = zip;
-      profile.isVeteran = isVeteran;
-      profile.usesVaHealthcare = isVeteran && usesVaHealthcare;
-      profile.updatedAt = DateTime.now();
-      await repo.saveProfile(profile, publishUpdate: false);
-    }
-
-    if (email.isNotEmpty) await store.setString('userEmail', email);
-    if (name.isNotEmpty) await store.setString('profileName', name);
-    if (phone.isNotEmpty) await store.setString('profilePhone', phone);
-    if (address.isNotEmpty) await store.setString('profileAddress', address);
-    if (city.isNotEmpty) await store.setString('profileCity', city);
-    if (state.isNotEmpty) await store.setString('profileState', state);
-    if (zip.isNotEmpty) await store.setString('profileZip', zip);
+    final dob = profile.dob ?? "";
 
     if (!mounted) return;
 
@@ -152,49 +61,13 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       _emailCtrl.text = email;
       _nameCtrl.text = name;
       _phoneCtrl.text = phone;
-      _dobCtrl.text = dob;
+      _dobCtrl.text = dob; // ✅ FIXED
 
       _addressCtrl.text = address;
       _cityCtrl.text = city;
       _stateCtrl.text = state;
       _zipCtrl.text = zip;
-      _isVeteran = isVeteran;
-      _usesVaHealthcare = isVeteran && usesVaHealthcare;
     });
-  }
-
-  Future<void> _changeVeteranStatus(bool value) async {
-    if (value) {
-      setState(() => _isVeteran = true);
-      return;
-    }
-
-    final removeStatus = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove Veteran status?'),
-        content: const Text(
-          'This will also remove the VA health care selection and VA emergency notice from this profile.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep Veteran Status'),
-          ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-
-    if (removeStatus == true && mounted) {
-      setState(() {
-        _isVeteran = false;
-        _usesVaHealthcare = false;
-      });
-    }
   }
 
   Future<void> _saveProfile() async {
@@ -259,8 +132,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       profile.city = newCity;
       profile.state = newState;
       profile.zip = newZip;
-      profile.isVeteran = _isVeteran;
-      profile.usesVaHealthcare = _isVeteran && _usesVaHealthcare;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
@@ -273,9 +144,9 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Profile updated ✅")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile updated ✅")),
+      );
 
       Navigator.pop(context);
     } finally {
@@ -370,9 +241,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Address Line 1",
-                  ),
+                  decoration: const InputDecoration(labelText: "Address Line 1"),
                 ),
                 const SizedBox(height: 12),
 
@@ -392,25 +261,6 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   controller: _zipCtrl,
                   decoration: const InputDecoration(labelText: "Zip Code"),
                 ),
-
-                const SizedBox(height: 16),
-
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _isVeteran,
-                  onChanged: _changeVeteranStatus,
-                  title: const Text("Are you a Veteran?"),
-                  activeThumbColor: Colors.blue,
-                ),
-                if (_isVeteran)
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _usesVaHealthcare,
-                    onChanged: (value) =>
-                        setState(() => _usesVaHealthcare = value),
-                    title: const Text("Do you use VA health care?"),
-                    activeThumbColor: Colors.blue,
-                  ),
 
                 const SizedBox(height: 24),
 

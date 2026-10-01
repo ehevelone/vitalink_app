@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_state.dart';
+import '../services/secure_store.dart';
+import '../services/device_id.dart';
 
 class MyAgentUser extends StatefulWidget {
   const MyAgentUser({super.key});
@@ -27,6 +30,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
   String? _agencyPhone;
   String? _calendlyUrl;
   String? _businessCardImageBase64;
+  bool? _agentMessagesEnabled;
+  bool _updatingMessages = false;
   bool _loading = true;
 
   @override
@@ -60,6 +65,17 @@ class _MyAgentUserState extends State<MyAgentUser> {
         _agencyPhone = agent["agency_phone"];
         _calendlyUrl = agent["calendly_url"];
         _businessCardImageBase64 = agent["business_card_image_base64"];
+      }
+
+      final userId = await SecureStore().getString('userId');
+      if (userId != null && userId.isNotEmpty) {
+        final access = await ApiService.getAccountAccess(userId);
+        final details = Map<String, dynamic>.from(
+          access['access'] as Map? ?? {},
+        );
+        if (details['relationshipStatus'] == 'confirmed_client') {
+          _agentMessagesEnabled = details['canMessage'] == true;
+        }
       }
     } catch (e) {
       debugPrint("Agent load error: $e");
@@ -128,6 +144,76 @@ class _MyAgentUserState extends State<MyAgentUser> {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _disconnectAgent() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disconnect from your agent?'),
+        content: const Text(
+          'Disconnecting from your agent will end your sponsored VitaLink access. To continue using VitaLink, you will need another agent\'s code or a personal access code.\n\nAgent messaging and future information sharing will stop. Information already stored on this device will not be deleted.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep My Current Agent')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Disconnect and Lock My Account')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final store = SecureStore();
+    final userId = await store.getString('userId');
+    if (userId == null) {
+      if (mounted) setState(() => _updatingMessages = false);
+      return;
+    }
+    final result = await ApiService.updateAccountAccess(
+      userId: userId,
+      action: 'disconnect',
+      values: {
+        'deviceId': await DeviceId.getOrCreate(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      },
+    );
+    if (!mounted) return;
+    if (result['success'] == true) {
+      Navigator.pushNamedAndRemoveUntil(
+          context, '/account_access', (_) => false);
+    } else {
+      _showActionError(
+          result['error']?.toString() ?? 'Unable to disconnect your agent.');
+    }
+  }
+
+  Future<void> _setAgentMessages(bool enabled) async {
+    setState(() => _updatingMessages = true);
+    final store = SecureStore();
+    final userId = await store.getString('userId');
+    if (userId == null) return;
+    final result = await ApiService.updateAccountAccess(
+      userId: userId,
+      action: 'messaging_consent',
+      values: {
+        'messagingConsent': enabled,
+        'userAttestation': true,
+        'deviceId': await DeviceId.getOrCreate(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _updatingMessages = false;
+      if (result['success'] == true) _agentMessagesEnabled = enabled;
+    });
+    if (result['success'] != true) {
+      _showActionError(
+        result['error']?.toString() ?? 'Unable to update message consent.',
+      );
+    }
   }
 
   Widget _agentCardDisplay() {
@@ -251,8 +337,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                     onPressed: _call,
                   ),
                 ),
-              if (_contactPhone.isNotEmpty &&
-                  _agentEmail?.isNotEmpty == true)
+              if (_contactPhone.isNotEmpty && _agentEmail?.isNotEmpty == true)
                 const SizedBox(width: 12),
               if (_agentEmail?.isNotEmpty == true)
                 Expanded(
@@ -384,6 +469,26 @@ class _MyAgentUserState extends State<MyAgentUser> {
                   icon: Icons.refresh,
                   label: "Reload Info",
                   onPressed: _loadAgent,
+                ),
+                if (_agentMessagesEnabled != null) ...[
+                  const SizedBox(height: 14),
+                  Card(
+                    child: SwitchListTile(
+                      value: _agentMessagesEnabled!,
+                      onChanged: _updatingMessages ? null : _setAgentMessages,
+                      secondary: const Icon(Icons.notifications_outlined),
+                      title: const Text('Messages from my agent'),
+                      subtitle: const Text(
+                        'Coverage reminders and enrollment-period outreach. You can change this at any time.',
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: _disconnectAgent,
+                  icon: const Icon(Icons.link_off),
+                  label: const Text('Change or Disconnect My Agent'),
                 ),
                 const SizedBox(height: 20),
                 _actionButton(

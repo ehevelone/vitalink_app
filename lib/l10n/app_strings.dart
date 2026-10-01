@@ -25,8 +25,9 @@ class AppStrings {
       _es ? 'Usar idioma del telefono' : 'Use phone language';
   String get english => _es ? 'Ingles' : 'English';
   String get spanish => _es ? 'Espanol' : 'Spanish';
-  String get moveToNewDevice =>
-      _es ? 'Mover VitaLink a un dispositivo nuevo' : 'Move VitaLink to a New Device';
+  String get moveToNewDevice => _es
+      ? 'Mover VitaLink a un dispositivo nuevo'
+      : 'Move VitaLink to a New Device';
   String get moveToNewDeviceBody => _es
       ? 'Cree un traslado temporal para mover sus perfiles, tarjetas, polizas y datos de VitaLink a otro dispositivo. Esto no es una copia de seguridad permanente.'
       : 'Create a temporary transfer to move your VitaLink profiles, cards, policies, and data to another device. This is not a permanent backup.';
@@ -39,13 +40,11 @@ class AppStrings {
       : 'Your information will be temporarily stored on the VitaLink server so it can be moved to your new device. It is automatically deleted after 6 hours or immediately after the code is used.';
   String get transferCodeCreated =>
       _es ? 'Codigo de traslado creado' : 'Transfer Code Created';
-  String get transferCodeExpires => _es
-      ? 'Este codigo vence en 6 horas.'
-      : 'This code expires in 6 hours.';
+  String get transferCodeExpires =>
+      _es ? 'Este codigo vence en 6 horas.' : 'This code expires in 6 hours.';
   String get enterTransferCode =>
       _es ? 'Ingrese codigo de traslado' : 'Enter transfer code';
-  String get restoreTransfer =>
-      _es ? 'Cargar traslado' : 'Load Transfer';
+  String get restoreTransfer => _es ? 'Cargar traslado' : 'Load Transfer';
   String get transferComplete =>
       _es ? 'Traslado completado.' : 'Transfer complete.';
   String get pendingTransferTitle => _es
@@ -63,29 +62,6 @@ class AppStrings {
       _es ? 'Cargando traslado...' : 'Loading transfer...';
   String get copyCode => _es ? 'Copiar codigo' : 'Copy Code';
   String get copied => _es ? 'Copiado.' : 'Copied.';
-  String get authorizationsTitle =>
-      _es ? 'Permisos compartidos con mi agente' : 'Permissions Shared With My Agent';
-  String get authorizationsBody => _es
-      ? 'Puede retirar su autorizacion de informacion de salud y el alcance de la cita. La informacion ya compartida no se puede retirar.'
-      : 'You can withdraw your Health Information Authorization and Scope of Appointment. Information already shared cannot be taken back.';
-  String get sendRevocation =>
-      _es ? 'Enviar revocacion' : 'Send Revocation';
-  String get revocationConfirmTitle =>
-      _es ? 'Retirar ambos permisos?' : 'Withdraw Both Permissions?';
-  String get revocationConfirmBody => _es
-      ? 'Esto retirara su autorizacion de informacion de salud y el alcance de la cita, y avisara a su agente. No deshace la informacion ya compartida.'
-      : 'This withdraws your Health Information Authorization and Scope of Appointment and notifies your agent. It does not undo information already shared.';
-  String get revocationSent => _es
-      ? 'Revocacion registrada y enviada a su agente.'
-      : 'Withdrawal recorded and sent to your agent.';
-  String get revocationAlreadySent => _es
-      ? 'Estos permisos ya fueron retirados.'
-      : 'These permissions have already been withdrawn.';
-  String get agentNoticePending => _es
-      ? 'La revocacion se registro, pero el aviso al agente fallo. Vuelva a intentarlo.'
-      : 'Withdrawal was recorded, but the agent notice failed. Please retry.';
-  String get retryAgentNotice =>
-      _es ? 'Reenviar aviso al agente' : 'Retry Agent Notice';
 
   String welcome(String name) => _es ? 'Bienvenido $name' : 'Welcome $name';
   String get user => _es ? 'Usuario' : 'User';
@@ -129,27 +105,23 @@ class AppStrings {
       ? 'Para usuarios y familias de VitaLink'
       : 'For VitaLink users and families';
   String get activateAgentPortal =>
-      _es ? 'Activar portal de agente' : 'Activate Agent Portal';
+      _es ? 'Crear cuenta de agente' : 'Create Agent Account';
   String get agentActivationSubtitle => _es
-      ? 'Los agentes de seguros deben activar el acceso en myvitalink.app'
-      : 'Insurance agents must activate access through myvitalink.app';
+      ? 'Para agentes con un codigo de registro'
+      : 'For licensed agents with a registration code';
   String get clientAccountActivation =>
       _es ? 'Activacion de cuenta de cliente' : 'Client Account Activation';
   String get clientActivationBody => _es
-      ? 'Las cuentas de cliente de VitaLink requieren un codigo de activacion antes del registro. Este codigo puede venir de su agente de seguros o de myvitalink.app.\n\nYa tiene un codigo de activacion de VitaLink?'
-      : 'VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\nDo you already have a VitaLink activation code?';
+      ? 'Las cuentas de cliente de VitaLink requieren un codigo de acceso antes del registro. El codigo puede venir de su agente de seguros o llegar por correo electronico despues de ser emitido.\n\nYa tiene un codigo de acceso de VitaLink?'
+      : 'VitaLink client accounts require an access code before registration. The code may come from your insurance agent or be delivered by email after it is issued.\n\nDo you already have a VitaLink access code?';
   String get iHaveCode => _es ? 'Tengo un codigo' : 'I Have a Code';
-  String get getActivationCode =>
-      _es ? 'Obtener codigo de activacion' : 'Get Activation Code';
   String get agentPortalActivation =>
       _es ? 'Activacion del portal de agente' : 'Agent Portal Activation';
   String get agentActivationBody => _es
-      ? 'Las cuentas de agentes de seguros se activan a traves del sitio web de VitaLink antes de habilitar el acceso a la app.\n\nTiene su codigo de activacion?'
-      : 'Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\nDo you have your activation code?';
+      ? 'Ingrese un codigo de registro de agente ya emitido para continuar.'
+      : 'Enter an already-issued agent registration code to continue.';
   String get iHaveMyActivationCode =>
       _es ? 'Tengo mi codigo de activacion' : 'I Have My Activation Code';
-  String get iNeedActivationCode =>
-      _es ? 'Necesito un codigo de activacion' : 'I Need An Activation Code';
   String get welcomeTo => _es ? 'Bienvenido a' : 'Welcome To';
   String get loginToYourAccount =>
       _es ? 'Iniciar sesion en su cuenta' : 'Log In to Your Account';
@@ -195,8 +167,8 @@ class AppStrings {
   String get recoverActivationCode =>
       _es ? 'Recuperar codigo de activacion' : 'Recover Activation Code';
   String get recoverActivationCodeBody => _es
-      ? 'Si compro VitaLink pero perdio su codigo de activacion, visite:\n\nmyvitalink.app/recover'
-      : 'If you purchased VitaLink but lost your activation code, visit:\n\nmyvitalink.app/recover';
+      ? 'Los codigos de acceso personal se entregan por correo electronico despues de ser emitidos. Revise su bandeja de entrada y correo no deseado.'
+      : 'Personal access codes are delivered by email after they are issued. Check your inbox and spam folder.';
   String get close => _es ? 'Cerrar' : 'Close';
   String get enterActivationCode =>
       _es ? 'INGRESE SU CODIGO DE ACTIVACION' : 'ENTER YOUR ACTIVATION CODE';
@@ -403,9 +375,8 @@ I understand:
   String get reviewAgentEnteredDetails => _es
       ? 'Revise los detalles ingresados por el agente'
       : 'Review Agent-Entered Details';
-  String emergencyContactNumber(int number) => _es
-      ? 'Contacto de emergencia $number'
-      : 'Emergency Contact $number';
+  String emergencyContactNumber(int number) =>
+      _es ? 'Contacto de emergencia $number' : 'Emergency Contact $number';
   String get invalidActivationCode => _es
       ? 'Codigo de activacion invalido o inactivo'
       : 'Invalid or inactive activation code';

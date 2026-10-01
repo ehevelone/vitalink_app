@@ -8,12 +8,6 @@ class Medication {
   String dose;
   String frequency;
   String prescriber;
-  String? pharmacyFulfillmentType;
-  String? pharmacyNpi;
-  String pharmacyVerificationStatus;
-  List<Map<String, dynamic>> pharmacyNpiCandidates;
-  DateTime? pharmacyVerifiedAt;
-  String? pharmacyVerifiedBy;
   String source;
   DateTime updatedAt;
 
@@ -22,50 +16,27 @@ class Medication {
     this.dose = '',
     this.frequency = '',
     this.prescriber = '',
-    this.pharmacyFulfillmentType,
-    this.pharmacyNpi,
-    this.pharmacyVerificationStatus = 'unverified',
-    List<Map<String, dynamic>>? pharmacyNpiCandidates,
-    this.pharmacyVerifiedAt,
-    this.pharmacyVerifiedBy,
     this.source = 'Manual',
     DateTime? updatedAt,
-  }) : pharmacyNpiCandidates = pharmacyNpiCandidates ?? [],
-       updatedAt = updatedAt ?? DateTime.now();
+  }) : updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'dose': dose,
-    'frequency': frequency,
-    'prescriber': prescriber,
-    'pharmacyFulfillmentType': pharmacyFulfillmentType,
-    'pharmacyNpi': pharmacyNpi,
-    'pharmacyVerificationStatus': pharmacyVerificationStatus,
-    'pharmacyNpiCandidates': pharmacyNpiCandidates,
-    'pharmacyVerifiedAt': pharmacyVerifiedAt?.toIso8601String(),
-    'pharmacyVerifiedBy': pharmacyVerifiedBy,
-    'source': source,
-    'updatedAt': updatedAt.toIso8601String(),
-  };
+        'name': name,
+        'dose': dose,
+        'frequency': frequency,
+        'prescriber': prescriber,
+        'source': source,
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 
   factory Medication.fromJson(Map<String, dynamic> json) => Medication(
-    name: json['name'] ?? '',
-    dose: json['dose'] ?? '',
-    frequency: json['frequency'] ?? '',
-    prescriber: json['prescriber'] ?? '',
-    pharmacyFulfillmentType: json['pharmacyFulfillmentType'],
-    pharmacyNpi: json['pharmacyNpi'],
-    pharmacyVerificationStatus:
-        json['pharmacyVerificationStatus'] ?? 'unverified',
-    pharmacyNpiCandidates: (json['pharmacyNpiCandidates'] as List? ?? [])
-        .whereType<Map>()
-        .map((candidate) => Map<String, dynamic>.from(candidate))
-        .toList(),
-    pharmacyVerifiedAt: DateTime.tryParse(json['pharmacyVerifiedAt'] ?? ''),
-    pharmacyVerifiedBy: json['pharmacyVerifiedBy'],
-    source: json['source'] ?? 'Manual',
-    updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
-  );
+        name: json['name'] ?? '',
+        dose: json['dose'] ?? '',
+        frequency: json['frequency'] ?? '',
+        prescriber: json['prescriber'] ?? '',
+        source: json['source'] ?? 'Manual',
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+      );
 }
 
 // =========================
@@ -76,70 +47,27 @@ class Doctor {
   String specialty;
   String clinic;
   String phone;
-  String? npi;
-  String verificationStatus;
-  List<Map<String, dynamic>> npiCandidates;
-  DateTime? verifiedAt;
-  String? verifiedBy;
-  bool isPrimaryCareProvider;
-  bool isVaProvider;
-  String? vaFacility;
-  String? vaServiceLine;
-  DateTime? vaVerifiedAt;
 
   Doctor({
     this.name = '',
     this.specialty = '',
     this.clinic = '',
     this.phone = '',
-    this.npi,
-    this.verificationStatus = 'unverified',
-    List<Map<String, dynamic>>? npiCandidates,
-    this.verifiedAt,
-    this.verifiedBy,
-    this.isPrimaryCareProvider = false,
-    this.isVaProvider = false,
-    this.vaFacility,
-    this.vaServiceLine,
-    this.vaVerifiedAt,
-  }) : npiCandidates = npiCandidates ?? [];
+  });
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'specialty': specialty,
-    'clinic': clinic,
-    'phone': phone,
-    'npi': npi,
-    'verificationStatus': verificationStatus,
-    'npiCandidates': npiCandidates,
-    'verifiedAt': verifiedAt?.toIso8601String(),
-    'verifiedBy': verifiedBy,
-    'isPrimaryCareProvider': isPrimaryCareProvider,
-    'isVaProvider': isVaProvider,
-    'vaFacility': vaFacility,
-    'vaServiceLine': vaServiceLine,
-    'vaVerifiedAt': vaVerifiedAt?.toIso8601String(),
-  };
+        'name': name,
+        'specialty': specialty,
+        'clinic': clinic,
+        'phone': phone,
+      };
 
   factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
-    name: json['name'] ?? '',
-    specialty: json['specialty'] ?? '',
-    clinic: json['clinic'] ?? '',
-    phone: json['phone'] ?? '',
-    npi: json['npi'],
-    verificationStatus: json['verificationStatus'] ?? 'unverified',
-    npiCandidates: (json['npiCandidates'] as List? ?? [])
-        .whereType<Map>()
-        .map((candidate) => Map<String, dynamic>.from(candidate))
-        .toList(),
-    verifiedAt: DateTime.tryParse(json['verifiedAt'] ?? ''),
-    verifiedBy: json['verifiedBy'],
-    isPrimaryCareProvider: json['isPrimaryCareProvider'] == true,
-    isVaProvider: json['isVaProvider'] == true,
-    vaFacility: json['vaFacility'],
-    vaServiceLine: json['vaServiceLine'],
-    vaVerifiedAt: DateTime.tryParse(json['vaVerifiedAt'] ?? ''),
-  );
+        name: json['name'] ?? '',
+        specialty: json['specialty'] ?? '',
+        clinic: json['clinic'] ?? '',
+        phone: json['phone'] ?? '',
+      );
 }
 
 // =========================
@@ -158,16 +86,16 @@ class UserAppointment {
     DateTime? appointmentAt,
     this.notes = '',
     DateTime? updatedAt,
-  }) : appointmentAt = appointmentAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+  })  : appointmentAt = appointmentAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
-    'doctorName': doctorName,
-    'specialty': specialty,
-    'appointmentAt': appointmentAt.toIso8601String(),
-    'notes': notes,
-    'updatedAt': updatedAt.toIso8601String(),
-  };
+        'doctorName': doctorName,
+        'specialty': specialty,
+        'appointmentAt': appointmentAt.toIso8601String(),
+        'notes': notes,
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 
   factory UserAppointment.fromJson(Map<String, dynamic> json) =>
       UserAppointment(
@@ -212,40 +140,40 @@ class InsuranceCard {
     this.imagePath,
     this.source = 'Manual',
     DateTime? updatedAt,
-  }) : id = id ?? const Uuid().v4(),
-       updatedAt = updatedAt ?? DateTime.now();
+  })  : id = id ?? const Uuid().v4(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'carrier': carrier,
-    'policy': policy,
-    'memberId': memberId,
-    'policyType': policyType,
-    'medicarePlanId': medicarePlanId,
-    'medicarePlanKind': medicarePlanKind,
-    'ocrText': ocrText,
-    'frontImagePath': frontImagePath,
-    'backImagePath': backImagePath,
-    'imagePath': imagePath ?? frontImagePath,
-    'source': source,
-    'updatedAt': updatedAt.toIso8601String(),
-  };
+        'id': id,
+        'carrier': carrier,
+        'policy': policy,
+        'memberId': memberId,
+        'policyType': policyType,
+        'medicarePlanId': medicarePlanId,
+        'medicarePlanKind': medicarePlanKind,
+        'ocrText': ocrText,
+        'frontImagePath': frontImagePath,
+        'backImagePath': backImagePath,
+        'imagePath': imagePath ?? frontImagePath,
+        'source': source,
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 
   factory InsuranceCard.fromJson(Map<String, dynamic> json) => InsuranceCard(
-    id: json['id'],
-    carrier: json['carrier'] ?? '',
-    policy: json['policy'] ?? '',
-    memberId: json['memberId'] ?? '',
-    policyType: json['policyType'] ?? '',
-    medicarePlanId: json['medicarePlanId'] ?? '',
-    medicarePlanKind: json['medicarePlanKind'] ?? '',
-    ocrText: json['ocrText'] ?? '',
-    frontImagePath: json['frontImagePath'] ?? '',
-    backImagePath: json['backImagePath'],
-    imagePath: json['imagePath'],
-    source: json['source'] ?? 'Manual',
-    updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
-  );
+        id: json['id'],
+        carrier: json['carrier'] ?? '',
+        policy: json['policy'] ?? '',
+        memberId: json['memberId'] ?? '',
+        policyType: json['policyType'] ?? '',
+        medicarePlanId: json['medicarePlanId'] ?? '',
+        medicarePlanKind: json['medicarePlanKind'] ?? '',
+        ocrText: json['ocrText'] ?? '',
+        frontImagePath: json['frontImagePath'] ?? '',
+        backImagePath: json['backImagePath'],
+        imagePath: json['imagePath'],
+        source: json['source'] ?? 'Manual',
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+      );
 }
 
 // =========================
@@ -278,48 +206,52 @@ class Insurance {
     List<String>? decPagePaths,
     List<Map<String, String>>? benefits,
     List<InsuranceCard>? cards,
-  }) : decPagePaths = decPagePaths ?? [],
-       benefits = benefits ?? [],
-       cards = cards ?? [];
+  })  : decPagePaths = decPagePaths ?? [],
+        benefits = benefits ?? [],
+        cards = cards ?? [];
 
   Map<String, dynamic> toJson() => {
-    'carrier': carrier,
-    'policy': policy,
-    'memberId': memberId,
-    'group': group,
-    'phone': phone,
-    'policyType': policyType,
-    'insuredName': insuredName,
-    'beneficiary': beneficiary,
-    'decPagePaths': decPagePaths,
-    'benefits': benefits,
-    'cards': cards.map((c) => c.toJson()).toList(),
-  };
+        'carrier': carrier,
+        'policy': policy,
+        'memberId': memberId,
+        'group': group,
+        'phone': phone,
+        'policyType': policyType,
+        'insuredName': insuredName,
+        'beneficiary': beneficiary,
+        'decPagePaths': decPagePaths,
+        'benefits': benefits,
+        'cards': cards.map((c) => c.toJson()).toList(),
+      };
 
   factory Insurance.fromJson(Map<String, dynamic> json) => Insurance(
-    carrier: json['carrier'] ?? '',
-    policy: json['policy'] ?? '',
-    memberId: json['memberId'] ?? '',
-    group: json['group'] ?? '',
-    phone: json['phone'] ?? '',
-    policyType: json['policyType'] ?? '',
-    insuredName: json['insuredName'] ?? '',
-    beneficiary: json['beneficiary'] ?? '',
-    decPagePaths: (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
-    benefits: (json['benefits'] as List<dynamic>? ?? []).map((b) {
-      if (b is Map) {
-        return {
-          'name': b['name']?.toString() ?? '',
-          'value': b['value']?.toString() ?? '',
-        };
-      } else {
-        return {'name': b.toString(), 'value': ''};
-      }
-    }).toList(),
-    cards: (json['cards'] as List<dynamic>? ?? [])
-        .map((c) => InsuranceCard.fromJson(c))
-        .toList(),
-  );
+        carrier: json['carrier'] ?? '',
+        policy: json['policy'] ?? '',
+        memberId: json['memberId'] ?? '',
+        group: json['group'] ?? '',
+        phone: json['phone'] ?? '',
+        policyType: json['policyType'] ?? '',
+        insuredName: json['insuredName'] ?? '',
+        beneficiary: json['beneficiary'] ?? '',
+        decPagePaths:
+            (json['decPagePaths'] as List<dynamic>? ?? []).cast<String>(),
+        benefits: (json['benefits'] as List<dynamic>? ?? []).map((b) {
+          if (b is Map) {
+            return {
+              'name': b['name']?.toString() ?? '',
+              'value': b['value']?.toString() ?? '',
+            };
+          } else {
+            return {
+              'name': b.toString(),
+              'value': '',
+            };
+          }
+        }).toList(),
+        cards: (json['cards'] as List<dynamic>? ?? [])
+            .map((c) => InsuranceCard.fromJson(c))
+            .toList(),
+      );
 }
 
 // =========================
@@ -329,11 +261,17 @@ class EmergencyContact {
   String name;
   String phone;
 
-  EmergencyContact({this.name = '', this.phone = ''});
+  EmergencyContact({
+    this.name = '',
+    this.phone = '',
+  });
 
   bool get hasDetails => name.trim().isNotEmpty || phone.trim().isNotEmpty;
 
-  Map<String, dynamic> toJson() => {'name': name, 'phone': phone};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'phone': phone,
+      };
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) =>
       EmergencyContact(
@@ -401,35 +339,32 @@ class EmergencyInfo {
   }
 
   Map<String, dynamic> toJson() => {
-    'contact': contact,
-    'phone': phone,
-    'contacts': effectiveContacts.map((c) => c.toJson()).toList(),
-    'allergies': allergies,
-    'conditions': conditions,
-    'bloodType': bloodType,
-    'implants': implants,
-    'procedures': procedures,
-    'organDonor': organDonor,
-  };
+        'contact': contact,
+        'phone': phone,
+        'contacts': effectiveContacts.map((c) => c.toJson()).toList(),
+        'allergies': allergies,
+        'conditions': conditions,
+        'bloodType': bloodType,
+        'implants': implants,
+        'procedures': procedures,
+        'organDonor': organDonor,
+      };
 
   factory EmergencyInfo.fromJson(Map<String, dynamic> json) {
-    final parsedContacts =
-        (json['contacts'] as List<dynamic>? ??
-                json['emergencyContacts'] as List<dynamic>? ??
-                [])
-            .whereType<Map>()
-            .map((c) => EmergencyContact.fromJson(Map<String, dynamic>.from(c)))
-            .where((c) => c.hasDetails)
-            .toList();
+    final parsedContacts = (json['contacts'] as List<dynamic>? ??
+            json['emergencyContacts'] as List<dynamic>? ??
+            [])
+        .whereType<Map>()
+        .map((c) => EmergencyContact.fromJson(Map<String, dynamic>.from(c)))
+        .where((c) => c.hasDetails)
+        .toList();
 
     final legacyContact = json['contact'] ?? '';
     final legacyPhone = json['phone'] ?? '';
-    final firstContact = parsedContacts.isNotEmpty
-        ? parsedContacts.first.name
-        : legacyContact;
-    final firstPhone = parsedContacts.isNotEmpty
-        ? parsedContacts.first.phone
-        : legacyPhone;
+    final firstContact =
+        parsedContacts.isNotEmpty ? parsedContacts.first.name : legacyContact;
+    final firstPhone =
+        parsedContacts.isNotEmpty ? parsedContacts.first.phone : legacyPhone;
 
     return EmergencyInfo(
       contact: firstContact,
@@ -459,8 +394,6 @@ class Profile {
   String? city;
   String? state;
   String? zip;
-  bool isVeteran;
-  bool usesVaHealthcare;
 
   List<Medication> meds;
   List<Doctor> doctors;
@@ -487,6 +420,8 @@ class Profile {
   String? agentNpn;
 
   String? qrToken; // ✅ ADDED
+  String? sharedRelationshipId;
+  String sharedAccessStatus;
 
   Profile({
     String? id,
@@ -498,8 +433,6 @@ class Profile {
     this.city,
     this.state,
     this.zip,
-    this.isVeteran = false,
-    this.usesVaHealthcare = false,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<UserAppointment>? appointments,
@@ -521,14 +454,16 @@ class Profile {
     this.agentPhone,
     this.agentNpn,
     this.qrToken, // ✅ ADDED
-  }) : id = id ?? const Uuid().v4(),
-       updatedAt = updatedAt ?? DateTime.now(),
-       meds = meds ?? [],
-       doctors = doctors ?? [],
-       appointments = appointments ?? [],
-       insurances = insurances ?? [],
-       orphanCards = orphanCards ?? [],
-       emergency = emergency ?? EmergencyInfo();
+    this.sharedRelationshipId,
+    this.sharedAccessStatus = 'owned',
+  })  : id = id ?? const Uuid().v4(),
+        updatedAt = updatedAt ?? DateTime.now(),
+        meds = meds ?? [],
+        doctors = doctors ?? [],
+        appointments = appointments ?? [],
+        insurances = insurances ?? [],
+        orphanCards = orphanCards ?? [],
+        emergency = emergency ?? EmergencyInfo();
 
   Profile copyWith({
     String? id,
@@ -540,8 +475,6 @@ class Profile {
     String? city,
     String? state,
     String? zip,
-    bool? isVeteran,
-    bool? usesVaHealthcare,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<UserAppointment>? appointments,
@@ -563,6 +496,8 @@ class Profile {
     String? agentPhone,
     String? agentNpn,
     String? qrToken,
+    String? sharedRelationshipId,
+    String? sharedAccessStatus,
   }) {
     return Profile(
       id: id ?? this.id,
@@ -574,8 +509,6 @@ class Profile {
       city: city ?? this.city,
       state: state ?? this.state,
       zip: zip ?? this.zip,
-      isVeteran: isVeteran ?? this.isVeteran,
-      usesVaHealthcare: usesVaHealthcare ?? this.usesVaHealthcare,
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
       appointments: appointments ?? this.appointments,
@@ -597,95 +530,92 @@ class Profile {
       agentPhone: agentPhone ?? this.agentPhone,
       agentNpn: agentNpn ?? this.agentNpn,
       qrToken: qrToken ?? this.qrToken,
+      sharedRelationshipId: sharedRelationshipId ?? this.sharedRelationshipId,
+      sharedAccessStatus: sharedAccessStatus ?? this.sharedAccessStatus,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'fullName': fullName,
-    'dob': dob,
-    'updatedAt': updatedAt.toIso8601String(),
-    'userPhone': userPhone,
-    'address': address,
-    'city': city,
-    'state': state,
-    'zip': zip,
-    'isVeteran': isVeteran,
-    'usesVaHealthcare': usesVaHealthcare,
-    'meds': meds.map((m) => m.toJson()).toList(),
-    'doctors': doctors.map((d) => d.toJson()).toList(),
-    'appointments': appointments.map((a) => a.toJson()).toList(),
-    'insurances': insurances.map((i) => i.toJson()).toList(),
-    'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
-    'emergency': emergency.toJson(),
-    'username': username,
-    'password': password,
-    'useBiometrics': useBiometrics,
-    'acceptedTerms': acceptedTerms,
-    'registered': registered,
-    'agentTerms': agentTerms,
-    'agentRegistered': agentRegistered,
-    'agentLoggedIn': agentLoggedIn,
-    'agentSetupDone': agentSetupDone,
-    'agentId': agentId,
-    'agentName': agentName,
-    'agentEmail': agentEmail,
-    'agentPhone': agentPhone,
-    'agentNpn': agentNpn,
-    'qr_Token': qrToken,
-  };
+        'id': id,
+        'fullName': fullName,
+        'dob': dob,
+        'updatedAt': updatedAt.toIso8601String(),
+        'userPhone': userPhone,
+        'address': address,
+        'city': city,
+        'state': state,
+        'zip': zip,
+        'meds': meds.map((m) => m.toJson()).toList(),
+        'doctors': doctors.map((d) => d.toJson()).toList(),
+        'appointments': appointments.map((a) => a.toJson()).toList(),
+        'insurances': insurances.map((i) => i.toJson()).toList(),
+        'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
+        'emergency': emergency.toJson(),
+        'username': username,
+        'password': password,
+        'useBiometrics': useBiometrics,
+        'acceptedTerms': acceptedTerms,
+        'registered': registered,
+        'agentTerms': agentTerms,
+        'agentRegistered': agentRegistered,
+        'agentLoggedIn': agentLoggedIn,
+        'agentSetupDone': agentSetupDone,
+        'agentId': agentId,
+        'agentName': agentName,
+        'agentEmail': agentEmail,
+        'agentPhone': agentPhone,
+        'agentNpn': agentNpn,
+        'qr_Token': qrToken,
+        'sharedRelationshipId': sharedRelationshipId,
+        'sharedAccessStatus': sharedAccessStatus,
+      };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
-    id: json['id'],
-    fullName: json['fullName'] ?? '',
-    dob: json['dob'],
-    updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
-    userPhone: json['userPhone'] ?? '',
-    address: json['address'],
-    city: json['city'],
-    state: json['state'],
-    zip: json['zip'],
-    isVeteran:
-        json['isVeteran'] == true ||
-        json['is_veteran'] == true ||
-        json['veteran'] == true ||
-        json['veteran_status'] == true,
-    usesVaHealthcare:
-        json['usesVaHealthcare'] == true || json['uses_va_healthcare'] == true,
-    meds: (json['meds'] as List<dynamic>? ?? [])
-        .map((m) => Medication.fromJson(m))
-        .toList(),
-    doctors: (json['doctors'] as List<dynamic>? ?? [])
-        .map((d) => Doctor.fromJson(d))
-        .toList(),
-    appointments: (json['appointments'] as List<dynamic>? ?? [])
-        .map((a) => UserAppointment.fromJson(a))
-        .toList(),
-    insurances: (json['insurances'] as List<dynamic>? ?? [])
-        .map((i) => Insurance.fromJson(i))
-        .toList(),
-    orphanCards: (json['orphanCards'] as List<dynamic>? ?? [])
-        .map((c) => InsuranceCard.fromJson(c))
-        .toList(),
-    emergency: json['emergency'] != null
-        ? EmergencyInfo.fromJson(json['emergency'])
-        : EmergencyInfo(),
-    username: json['username'],
-    password: json['password'],
-    useBiometrics: json['useBiometrics'] ?? false,
-    acceptedTerms: json['acceptedTerms'] ?? false,
-    registered: json['registered'] ?? false,
-    agentTerms: json['agentTerms'] ?? false,
-    agentRegistered: json['agentRegistered'] ?? false,
-    agentLoggedIn: json['agentLoggedIn'] ?? false,
-    agentSetupDone: json['agentSetupDone'] ?? false,
-    agentId: json['agentId'],
-    agentName: json['agentName'],
-    agentEmail: json['agentEmail'],
-    agentPhone: json['agentPhone'],
-    agentNpn: json['agentNpn'],
-    qrToken: json['qr_token'],
-  );
+        id: json['id'],
+        fullName: json['fullName'] ?? '',
+        dob: json['dob'],
+        updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
+        userPhone: json['userPhone'] ?? '',
+        address: json['address'],
+        city: json['city'],
+        state: json['state'],
+        zip: json['zip'],
+        meds: (json['meds'] as List<dynamic>? ?? [])
+            .map((m) => Medication.fromJson(m))
+            .toList(),
+        doctors: (json['doctors'] as List<dynamic>? ?? [])
+            .map((d) => Doctor.fromJson(d))
+            .toList(),
+        appointments: (json['appointments'] as List<dynamic>? ?? [])
+            .map((a) => UserAppointment.fromJson(a))
+            .toList(),
+        insurances: (json['insurances'] as List<dynamic>? ?? [])
+            .map((i) => Insurance.fromJson(i))
+            .toList(),
+        orphanCards: (json['orphanCards'] as List<dynamic>? ?? [])
+            .map((c) => InsuranceCard.fromJson(c))
+            .toList(),
+        emergency: json['emergency'] != null
+            ? EmergencyInfo.fromJson(json['emergency'])
+            : EmergencyInfo(),
+        username: json['username'],
+        password: json['password'],
+        useBiometrics: json['useBiometrics'] ?? false,
+        acceptedTerms: json['acceptedTerms'] ?? false,
+        registered: json['registered'] ?? false,
+        agentTerms: json['agentTerms'] ?? false,
+        agentRegistered: json['agentRegistered'] ?? false,
+        agentLoggedIn: json['agentLoggedIn'] ?? false,
+        agentSetupDone: json['agentSetupDone'] ?? false,
+        agentId: json['agentId'],
+        agentName: json['agentName'],
+        agentEmail: json['agentEmail'],
+        agentPhone: json['agentPhone'],
+        agentNpn: json['agentNpn'],
+        qrToken: json['qr_token'],
+        sharedRelationshipId: json['sharedRelationshipId'],
+        sharedAccessStatus: json['sharedAccessStatus'] ?? 'owned',
+      );
 }
 
 // =========================

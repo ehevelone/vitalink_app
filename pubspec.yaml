@@ -31,6 +31,7 @@ dependencies:
 
   # 🔥 ADD THIS
   uuid: 4.4.0
+  cryptography: ^2.7.0
 
   # ✅ NEW (for sending card attachments)
   share_plus: ^7.2.1

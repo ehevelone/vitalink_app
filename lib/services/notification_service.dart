@@ -20,16 +20,16 @@ class NotificationService {
     }
 
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-      debugPrint("🔄 FCM REFRESH → $newToken");
+      debugPrint("FCM token refreshed");
       await _sendToBackend(userId, newToken);
     });
   }
 
   static Future<void> _sendToBackend(String userId, String token) async {
-    final res = await ApiService.registerDeviceToken(
+    await ApiService.registerDeviceToken(
       userId: userId,
       fcmToken: token,
     );
-    debugPrint("📌 registerDeviceToken result: $res");
+    debugPrint("FCM token registration completed");
   }
 }

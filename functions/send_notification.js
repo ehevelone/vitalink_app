@@ -1,5 +1,10 @@
 const db = require("./services/db");
 const admin = require("firebase-admin");
+const { verifyAgentSession } = require("./services/agent-auth");
+const {
+  MESSAGING_CONSENT_VERSION,
+  ensureAccountAccessSchema,
+} = require("./services/account-access");
 
 /* INIT FIREBASE (SAFE ENV ONLY) */
 if (!admin.apps.length) {
@@ -68,10 +73,23 @@ async function ensureDeviceDeliveryColumns() {
   await db.query(`
     ALTER TABLE user_devices
     ADD COLUMN IF NOT EXISTS push_status TEXT,
+    ADD COLUMN IF NOT EXISTS device_status TEXT NOT NULL DEFAULT 'active',
     ADD COLUMN IF NOT EXISTS last_push_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_success_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_failure_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS last_push_error TEXT
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_message_events (
+      id BIGSERIAL PRIMARY KEY,
+      agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      campaign TEXT NOT NULL,
+      eligible_user_count INTEGER NOT NULL DEFAULT 0,
+      devices_targeted INTEGER NOT NULL DEFAULT 0,
+      success_count INTEGER NOT NULL DEFAULT 0,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
 }
 
@@ -209,6 +227,7 @@ exports.handler = async (event) => {
     }
 
     await ensureDeviceDeliveryColumns();
+    await ensureAccountAccessSchema();
 
     let body = {};
 
@@ -226,6 +245,14 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Missing agentEmail" });
     }
 
+    const authenticatedAgent = await verifyAgentSession({
+      agentEmail: agentEmail.trim(),
+      token: body.agentSessionToken,
+    });
+    if (!authenticatedAgent) {
+      return reply(403, { success: false, error: "Unauthorized" });
+    }
+
     const forcedCampaign =
       typeof body.campaign === "string"
         ? body.campaign.trim().toUpperCase()
@@ -241,6 +268,9 @@ exports.handler = async (event) => {
     }
 
     const agent = agentRes.rows[0];
+    if (Number(authenticatedAgent.id) !== Number(agent.id)) {
+      return reply(403, { success: false, error: "Unauthorized" });
+    }
 
     const now = new Date();
     const campaign = forcedCampaign || pickCampaign(now);
@@ -254,16 +284,24 @@ exports.handler = async (event) => {
       FROM user_devices ud
       JOIN users u ON u.id = ud.user_id
       WHERE u.agent_id = $1
+      AND u.relationship_status = 'confirmed_client'
+      AND u.messaging_consent_status = 'granted'
+      AND u.messaging_consent_version = $2
+      AND ud.device_status = 'active'
       AND ud.device_token IS NOT NULL
       AND TRIM(ud.device_token) <> ''
       AND TRIM(ud.device_token) <> 'NO_TOKEN'
     `;
 
-    const devicesRes = await db.query(eligibleSql, [
-      agent.id,
-    ]);
+    const devicesRes = await db.query(eligibleSql, [agent.id, MESSAGING_CONSENT_VERSION]);
 
     if (!devicesRes.rows.length) {
+      await db.query(
+        `INSERT INTO agent_message_events
+          (agent_id, campaign, eligible_user_count)
+         VALUES ($1,$2,0)`,
+        [agent.id, campaign]
+      );
       return reply(200, { success: true, message: "No eligible devices" });
     }
 
@@ -306,6 +344,20 @@ exports.handler = async (event) => {
     const response = await admin.messaging().sendEachForMulticast(message);
 
     await recordDeliveryResults(devices, response);
+    await db.query(
+      `INSERT INTO agent_message_events
+        (agent_id, campaign, eligible_user_count, devices_targeted,
+         success_count, failure_count)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [
+        agent.id,
+        campaign,
+        new Set(devices.map((device) => device.userId)).size,
+        tokens.length,
+        response?.successCount ?? 0,
+        response?.failureCount ?? 0,
+      ]
+    );
 
     return reply(200, {
       success: true,

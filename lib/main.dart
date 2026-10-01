@@ -1,6 +1,7 @@
 // lib/main.dart
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,7 +12,7 @@ import 'package:app_links/app_links.dart';
 import 'services/api_service.dart';
 import 'services/secure_store.dart';
 import 'services/deep_link_service.dart';
-import 'widgets/app_update_gate.dart';
+import 'services/device_security_service.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -47,6 +48,8 @@ import 'screens/new_profile_screen.dart';
 import 'screens/referral_center_screen.dart';
 import 'screens/agent_referrals_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/account_access_screen.dart';
+import 'screens/device_disabled_screen.dart';
 
 // MEDICAL
 import 'screens/meds_screen.dart';
@@ -85,15 +88,7 @@ const AndroidNotificationChannel vitalinkNotificationChannel =
 
 Future<void> _setupNotificationDisplay() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosSettings = DarwinInitializationSettings(
-    requestAlertPermission: false,
-    requestBadgePermission: false,
-    requestSoundPermission: false,
-  );
-  const initSettings = InitializationSettings(
-    android: androidSettings,
-    iOS: iosSettings,
-  );
+  const initSettings = InitializationSettings(android: androidSettings);
 
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
@@ -121,8 +116,14 @@ void showGlobalNotificationPopup(RemoteMessage message) {
     barrierDismissible: false,
     builder: (context) {
       return AlertDialog(
-        title: Text(data["title"] ?? "New Notification"),
-        content: Text(data["body"] ?? "You have a new update."),
+        title: Text(
+          data["title"] ?? message.notification?.title ?? "New Notification",
+        ),
+        content: Text(
+          data["body"] ??
+              message.notification?.body ??
+              "You have a new update.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -153,12 +154,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 // 🔥 TAP HANDLER
 void _handleNotificationNavigation(RemoteMessage message) {
-  debugPrint("📩 TAP DATA: ${message.data}");
+  debugPrint("Notification opened");
 }
 
 void _captureProfileShareInvite(RemoteMessage message) {
   final type = message.data["type"]?.toString();
-  final inviteCode = message.data["inviteCode"]?.toString().toUpperCase();
+  final inviteCode = message.data["inviteCode"]?.toString();
 
   if (type == "profile_share_invite" &&
       inviteCode != null &&
@@ -201,136 +202,96 @@ Future<void> _setupFCMGlobal() async {
 }
 
 Future<void> main() async {
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
   WidgetsFlutterBinding.ensureInitialized();
 
   await runZonedGuarded(() async {
-    var appStarted = false;
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-    try {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
 
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-      ]);
+    await Firebase.initializeApp();
+    await _setupNotificationDisplay();
+    await _setupFCMGlobal();
 
-      await Firebase.initializeApp();
+    // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
+    _appLinks.uriLinkStream.listen((uri) {
+      final code = uri.queryParameters['code']?.toUpperCase();
 
-      try {
-        await _setupNotificationDisplay();
-      } catch (error, stack) {
-        debugPrint('Notification display setup failed: $error');
-        debugPrintStack(stackTrace: stack);
+      if (uri.host != 'share' && code != null && code.isNotEmpty) {
+        VitaLinkDeepLink.code = code;
       }
+    });
 
-      await _setupFCMGlobal();
+    // 🔥 HANDLE TAP WHEN APP IS CLOSED
+    Future<void> handleProfileShareLink(Uri uri) async {
+      if (uri.host != 'share') return;
 
-      String? lastRegistrationLink;
-      DateTime? lastRegistrationLinkAt;
-      void handleRegistrationLink(Uri uri) {
-        final link = VitaLinkRegistrationLink.fromUri(uri);
-        if (link == null) return;
+      final shareCode = uri.queryParameters['code'];
+      if (shareCode == null || shareCode.isEmpty) return;
 
-        final now = DateTime.now();
-        if (lastRegistrationLink == uri.toString() &&
-            lastRegistrationLinkAt != null &&
-            now.difference(lastRegistrationLinkAt!).inSeconds < 2) {
-          return;
-        }
-        lastRegistrationLink = uri.toString();
-        lastRegistrationLinkAt = now;
-        if (link.onboardingCode != null) {
-          VitaLinkDeepLink.clear();
-          VitaLinkDeepLink.onboardingCode = link.onboardingCode;
-        } else {
-          VitaLinkDeepLink.clearOnboardingCode();
-          VitaLinkDeepLink.code = link.code;
-        }
+      VitaLinkDeepLink.shareCode = shareCode;
 
-        void openRegistration() {
-          navigatorKey.currentState?.pushNamed(
-            link.route,
-            arguments: link.onboardingCode != null
-                ? {'onboard': link.onboardingCode}
-                : {'code': link.code},
-          );
-        }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushNamed('/profile_accept');
+      });
+    }
 
-        if (navigatorKey.currentState == null) {
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => openRegistration());
-        } else {
-          openRegistration();
-        }
-      }
+    final initialShareUri = await _appLinks.getInitialLink();
+    if (initialShareUri != null) {
+      await handleProfileShareLink(initialShareUri);
+    }
 
-      _appLinks.uriLinkStream.listen(handleRegistrationLink);
+    _appLinks.uriLinkStream.listen(handleProfileShareLink);
 
-      // 🔥 HANDLE TAP WHEN APP IS CLOSED
-      Future<void> handleProfileShareLink(Uri uri) async {
-        if (uri.host != 'share') return;
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
 
-        final shareCode = uri.queryParameters['code']?.toUpperCase();
-        if (shareCode == null || shareCode.isEmpty) return;
+    if (initialMessage != null) {
+      _captureProfileShareInvite(initialMessage);
+      final route = initialMessage.data["route"];
 
-        VitaLinkDeepLink.shareCode = shareCode;
-        debugPrint("Profile share link code received: $shareCode");
-
+      if (route != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamed('/profile_accept');
+          navigatorKey.currentState?.pushNamed(route);
         });
       }
-
-      final initialShareUri = await _appLinks.getInitialLink();
-      if (initialShareUri != null) {
-        handleRegistrationLink(initialShareUri);
-        await handleProfileShareLink(initialShareUri);
-      }
-
-      _appLinks.uriLinkStream.listen(handleProfileShareLink);
-
-      RemoteMessage? initialMessage =
-          await FirebaseMessaging.instance.getInitialMessage();
-
-      if (initialMessage != null) {
-        _captureProfileShareInvite(initialMessage);
-        final route = initialMessage.data["route"];
-
-        if (route != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            navigatorKey.currentState?.pushNamed(route);
-          });
-        }
-      }
-
-      FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
-      );
-
-      FirebaseMessaging.onMessage.listen((message) {
-        showGlobalNotificationPopup(message);
-      });
-
-      FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        _handleNotificationNavigation(message);
-        _captureProfileShareInvite(message);
-
-        final route = message.data["route"];
-
-        if (route != null) {
-          navigatorKey.currentState?.pushNamed(route);
-        }
-      });
-
-      runApp(const VitaLinkApp());
-      appStarted = true;
-    } catch (error, stack) {
-      debugPrint('STARTUP ERROR: $error');
-      debugPrintStack(stackTrace: stack);
-    } finally {
-      if (!appStarted) {
-        runApp(const VitaLinkApp());
-      }
     }
+
+    FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler,
+    );
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      if (message.data['type'] == 'device_revoked') {
+        await DeviceSecurityService.disableCurrentDevice(
+          reason: message.data['reason']?.toString(),
+        );
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/device_disabled',
+          (route) => false,
+        );
+        return;
+      }
+      showGlobalNotificationPopup(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationNavigation(message);
+      _captureProfileShareInvite(message);
+
+      final route = message.data["route"];
+
+      if (route != null) {
+        navigatorKey.currentState?.pushNamed(route);
+      }
+    });
+
+    runApp(const VitaLinkApp());
   }, (error, stack) {
     debugPrint('ZONED ERROR: $error');
   });
@@ -376,10 +337,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
       debugShowCheckedModeBanner: false,
       home: const LandingScreen(),
       builder: (context, child) {
-        return AppUpdateGate(
-          child: SafeArea(
-            child: child ?? const SizedBox.shrink(),
-          ),
+        return SafeArea(
+          child: child ?? const SizedBox.shrink(),
         );
       },
       onGenerateRoute: (settings) {
@@ -410,6 +369,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/agent_setup': (context) => const AgentSetupScreen(),
         '/terms_user': (context) => const TermsUserScreen(),
         '/terms_agent': (context) => const TermsAgentScreen(),
+        '/account_access': (context) => const AccountAccessScreen(),
+        '/device_disabled': (context) => const DeviceDisabledScreen(),
         '/logo': (context) => const LogoScreen(),
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),

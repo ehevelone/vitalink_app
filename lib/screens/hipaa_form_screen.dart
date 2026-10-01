@@ -36,11 +36,8 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   }
 
   bool _saving = false;
-  bool _hipaaAcknowledged = false;
-  bool _soaAcknowledged = false;
+  bool _acknowledged = false;
   bool _canScroll = false;
-  int _step = 0;
-  final Set<String> _selectedProducts = {};
 
   Profile? _profile;
 
@@ -48,8 +45,8 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   String? _agentName;
   String? _agentPhone;
 
-  static const String _hipaaText = """
-HEALTH INFORMATION AUTHORIZATION
+  static const String _authorizationText = """
+HIPAA AUTHORIZATION & MEDICARE SCOPE OF APPOINTMENT
 
 By signing below, I authorize my licensed insurance agent and/or affiliated agency to access, receive, and use ONLY the following information for the purpose of assisting me with Medicare plan education and enrollment:
 
@@ -66,45 +63,35 @@ I understand:
 • Revocation will not apply to information already disclosed.
 • Information disclosed may be subject to redisclosure and may no longer be protected by federal privacy regulations.
 • This authorization expires one (1) year from the date signed unless revoked earlier.
-""";
 
-  static const String _soaText = """
-MEDICARE SCOPE OF APPOINTMENT
+MEDICARE SCOPE OF APPOINTMENT (CMS Required)
 
-Select only the product types you want to discuss with your licensed agent. The agent may discuss only the product types you select.
+I agree to discuss the following Medicare product types with my licensed agent:
+
+• Medicare Advantage (Part C)
+• Prescription Drug Plans (Part D)
+• Medicare Supplement (Medigap)
+• Dental / Vision / Hearing
+• Hospital Indemnity and related products
 
 I understand:
 
 • I am not required to enroll in any plan.
-• My current or future Medicare enrollment status will not be affected by signing.
-• Signing will not automatically enroll me in any plan.
-• If I want to discuss another product type later, a new Scope of Appointment may be needed.
+• The agent may only discuss the product types listed above.
+• Signing does not obligate me to enroll.
+• This Scope of Appointment remains valid for twelve (12) months unless revoked.
 """;
-
-  static const List<String> _products = [
-    'Medicare Advantage (Part C)',
-    'Prescription Drug Plans (Part D)',
-    'Medicare Supplement (Medigap)',
-    'Dental / Vision / Hearing',
-    'Hospital Indemnity and related products',
-  ];
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _sigCtrl.addListener(() {
-      if (mounted && _step == 3) setState(() {});
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _confirmInformationFirst();
-    });
 
     _scrollCtrl.addListener(() {
       final atBottom =
           _scrollCtrl.offset >= _scrollCtrl.position.maxScrollExtent &&
               !_scrollCtrl.position.outOfRange;
-      if (atBottom && !_canScroll && (_step == 1 || _step == 2)) {
+      if (atBottom && !_canScroll) {
         setState(() => _canScroll = true);
       }
     });
@@ -153,13 +140,13 @@ I understand:
     // 🔥 Medications field
     final medsStr = p.meds
         .map((m) =>
-            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}${m.prescriber.isNotEmpty ? " | Pharmacy: ${m.prescriber}" : ""}${m.pharmacyFulfillmentType == 'mail_order' ? " | Mail order" : ""}${m.pharmacyVerificationStatus == 'verified' && m.pharmacyNpi != null ? " | Pharmacy NPI: ${m.pharmacyNpi} (verified)" : ""}")
+            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
         .join("; ");
 
     // 🔥 Doctors field
     final docsStr = p.doctors
         .map((d) =>
-            "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}${d.isPrimaryCareProvider ? " [Primary Care]" : ""}${d.verificationStatus == 'verified' && d.npi != null ? " [NPI: ${d.npi} verified]" : ""}")
+            "${d.name}${d.specialty.isNotEmpty ? " (${d.specialty})" : ""}")
         .join("; ");
 
     // ✅ HEADER
@@ -187,13 +174,18 @@ I understand:
     return file;
   }
 
-  List<Map<String, dynamic>> _pharmacyList(Profile p) {
-    final pharmacies = <Map<String, dynamic>>[];
+  List<Map<String, String>> _pharmacyList(Profile p) {
+    final seen = <String>{};
+    final pharmacies = <Map<String, String>>[];
 
     for (final med in p.meds) {
       final text = med.prescriber.trim();
 
-      if (text.isEmpty) continue;
+      if (text.isEmpty || seen.contains(text.toLowerCase())) {
+        continue;
+      }
+
+      seen.add(text.toLowerCase());
 
       final lines = text
           .split(RegExp(r'[\r\n]+'))
@@ -201,42 +193,57 @@ I understand:
           .where((line) => line.isNotEmpty)
           .toList();
 
-      final pharmacy = <String, dynamic>{
+      pharmacies.add({
         "name": lines.isNotEmpty ? lines.first : text,
         "phone": lines.length > 1 ? lines.sublist(1).join(" ") : "",
-        if (med.pharmacyFulfillmentType != null)
-          "fulfillment_type": med.pharmacyFulfillmentType,
-        if (med.pharmacyVerificationStatus == 'verified' &&
-            med.pharmacyNpi != null)
-          "npi": med.pharmacyNpi,
-      };
-      final key = '${text.toLowerCase()}|${med.pharmacyFulfillmentType ?? ''}';
-      final existingIndex = pharmacies.indexWhere(
-        (item) => item['_key'] == key,
-      );
-
-      if (existingIndex >= 0) {
-        if (pharmacy['npi'] != null) {
-          pharmacies[existingIndex]['npi'] = pharmacy['npi'];
-        }
-        continue;
-      }
-
-      pharmacy['_key'] = key;
-      pharmacies.add(pharmacy);
+      });
     }
 
-    return pharmacies
-        .map((pharmacy) => Map<String, dynamic>.from(pharmacy)..remove('_key'))
-        .toList();
+    return pharmacies;
   }
 
-  Future<void> _confirmInformationFirst() async {
+  Future<void> _openSignaturePopup() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("Sign Authorization"),
+        content: SizedBox(
+          height: 200,
+          width: 300,
+          child: Signature(
+            controller: _sigCtrl,
+            backgroundColor: Colors.grey[200]!,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => _sigCtrl.clear(),
+            child: const Text("Clear"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_sigCtrl.isEmpty) return;
+              Navigator.pop(context);
+              _saveAndSend();
+            },
+            child: const Text("Submit"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startSignatureFlow() async {
     final readyToSign = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _VitaLinkConfirmDialog(
-        title: "Before you begin",
+        title: "Almost ready!",
         message:
             "Before signing, please confirm your medications and doctors are current. Your agent uses this to help find you the best coverage.",
         secondaryLabel: "Let me update first",
@@ -249,7 +256,7 @@ I understand:
     if (!mounted) return;
 
     if (readyToSign == true) {
-      _advanceTo(1);
+      await _openSignaturePopup();
       return;
     }
 
@@ -270,32 +277,8 @@ I understand:
     Navigator.pushReplacementNamed(context, '/menu');
   }
 
-  void _advanceTo(int step) {
-    setState(() {
-      _step = step;
-      _canScroll = false;
-    });
-    if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollCtrl.hasClients) return;
-      if (_scrollCtrl.position.maxScrollExtent <= 0) {
-        setState(() => _canScroll = true);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    _sigCtrl.dispose();
-    super.dispose();
-  }
-
   Future<void> _saveAndSend() async {
-    if (_sigCtrl.isEmpty || _profile == null || !_hipaaAcknowledged ||
-        !_soaAcknowledged || _selectedProducts.isEmpty) {
-      return;
-    }
+    if (_sigCtrl.isEmpty || _profile == null) return;
 
     if (_agentEmail == null || _agentEmail!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -312,27 +295,25 @@ I understand:
         throw Exception("Signature image missing");
       }
 
+      final pdf = pw.Document();
       final sigImg = pw.MemoryImage(sigBytes);
 
       final meds = _profile!.meds;
       final doctors = _profile!.doctors;
 
-      final signedAt = DateTime.now().toUtc().toIso8601String();
-      final clientEmail = await SecureStore().getString('userEmail') ?? '';
-      final hipaaPdf = pw.Document();
-      hipaaPdf.addPage(
+      pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           build: (_) => [
             pw.Text(
-              "Health Information Authorization",
+              "HIPAA & SOA Authorization",
               style: pw.TextStyle(
                 fontSize: 20,
                 fontWeight: pw.FontWeight.bold,
               ),
             ),
             pw.SizedBox(height: 12),
-            pw.Text(_hipaaText),
+            pw.Text(_authorizationText),
             pw.SizedBox(height: 18),
             pw.Divider(),
             pw.SizedBox(height: 8),
@@ -366,7 +347,7 @@ I understand:
               ...doctors.map(
                 (d) => pw.Bullet(
                   text:
-                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.isPrimaryCareProvider ? " — Primary Care" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
+                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
                 ),
               ),
             pw.SizedBox(height: 16),
@@ -376,8 +357,6 @@ I understand:
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
             pw.Text(
                 "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
-            pw.Text("Client: ${_profile!.fullName}"),
-            pw.Text("Email: $clientEmail"),
             pw.SizedBox(height: 24),
             pw.Row(children: [
               pw.Text("Signature: "),
@@ -388,51 +367,23 @@ I understand:
               ),
             ]),
             pw.SizedBox(height: 8),
-            pw.Text("Signed at (UTC): $signedAt"),
+            pw.Text(
+                "Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
           ],
         ),
       );
 
-      final soaPdf = pw.Document();
-      soaPdf.addPage(pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        build: (_) => [
-          pw.Text('Medicare Scope of Appointment',
-              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 12),
-          pw.Text(_soaText),
-          pw.SizedBox(height: 16),
-          pw.Text('Product types selected by the client:',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          ..._products.where(_selectedProducts.contains).map((p) => pw.Bullet(text: p)),
-          pw.SizedBox(height: 18),
-          pw.Text('Client: ${_profile!.fullName}'),
-          pw.Text('Agent: ${_agentName ?? ''}'),
-          pw.Text('Agent email: ${_agentEmail ?? ''}'),
-          pw.Text('Agent phone: ${_agentPhone ?? ''}'),
-          pw.SizedBox(height: 20),
-          pw.Row(children: [
-            pw.Text('Signature: '),
-            pw.Container(width: 150, height: 60, child: pw.Image(sigImg)),
-          ]),
-          pw.Text('Signed at (UTC): $signedAt'),
-        ],
-      ));
-
       final dir = await getTemporaryDirectory();
-      final hipaaFile = File("${dir.path}/Health_Information_Authorization.pdf");
-      final soaFile = File("${dir.path}/Medicare_Scope_of_Appointment.pdf");
-      await hipaaFile.writeAsBytes(await hipaaPdf.save());
-      await soaFile.writeAsBytes(await soaPdf.save());
+      final pdfFile = File("${dir.path}/HIPAA_SOA_Authorization.pdf");
+      await pdfFile.writeAsBytes(await pdf.save());
 
       final csvFile = await _buildCsv(_profile!);
       final store = SecureStore();
       final userEmail = await store.getString('userEmail') ?? "";
       final userId = await store.getString('userId') ?? "";
-      final sessionToken = await store.getString('userSessionToken') ?? "";
+      final signedAt = DateTime.now().toIso8601String();
       final reviewedAt = signedAt;
-      final hipaaPdfBase64 = base64Encode(await hipaaFile.readAsBytes());
-      final soaPdfBase64 = base64Encode(await soaFile.readAsBytes());
+      final hipaaSoaPdfBase64 = base64Encode(await pdfFile.readAsBytes());
       final vitalinkCsvBase64 = base64Encode(await csvFile.readAsBytes());
 
       final resp = await http.post(
@@ -455,10 +406,8 @@ I understand:
           "user_state": _profile!.state ?? "",
           "user_zip": _profile!.zip ?? "",
           "app_user_id": userId,
-          "sessionToken": sessionToken,
           "app_profile_id": _profile!.id,
           "signed_at": signedAt,
-          "soa_product_types": _products.where(_selectedProducts.contains).toList(),
           "meds_reviewed_at": reviewedAt,
           "doctors_reviewed_at": reviewedAt,
           "emergency_contacts": _profile!.emergency.effectiveContacts
@@ -474,8 +423,6 @@ I understand:
                     "dose": m.dose,
                     "frequency": m.frequency,
                     "pharmacy": m.prescriber,
-                    if (m.pharmacyFulfillmentType != null)
-                      "pharmacy_fulfillment_type": m.pharmacyFulfillmentType,
                   })
               .toList(),
           "providers": doctors
@@ -483,19 +430,12 @@ I understand:
                     "name": d.name,
                     "specialty": d.specialty,
                     "phone": d.phone,
-                    "is_primary_care_provider": d.isPrimaryCareProvider,
-                    if (d.verificationStatus == 'verified' && d.npi != null)
-                      "npi": d.npi,
                   })
               .toList(),
           "attachments": [
             {
-              "name": "Health_Information_Authorization.pdf",
-              "content": hipaaPdfBase64,
-            },
-            {
-              "name": "Medicare_Scope_of_Appointment.pdf",
-              "content": soaPdfBase64,
+              "name": "HIPAA_SOA_Authorization.pdf",
+              "content": hipaaSoaPdfBase64,
             },
             {
               "name": "vitalink_user_info.csv",
@@ -523,7 +463,7 @@ I understand:
           builder: (_) => AlertDialog(
             title: const Text("Sent Successfully"),
             content: const Text(
-              "Your signed authorization and Scope of Appointment have been sent to your agent.",
+              "Your HIPAA & SOA authorization has been sent to your agent.",
             ),
             actions: [
               TextButton(
@@ -541,80 +481,23 @@ I understand:
 
   @override
   Widget build(BuildContext context) {
-    final canContinue = _step == 1
-        ? _hipaaAcknowledged && _canScroll
-        : _step == 2
-            ? _soaAcknowledged && _selectedProducts.isNotEmpty && _canScroll
-            : _step == 3 && _sigCtrl.isNotEmpty;
+    final canSubmit = _acknowledged && _canScroll && !_saving;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Authorization and SOA'),
-        leading: _step > 1
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _saving ? null : () => _advanceTo(_step - 1),
-              )
-            : null,
-      ),
+      appBar: AppBar(title: const Text("HIPAA & SOA Authorization")),
       body: Stack(
         children: [
-          if (_step == 0)
-            const Center(child: CircularProgressIndicator())
-          else if (_step == 3)
-            ListView(padding: const EdgeInsets.all(16), children: [
-              const Text('Step 3 of 3 - Signature',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              const Text(
-                'Your signature will be placed on two separate documents: the Health Information Authorization and the Scope of Appointment with only your selected product types.',
+          ListView(
+            controller: _scrollCtrl,
+            padding: const EdgeInsets.all(16),
+            children: const [
+              Text(
+                _authorizationText,
                 style: TextStyle(fontSize: 16, height: 1.4),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 200,
-                child: Signature(controller: _sigCtrl, backgroundColor: Colors.white),
-              ),
-              TextButton(
-                onPressed: () => setState(_sigCtrl.clear),
-                child: const Text('Clear signature'),
-              ),
-            ])
-          else
-            ListView(
-              key: ValueKey(_step),
-              controller: _scrollCtrl,
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text('Step $_step of 3',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Text(_step == 1 ? _hipaaText : _soaText,
-                    style: const TextStyle(fontSize: 16, height: 1.4)),
-                if (_step == 2) ...[
-                  const SizedBox(height: 18),
-                  CheckboxListTile(
-                    title: const Text('Select all product types'),
-                    value: _selectedProducts.length == _products.length,
-                    onChanged: (value) => setState(() {
-                      _selectedProducts.clear();
-                      if (value == true) _selectedProducts.addAll(_products);
-                    }),
-                  ),
-                  ..._products.map((product) => CheckboxListTile(
-                        title: Text(product),
-                        value: _selectedProducts.contains(product),
-                        onChanged: (value) => setState(() {
-                          if (value == true) {
-                            _selectedProducts.add(product);
-                          } else {
-                            _selectedProducts.remove(product);
-                          }
-                        }),
-                      )),
-                ],
-              ],
-            ),
+              SizedBox(height: 300),
+            ],
+          ),
           if (_saving)
             Container(
               color: Colors.black26,
@@ -622,39 +505,30 @@ I understand:
             ),
         ],
       ),
-      bottomNavigationBar: _step == 0 ? null : SafeArea(
+      bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_step < 3)
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _step == 1 ? _hipaaAcknowledged : _soaAcknowledged,
-                  onChanged: !_canScroll ? null : (value) => setState(() {
-                    if (_step == 1) {
-                      _hipaaAcknowledged = value ?? false;
-                    } else {
-                      _soaAcknowledged = value ?? false;
-                    }
-                  }),
-                  title: Text(_step == 1
-                      ? 'I authorize the information sharing described in the Health Information Authorization.'
-                      : 'I agree to discuss only the product types I selected in the Scope of Appointment.'),
-                ),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _acknowledged,
+                    onChanged: (v) =>
+                        setState(() => _acknowledged = v ?? false),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      "I acknowledge and authorize my agent as described above.",
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: canContinue && !_saving
-                      ? () {
-                          if (_step < 3) {
-                            _advanceTo(_step + 1);
-                          } else {
-                            _saveAndSend();
-                          }
-                        }
-                      : null,
+                  onPressed: canSubmit ? _startSignatureFlow : null,
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     foregroundColor: Colors.white,
@@ -663,10 +537,10 @@ I understand:
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: Icon(_step == 3 ? Icons.draw : Icons.arrow_forward),
-                  label: Text(
-                    _step == 3 ? 'Sign both documents and send' : 'Continue',
-                    style: const TextStyle(
+                  icon: const Icon(Icons.send),
+                  label: const Text(
+                    "Sign & Send My Information",
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),

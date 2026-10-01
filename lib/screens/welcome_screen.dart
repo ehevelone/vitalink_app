@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -96,9 +95,8 @@ class WelcomeScreen extends StatelessWidget {
                 _registerOption(
                   context,
                   icon: Icons.business_center,
-                  title: "Activate Agent Portal",
-                  subtitle:
-                      "Insurance agents must activate access through myvitalink.app",
+                  title: "Create Agent Account",
+                  subtitle: "For licensed agents with a registration code",
                   color: vitalinkBlue,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -173,16 +171,6 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openVitaLinkWebsite() async {
-    final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _openClientActivationPage() async {
-    final url = Uri.parse("https://myvitalink.app/activate");
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  }
-
   Widget _dialogActionButton({
     required String label,
     required VoidCallback onPressed,
@@ -251,7 +239,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
+                  "VitaLink client accounts require an access code before registration. This code may come from your insurance agent or be delivered by email after it is issued.\n\n"
                   "Do you already have a VitaLink activation code?",
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -267,15 +255,6 @@ class WelcomeScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/registration');
-                  },
-                ),
-                const SizedBox(height: 10),
-                _dialogActionButton(
-                  label: "Get Activation Code",
-                  primary: false,
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _openClientActivationPage();
                   },
                 ),
                 TextButton(
@@ -316,8 +295,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-                  "Do you have your activation code?",
+                  "Enter an already-issued agent registration code to continue.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white70,
@@ -327,20 +305,11 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "I Have My Activation Code",
-                  primary: false,
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pushNamed(context, '/terms_agent');
-                  },
-                ),
-                const SizedBox(height: 10),
-                _dialogActionButton(
-                  label: "I Need An Activation Code",
+                  label: "Continue With Registration Code",
                   primary: true,
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _openVitaLinkWebsite();
+                    Navigator.pushNamed(context, '/terms_agent');
                   },
                 ),
                 TextButton(

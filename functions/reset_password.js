@@ -53,8 +53,6 @@ exports.handler = async (event) => {
       return reply(400, { success: false, error: "Invalid request body" });
     }
 
-    console.log("📥 BODY:", body);
-
     const { emailOrPhone, code, newPassword, role } = body;
 
     if (!emailOrPhone || !code || !newPassword || !role) {
@@ -84,20 +82,13 @@ exports.handler = async (event) => {
     );
 
     if (!result.rows.length) {
-      console.log("❌ No account found for:", email);
       return reply(404, { success: false, error: "No account found" });
     }
 
     const user = result.rows[0];
 
-    console.log("👤 DB USER:", user);
-
     const storedCode = String(user.reset_code ?? "").trim();
     const enteredCode = String(code ?? "").trim();
-
-    console.log("🔐 Stored Code:", storedCode);
-    console.log("🔐 Entered Code:", enteredCode);
-    console.log("⏱ Expires:", user.reset_expires);
 
     if (storedCode.length === 0) {
       console.log("❌ No reset code in DB");
@@ -137,7 +128,7 @@ exports.handler = async (event) => {
       return reply(500, { success: false, error: "Password update failed" });
     }
 
-    console.log(`✅ Password reset SUCCESS for ${user.email} (${role})`);
+    console.log("Password reset completed");
 
     return reply(200, { success: true });
 

@@ -1,7 +1,6 @@
 // functions/claim_agent_unlock.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
-const { randomBytes } = require("crypto");
 
 function ok(obj) {
   return {
@@ -69,19 +68,6 @@ function isAdminOverride(...values) {
   );
 }
 
-function rsmBillingActive(rsm) {
-  return rsm.billing_active === true || isAdminOverride(
-    rsm.subscription_status,
-    rsm.stripe_customer_id,
-    rsm.stripe_subscription_id,
-    rsm.stripe_subscription_item_id
-  );
-}
-
-function newAgentCode() {
-  return "AGT-" + randomBytes(8).toString("hex").toUpperCase();
-}
-
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -112,6 +98,7 @@ exports.handler = async (event) => {
       agencyCity,
       agencyState,
       agencyZip,
+      agreementVersion,
     } = JSON.parse(event.body || "{}");
 
     const registrationCode = normalizeCode(unlockCode);
@@ -123,24 +110,33 @@ exports.handler = async (event) => {
       );
     }
 
+    if (agreementVersion !== "2026-09-30") {
+      return fail("The current Agent Agreement must be accepted.");
+    }
+
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS agent_agreement_version TEXT,
+      ADD COLUMN IF NOT EXISTS agent_agreement_accepted_at TIMESTAMPTZ
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS agent_agreement_events (
+        id BIGSERIAL PRIMARY KEY,
+        agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        agreement_version TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     const emailError = getEmailValidationError(cleanEmail);
     if (emailError) {
       return fail(emailError);
     }
 
-    await db.query(`ALTER TABLE agents
-      ADD COLUMN IF NOT EXISTS linked_rsm_id UUID,
-      ADD COLUMN IF NOT EXISTS pricing_tier TEXT DEFAULT 'founders'`);
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const client = await db.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [cleanEmail]);
-
-    const existing = await client.query(
+    const existing = await db.query(
       `
       SELECT id, active, password_hash, promo_code, unlock_code,
-        rsm_id, billing_owner, subscription_status, stripe_subscription_id,
+        rsm_id, billing_owner, subscription_status,
         CASE WHEN promo_code = $1 THEN 'promo' ELSE 'unlock' END AS code_match
       FROM agents
       WHERE promo_code = $1
@@ -151,49 +147,26 @@ exports.handler = async (event) => {
          )
       ORDER BY CASE WHEN promo_code = $1 THEN 0 ELSE 1 END
       LIMIT 1
-      FOR UPDATE
       `,
       [registrationCode]
     );
 
-    let agent = existing.rows[0];
-    let rsm = null;
-    if (!agent || agent.rsm_id) {
-      const rsmResult = await client.query(
-        `SELECT id, billing_active, billing_mode, pricing_tier, subscription_status,
-                stripe_customer_id, stripe_subscription_id, stripe_subscription_item_id
-         FROM rsms
-         WHERE ${agent ? "id" : "invite_code"} = $1 AND role = 'rsm' AND active = TRUE
-         LIMIT 1 FOR UPDATE`,
-        [agent ? agent.rsm_id : registrationCode]
-      );
-      rsm = rsmResult.rows[0];
-      if (!rsm || !rsmBillingActive(rsm)) {
-        await client.query("ROLLBACK");
-        return fail(rsm ? "Office billing must be active before enrolling agents." : "Invalid agent registration code", rsm ? 402 : 404);
-      }
-    }
-
-    if (!agent && !rsm) {
-      await client.query("ROLLBACK");
+    if (existing.rows.length === 0) {
       return fail("Invalid agent registration code", 404);
     }
 
-    if (agent?.password_hash) {
-      await client.query("ROLLBACK");
+    const agent = existing.rows[0];
+
+    if (agent.password_hash) {
       return fail("Agent registration code already used");
     }
 
-    const duplicate = await client.query(
-      `SELECT id FROM agents WHERE LOWER(email) = $1 AND id IS DISTINCT FROM $2 LIMIT 1`,
-      [cleanEmail, agent?.id || null]
-    );
-    if (duplicate.rows.length) {
-      await client.query("ROLLBACK");
-      return fail("An agent account already exists with this email. Please log in or contact your RSM.", 409);
-    }
+    await db.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS linked_rsm_id UUID
+    `);
 
-    const matchingRsm = await client.query(
+    const matchingRsm = await db.query(
       `
       SELECT id
       FROM rsms
@@ -205,27 +178,19 @@ exports.handler = async (event) => {
       [cleanEmail]
     );
 
-    const selfRsmId = agent &&
+    const selfRsmId =
       matchingRsm.rows.length > 0 &&
       (!agent.rsm_id || String(agent.rsm_id) === String(matchingRsm.rows[0].id))
         ? matchingRsm.rows[0].id
         : null;
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const promoCode =
-      agent?.promo_code ||
+      agent.promo_code ||
       "AG-" + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    const billingOwner = selfRsmId ? "rsm" : rsm ?
-      (rsm.billing_mode === "agent_paid" ? "agent" : "agency") : agent.billing_owner;
-    const requiresAgentBilling = billingOwner === "agent" &&
-      !isAdminOverride(agent?.subscription_status) &&
-      !(agent?.stripe_subscription_id && agent?.subscription_status === "active");
-    const subscriptionStatus = requiresAgentBilling ? "pending_payment" :
-      selfRsmId || rsm ? "active" : (agent.subscription_status || "active");
-    const active = !requiresAgentBilling;
-    const pricingTier = rsm?.pricing_tier === "regular" ? "regular" : "founders";
-
-    const result = agent ? await client.query(
+    const result = await db.query(
       `
       UPDATE agents
       SET email = $1,
@@ -239,16 +204,25 @@ exports.handler = async (event) => {
           agency_city = $8,
           agency_state = $9,
           agency_zip = $10,
-          active = $14,
+          active = TRUE,
           rsm_id = COALESCE(rsm_id, $13),
           linked_rsm_id = $13,
-          billing_owner = $15,
-          subscription_status = $16,
-          pricing_tier = CASE WHEN $17::boolean THEN $18 ELSE pricing_tier END,
+          billing_owner = CASE
+            WHEN $13::uuid IS NOT NULL THEN 'rsm'
+            ELSE billing_owner
+          END,
+          subscription_status = CASE
+            WHEN $13::uuid IS NOT NULL THEN 'active'
+            WHEN billing_owner = 'agent' AND subscription_status <> 'active'
+              THEN 'pending_payment'
+            ELSE COALESCE(subscription_status, 'active')
+          END,
           promo_code = $11
-      WHERE id = $12 AND password_hash IS NULL
+          ,agent_agreement_version = $14
+          ,agent_agreement_accepted_at = NOW()
+      WHERE id = $12
       RETURNING id, name, email, phone, npn, agency_name, agency_street, agency_city,
-        agency_state, agency_zip, promo_code, active, role, subscription_status
+        agency_state, agency_zip, promo_code, unlock_code, active, role, subscription_status
       `,
       [
         cleanEmail,
@@ -264,36 +238,28 @@ exports.handler = async (event) => {
         promoCode,
         agent.id,
         selfRsmId,
-        active,
-        billingOwner,
-        subscriptionStatus,
-        Boolean(rsm),
-        pricingTier,
+        agreementVersion,
       ]
-    ) : await client.query(
-      `INSERT INTO agents
-        (unlock_code, email, password_hash, npn, phone, name, agency_name,
-         agency_street, agency_address, agency_city, agency_state, agency_zip,
-         active, role, rsm_id, billing_owner, subscription_status, pricing_tier,
-         promo_code, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11,
-               $12, 'agent', $13, $14, $15, $16, $17, NOW())
-       RETURNING id, name, email, phone, npn, agency_name, agency_street, agency_city,
-         agency_state, agency_zip, promo_code, active, role, subscription_status`,
-      [newAgentCode(), cleanEmail, hashedPassword, npn, normalizeUsPhone(phone),
-        name, agencyName, agencyStreet, agencyCity,
-        String(agencyState || "").trim().toUpperCase() || null, agencyZip,
-        active, rsm.id, billingOwner, subscriptionStatus, pricingTier, promoCode]
+    );
+
+    await db.query(
+      `INSERT INTO agent_agreement_events (agent_id, agreement_version) VALUES ($1,$2)`,
+      [agent.id, agreementVersion]
     );
 
     const row = result.rows[0];
-    if (!row) throw new Error("Agent registration could not be completed");
-    await client.query("COMMIT");
+    const requiresAgentBilling =
+      !isAdminOverride(agent.subscription_status) &&
+      !selfRsmId &&
+      agent.rsm_id &&
+      agent.billing_owner === "agent" &&
+      agent.subscription_status !== "active";
 
     return ok({
       message: "Agent registration complete",
       agentId: row.id,
       promoCode: row.promo_code,
+      activationCode: row.unlock_code,
       name: row.name,
       email: row.email,
       phone: row.phone,
@@ -306,15 +272,9 @@ exports.handler = async (event) => {
       active: row.active,
       role: row.role,
       requiresAgentBilling,
-      billingOwner: billingOwner || null,
-      subscriptionStatus: row.subscription_status || null,
+      billingOwner: selfRsmId ? "rsm" : agent.billing_owner || null,
+      subscriptionStatus: requiresAgentBilling ? "pending_payment" : row.subscription_status || null,
     });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
   } catch (err) {
     console.error("claim_agent_unlock error:", err);
     return fail("Server error: " + err.message, 500);

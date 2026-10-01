@@ -2,9 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStore {
   static const _iosOptions = IOSOptions(
-    accessibility: KeychainAccessibility.unlocked,
+    accessibility: KeychainAccessibility.unlocked_this_device,
   );
-
   final FlutterSecureStorage _storage =
       const FlutterSecureStorage(iOptions: _iosOptions);
 
@@ -33,8 +32,7 @@ class SecureStore {
   }
 
   Future<bool?> getBool(String key) async {
-    final value =
-        await _storage.read(key: key, iOptions: _iosOptions);
+    final value = await _storage.read(key: key, iOptions: _iosOptions);
     if (value == null) return null;
     return value.toLowerCase() == 'true';
   }

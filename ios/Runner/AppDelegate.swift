@@ -4,6 +4,7 @@ import Firebase
 import FirebaseMessaging
 import EventKit
 import EventKitUI
+import Security
 import UserNotifications
 
 @main
@@ -16,6 +17,8 @@ import UserNotifications
   ) -> Bool {
 
     FirebaseApp.configure()
+    migrateVitaLinkKeychainToDeviceOnly()
+    excludeVitaLinkDataFromBackup()
 
     UNUserNotificationCenter.current().delegate = self
     Messaging.messaging().delegate = self
@@ -24,10 +27,8 @@ import UserNotifications
     UNUserNotificationCenter.current().requestAuthorization(
       options: [.alert, .badge, .sound]
     ) { granted, error in
-      print("🔔 Permission granted: \(granted)")
-      if let error = error {
-        print("❌ Permission error: \(error)")
-      }
+      _ = granted
+      _ = error
     }
 
     application.registerForRemoteNotifications()
@@ -58,8 +59,6 @@ import UserNotifications
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
 
-    print("🔥 APNs DEVICE TOKEN RECEIVED")
-
     Messaging.messaging().setAPNSToken(deviceToken, type: .unknown)
 
     super.application(
@@ -72,11 +71,46 @@ import UserNotifications
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
   ) {
-    print("❌ FAILED TO REGISTER FOR APNs: \(error)")
+    _ = error
   }
 
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-    print("🔥 FCM TOKEN: \(String(describing: fcmToken))")
+    _ = fcmToken
+  }
+  private func excludeVitaLinkDataFromBackup() {
+    let fileManager = FileManager.default
+    let directories: [FileManager.SearchPathDirectory] = [
+      .documentDirectory,
+      .libraryDirectory,
+      .applicationSupportDirectory
+    ]
+
+    for directory in directories {
+      guard let url = fileManager.urls(for: directory, in: .userDomainMask).first else {
+        continue
+      }
+      if !fileManager.fileExists(atPath: url.path) {
+        try? fileManager.createDirectory(
+          at: url,
+          withIntermediateDirectories: true,
+          attributes: nil
+        )
+      }
+      var excludedUrl = url
+      try? excludedUrl.setResourceValue(true, forKey: .isExcludedFromBackupKey)
+    }
+  }
+
+  private func migrateVitaLinkKeychainToDeviceOnly() {
+    let query: [CFString: Any] = [
+      kSecClass: kSecClassGenericPassword,
+      kSecAttrService: "flutter_secure_storage_service",
+      kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked
+    ]
+    let update: [CFString: Any] = [
+      kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    ]
+    _ = SecItemUpdate(query as CFDictionary, update as CFDictionary)
   }
   private func openCalendarEvent(arguments: Any?, result: @escaping FlutterResult) {
     guard

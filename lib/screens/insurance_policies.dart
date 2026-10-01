@@ -6,7 +6,9 @@ import 'package:http/http.dart' as http;
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
-import '../widgets/working_overlay.dart';
+import '../services/api_service.dart';
+import '../services/app_state.dart';
+import '../services/device_id.dart';
 import 'insurance_policy_view.dart';
 import 'insurance_policy_form.dart';
 import 'vitalink_camera_capture_screen.dart';
@@ -23,8 +25,6 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
-  bool _captureInProgress = false;
-  String? _workingMessage;
 
   @override
   void initState() {
@@ -70,10 +70,78 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     return {};
   }
 
-  Future<void> _scanPolicy() async {
-    if (_workingMessage != null || _captureInProgress) return;
-    setState(() => _captureInProgress = true);
+  String _nameKey(String value) =>
+      value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
+  bool _personNamesMatch(String scanned, String expected) {
+    List<String> parts(String value) => value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .where((part) => !const {
+              'agent',
+              'producer',
+              'licensed',
+              'npn',
+            }.contains(part))
+        .toList();
+
+    final scannedParts = parts(scanned);
+    final expectedParts = parts(expected);
+    if (scannedParts.length < 2 || expectedParts.length < 2) return false;
+    final sameLastName = scannedParts.last == expectedParts.last;
+    final scannedFirst = scannedParts.first;
+    final expectedFirst = expectedParts.first;
+    final sameFirstName = scannedFirst == expectedFirst ||
+        (scannedFirst.length == 1 && expectedFirst.startsWith(scannedFirst)) ||
+        (expectedFirst.length == 1 && scannedFirst.startsWith(expectedFirst));
+    return sameLastName && sameFirstName;
+  }
+
+  Future<void> _recordPolicyAgentMatch(Map<String, dynamic> parsed) async {
+    final scannedAgent = parsed['writingAgentName']?.toString() ?? '';
+    final scannedAgency = parsed['writingAgencyName']?.toString() ?? '';
+    if (scannedAgent.isEmpty && scannedAgency.isEmpty) return;
+
+    final email = await AppState.getEmail();
+    if (email == null || email.isEmpty) return;
+    final agentResult = await ApiService.getUserAgent(email);
+    final agent = Map<String, dynamic>.from(agentResult['agent'] as Map? ?? {});
+    final agentName = agent['name']?.toString() ?? '';
+    final agencyName = agent['agency_name']?.toString() ?? '';
+    final scannedAgentKey = _nameKey(scannedAgent);
+    final agentNameKey = _nameKey(agentName);
+    final scannedAgencyKey = _nameKey(scannedAgency);
+    final agencyNameKey = _nameKey(agencyName);
+    final agentMatch = scannedAgentKey.isNotEmpty &&
+        agentNameKey.isNotEmpty &&
+        _personNamesMatch(scannedAgent, agentName);
+    final agencyMatch = scannedAgencyKey.isNotEmpty &&
+        agencyNameKey.isNotEmpty &&
+        (scannedAgencyKey == agencyNameKey ||
+            (scannedAgencyKey.length >= 6 &&
+                agencyNameKey.length >= 6 &&
+                (scannedAgencyKey.contains(agencyNameKey) ||
+                    agencyNameKey.contains(scannedAgencyKey))));
+    if (!agentMatch && !agencyMatch) return;
+
+    final store = SecureStore();
+    final userId = await store.getString('userId');
+    if (userId == null) return;
+    await ApiService.updateAccountAccess(
+      userId: userId,
+      action: 'policy_verified',
+      values: {
+        'documentMatch': true,
+        'matchType': agentMatch ? 'agent' : 'agency',
+        'deviceId': await DeviceId.getOrCreate(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      },
+    );
+  }
+
+  Future<void> _scanPolicy() async {
     try {
       if (_p == null) return;
 
@@ -98,13 +166,6 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       }
 
       if (base64Images.isEmpty) return;
-
-      if (mounted) {
-        setState(() {
-          _captureInProgress = false;
-          _workingMessage = 'Processing and saving your insurance policy...';
-        });
-      }
 
       const url =
           "https://vitalink-app.netlify.app/.netlify/functions/parse_insurance";
@@ -133,6 +194,7 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body);
         final normalized = _normalizeParsed(parsed['data'] ?? parsed);
+        await _recordPolicyAgentMatch(normalized);
 
         final newPolicy = Insurance(
           carrier: (normalized['carrier'] ?? '').trim(),
@@ -221,13 +283,6 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Policy scan failed: $e")),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _captureInProgress = false;
-          _workingMessage = null;
-        });
-      }
     }
   }
 
@@ -246,15 +301,8 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     );
 
     if (updated != null) {
-      setState(() {
-        _workingMessage = 'Saving your insurance policy...';
-        _p!.insurances.add(updated);
-      });
-      try {
-        await _save();
-      } finally {
-        if (mounted) setState(() => _workingMessage = null);
-      }
+      setState(() => _p!.insurances.add(updated));
+      await _save();
     }
   }
 
@@ -297,16 +345,12 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Insurance Policies")),
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: ElevatedButton.icon(
-              onPressed: _workingMessage == null && !_captureInProgress
-                  ? _scanPolicy
-                  : null,
+              onPressed: _scanPolicy,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,
@@ -360,16 +404,10 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
                     },
                   ),
           ),
-            ],
-          ),
-          if (_workingMessage != null)
-            WorkingOverlay(message: _workingMessage!),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _workingMessage == null && !_captureInProgress
-            ? _addPolicy
-            : null,
+        onPressed: _addPolicy,
         child: const Icon(Icons.add),
       ),
     );

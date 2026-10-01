@@ -92,14 +92,14 @@ exports.handler = async (event) => {
 
     if (!agentAccessOverride && agent.billing_owner === "agent" && !hasValidSubscription) {
       return fail(
-        "Billing required",
+        "Agent access not active",
         403,
         {
           requires_payment: true,
           agentId: agent.id,
           email: agent.email,
           message:
-            "Activate your VitaLink Agent Access to continue.",
+            "Your VitaLink agent access is not active. Contact VitaLink support.",
         }
       );
     }

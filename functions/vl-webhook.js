@@ -1,7 +1,5 @@
 const Stripe = require("stripe");
-const crypto = require("crypto");
 const { Pool } = require("pg");
-const { getActivationPriceId } = require("./services/stripe-prices");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -13,17 +11,12 @@ const pool = new Pool({
 function generateCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-  const part = (len) => {
-    const bytes = crypto.randomBytes(len);
-    return Array.from(bytes, (byte) => chars[byte % chars.length]).join("");
-  };
+  const part = (len) =>
+    Array.from({ length: len }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
 
   return `VL-${part(4)}-${part(4)}`;
-}
-
-function getPaymentIntentId(value) {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
 }
 
 exports.handler = async (event) => {
@@ -55,106 +48,79 @@ exports.handler = async (event) => {
 
   }
 
-  if (stripeEvent.type !== "checkout.session.completed") {
-    console.log("Ignored Stripe event:", stripeEvent.type);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ received: true, ignored: true })
-    };
-  }
+  // 🔥 HANDLE ALL SUCCESS PATHS (CARD + ACH)
+  if (
+    stripeEvent.type === "checkout.session.completed" ||
+    stripeEvent.type === "checkout.session.async_payment_succeeded" ||
+    stripeEvent.type === "invoice.paid" // ✅ ADDED FOR ACH SAFETY
+  ) {
 
-  try {
-    const eventSession = stripeEvent.data.object;
-    const session = await stripe.checkout.sessions.retrieve(eventSession.id, {
-      expand: ["line_items.data.price"]
-    });
+    console.log("Payment event detected");
 
-    const lineItems = session.line_items?.data || [];
-    const expectedPriceId = getActivationPriceId();
-    const validLineItem = lineItems.length === 1 &&
-      lineItems[0].price?.id === expectedPriceId &&
-      lineItems[0].quantity === 1;
+    const obj = stripeEvent.data.object;
 
-    if (
-      session.mode !== "payment" ||
-      session.payment_status !== "paid" ||
-      session.metadata?.purchase_type !== "consumer_activation" ||
-      session.currency !== "usd" ||
-      session.amount_total !== 4995 ||
-      !validLineItem
-    ) {
-      console.error("Rejected activation Checkout Session", {
-        sessionId: session.id,
-        mode: session.mode,
-        paymentStatus: session.payment_status,
-        purchaseType: session.metadata?.purchase_type,
-        currency: session.currency,
-        amountTotal: session.amount_total
-      });
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ received: true, ignored: true })
-      };
+    // 🔥 HANDLE DIFFERENT EVENT TYPES
+    let sessionId = null;
+    let email = null;
+
+    if (stripeEvent.type === "invoice.paid") {
+      // ACH final settlement
+      sessionId = obj.subscription || obj.id;
+      email = obj.customer_email || null;
+
+      console.log("Invoice paid (ACH cleared)");
+    } else {
+      // Checkout session
+      sessionId = obj.id;
+      email = obj.customer_details?.email || null;
     }
 
-    const name = session.customer_details?.individual_name ||
-      session.customer_details?.name || null;
-    const email = String(session.customer_details?.email || "")
-      .trim()
-      .toLowerCase();
+    const code = generateCode();
 
-    if (!name || !email) {
-      throw new Error(`Paid Checkout Session ${session.id} is missing purchaser identity`);
-    }
-
-    const paymentIntentId = getPaymentIntentId(session.payment_intent);
-    const paidAt = new Date(stripeEvent.created * 1000);
     const client = await pool.connect();
 
     try {
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const code = generateCode();
-        const inserted = await client.query(
+
+      const existing = await client.query(
+        `SELECT id FROM activation_codes
+         WHERE stripe_session = $1
+         LIMIT 1`,
+        [sessionId]
+      );
+
+      if (existing.rows.length === 0) {
+
+        console.log("Creating activation code row");
+
+        await client.query(
           `INSERT INTO activation_codes
-             (code, name, email, stripe_session, purchase_type,
-              payment_intent_id, payment_status, paid_at, redeemed, created_at)
-           VALUES ($1, $2, $3, $4, 'consumer_activation', $5, 'paid', $6, false, NOW())
-           ON CONFLICT DO NOTHING
-           RETURNING id, code`,
-          [code, name, email, session.id, paymentIntentId, paidAt]
+           (code, email, stripe_session, created_at)
+           VALUES ($1,$2,$3,NOW())`,
+          [code, email, sessionId]
         );
 
-        if (inserted.rows.length) {
-          console.log("Activation created", {
-            activationId: inserted.rows[0].id,
-            sessionId: session.id
-          });
-          break;
-        }
+        console.log("Activation record created");
 
-        const existing = await client.query(
-          `SELECT id FROM activation_codes WHERE stripe_session = $1 LIMIT 1`,
-          [session.id]
-        );
+      } else {
 
-        if (existing.rows.length) {
-          console.log("Duplicate webhook ignored:", session.id);
-          break;
-        }
+        console.log("Duplicate webhook ignored");
 
-        if (attempt === 4) {
-          throw new Error("Could not generate a unique activation code");
-        }
       }
+
+    } catch (err) {
+
+      console.error("DB error:", err);
+
     } finally {
+
       client.release();
+
     }
-  } catch (err) {
-    console.error("Activation fulfillment failed:", err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ received: false })
-    };
+
+  } else {
+
+    console.log("Unhandled Stripe event:", stripeEvent.type);
+
   }
 
   return {

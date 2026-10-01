@@ -29,8 +29,6 @@ exports.handler = async (event) => {
     const amount = body.amount;
     const order_id = body.order_id;
 
-    console.log("CHECKOUT BODY:", body);
-
     if (!order_id) {
       return {
         statusCode: 400,

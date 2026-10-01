@@ -4,10 +4,6 @@ const { createMailer, fromAddress } = require("./services/mailer");
 const {
   syncVitalinkPackageToCrm,
 } = require("./services/crm-sync");
-const {
-  getAuthorizedUser,
-  recordSigning,
-} = require("./services/authorization-status");
 
 exports.handler = async (event) => {
   try {
@@ -21,44 +17,17 @@ exports.handler = async (event) => {
     }
 
     const transporter = createMailer();
-    const hipaaAttachment = body.attachments.find((att) =>
-      att.name === "Health_Information_Authorization.pdf"
-    );
-    const soaAttachment = body.attachments.find((att) =>
-      att.name === "Medicare_Scope_of_Appointment.pdf"
-    );
-    const isSeparateConsent = Boolean(hipaaAttachment || soaAttachment || body.soa_product_types);
-    if (isSeparateConsent && (!hipaaAttachment?.content || !soaAttachment?.content ||
-        !Array.isArray(body.soa_product_types) || body.soa_product_types.length === 0)) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ success: false, error: "Both signed documents and selected SOA products are required" }),
-      };
-    }
-    let signedUser = null;
-    if (isSeparateConsent) {
-      signedUser = await getAuthorizedUser(body.app_user_id, body.sessionToken);
-      if (!signedUser ||
-          signedUser.email.toLowerCase() !== String(body.user_email || '').toLowerCase() ||
-          signedUser.agent_email?.toLowerCase() !== body.agent.email.toLowerCase()) {
-        return {
-          statusCode: 403,
-          body: JSON.stringify({ success: false, error: 'Client session or registered agent does not match' }),
-        };
-      }
-    }
 
     const mailOptions = {
       from: fromAddress("VitaLink"),
       to: body.agent.email,
-      subject: `VitaLink - Signed authorization and SOA from ${body.user || "Client"}`,
+      subject: `VitaLink - Signed HIPAA & SOA from ${body.user || "Client"}`,
       text: `Hello ${body.agent.name || "Agent"},
 
-Your client ${body.user || "Client"} has signed their information authorization and Scope of Appointment.
+Your client ${body.user || "Client"} has signed their HIPAA & SOA authorization.
 
 Attached:
-• Signed information authorization PDF
-• Signed Scope of Appointment PDF
+• Signed HIPAA & SOA PDF
 • Client information report (PDF)
 • Client medication/doctor CSV
 
@@ -73,7 +42,6 @@ Attached:
       phone: body.user_phone || "",
       dob: body.user_dob || "",
       medications: body.medications || [],
-      pharmacies: body.pharmacies || [],
       providers: body.providers || [],
     });
 
@@ -83,7 +51,7 @@ Attached:
       contentType: "application/pdf",
     });
 
-    // Signed forms and the client CSV are sent as separate attachments.
+    // 🔹 Existing attachments (SOA + CSV)
     body.attachments.forEach((att) => {
       if (!att.name || !att.content) return;
 
@@ -113,22 +81,14 @@ Attached:
     // 🔥 Send email and capture confirmation
     const info = await transporter.sendMail(mailOptions);
 
-    if (signedUser) {
-      try {
-        await recordSigning(signedUser.id, signedUser.agent_id, body.signed_at);
-      } catch (error) {
-        console.error('Authorization status record failed after email delivery:', error);
-      }
-    }
-
     // Update user record
-    if (body.user_email) {
+    if (body.user) {
       await db.query(
         `UPDATE users
          SET status = 'complete',
              last_review_year = EXTRACT(YEAR FROM CURRENT_DATE)
          WHERE LOWER(email) = LOWER($1)`,
-        [body.user_email]
+        [body.user]
       );
     }
 
@@ -136,7 +96,7 @@ Attached:
     let crmSync = null;
 
     try {
-      const legacyAttachment = (body.attachments || []).find((att) =>
+      const hipaaSoaAttachment = (body.attachments || []).find((att) =>
         String(att.name || "").toLowerCase().includes("hipaa")
       );
 
@@ -162,10 +122,7 @@ Attached:
           doctorsReviewedAt: body.doctors_reviewed_at,
           emergencyContacts: body.emergency_contacts || [],
           pharmacies: body.pharmacies || [],
-          hipaaPdfBase64: hipaaAttachment?.content || legacyAttachment?.content,
-          soaPdfBase64: soaAttachment?.content || legacyAttachment?.content,
-          soaProductTypes: body.soa_product_types || null,
-          newAuthorizationSigned: Boolean(signedUser),
+          hipaaSoaPdfBase64: hipaaSoaAttachment?.content,
         },
       });
     } catch (syncErr) {

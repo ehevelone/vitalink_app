@@ -53,24 +53,18 @@ exports.handler = async function (event) {
     }
 
     const client = await pool.connect();
-    let result;
 
-    try {
-      result = await client.query(
-        `
-        SELECT name, email
-        FROM activation_codes
-        WHERE code = $1
-          AND purchase_type = 'consumer_activation'
-          AND payment_status = 'paid'
-          AND redeemed IS NOT TRUE
-        LIMIT 1
-        `,
-        [code]
-      );
-    } finally {
-      client.release();
-    }
+    const result = await client.query(
+      `
+      SELECT full_name, email
+      FROM activation_codes
+      WHERE code = $1
+      LIMIT 1
+      `,
+      [code]
+    );
+
+    client.release();
 
     if (result.rows.length === 0) {
       return {
@@ -87,7 +81,7 @@ exports.handler = async function (event) {
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
-        name: row.name,
+        name: row.full_name,
         email: row.email
       })
     };

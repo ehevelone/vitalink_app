@@ -10,7 +10,7 @@ import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
-import '../services/deep_link_service.dart';
+import '../services/device_security_service.dart';
 import '../widgets/safe_bottom_button.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -30,10 +30,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   bool _notificationPermissionDialogShown = false;
 
   bool _syncRan = false;
-  bool _notificationDialogOpen = false;
   StreamSubscription<String>? _tokenSub;
   StreamSubscription<RemoteMessage>? _messageSub;
-  StreamSubscription<RemoteMessage>? _openedSub;
 
   @override
   void initState() {
@@ -45,6 +43,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     _repo = DataRepository(_store);
 
     _loadProfile();
+    _refreshSharedAccess();
     _setupFCM();
   }
 
@@ -58,7 +57,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     debugPrint("SYNC STARTING");
 
     ApiService.syncProfilesToServer()
-        .then((res) => debugPrint("SYNC RESULT: $res"))
+        .then((_) => debugPrint("SYNC COMPLETE"))
         .catchError((e) => debugPrint("SYNC ERROR: $e"));
   }
 
@@ -67,9 +66,50 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _loadProfile();
       _registerToken();
+      _checkDeviceAndSharedAccess();
 
       // 🔥 ADDED — refresh QR on resume
       _refreshQr();
+    }
+  }
+
+  Future<void> _checkDeviceAndSharedAccess() async {
+    final active = await DeviceSecurityService.checkCurrentDevice();
+    if (!mounted) return;
+    if (!active) {
+      Navigator.pushNamedAndRemoveUntil(
+          context, '/device_disabled', (_) => false);
+      return;
+    }
+    await _refreshSharedAccess();
+  }
+
+  Future<void> _refreshSharedAccess() async {
+    final userId = await _store.getString('userId');
+    if (userId == null) return;
+    final result = await ApiService.getSharedProfileStatuses(userId: userId);
+    final relationships = result['relationships'] is List
+        ? (result['relationships'] as List)
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList()
+        : <Map<String, dynamic>>[];
+    if (result['success'] == true) {
+      await _repo.applySharedAccessStatuses(relationships);
+      final profiles = await _repo.loadAllProfiles();
+      final activeIndex = await _repo.getActiveProfileIndex();
+      if (profiles.isNotEmpty &&
+          activeIndex >= 0 &&
+          activeIndex < profiles.length &&
+          profiles[activeIndex].sharedAccessStatus == 'revoked') {
+        final availableIndex = profiles.indexWhere(
+          (profile) => profile.sharedAccessStatus != 'revoked',
+        );
+        if (availableIndex >= 0) {
+          await _repo.setActiveProfileIndex(availableIndex);
+        }
+      }
+      await _loadProfile();
     }
   }
 
@@ -102,7 +142,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
       await _store.setString("qr_url", qrUrl);
 
-      debugPrint("QR UPDATED: $qrUrl");
+      debugPrint("QR UPDATED");
     } catch (e) {
       debugPrint("QR REFRESH FAILED: $e");
     }
@@ -115,9 +155,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       if (token != null && token.isNotEmpty) {
         final userId = await _store.getString("userId");
 
-        debugPrint("REGISTER TOKEN USERID: $userId");
-        debugPrint("REGISTER TOKEN FCM: $token");
-
         if (userId == null) return;
 
         await ApiService.registerDeviceToken(
@@ -125,7 +162,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           fcmToken: token,
         );
 
-        debugPrint("FCM TOKEN REGISTERED: $token");
+        debugPrint("FCM TOKEN REGISTERED");
       }
     } catch (e) {
       debugPrint("Token registration error: $e");
@@ -134,20 +171,14 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Future<void> _loadProfile() async {
     try {
-      final p = await _repo.loadProfile().timeout(const Duration(seconds: 12));
-      String? storedName;
-      try {
-        storedName = await _store
-            .getString("userName")
-            .timeout(const Duration(seconds: 6));
-      } catch (error) {
-        debugPrint('Unable to load saved display name: $error');
-      }
+      final p = await _repo.loadProfile();
+      final storedName = await _store.getString("userName");
 
       String name = "";
 
       if (p.fullName.trim().isNotEmpty) {
         name = p.fullName.trim();
+        await _store.setString("userName", name);
       } else if (storedName != null && storedName.trim().isNotEmpty) {
         name = storedName.trim();
       } else {
@@ -161,16 +192,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         _displayName = name;
         _loading = false;
       });
-
-      if (p.fullName.trim().isNotEmpty) {
-        try {
-          await _store
-              .setString("userName", name)
-              .timeout(const Duration(seconds: 6));
-        } catch (error) {
-          debugPrint('Unable to save display name: $error');
-        }
-      }
 
       // 🔥 ADDED — refresh QR AFTER profile loads
       await _refreshQr();
@@ -225,82 +246,16 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           fcmToken: newToken,
         );
 
-        debugPrint("TOKEN REFRESHED: $newToken");
+        debugPrint("FCM TOKEN REFRESHED");
       });
 
       await _messageSub?.cancel();
       _messageSub = FirebaseMessaging.onMessage.listen((message) {
-        debugPrint("FOREGROUND MESSAGE: ${message.data}");
-        debugPrint(
-          "FOREGROUND NOTIFICATION: "
-          "${message.notification?.title} / ${message.notification?.body}",
-        );
+        debugPrint("FOREGROUND NOTIFICATION RECEIVED");
 
-        _handleNotificationTap(message);
-
-        if (!mounted || _notificationDialogOpen) return;
-
-        final title = message.notification?.title ??
-            message.data["title"] ??
-            "New Notification";
-
-        final body = message.notification?.body ??
-            message.data["body"] ??
-            "You have a new notification";
-
-        _notificationDialogOpen = true;
-
-        showDialog(
-          context: context,
-          barrierDismissible: true,
-          builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF111111),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(
-              body,
-              style: const TextStyle(color: Colors.white70),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  }
-                  _notificationDialogOpen = false;
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.greenAccent,
-                ),
-                child: const Text(
-                  "OK",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ).then((_) {
-          _notificationDialogOpen = false;
-        });
-      });
-
-      FirebaseMessaging.instance.getInitialMessage().then((message) {
-        if (message != null) {
-          _handleNotificationTap(message);
+        if (message.data['type'] == 'profile_share_revoked') {
+          _refreshSharedAccess();
         }
-      });
-
-      await _openedSub?.cancel();
-      _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        _handleNotificationTap(message);
       });
     } catch (e) {
       debugPrint("FCM error: $e");
@@ -357,23 +312,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _handleNotificationTap(RemoteMessage message) {
-    final type = message.data["type"]?.toString();
-    final inviteCode = message.data["inviteCode"]?.toString().toUpperCase();
-
-    if (type == "profile_share_invite" &&
-        inviteCode != null &&
-        inviteCode.isNotEmpty) {
-      VitaLinkDeepLink.shareCode = inviteCode;
-    }
-
-    final route = message.data["route"]?.toString();
-
-    if (route != null && route.isNotEmpty && mounted) {
-      Navigator.pushNamed(context, route);
-    }
-  }
-
   Future<void> _logout(BuildContext context) async {
     await _store.remove('userLoggedIn');
     await _store.remove('rememberMe');
@@ -397,7 +335,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _tokenSub?.cancel();
     _messageSub?.cancel();
-    _openedSub?.cancel();
     super.dispose();
   }
 

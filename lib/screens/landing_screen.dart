@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 
 class LandingScreen extends StatefulWidget {
@@ -73,9 +72,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -90,9 +87,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     style: TextStyle(fontSize: 18, color: Colors.black),
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: vitalinkBlue,
@@ -137,9 +132,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
                 const Text(
                   "Choose the account type that matches how you use VitaLink.",
                   textAlign: TextAlign.center,
@@ -148,9 +141,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     fontSize: 14,
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 _registerOption(
                   icon: Icons.family_restroom,
                   title: "Create Client Account",
@@ -161,14 +152,11 @@ class _LandingScreenState extends State<LandingScreen> {
                     _showClientActivationDialog();
                   },
                 ),
-
                 const SizedBox(height: 15),
-
                 _registerOption(
                   icon: Icons.business_center,
-                  title: "Activate Agent Portal",
-                  subtitle:
-                      "Insurance agents must activate access through myvitalink.app",
+                  title: "Create Agent Account",
+                  subtitle: "For licensed agents with a registration code",
                   color: vitalinkBlue,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -242,16 +230,6 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  Future<void> _openVitaLinkWebsite() async {
-    final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _openClientActivationPage() async {
-    final url = Uri.parse("https://myvitalink.app/activate");
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  }
-
   void _continueClientRegistration() {
     Navigator.pushReplacementNamed(
       context,
@@ -316,48 +294,39 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              const Text(
-                "Client Account Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                const Text(
+                  "Client Account Activation",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "VitaLink client accounts require an activation code before registration. This code may come from your insurance agent or from myvitalink.app.\n\n"
-                "Do you already have a VitaLink activation code?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                const Text(
+                  "VitaLink client accounts require an access code before registration. This code may come from your insurance agent or be delivered by email after it is issued.\n\n"
+                  "Do you already have a VitaLink activation code?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "I Have a Code",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _continueClientRegistration();
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "Get Activation Code",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openClientActivationPage();
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: "I Have a Code",
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _continueClientRegistration();
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel"),
+                ),
               ],
             ),
           ),
@@ -380,52 +349,42 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              const Text(
-                "Agent Portal Activation",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                const Text(
+                  "Agent Portal Activation",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "Insurance agent accounts are activated through the VitaLink website before app access is enabled.\n\n"
-                "Do you have your activation code?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  height: 1.4,
+                const SizedBox(height: 14),
+                const Text(
+                  "Enter an already-issued agent registration code to continue.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              _dialogActionButton(
-                label: "I Have My Activation Code",
-                primary: false,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushNamed(
-                    context,
-                    '/terms_agent',
-                    arguments: {"code": activationCode},
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              _dialogActionButton(
-                label: "I Need An Activation Code",
-                primary: true,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openVitaLinkWebsite();
-                },
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
-              ),
+                const SizedBox(height: 22),
+                _dialogActionButton(
+                  label: "Continue With Registration Code",
+                  primary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(
+                      context,
+                      '/terms_agent',
+                      arguments: {"code": activationCode},
+                    );
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel"),
+                ),
               ],
             ),
           ),
@@ -467,7 +426,6 @@ class _LandingScreenState extends State<LandingScreen> {
                           child: Column(
                             children: [
                               SizedBox(height: topGap),
-
                               Text(
                                 "Welcome To",
                                 style: TextStyle(
@@ -476,9 +434,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                   color: vitalinkBlue,
                                 ),
                               ),
-
                               SizedBox(height: logoGap),
-
                               Image.asset(
                                 'assets/images/vitalink-logo-2.png',
                                 width: logoWidth,
@@ -486,9 +442,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                         MediaQuery.of(context).devicePixelRatio)
                                     .round(),
                               ),
-
                               SizedBox(height: buttonGap),
-
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
@@ -503,9 +457,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 20),
-
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: vitalinkBlue,
@@ -520,7 +472,6 @@ class _LandingScreenState extends State<LandingScreen> {
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: compactHeight ? 28 : 60),
                             ],
                           ),
@@ -528,7 +479,6 @@ class _LandingScreenState extends State<LandingScreen> {
                       ),
                     ),
                   ),
-
                   SizedBox(
                     width: double.infinity,
                     height: bottomImageHeight,

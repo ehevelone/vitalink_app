@@ -18,8 +18,6 @@ function fail(msg) {
 
 exports.handler = async (event) => {
   try {
-    console.log("RAW EVENT BODY:", event.body);
-
     let body = {};
     try {
       body = JSON.parse(event.body || "{}");

@@ -23,26 +23,9 @@ exports.handler = async (event) => {
 
     const session = await stripe.checkout.sessions.create({
 
-      payment_method_types: ["card"],
+      payment_method_types: ["card", "us_bank_account"],
 
       mode: "payment",
-
-      name_collection: {
-        individual: {
-          enabled: true,
-          optional: false
-        }
-      },
-
-      metadata: {
-        purchase_type: "consumer_activation"
-      },
-
-      payment_intent_data: {
-        metadata: {
-          purchase_type: "consumer_activation"
-        }
-      },
 
       line_items: [
         {

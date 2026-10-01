@@ -20,7 +20,7 @@ exports.handler = async (event) => {
     // 🔍 Find invite
     const result = await db.query(
       `SELECT * FROM agent_invites 
-       WHERE token_hash = $1 AND used = false`,
+       WHERE token_hash = $1 AND used = false AND expires_at > NOW()`,
       [token_hash]
     );
 

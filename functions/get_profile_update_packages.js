@@ -1,7 +1,6 @@
 const db = require("./services/db");
 const {
   cleanupExpiredPackages,
-  decrypt,
   ensureSchema,
   parseBody,
   reply,
@@ -32,6 +31,7 @@ exports.handler = async (event) => {
       SELECT
         pur.id AS recipient_package_id,
         pur.status AS recipient_status,
+        pur.share_link_id,
         pup.id AS package_id,
         pup.profile_id,
         pup.profile_name,
@@ -49,29 +49,17 @@ exports.handler = async (event) => {
       [userId]
     );
 
-    const packages = [];
-
-    for (const row of result.rows) {
-      let payload = null;
-
-      try {
-        payload = JSON.parse(decrypt(row.encrypted_payload));
-      } catch (err) {
-        console.error("Failed to decrypt profile update package:", row.package_id, err);
-        continue;
-      }
-
-      packages.push({
+    const packages = result.rows.map((row) => ({
         recipientPackageId: row.recipient_package_id,
         packageId: row.package_id,
+        shareId: row.share_link_id,
         profileId: row.profile_id,
         profileName: row.profile_name,
         allowedSections: row.allowed_sections,
         createdAt: row.created_at,
         expiresAt: row.expires_at,
-        payload,
-      });
-    }
+        encryptedPayload: row.encrypted_payload,
+      }));
 
     return reply(200, { success: true, packages });
   } catch (err) {

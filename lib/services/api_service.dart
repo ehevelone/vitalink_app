@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 // 🔥 ADDED FOR PROFILE SYNC
 import '../services/secure_store.dart';
 import '../services/data_repository.dart';
+import '../services/device_id.dart';
 
 class ApiService {
   static const String _baseUrl =
@@ -26,17 +27,15 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // 🔧 Internal POST helper (SAFE)
-  // -------------------------------------------------------------
+// 🔧 Internal POST helper (SAFE)
+// -------------------------------------------------------------
   static Future<Map<String, dynamic>> _postJson(
     String path,
     Map<String, dynamic> body,
   ) async {
     try {
       final url = Uri.parse("$_baseUrl/$path");
-      debugPrint("🌐 FULL URL → $url");
-
-      debugPrint("📡 POST → $url");
+      debugPrint("API POST: $path");
 
       final res = await http.post(
         url,
@@ -44,7 +43,7 @@ class ApiService {
         body: jsonEncode(body),
       );
 
-      debugPrint("📥 STATUS ($path): ${res.statusCode}");
+      debugPrint("API STATUS ($path): ${res.statusCode}");
 
       // 🔥 CRITICAL FIX:
       // Always return backend JSON — even on 403
@@ -98,66 +97,6 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> lookupNpi({
-    required Map<String, dynamic> identity,
-    required String entityType,
-    required String name,
-    String? city,
-    String? state,
-    String? postalCode,
-    String? specialty,
-    String? phone,
-    bool? mailOrder,
-    bool includeVa = false,
-  }) async {
-    final body = {
-      ...identity,
-      'entityType': entityType,
-      'name': name,
-      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
-      if (state != null && state.trim().isNotEmpty) 'state': state.trim(),
-      if (postalCode != null && postalCode.trim().isNotEmpty)
-        'postalCode': postalCode.trim(),
-      if (specialty != null && specialty.trim().isNotEmpty)
-        'specialty': specialty.trim(),
-      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
-      if (mailOrder != null) 'mailOrder': mailOrder,
-      if (includeVa) 'includeVa': true,
-    };
-    return identity['agentId'] != null
-        ? _postJsonWithAgentSession('npi_lookup', body)
-        : _postJsonWithUserSession('npi_lookup', body);
-  }
-
-  static Future<Map<String, dynamic>> confirmNpi({
-    required Map<String, dynamic> identity,
-    required String entityType,
-    required String searchedName,
-    required Map<String, dynamic> candidate,
-  }) async {
-    final body = {
-      ...identity,
-      'entityType': entityType,
-      'searchedName': searchedName,
-      'candidate': candidate,
-    };
-    return identity['agentId'] != null
-        ? _postJsonWithAgentSession('npi_confirm', body)
-        : _postJsonWithUserSession('npi_confirm', body);
-  }
-
-  static Future<Map<String, dynamic>> checkAppUpdate({
-    required String platform,
-    required int currentBuild,
-    required String currentVersion,
-  }) {
-    return _postJson("check_app_update", {
-      "platform": platform,
-      "currentBuild": currentBuild,
-      "currentVersion": currentVersion,
-    });
-  }
-
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
     required List<Map<String, dynamic>> profiles,
@@ -166,8 +105,6 @@ class ApiService {
       "id": userId, // ✅ FIXED
       "profiles": profiles,
     };
-
-    debugPrint("🚀 SAVE USER PROFILES: $body");
 
     return await _postJsonWithUserSession("save_user_profiles", body);
   }
@@ -182,16 +119,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getUserProfiles(String userId) async {
-    return await _postJsonWithUserSession("get_profiles", {"user_id": userId});
-  }
-
-  static Future<Map<String, dynamic>> getUserDemographics({
-    required String userId,
-    required String profileId,
-  }) {
-    return _postJsonWithUserSession("get_user_demographics", {
-      "userId": userId,
-      "profileId": profileId,
+    return await _postJsonWithUserSession("get_profiles", {
+      "user_id": userId,
     });
   }
 
@@ -205,7 +134,9 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔎 Get full agent profile
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentProfile({required String email}) {
+  static Future<Map<String, dynamic>> getAgentProfile({
+    required String email,
+  }) {
     return _postJsonWithAgentSession("get_agent_profile", {"email": email});
   }
 
@@ -303,19 +234,24 @@ class ApiService {
       "agencyCity": agencyCity,
       "agencyState": agencyState,
       "agencyZip": agencyZip,
+      "agreementVersion": "2026-09-30",
     });
   }
 
   // -------------------------------------------------------------
-  // 🔹 Agent login
-  // -------------------------------------------------------------
+// 🔹 Agent login
+// -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginAgent({
     required String email,
     required String password,
     String? deviceId,
     bool replace = false,
   }) async {
-    final body = {"email": email, "password": password, "replace": replace};
+    final body = {
+      "email": email,
+      "password": password,
+      "replace": replace,
+    };
 
     if (deviceId != null) {
       body["device_id"] = deviceId;
@@ -326,27 +262,7 @@ class ApiService {
     return res; // 🔥 DO NOT MODIFY RESPONSE
   }
 
-  // -------------------------------------------------------------
-  // 🔥 NEW — CREATE AGENT CHECKOUT (PUBLIC)
-  // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> createAgentCheckout({
-    required String email,
-    String? agentId,
-    String plan = "agent",
-    String billing = "monthly",
-  }) async {
-    final body = {"email": email, "plan": plan, "billing": billing};
-
-    if (agentId != null && agentId.isNotEmpty) {
-      body["agentId"] = agentId;
-    }
-
-    final res = await _postJson("vl-agent-checkout", body);
-
-    return res;
-  }
-
-  // -------------------------------------------------------------
+// -------------------------------------------------------------
   // 🔹 User login
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> loginUser({
@@ -355,6 +271,7 @@ class ApiService {
     required String platform,
     required String deviceId,
     bool replace = false,
+    String replacementReason = "replaced",
   }) async {
     final res = await _postJson("check_user", {
       "email": email,
@@ -362,6 +279,7 @@ class ApiService {
       "platform": platform,
       "device_id": deviceId,
       "replace": replace,
+      "replacement_reason": replacementReason,
     });
 
     if (res["success"] != true) {
@@ -372,24 +290,7 @@ class ApiService {
       return {"success": false, "error": "User data missing"};
     }
 
-    final user = Map<String, dynamic>.from(res["user"]);
-    final sessionToken =
-        (user["session_token"] ??
-                res["session_token"] ??
-                res["sessionToken"] ??
-                res["token"])
-            ?.toString();
-
-    if (sessionToken == null || sessionToken.isEmpty) {
-      return {
-        "success": false,
-        "error": "Login session missing. Please try again.",
-      };
-    }
-
-    user["session_token"] = sessionToken;
-
-    return {"success": true, "user": user};
+    return {"success": true, "user": res["user"]};
   }
 
   // -------------------------------------------------------------
@@ -403,6 +304,8 @@ class ApiService {
     required String password,
     required String promoCode,
     required String platform,
+    required String deviceId,
+    required String relationshipType,
   }) {
     return _postJson("register_user", {
       "firstName": firstName,
@@ -412,6 +315,42 @@ class ApiService {
       "password": password,
       "promoCode": promoCode,
       "platform": platform,
+      "deviceId": deviceId,
+      "relationshipType": relationshipType,
+    });
+  }
+
+  static Future<Map<String, dynamic>> validateAccessCode(String code) {
+    return _postJson("validate_access_code", {"code": code});
+  }
+
+  static Future<Map<String, dynamic>> recoverPersonalAccessCode(String email) {
+    return _postJson("recover_personal_access_code", {"email": email});
+  }
+
+  static Future<Map<String, dynamic>> getAccountAccess(String userId) {
+    return _postJsonWithUserSession("get_account_access", {"userId": userId});
+  }
+
+  static Future<Map<String, dynamic>> updateAccountAccess({
+    required String userId,
+    required String action,
+    Map<String, dynamic> values = const {},
+  }) {
+    return _postJsonWithUserSession("update_account_access", {
+      "userId": userId,
+      "action": action,
+      ...values,
+    });
+  }
+
+  static Future<Map<String, dynamic>> checkDeviceStatus({
+    required String userId,
+    required String deviceId,
+  }) {
+    return _postJsonWithUserSession("check_device_status", {
+      "userId": userId,
+      "deviceId": deviceId,
     });
   }
 
@@ -419,20 +358,8 @@ class ApiService {
   // 🔎 Activation lookup
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> lookupActivation(String code) {
-    return _postJson("vl-get-activation-details", {"code": code});
-  }
-
-  static Future<Map<String, dynamic>> getAssistedOnboarding(String code) {
-    return _postJson('get_assisted_onboarding', {'code': code});
-  }
-
-  static Future<Map<String, dynamic>> claimAssistedOnboarding({
-    required String code,
-    required String userId,
-  }) {
-    return _postJsonWithUserSession('claim_assisted_onboarding', {
-      'code': code,
-      'userId': userId,
+    return _postJson("vl-get-activation-details", {
+      "code": code,
     });
   }
 
@@ -498,38 +425,88 @@ class ApiService {
     required String fcmToken,
     String? platform,
   }) {
-    return _postJsonWithUserSession("register_device_v2", {
-      "user_id": int.parse(userId), // 🔥 THIS FIXES IT
-      "deviceToken": fcmToken,
-      "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
-    });
+    return DeviceId.getOrCreate()
+        .then((deviceId) => _postJsonWithUserSession("register_device_v2", {
+              "user_id": int.parse(userId), // 🔥 THIS FIXES IT
+              "deviceToken": fcmToken,
+              "deviceId": deviceId,
+              "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+            }));
   }
 
   static Future<Map<String, dynamic>> createDeviceTransfer({
     required String userId,
-    required Map<String, dynamic> payload,
+    required String deviceId,
+    required int chunkCount,
   }) {
     return _postJsonWithUserSession("create_device_transfer", {
       "userId": userId,
-      "payload": payload,
+      "deviceId": deviceId,
+      "chunkCount": chunkCount,
+    });
+  }
+
+  static Future<Map<String, dynamic>> uploadDeviceTransferChunk({
+    required String userId,
+    required String deviceId,
+    required String transferId,
+    required int chunkIndex,
+    required String chunkData,
+  }) {
+    return _postJsonWithUserSession("upload_device_transfer_chunk", {
+      "userId": userId,
+      "deviceId": deviceId,
+      "transferId": transferId,
+      "chunkIndex": chunkIndex,
+      "chunkData": chunkData,
     });
   }
 
   static Future<Map<String, dynamic>> checkDeviceTransfer({
     required String userId,
+    required String deviceId,
   }) {
     return _postJsonWithUserSession("check_device_transfer", {
       "userId": userId,
+      "deviceId": deviceId,
     });
   }
 
   static Future<Map<String, dynamic>> redeemDeviceTransfer({
     required String userId,
+    required String deviceId,
     required String transferCode,
   }) {
     return _postJsonWithUserSession("redeem_device_transfer", {
       "userId": userId,
+      "deviceId": deviceId,
       "transferCode": transferCode,
+    });
+  }
+
+  static Future<Map<String, dynamic>> completeDeviceTransfer({
+    required String userId,
+    required String deviceId,
+    required String transferId,
+  }) {
+    return _postJsonWithUserSession("complete_device_transfer", {
+      "userId": userId,
+      "deviceId": deviceId,
+      "transferId": transferId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getDeviceTransferChunk({
+    required String userId,
+    required String deviceId,
+    required String transferId,
+    required int chunkIndex,
+  }) {
+    return _postJsonWithUserSession("get_device_transfer_chunk", {
+      "userId": userId,
+      "deviceId": deviceId,
+      "transferId": transferId,
+      "chunkIndex": chunkIndex,
     });
   }
 
@@ -545,13 +522,29 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> getAgentAgreement(int agentId) {
+    return _postJsonWithAgentSession("agent_agreement", {
+      "agentId": agentId,
+      "action": "status",
+    });
+  }
+
+  static Future<Map<String, dynamic>> acceptAgentAgreement(int agentId) {
+    return _postJsonWithAgentSession("agent_agreement", {
+      "agentId": agentId,
+      "action": "accept",
+      "agentAttestation": true,
+    });
+  }
+
   // -------------------------------------------------------------
   // 🔔 Send notification
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> sendNotification({
     required String agentEmail,
   }) {
-    return _postJson("send_notification", {"agentEmail": agentEmail});
+    return _postJsonWithAgentSession(
+        "send_notification", {"agentEmail": agentEmail});
   }
 
   // -------------------------------------------------------------
@@ -615,28 +608,44 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔎 Mark agent as reviewed
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> markReviewed({required String email}) {
-    return _postJson("mark_reviewed", {"email": email.trim()});
+  static Future<Map<String, dynamic>> markReviewed({
+    required String email,
+  }) {
+    return _postJson("mark_reviewed", {
+      "email": email.trim(),
+    });
   }
 
   // -------------------------------------------------------------
   // 🔎 Resolve agent by code
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> resolveAgentByCode(String code) async {
-    final res = await _postJson("resolve_agent_code", {"code": code});
+    final res = await _postJson("resolve_agent_code", {
+      "code": code,
+    });
 
     if (res["success"] != true || res["agent"] == null) {
-      return {"success": false, "error": res["error"] ?? "Invalid agent code"};
+      return {
+        "success": false,
+        "error": res["error"] ?? "Invalid agent code",
+      };
     }
 
-    return {"success": true, "agent": res["agent"]};
+    return {
+      "success": true,
+      "agent": res["agent"],
+    };
   }
 
   // -------------------------------------------------------------
   // 🆕 GET AGENT CLIENTS
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getAgentClients({required int agentId}) {
-    return _postJsonWithAgentSession("get_agent_clients", {"agentId": agentId});
+  static Future<Map<String, dynamic>> getAgentClients({
+    required int agentId,
+  }) {
+    return _postJsonWithAgentSession("get_agent_clients", {
+      "agentId": agentId,
+    });
   }
 
   static Future<Map<String, dynamic>> getAgentItems({
@@ -743,21 +752,13 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getAuthorizationStatus({
+  static Future<Map<String, dynamic>> removeSharedProfileCopy({
     required String userId,
+    required String shareId,
   }) {
-    return _postJsonWithUserSession('manage_authorizations', {
-      'action': 'status',
-      'userId': userId,
-    });
-  }
-
-  static Future<Map<String, dynamic>> sendAuthorizationRevocation({
-    required String userId,
-  }) {
-    return _postJsonWithUserSession('manage_authorizations', {
-      'action': 'revoke',
-      'userId': userId,
+    return _postJsonWithUserSession("remove_shared_profile_copy", {
+      "userId": userId,
+      "shareId": shareId,
     });
   }
 
@@ -765,21 +766,13 @@ class ApiService {
     required String userId,
     required String profileId,
     required String profileName,
-    required Map<String, dynamic> payload,
-    String? pendingShareId,
-    List<String> allowedSections = const [
-      "emergency",
-      "medications",
-      "doctors",
-    ],
+    required List<Map<String, dynamic>> packages,
   }) {
     return _postJsonWithUserSession("create_profile_update_package", {
       "userId": userId,
       "profileId": profileId,
       "profileName": profileName,
-      "allowedSections": allowedSections,
-      "payload": payload,
-      if (pendingShareId != null) "pendingShareId": pendingShareId,
+      "packages": packages,
     });
   }
 
@@ -787,6 +780,14 @@ class ApiService {
     required String userId,
   }) {
     return _postJsonWithUserSession("get_profile_update_packages", {
+      "userId": userId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> getSharedProfileStatuses({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("get_shared_profile_statuses", {
       "userId": userId,
     });
   }
@@ -823,8 +824,12 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getMyReferrals({required String userId}) {
-    return _postJsonWithUserSession("get_my_referrals", {"userId": userId});
+  static Future<Map<String, dynamic>> getMyReferrals({
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("get_my_referrals", {
+      "userId": userId,
+    });
   }
 
   static Future<Map<String, dynamic>> getAgentReferrals({
@@ -889,8 +894,6 @@ class ApiService {
         "id": userId, // ✅ FIXED
         "profiles": fixedProfiles,
       };
-
-      debugPrint("🚀 SENDING PROFILES: $body");
 
       return await _postJsonWithUserSession("save_user_profiles", body);
     } catch (e, st) {

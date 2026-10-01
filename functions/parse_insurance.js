@@ -256,6 +256,8 @@ Return ONLY valid JSON with EXACTLY this structure:
   "medicarePlanKind": "",
   "insuredName": "",
   "beneficiary": "",
+  "writingAgentName": "",
+  "writingAgencyName": "",
   "benefits": [
     { "name": "", "value": "" }
   ],
@@ -317,6 +319,8 @@ Return ONLY valid JSON with EXACTLY this structure:
       insuredName: insuredName,
 
       beneficiary: (parsed.beneficiary || "").toString().trim(),
+      writingAgentName: (parsed.writingAgentName || "").toString().trim(),
+      writingAgencyName: (parsed.writingAgencyName || "").toString().trim(),
 
       benefits: normalizeBenefits(parsed.benefits),
       notes: (parsed.notes || "").toString().trim(),

@@ -67,8 +67,6 @@ exports.handler = async (event) => {
         .map(id => String(id))
         .filter(id => id && id.length === 36);
 
-      console.log("PROFILE UUIDS RECEIVED:", ids);
-
       result = await db.query(
         `
         SELECT id, name, qr_token

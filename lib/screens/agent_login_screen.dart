@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AgentLoginScreen extends StatefulWidget {
   const AgentLoginScreen({super.key});
@@ -34,29 +34,19 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   }
 
   Future<void> _loadSaved() async {
-    try {
-      final store = SecureStore();
-      final remember = await store
-              .getBool("rememberMeAgent")
-              .timeout(const Duration(seconds: 6)) ??
-          false;
-      if (!remember) return;
-      final email = await store
-              .getString("savedAgentEmail")
-              .timeout(const Duration(seconds: 6)) ??
-          "";
-      final pass = await store
-              .getString("savedAgentPassword")
-              .timeout(const Duration(seconds: 6)) ??
-          "";
-      if (!mounted) return;
+    final store = SecureStore();
+    final remember = await store.getBool("rememberMeAgent") ?? false;
+    final email = await store.getString("savedAgentEmail") ?? "";
+    final pass = await store.getString("savedAgentPassword") ?? "";
+
+    if (!mounted) return;
+
+    if (remember) {
       setState(() {
         _rememberMe = true;
         _emailCtrl.text = email;
         _passwordCtrl.text = pass;
       });
-    } catch (error) {
-      debugPrint('Unable to load saved agent login: $error');
     }
   }
 
@@ -75,39 +65,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     });
   }
 
-  Future<void> _openActivationPage() async {
-    final url = Uri.parse("https://myvitalink.app/agent-portal-activation");
-
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Could not open activation page")),
-      );
-    }
-  }
-
-  Future<String?> _chooseBillingInterval() {
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Choose Billing"),
-        content: const Text(
-            "How would you like to activate your VitaLink Agent Access?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop("monthly"),
-            child: const Text("Monthly"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop("annual"),
-            child: const Text("Annual"),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _login() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
@@ -117,12 +74,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       _errorMessage = null;
     });
 
-    var sessionWriteStarted = false;
     try {
       final res = await ApiService.loginAgent(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
-      ).timeout(const Duration(seconds: 20));
+      );
 
       if (!mounted) return;
 
@@ -131,39 +87,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
           _loading = false;
         });
 
-        if (res["requires_payment"] == true && res["agentId"] != null) {
-          final billing = await _chooseBillingInterval();
-          if (billing == null) {
-            if (mounted) setState(() => _loading = false);
-            return;
-          }
-
-          final checkout = await ApiService.createAgentCheckout(
-            email: res["email"]?.toString() ?? _emailCtrl.text.trim(),
-            agentId: res["agentId"]?.toString(),
-            plan: "agent",
-            billing: billing,
-          );
-
-          if (!mounted) return;
-
-          final checkoutUrl = checkout["url"]?.toString() ?? "";
-          if (checkoutUrl.isNotEmpty) {
-            setState(() => _loading = false);
-            await launchUrl(
-              Uri.parse(checkoutUrl),
-              mode: LaunchMode.externalApplication,
-            );
-            return;
-          }
-        }
-
-        // Show the access activation prompt when backend access is not active.
         if (res["requires_payment"] == true) {
           setState(() {
             _showAccessOverlay = true;
             _overlayMessage =
-                "Your agent portal access is not active.\n\nVisit myvitalink.app to activate access before logging in.";
+                "Your agent portal access is not active. Contact VitaLink support before logging in.";
           });
           return;
         }
@@ -177,11 +105,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       }
 
       final agent = res["agent"];
-      final sessionToken = res["token"]?.toString() ?? "";
 
-      if (agent == null || sessionToken.isEmpty) {
+      if (agent == null) {
         setState(() {
-          _errorMessage = "Agent session was not created. Please try again.";
+          _errorMessage = "Invalid response";
           _loading = false;
         });
         return;
@@ -190,72 +117,53 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       final store = SecureStore();
 
       await AppState.clearAuth();
-      sessionWriteStarted = true;
+      await AppState.setLoggedIn(true);
+      await AppState.setRole("agent");
 
-      await store
-          .setString("agentId", agent["id"].toString())
-          .timeout(const Duration(seconds: 6));
-      await store
-          .setString("agentEmail", agent["email"] ?? "")
-          .timeout(const Duration(seconds: 6));
-      await store
-          .setString("agentName", agent["name"] ?? "")
-          .timeout(const Duration(seconds: 6));
-      await store
-          .setString("agentSessionToken", sessionToken)
-          .timeout(const Duration(seconds: 6));
-      await AppState.setRole("agent").timeout(const Duration(seconds: 6));
-      await AppState.setLoggedIn(true).timeout(const Duration(seconds: 6));
+      await store.setString("agentId", agent["id"].toString());
+      await store.setString("agentEmail", agent["email"] ?? "");
+      await store.setString("agentName", agent["name"] ?? "");
+
+      final sessionToken = res["token"]?.toString() ?? "";
+      if (sessionToken.isNotEmpty) {
+        await store.setString("agentSessionToken", sessionToken);
+      } else {
+        await store.remove("agentSessionToken");
+      }
+
+      if (_rememberMe) {
+        await store.setBool("rememberMeAgent", true);
+        await store.setString("savedAgentEmail", _emailCtrl.text.trim());
+        await store.setString("savedAgentPassword", _passwordCtrl.text.trim());
+      } else {
+        await store.setBool("rememberMeAgent", false);
+        await store.remove("savedAgentEmail");
+        await store.remove("savedAgentPassword");
+      }
 
       try {
-        if (_rememberMe) {
-          await store
-              .setBool("rememberMeAgent", true)
-              .timeout(const Duration(seconds: 6));
-          await store
-              .setString("savedAgentEmail", _emailCtrl.text.trim())
-              .timeout(const Duration(seconds: 6));
-          await store
-              .setString("savedAgentPassword", _passwordCtrl.text.trim())
-              .timeout(const Duration(seconds: 6));
-        } else {
-          await store
-              .setBool("rememberMeAgent", false)
-              .timeout(const Duration(seconds: 6));
-          await store
-              .remove("savedAgentEmail")
-              .timeout(const Duration(seconds: 6));
-          await store
-              .remove("savedAgentPassword")
-              .timeout(const Duration(seconds: 6));
+        final fcm = await FirebaseMessaging.instance.getToken();
+        if (fcm != null) {
+          final agentId = int.tryParse(agent["id"].toString());
+          if (agentId != null && agentId > 0) {
+            await ApiService.registerAgentDeviceToken(
+              agentId: agentId,
+              fcmToken: fcm,
+            );
+          }
         }
-      } catch (error) {
-        debugPrint('Unable to save optional agent login details: $error');
+      } catch (e) {
+        debugPrint("Agent device registration failed: $e");
       }
 
       if (!mounted) return;
 
-      Navigator.pushReplacementNamed(
-        context,
-        '/logo',
-        arguments: {
-          'justLoggedIn': true,
-          'role': 'agent',
-          'agentSessionToken': sessionToken,
-        },
-      );
+      Navigator.pushReplacementNamed(context, "/logo");
     } catch (e) {
-      debugPrint('Agent login handoff failed: $e');
-      if (sessionWriteStarted) {
-        try {
-          await AppState.clearAuth().timeout(const Duration(seconds: 6));
-        } catch (_) {}
-      }
       if (!mounted) return;
 
       setState(() {
-        _errorMessage =
-            "Agent login could not finish on this phone. Your account is unchanged. Please restart VitaLink and try again.";
+        _errorMessage = "Login error";
         _loading = false;
       });
     }
@@ -385,35 +293,13 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF79CAE3),
-                                  side: const BorderSide(
-                                    color: Color(0xFF79CAE3),
-                                  ),
-                                ),
-                                onPressed: _closeOverlay,
-                                child: const Text("Contact Agency"),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF79CAE3),
-                                  foregroundColor: Colors.black,
-                                ),
-                                onPressed: () {
-                                  _closeOverlay();
-                                  _openActivationPage();
-                                },
-                                child: const Text("Continue"),
-                              ),
-                            ),
-                          ],
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF79CAE3),
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: _closeOverlay,
+                          child: const Text("Close"),
                         ),
                       ],
                     ),

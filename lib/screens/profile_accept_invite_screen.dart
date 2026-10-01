@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
+import '../services/profile_share_crypto_service.dart';
 import '../services/secure_store.dart';
 
 class ProfileAcceptInviteScreen extends StatefulWidget {
@@ -16,10 +17,10 @@ class ProfileAcceptInviteScreen extends StatefulWidget {
 class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
   final SecureStore _store = SecureStore();
   final DataRepository _repo = DataRepository();
+  final ProfileShareCryptoService _crypto = ProfileShareCryptoService();
   final TextEditingController _codeCtrl = TextEditingController();
 
   bool _working = false;
-  bool _acceptedInvite = false;
   String? _message;
 
   @override
@@ -38,10 +39,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     super.didChangeDependencies();
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is String && args.trim().isNotEmpty && _codeCtrl.text.isEmpty) {
-      _codeCtrl.text = args.trim().toUpperCase();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _acceptAndLoad();
-      });
+      _codeCtrl.text = args.trim();
     }
   }
 
@@ -52,10 +50,9 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
   }
 
   Future<void> _acceptAndLoad() async {
-    FocusScope.of(context).unfocus();
-    final code = _codeCtrl.text.trim().toUpperCase();
+    final token = _codeCtrl.text.trim();
 
-    if (code.isEmpty) {
+    if (token.isEmpty) {
       setState(() => _message = 'Enter the profile invite code first.');
       return;
     }
@@ -65,131 +62,135 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
       _message = null;
     });
 
-    try {
-      final userId = await _store.getString('userId');
+    final userId = await _store.getString('userId');
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      if (userId == null || userId.isEmpty) {
-        setState(() {
-          _working = false;
-          _message = 'Please log in before accepting a profile invite.';
-        });
-        return;
-      }
-
-      if (!_acceptedInvite) {
-        final accept = await ApiService.acceptProfileShareLink(
-          userId: userId,
-          inviteCode: code,
-        ).timeout(const Duration(seconds: 20));
-
-        if (!mounted) return;
-
-        if (accept['success'] != true) {
-          setState(() {
-            _working = false;
-            _message =
-                (accept['error'] ?? 'Unable to accept this profile invite.')
-                    .toString();
-          });
-          return;
-        }
-        _acceptedInvite = true;
-      }
-
-      final packages = await _loadPendingPackages(userId);
-
-      if (!mounted) return;
-
-      if (packages.isEmpty) {
-        setState(() {
-          _working = false;
-          _message =
-              'Invite accepted, but no profile has been sent yet. Ask the sender to tap Send Current Profile Update, then check again.';
-        });
-        return;
-      }
-
-      var applied = 0;
-      for (final item in packages) {
-        final packageId = item['packageId']?.toString() ?? '';
-        final packagePayload =
-            Map<String, dynamic>.from(item['payload'] as Map? ?? {});
-        final updatePayload =
-            Map<String, dynamic>.from(packagePayload['payload'] as Map? ?? {});
-
-        if (packageId.isEmpty || updatePayload.isEmpty) continue;
-
-        await _repo.applySharedProfileUpdate(updatePayload);
-        await ApiService.markProfileUpdateApplied(
-          userId: userId,
-          packageId: packageId,
-        );
-        applied++;
-      }
-
-      if (applied == 0) {
-        setState(() {
-          _working = false;
-          _message = 'The profile update was incomplete. Please check again.';
-        });
-        return;
-      }
-
-      if (!mounted) return;
-
+    if (userId == null || userId.isEmpty) {
       setState(() {
         _working = false;
-        _message = 'Shared profile added.';
+        _message = 'Please log in before accepting a profile invite.';
       });
+      return;
+    }
 
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF111827),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Profile Added',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'The shared profile has been added. You can switch to it now.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF78C7E7),
-                foregroundColor: Colors.black,
-              ),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+    late final ({String inviteCode, String encodedKey}) parsed;
+    try {
+      parsed = _crypto.parseInviteToken(token);
+    } on FormatException catch (e) {
+      setState(() {
+        _working = false;
+        _message = e.message;
+      });
+      return;
+    }
 
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/profile_picker');
-    } catch (_) {
-      if (!mounted) return;
+    final accept = await ApiService.acceptProfileShareLink(
+      userId: userId,
+      inviteCode: parsed.inviteCode,
+    );
+
+    if (!mounted) return;
+
+    if (accept['success'] != true) {
+      setState(() {
+        _working = false;
+        _message = (accept['error'] ?? 'Unable to accept this profile invite.')
+            .toString();
+      });
+      return;
+    }
+
+    final share = Map<String, dynamic>.from(accept['share'] as Map? ?? {});
+    final shareId = share['id']?.toString() ?? '';
+    if (shareId.isEmpty) {
+      setState(() {
+        _working = false;
+        _message = 'This profile invite could not be completed.';
+      });
+      return;
+    }
+    await _crypto.storeKey(shareId, parsed.encodedKey);
+
+    final packages = await _loadPendingPackages(userId);
+
+    if (!mounted) return;
+
+    if (packages.isEmpty) {
       setState(() {
         _working = false;
         _message =
-            'Could not load the shared profile. Check your connection and try again.';
+            'Profile invite accepted. The shared profile will appear when the sender sends the current profile update.';
       });
+      return;
     }
+
+    for (final item in packages) {
+      final packageId = item['packageId']?.toString() ?? '';
+      final itemShareId = item['shareId']?.toString() ?? '';
+      final encryptedPayload = item['encryptedPayload']?.toString() ?? '';
+      final key =
+          itemShareId.isEmpty ? null : await _crypto.loadKey(itemShareId);
+      if (key == null || key.isEmpty || encryptedPayload.isEmpty) continue;
+      Map<String, dynamic> packagePayload;
+      try {
+        packagePayload = await _crypto.decryptJson(encryptedPayload, key);
+      } catch (_) {
+        continue;
+      }
+      final updatePayload =
+          Map<String, dynamic>.from(packagePayload['payload'] as Map? ?? {});
+      updatePayload['_shareRelationshipId'] = itemShareId;
+
+      if (packageId.isEmpty || updatePayload.isEmpty) continue;
+
+      await _repo.applySharedProfileUpdate(updatePayload);
+      await ApiService.markProfileUpdateApplied(
+        userId: userId,
+        packageId: packageId,
+      );
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _working = false;
+      _message = 'Shared profile added.';
+    });
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Profile Added',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'The shared profile has been added. You can switch to it now.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF78C7E7),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/profile_picker');
   }
 
   Future<List<Map<String, dynamic>>> _loadPendingPackages(String userId) async {
     for (var attempt = 0; attempt < 4; attempt += 1) {
-      final updates = await ApiService.getProfileUpdatePackages(userId: userId)
-          .timeout(const Duration(seconds: 20));
-      if (updates['success'] != true) {
-        throw StateError('Unable to load profile updates');
-      }
+      final updates = await ApiService.getProfileUpdatePackages(userId: userId);
       final packages = updates['packages'] is List
           ? (updates['packages'] as List)
               .whereType<Map>()
@@ -239,9 +240,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _codeCtrl,
-                    textCapitalization: TextCapitalization.characters,
                     style: const TextStyle(color: Colors.white),
-                    onChanged: (_) => setState(() => _acceptedInvite = false),
                     decoration: const InputDecoration(
                       labelText: 'Invite Code',
                       labelStyle: TextStyle(color: Colors.white70),
@@ -258,11 +257,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: Text(
-                        _working
-                            ? 'Adding Profile...'
-                            : _acceptedInvite
-                                ? 'Check for Profile Again'
-                                : 'Add Shared Profile',
+                        _working ? 'Adding Profile...' : 'Add Shared Profile',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
