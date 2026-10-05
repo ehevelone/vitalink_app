@@ -1,4 +1,5 @@
 import UIKit
+import Foundation
 import Flutter
 import Firebase
 import FirebaseMessaging
@@ -97,7 +98,9 @@ import UserNotifications
         )
       }
       var excludedUrl = url
-      try? excludedUrl.setResourceValue(true, forKey: .isExcludedFromBackupKey)
+      var resourceValues = URLResourceValues()
+      resourceValues.isExcludedFromBackup = true
+      try? excludedUrl.setResourceValues(resourceValues)
     }
   }
 
