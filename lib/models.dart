@@ -8,6 +8,12 @@ class Medication {
   String dose;
   String frequency;
   String prescriber;
+  String? pharmacyFulfillmentType;
+  String? pharmacyNpi;
+  String pharmacyVerificationStatus;
+  List<Map<String, dynamic>> pharmacyNpiCandidates;
+  DateTime? pharmacyVerifiedAt;
+  String? pharmacyVerifiedBy;
   String source;
   DateTime updatedAt;
 
@@ -16,15 +22,28 @@ class Medication {
     this.dose = '',
     this.frequency = '',
     this.prescriber = '',
+    this.pharmacyFulfillmentType,
+    this.pharmacyNpi,
+    this.pharmacyVerificationStatus = 'unverified',
+    List<Map<String, dynamic>>? pharmacyNpiCandidates,
+    this.pharmacyVerifiedAt,
+    this.pharmacyVerifiedBy,
     this.source = 'Manual',
     DateTime? updatedAt,
-  }) : updatedAt = updatedAt ?? DateTime.now();
+  })  : pharmacyNpiCandidates = pharmacyNpiCandidates ?? [],
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'dose': dose,
         'frequency': frequency,
         'prescriber': prescriber,
+        'pharmacyFulfillmentType': pharmacyFulfillmentType,
+        'pharmacyNpi': pharmacyNpi,
+        'pharmacyVerificationStatus': pharmacyVerificationStatus,
+        'pharmacyNpiCandidates': pharmacyNpiCandidates,
+        'pharmacyVerifiedAt': pharmacyVerifiedAt?.toIso8601String(),
+        'pharmacyVerifiedBy': pharmacyVerifiedBy,
         'source': source,
         'updatedAt': updatedAt.toIso8601String(),
       };
@@ -34,6 +53,17 @@ class Medication {
         dose: json['dose'] ?? '',
         frequency: json['frequency'] ?? '',
         prescriber: json['prescriber'] ?? '',
+        pharmacyFulfillmentType: json['pharmacyFulfillmentType'],
+        pharmacyNpi: json['pharmacyNpi'],
+        pharmacyVerificationStatus:
+            json['pharmacyVerificationStatus'] ?? 'unverified',
+        pharmacyNpiCandidates: (json['pharmacyNpiCandidates'] as List? ?? [])
+            .whereType<Map>()
+            .map((candidate) => Map<String, dynamic>.from(candidate))
+            .toList(),
+        pharmacyVerifiedAt:
+            DateTime.tryParse(json['pharmacyVerifiedAt'] ?? ''),
+        pharmacyVerifiedBy: json['pharmacyVerifiedBy'],
         source: json['source'] ?? 'Manual',
         updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
@@ -47,19 +77,49 @@ class Doctor {
   String specialty;
   String clinic;
   String phone;
+  String? npi;
+  String verificationStatus;
+  List<Map<String, dynamic>> npiCandidates;
+  DateTime? verifiedAt;
+  String? verifiedBy;
+  bool isPrimaryCareProvider;
+  bool isVaProvider;
+  String? vaFacility;
+  String? vaServiceLine;
+  DateTime? vaVerifiedAt;
 
   Doctor({
     this.name = '',
     this.specialty = '',
     this.clinic = '',
     this.phone = '',
-  });
+    this.npi,
+    this.verificationStatus = 'unverified',
+    List<Map<String, dynamic>>? npiCandidates,
+    this.verifiedAt,
+    this.verifiedBy,
+    this.isPrimaryCareProvider = false,
+    this.isVaProvider = false,
+    this.vaFacility,
+    this.vaServiceLine,
+    this.vaVerifiedAt,
+  }) : npiCandidates = npiCandidates ?? [];
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'specialty': specialty,
         'clinic': clinic,
         'phone': phone,
+        'npi': npi,
+        'verificationStatus': verificationStatus,
+        'npiCandidates': npiCandidates,
+        'verifiedAt': verifiedAt?.toIso8601String(),
+        'verifiedBy': verifiedBy,
+        'isPrimaryCareProvider': isPrimaryCareProvider,
+        'isVaProvider': isVaProvider,
+        'vaFacility': vaFacility,
+        'vaServiceLine': vaServiceLine,
+        'vaVerifiedAt': vaVerifiedAt?.toIso8601String(),
       };
 
   factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
@@ -67,6 +127,19 @@ class Doctor {
         specialty: json['specialty'] ?? '',
         clinic: json['clinic'] ?? '',
         phone: json['phone'] ?? '',
+        npi: json['npi'],
+        verificationStatus: json['verificationStatus'] ?? 'unverified',
+        npiCandidates: (json['npiCandidates'] as List? ?? [])
+            .whereType<Map>()
+            .map((candidate) => Map<String, dynamic>.from(candidate))
+            .toList(),
+        verifiedAt: DateTime.tryParse(json['verifiedAt'] ?? ''),
+        verifiedBy: json['verifiedBy'],
+        isPrimaryCareProvider: json['isPrimaryCareProvider'] == true,
+        isVaProvider: json['isVaProvider'] == true,
+        vaFacility: json['vaFacility'],
+        vaServiceLine: json['vaServiceLine'],
+        vaVerifiedAt: DateTime.tryParse(json['vaVerifiedAt'] ?? ''),
       );
 }
 
@@ -394,6 +467,8 @@ class Profile {
   String? city;
   String? state;
   String? zip;
+  bool isVeteran;
+  bool usesVaHealthcare;
 
   List<Medication> meds;
   List<Doctor> doctors;
@@ -433,6 +508,8 @@ class Profile {
     this.city,
     this.state,
     this.zip,
+    this.isVeteran = false,
+    this.usesVaHealthcare = false,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<UserAppointment>? appointments,
@@ -475,6 +552,8 @@ class Profile {
     String? city,
     String? state,
     String? zip,
+    bool? isVeteran,
+    bool? usesVaHealthcare,
     List<Medication>? meds,
     List<Doctor>? doctors,
     List<UserAppointment>? appointments,
@@ -509,6 +588,8 @@ class Profile {
       city: city ?? this.city,
       state: state ?? this.state,
       zip: zip ?? this.zip,
+      isVeteran: isVeteran ?? this.isVeteran,
+      usesVaHealthcare: usesVaHealthcare ?? this.usesVaHealthcare,
       meds: meds ?? this.meds,
       doctors: doctors ?? this.doctors,
       appointments: appointments ?? this.appointments,
@@ -545,6 +626,8 @@ class Profile {
         'city': city,
         'state': state,
         'zip': zip,
+        'isVeteran': isVeteran,
+        'usesVaHealthcare': usesVaHealthcare,
         'meds': meds.map((m) => m.toJson()).toList(),
         'doctors': doctors.map((d) => d.toJson()).toList(),
         'appointments': appointments.map((a) => a.toJson()).toList(),
@@ -580,6 +663,12 @@ class Profile {
         city: json['city'],
         state: json['state'],
         zip: json['zip'],
+        isVeteran: json['isVeteran'] == true ||
+            json['is_veteran'] == true ||
+            json['veteran'] == true ||
+            json['veteran_status'] == true,
+        usesVaHealthcare: json['usesVaHealthcare'] == true ||
+            json['uses_va_healthcare'] == true,
         meds: (json['meds'] as List<dynamic>? ?? [])
             .map((m) => Medication.fromJson(m))
             .toList(),

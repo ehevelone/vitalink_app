@@ -50,6 +50,7 @@ import 'screens/agent_referrals_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/account_access_screen.dart';
 import 'screens/device_disabled_screen.dart';
+import 'screens/prospect_contact_request_screen.dart';
 
 // MEDICAL
 import 'screens/meds_screen.dart';
@@ -136,7 +137,7 @@ void showGlobalNotificationPopup(RemoteMessage message) {
               _captureProfileShareInvite(message);
               final route = data["route"];
               if (route != null) {
-                navigatorKey.currentState?.pushNamed(route);
+                navigatorKey.currentState?.pushNamed(route, arguments: data);
               }
             },
             child: const Text("Open"),
@@ -257,7 +258,10 @@ Future<void> main() async {
 
       if (route != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamed(route);
+          navigatorKey.currentState?.pushNamed(
+            route,
+            arguments: initialMessage.data,
+          );
         });
       }
     }
@@ -287,7 +291,7 @@ Future<void> main() async {
       final route = message.data["route"];
 
       if (route != null) {
-        navigatorKey.currentState?.pushNamed(route);
+        navigatorKey.currentState?.pushNamed(route, arguments: message.data);
       }
     });
 
@@ -371,6 +375,8 @@ class _VitaLinkAppState extends State<VitaLinkApp> {
         '/terms_agent': (context) => const TermsAgentScreen(),
         '/account_access': (context) => const AccountAccessScreen(),
         '/device_disabled': (context) => const DeviceDisabledScreen(),
+        '/prospect_contact_request': (context) =>
+            const ProspectContactRequestScreen(),
         '/logo': (context) => const LogoScreen(),
         '/menu': (context) => const MenuScreen(),
         '/agent_menu': (context) => const AgentMenuScreen(),

@@ -192,6 +192,88 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     );
   }
 
+  Future<void> _sendProspectMessage() async {
+    if (_agentEmail == null || _agentEmail!.isEmpty) return;
+    const templates = <String, Map<String, String>>{
+      'medicare_aep': {
+        'title': 'Medicare: AEP reminder',
+        'preview': 'AEP begins October 15. Would you like to schedule a Medicare coverage review?',
+      },
+      'medicare_window': {
+        'title': 'Medicare: Enrollment window',
+        'preview': 'Your Medicare enrollment window is approaching. Would you like me to reach out?',
+      },
+      'medicare_options': {
+        'title': 'Medicare: Talk about options',
+        'preview': 'Would you like to talk about your Medicare options?',
+      },
+      'life_awareness': {
+        'title': 'Life: Awareness Month',
+        'preview': "It's Life Insurance Awareness Month. Would you like to talk?",
+      },
+      'life_family': {
+        'title': 'Life: You or your family',
+        'preview': 'Would you like to discuss life insurance options for you or your family?',
+      },
+    };
+
+    final templateId = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Send a prospect message'),
+        content: SizedBox(
+          width: 520,
+          child: ListView(
+            shrinkWrap: true,
+            children: templates.entries
+                .map(
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(entry.value['title']!),
+                    subtitle: Text(entry.value['preview']!),
+                    trailing: const Icon(Icons.send_outlined),
+                    onTap: () => Navigator.pop(ctx, entry.key),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (templateId == null || !mounted) return;
+
+    setState(() => _loading = true);
+    final result = await ApiService.sendProspectNotification(
+      agentEmail: _agentEmail!,
+      templateId: templateId,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(result['success'] == true ? 'Message results' : 'Unable to send'),
+        content: Text(
+          result['success'] == true
+              ? '${result['successCount'] ?? 0} prospect device(s) notified.'
+              : result['error']?.toString() ?? 'The message could not be sent.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _goToAuthorizationForm() async {
     await Navigator.pushNamed(context, '/authorization_form');
     await _loadAgentInfo();
@@ -418,8 +500,14 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                     const SizedBox(height: 18),
                     _actionButton(
                       icon: Icons.notifications_active,
-                      label: "Send Notification",
+                      label: "Send Client Medicare Notification",
                       onPressed: _sendNotification,
+                    ),
+                    const SizedBox(height: 18),
+                    _actionButton(
+                      icon: Icons.campaign_outlined,
+                      label: "Send Prospect Message",
+                      onPressed: _sendProspectMessage,
                     ),
                   ],
                 ),

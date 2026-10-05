@@ -3,7 +3,10 @@ const { verifyUserSession } = require("./services/user-auth");
 const {
   AGREEMENT_VERSION,
   MESSAGING_CONSENT_VERSION,
+  PROSPECT_CATEGORIES,
+  PROSPECT_CONSENT_VERSION,
   ensureAccountAccessSchema,
+  prospectConsentText,
 } = require("./services/account-access");
 
 const headers = {
@@ -69,6 +72,33 @@ exports.handler = async (event) => {
         row.messaging_consent_status === "pending" ||
         (row.messaging_consent_status === "deferred" && promptDue));
 
+    const prospectConsentRows = row.agent_id
+      ? await db.query(
+        `SELECT category,
+                CASE WHEN status='granted' AND expires_at <= NOW() THEN 'expired' ELSE status END AS status,
+                consent_version, granted_at, withdrawn_at, expires_at
+         FROM prospect_marketing_consents
+         WHERE user_id=$1 AND agent_id=$2`,
+        [userId, row.agent_id]
+      )
+      : { rows: [] };
+    const prospectConsents = {};
+    const prospectOptions = {};
+    for (const category of Object.keys(PROSPECT_CATEGORIES)) {
+      const consent = prospectConsentRows.rows.find((item) => item.category === category);
+      prospectConsents[category] = consent || {
+        category,
+        status: "pending",
+        consent_version: PROSPECT_CONSENT_VERSION,
+      };
+      prospectOptions[category] = {
+        category,
+        label: PROSPECT_CATEGORIES[category].label,
+        durationDays: PROSPECT_CATEGORIES[category].durationDays,
+        text: prospectConsentText(category, row.agent_name),
+      };
+    }
+
     return reply(200, {
       success: true,
       access: {
@@ -87,6 +117,8 @@ exports.handler = async (event) => {
           row.relationship_status === "confirmed_client" &&
           row.messaging_consent_status === "granted" &&
           row.messaging_consent_version === MESSAGING_CONSENT_VERSION,
+        prospectConsents,
+        prospectOptions,
       },
     });
   } catch (err) {

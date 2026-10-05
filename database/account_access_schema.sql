@@ -25,6 +25,66 @@ CREATE TABLE IF NOT EXISTS user_consent_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS prospect_marketing_consents (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  consent_version TEXT NOT NULL,
+  consent_text TEXT NOT NULL,
+  granted_at TIMESTAMPTZ,
+  withdrawn_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, agent_id, category)
+);
+
+CREATE TABLE IF NOT EXISTS prospect_marketing_consent_events (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL,
+  consent_version TEXT NOT NULL,
+  consent_text TEXT NOT NULL,
+  platform TEXT,
+  device_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_prospect_consents_agent_category
+ON prospect_marketing_consents (agent_id, category, status, expires_at);
+
+CREATE TABLE IF NOT EXISTS prospect_marketing_deliveries (
+  id UUID PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  sent_at TIMESTAMPTZ,
+  opened_at TIMESTAMPTZ,
+  request_submitted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_prospect_deliveries_frequency
+ON prospect_marketing_deliveries (user_id, agent_id, category, sent_at DESC);
+
+CREATE TABLE IF NOT EXISTS prospect_contact_requests (
+  id UUID PRIMARY KEY,
+  delivery_id UUID NOT NULL UNIQUE REFERENCES prospect_marketing_deliveries(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  channels JSONB NOT NULL,
+  request_text TEXT NOT NULL,
+  request_version TEXT NOT NULL,
+  platform TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS access_code_attempts (
   scope_key TEXT PRIMARY KEY,
   failed_count INTEGER NOT NULL DEFAULT 0,

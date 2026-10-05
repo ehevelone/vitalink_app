@@ -36,6 +36,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _proceduresCtrl = TextEditingController();
 
   bool _organDonor = false;
+  bool _isVeteran = false;
+  bool _usesVaHealthcare = false;
 
   @override
   void dispose() {
@@ -94,7 +96,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _proceduresCtrl.text = e.procedures;
 
       _organDonor = e.organDonor;
+      _isVeteran = _p!.isVeteran;
+      _usesVaHealthcare = _p!.usesVaHealthcare;
     });
+  }
+
+  Future<void> _changeVeteranStatus(bool value) async {
+    if (value) {
+      setState(() => _isVeteran = true);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove Veteran status?'),
+        content: const Text(
+          'This will also remove the VA health care selection and VA emergency notice from this profile.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Veteran Status'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() {
+        _isVeteran = false;
+        _usesVaHealthcare = false;
+      });
+    }
   }
 
   bool _validFullName(String v) {
@@ -120,6 +158,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _p = _p!.copyWith(
       fullName: _nameCtrl.text.trim(),
       dob: _dobCtrl.text.trim(),
+      isVeteran: _isVeteran,
+      usesVaHealthcare: _isVeteran && _usesVaHealthcare,
       emergency: _p!.emergency.copyWith(
         bloodType: _bloodCtrl.text.trim(),
         contact: _contactCtrl.text.trim(),
@@ -458,6 +498,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+              SwitchListTile(
+                value: _isVeteran,
+                onChanged: _changeVeteranStatus,
+                title: const Text('Veteran'),
+                activeThumbColor: Colors.blue,
+              ),
+              if (_isVeteran)
+                SwitchListTile(
+                  value: _usesVaHealthcare,
+                  onChanged: (value) =>
+                      setState(() => _usesVaHealthcare = value),
+                  title: const Text('Do you use VA health care?'),
+                  activeThumbColor: Colors.blue,
+                ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),

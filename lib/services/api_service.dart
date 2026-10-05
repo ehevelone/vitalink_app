@@ -97,6 +97,66 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> lookupNpi({
+    required Map<String, dynamic> identity,
+    required String entityType,
+    required String name,
+    String? city,
+    String? state,
+    String? postalCode,
+    String? specialty,
+    String? phone,
+    bool? mailOrder,
+    bool includeVa = false,
+  }) async {
+    final body = {
+      ...identity,
+      'entityType': entityType,
+      'name': name,
+      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      if (state != null && state.trim().isNotEmpty) 'state': state.trim(),
+      if (postalCode != null && postalCode.trim().isNotEmpty)
+        'postalCode': postalCode.trim(),
+      if (specialty != null && specialty.trim().isNotEmpty)
+        'specialty': specialty.trim(),
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (mailOrder != null) 'mailOrder': mailOrder,
+      if (includeVa) 'includeVa': true,
+    };
+    return identity['agentId'] != null
+        ? _postJsonWithAgentSession('npi_lookup', body)
+        : _postJsonWithUserSession('npi_lookup', body);
+  }
+
+  static Future<Map<String, dynamic>> confirmNpi({
+    required Map<String, dynamic> identity,
+    required String entityType,
+    required String searchedName,
+    required Map<String, dynamic> candidate,
+  }) async {
+    final body = {
+      ...identity,
+      'entityType': entityType,
+      'searchedName': searchedName,
+      'candidate': candidate,
+    };
+    return identity['agentId'] != null
+        ? _postJsonWithAgentSession('npi_confirm', body)
+        : _postJsonWithUserSession('npi_confirm', body);
+  }
+
+  static Future<Map<String, dynamic>> checkAppUpdate({
+    required String platform,
+    required int currentBuild,
+    required String currentVersion,
+  }) {
+    return _postJson('check_app_update', {
+      'platform': platform,
+      'currentBuild': currentBuild,
+      'currentVersion': currentVersion,
+    });
+  }
+
   static Future<Map<String, dynamic>> saveUserProfiles({
     required String userId,
     required List<Map<String, dynamic>> profiles,
@@ -549,6 +609,30 @@ class ApiService {
   }) {
     return _postJsonWithAgentSession(
         "send_notification", {"agentEmail": agentEmail});
+  }
+
+  static Future<Map<String, dynamic>> sendProspectNotification({
+    required String agentEmail,
+    required String templateId,
+  }) {
+    return _postJsonWithAgentSession("send_prospect_notification", {
+      "agentEmail": agentEmail,
+      "templateId": templateId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> submitProspectContactRequest({
+    required String userId,
+    required String deliveryId,
+    required List<String> channels,
+    required String platform,
+  }) {
+    return _postJsonWithUserSession("submit_prospect_contact_request", {
+      "userId": userId,
+      "deliveryId": deliveryId,
+      "channels": channels,
+      "platform": platform,
+    });
   }
 
   // -------------------------------------------------------------

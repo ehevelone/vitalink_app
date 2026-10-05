@@ -31,6 +31,12 @@ class _MyAgentUserState extends State<MyAgentUser> {
   String? _calendlyUrl;
   String? _businessCardImageBase64;
   bool? _agentMessagesEnabled;
+  String? _relationshipStatus;
+  final Map<String, bool> _prospectMessages = {
+    'medicare': false,
+    'life': false,
+  };
+  final Map<String, String> _prospectConsentText = {};
   bool _updatingMessages = false;
   bool _loading = true;
 
@@ -73,8 +79,26 @@ class _MyAgentUserState extends State<MyAgentUser> {
         final details = Map<String, dynamic>.from(
           access['access'] as Map? ?? {},
         );
+        _relationshipStatus = details['relationshipStatus']?.toString();
         if (details['relationshipStatus'] == 'confirmed_client') {
           _agentMessagesEnabled = details['canMessage'] == true;
+        } else if (details['relationshipStatus'] == 'confirmed_prospect') {
+          final consents = Map<String, dynamic>.from(
+            details['prospectConsents'] as Map? ?? {},
+          );
+          for (final category in _prospectMessages.keys) {
+            _prospectMessages[category] =
+                (consents[category] as Map?)?['status'] == 'granted';
+          }
+          final options = Map<String, dynamic>.from(
+            details['prospectOptions'] as Map? ?? {},
+          );
+          for (final category in _prospectMessages.keys) {
+            final option = options[category];
+            if (option is Map && option['text'] != null) {
+              _prospectConsentText[category] = option['text'].toString();
+            }
+          }
         }
       }
     } catch (e) {
@@ -208,6 +232,58 @@ class _MyAgentUserState extends State<MyAgentUser> {
     setState(() {
       _updatingMessages = false;
       if (result['success'] == true) _agentMessagesEnabled = enabled;
+    });
+    if (result['success'] != true) {
+      _showActionError(
+        result['error']?.toString() ?? 'Unable to update message consent.',
+      );
+    }
+  }
+
+  Future<void> _setProspectMessages(String category, bool enabled) async {
+    if (enabled) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(category == 'medicare'
+              ? 'Medicare messages'
+              : 'Life insurance messages'),
+          content: Text(
+            _prospectConsentText[category] ??
+                'I agree to receive optional in-app and push marketing messages from my connected agent.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('I Agree'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+    }
+    setState(() => _updatingMessages = true);
+    final userId = await SecureStore().getString('userId');
+    if (userId == null) return;
+    final result = await ApiService.updateAccountAccess(
+      userId: userId,
+      action: 'prospect_marketing_consent',
+      values: {
+        'category': category,
+        'granted': enabled,
+        'userAttestation': true,
+        'deviceId': await DeviceId.getOrCreate(),
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _updatingMessages = false;
+      if (result['success'] == true) _prospectMessages[category] = enabled;
     });
     if (result['success'] != true) {
       _showActionError(
@@ -481,6 +557,40 @@ class _MyAgentUserState extends State<MyAgentUser> {
                       subtitle: const Text(
                         'Coverage reminders and enrollment-period outreach. You can change this at any time.',
                       ),
+                    ),
+                  ),
+                ],
+                if (_relationshipStatus == 'confirmed_prospect') ...[
+                  const SizedBox(height: 14),
+                  Card(
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          value: _prospectMessages['medicare']!,
+                          onChanged: _updatingMessages
+                              ? null
+                              : (value) =>
+                                  _setProspectMessages('medicare', value),
+                          secondary: const Icon(Icons.health_and_safety_outlined),
+                          title: const Text('Medicare messages'),
+                          subtitle: const Text(
+                            'Optional in-app and push marketing messages from my agent.',
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        SwitchListTile(
+                          value: _prospectMessages['life']!,
+                          onChanged: _updatingMessages
+                              ? null
+                              : (value) =>
+                                  _setProspectMessages('life', value),
+                          secondary: const Icon(Icons.favorite_outline),
+                          title: const Text('Life insurance messages'),
+                          subtitle: const Text(
+                            'Optional in-app and push marketing messages from my agent.',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

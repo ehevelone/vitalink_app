@@ -5,6 +5,7 @@ const {
   MESSAGING_CONSENT_VERSION,
   ensureAccountAccessSchema,
   recordConsentEvent,
+  setProspectConsent,
 } = require("./services/account-access");
 const {
   checkAccessCodeLimit,
@@ -35,7 +36,11 @@ exports.handler = async (event) => {
 
     await ensureAccountAccessSchema();
     const current = await db.query(
-      "SELECT agent_id, purchase_code, email FROM users WHERE id=$1 LIMIT 1",
+      `SELECT u.agent_id, u.purchase_code, u.email, u.relationship_status,
+              a.name AS agent_name
+       FROM users u
+       LEFT JOIN agents a ON a.id=u.agent_id
+       WHERE u.id=$1 LIMIT 1`,
       [userId]
     );
     if (!current.rows.length) return reply(404, { success: false, error: "Account not found" });
@@ -82,6 +87,22 @@ exports.handler = async (event) => {
         userId, agentId, eventType: "messaging_consent", eventValue: consent,
         platform: body.platform, deviceId: body.deviceId,
       });
+      if (relationship === "confirmed_prospect") {
+        const selections = body.prospectConsents && typeof body.prospectConsents === "object"
+          ? body.prospectConsents
+          : {};
+        for (const category of ["medicare", "life"]) {
+          await setProspectConsent({
+            userId,
+            agentId,
+            agentName: current.rows[0].agent_name,
+            category,
+            granted: selections[category] === true,
+            platform: body.platform,
+            deviceId: body.deviceId,
+          });
+        }
+      }
       return reply(200, { success: true });
     }
 
@@ -165,6 +186,45 @@ exports.handler = async (event) => {
       return reply(200, { success: true, messagingConsentStatus: consent });
     }
 
+    if (action === "prospect_marketing_consent") {
+      if (!agentId || body.userAttestation !== true) {
+        return reply(400, { success: false, error: "The user must make this choice." });
+      }
+      if (current.rows[0].relationship_status !== "confirmed_prospect") {
+        return reply(400, { success: false, error: "Prospect messaging is available only to confirmed prospects." });
+      }
+      const category = String(body.category || "").toLowerCase();
+      if (!["medicare", "life"].includes(category)) {
+        return reply(400, { success: false, error: "Unsupported message category." });
+      }
+      const granted = body.granted === true;
+      await setProspectConsent({
+        userId,
+        agentId,
+        agentName: current.rows[0].agent_name,
+        category,
+        granted,
+        declinedStatus: granted ? null : "withdrawn",
+        platform: body.platform,
+        deviceId: body.deviceId,
+      });
+      if (!granted) {
+        await db.query(
+          `UPDATE prospect_marketing_consents
+           SET status='withdrawn', withdrawn_at=NOW(), expires_at=NULL, updated_at=NOW()
+           WHERE user_id=$1 AND agent_id=$2 AND category=$3`,
+          [userId, agentId, category]
+        );
+        await db.query(
+          `UPDATE prospect_marketing_deliveries
+           SET status='cancelled'
+           WHERE user_id=$1 AND agent_id=$2 AND category=$3 AND status='queued'`,
+          [userId, agentId, category]
+        ).catch(() => {});
+      }
+      return reply(200, { success: true, category, status: granted ? "granted" : "withdrawn" });
+    }
+
     if (action === "disconnect") {
       const sponsor = current.rows[0].purchase_code ? "personal" : "locked";
       await db.query(
@@ -174,6 +234,14 @@ exports.handler = async (event) => {
          WHERE id=$2`,
         [sponsor, userId]
       );
+      if (agentId) {
+        await db.query(
+          `UPDATE prospect_marketing_consents
+           SET status='withdrawn', withdrawn_at=NOW(), expires_at=NULL, updated_at=NOW()
+           WHERE user_id=$1 AND agent_id=$2`,
+          [userId, agentId]
+        );
+      }
       await recordConsentEvent({ userId, agentId, eventType: "agent_disconnected", eventValue: sponsor, platform: body.platform, deviceId: body.deviceId });
       try {
         await createMailer().sendMail({

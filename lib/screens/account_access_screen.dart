@@ -22,6 +22,8 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
   bool _userAttestation = false;
   bool _agreementAccepted = false;
   bool _messagingConsent = false;
+  bool _prospectMedicareConsent = false;
+  bool _prospectLifeConsent = false;
   String _relationship = 'client';
   String? _error;
 
@@ -59,6 +61,13 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
             _access?['relationshipStatus'] == 'pending_prospect_confirmation') {
           _relationship = 'prospect';
         }
+        final prospectConsents = Map<String, dynamic>.from(
+          _access?['prospectConsents'] as Map? ?? {},
+        );
+        _prospectMedicareConsent =
+            (prospectConsents['medicare'] as Map?)?['status'] == 'granted';
+        _prospectLifeConsent =
+            (prospectConsents['life'] as Map?)?['status'] == 'granted';
       } else {
         _error =
             result['error']?.toString() ?? 'Unable to check account access.';
@@ -91,6 +100,11 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
         'agreementAccepted': true,
         'relationship': _relationship,
         'messagingConsent': _relationship == 'client' && _messagingConsent,
+        'prospectConsents': {
+          'medicare':
+              _relationship == 'prospect' && _prospectMedicareConsent,
+          'life': _relationship == 'prospect' && _prospectLifeConsent,
+        },
       },
     );
     if (!mounted) return;
@@ -233,6 +247,15 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     final agentName =
         (access['agentName'] ?? access['agencyName'] ?? 'this agent')
             .toString();
+    final prospectOptions = Map<String, dynamic>.from(
+      access['prospectOptions'] as Map? ?? {},
+    );
+    String prospectText(String category, String fallback) {
+      final option = prospectOptions[category];
+      return option is Map && option['text'] != null
+          ? option['text'].toString()
+          : fallback;
+    }
 
     return PopScope(
       canPop: false,
@@ -305,7 +328,12 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   selected: {_relationship},
                   onSelectionChanged: (value) => setState(() {
                     _relationship = value.first;
-                    if (_relationship == 'prospect') _messagingConsent = false;
+                    if (_relationship == 'prospect') {
+                      _messagingConsent = false;
+                    } else {
+                      _prospectMedicareConsent = false;
+                      _prospectLifeConsent = false;
+                    }
                   }),
                 ),
                 Align(
@@ -355,6 +383,47 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   ),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
+              if (sponsor == 'agent' && _relationship == 'prospect') ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Optional messages from $agentName',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Choose either, both, or neither. These choices do not make you a client and may be changed later.',
+                  style: TextStyle(color: Colors.black54, height: 1.35),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _prospectMedicareConsent,
+                  onChanged: (value) => setState(
+                    () => _prospectMedicareConsent = value ?? false,
+                  ),
+                  title: const Text('Medicare messages'),
+                  subtitle: Text(
+                    prospectText('medicare',
+                        'I agree to receive optional in-app and push Medicare messages from $agentName.'),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _prospectLifeConsent,
+                  onChanged: (value) => setState(
+                    () => _prospectLifeConsent = value ?? false,
+                  ),
+                  title: const Text('Life insurance messages'),
+                  subtitle: Text(
+                    prospectText('life',
+                        'I agree to receive optional in-app and push life insurance messages from $agentName.'),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 10),
                 Text(_error!,

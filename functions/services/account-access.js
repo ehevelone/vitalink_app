@@ -1,7 +1,33 @@
 const db = require("./db");
 
-const AGREEMENT_VERSION = "2026-09-30";
+const AGREEMENT_VERSION = "2026-10-01";
 const MESSAGING_CONSENT_VERSION = "2026-09-30";
+const PROSPECT_CONSENT_VERSION = "2026-10-01";
+
+const PROSPECT_CATEGORIES = {
+  medicare: {
+    label: "Medicare",
+    durationDays: Number(process.env.PROSPECT_MEDICARE_CONSENT_DAYS || 365),
+  },
+  life: {
+    label: "Life Insurance",
+    durationDays: Number(process.env.PROSPECT_LIFE_CONSENT_DAYS || 365),
+  },
+};
+
+function prospectConsentText(category, agentName) {
+  const config = PROSPECT_CATEGORIES[category];
+  if (!config) return null;
+  const name = String(agentName || "your connected agent").trim();
+  const topic = category === "medicare"
+    ? "Medicare coverage options, enrollment periods, and invitations to request an appointment"
+    : "life insurance information and invitations to request a conversation";
+  const compensation = category === "medicare"
+    ? "enroll in a plan"
+    : "purchase coverage";
+
+  return `I agree to receive in-app and push marketing messages from ${name}, a licensed insurance agent, about ${topic}. ${name} may be compensated if I ${compensation}. This permission applies only to ${name} and only to ${config.label} messages delivered through VitaLink. It does not authorize phone calls, text messages, or email. This consent is optional, is not required to use VitaLink, expires ${config.durationDays} days after I provide it, and may be withdrawn at any time.`;
+}
 
 async function ensureAccountAccessSchema() {
   await db.query(`
@@ -72,6 +98,90 @@ async function ensureAccountAccessSchema() {
       reviewed_by TEXT
     )
   `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS prospect_marketing_consents (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      consent_version TEXT NOT NULL,
+      consent_text TEXT NOT NULL,
+      granted_at TIMESTAMPTZ,
+      withdrawn_at TIMESTAMPTZ,
+      expires_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, agent_id, category)
+    )
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS prospect_marketing_consent_events (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      status TEXT NOT NULL,
+      consent_version TEXT NOT NULL,
+      consent_text TEXT NOT NULL,
+      platform TEXT,
+      device_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_prospect_consents_agent_category
+    ON prospect_marketing_consents (agent_id, category, status, expires_at)
+  `);
+}
+
+async function setProspectConsent({
+  userId,
+  agentId,
+  agentName,
+  category,
+  granted,
+  declinedStatus,
+  platform,
+  deviceId,
+}) {
+  const config = PROSPECT_CATEGORIES[category];
+  const consentText = prospectConsentText(category, agentName);
+  if (!config || !consentText) throw new Error("Unsupported prospect category");
+
+  const status = granted ? "granted" : (declinedStatus || "deferred");
+  const expiresAt = granted
+    ? new Date(Date.now() + config.durationDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  await db.query(
+    `INSERT INTO prospect_marketing_consents
+      (user_id, agent_id, category, status, consent_version, consent_text,
+       granted_at, withdrawn_at, expires_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,
+       CASE WHEN $4='granted' THEN NOW() ELSE NULL END,
+       NULL,$7,NOW())
+     ON CONFLICT (user_id, agent_id, category) DO UPDATE SET
+       status=EXCLUDED.status,
+       consent_version=EXCLUDED.consent_version,
+       consent_text=EXCLUDED.consent_text,
+       granted_at=CASE WHEN EXCLUDED.status='granted' THEN NOW()
+                       ELSE prospect_marketing_consents.granted_at END,
+       withdrawn_at=NULL,
+       expires_at=EXCLUDED.expires_at,
+       updated_at=NOW()`,
+    [userId, agentId, category, status, PROSPECT_CONSENT_VERSION, consentText, expiresAt]
+  );
+
+  await db.query(
+    `INSERT INTO prospect_marketing_consent_events
+      (user_id, agent_id, category, status, consent_version, consent_text,
+       platform, device_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [userId, agentId, category, status, PROSPECT_CONSENT_VERSION,
+      consentText, platform || null, deviceId || null]
+  );
 }
 
 async function recordConsentEvent({
@@ -103,6 +213,10 @@ async function recordConsentEvent({
 module.exports = {
   AGREEMENT_VERSION,
   MESSAGING_CONSENT_VERSION,
+  PROSPECT_CATEGORIES,
+  PROSPECT_CONSENT_VERSION,
   ensureAccountAccessSchema,
+  prospectConsentText,
   recordConsentEvent,
+  setProspectConsent,
 };

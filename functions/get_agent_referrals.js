@@ -36,6 +36,8 @@ exports.handler = async (event) => {
         r.relationship,
         r.reason,
         r.notes,
+        r.source,
+        r.reason,
         r.contact_preference,
         r.status,
         r.submitted_at,

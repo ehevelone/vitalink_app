@@ -30,6 +30,8 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   bool _loading = false;
   String _currentEmail = "";
+  bool _isVeteran = false;
+  bool _usesVaHealthcare = false;
 
   @override
   void initState() {
@@ -67,7 +69,43 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       _cityCtrl.text = city;
       _stateCtrl.text = state;
       _zipCtrl.text = zip;
+      _isVeteran = profile.isVeteran;
+      _usesVaHealthcare = profile.usesVaHealthcare;
     });
+  }
+
+  Future<void> _changeVeteranStatus(bool value) async {
+    if (value) {
+      setState(() => _isVeteran = true);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove Veteran status?'),
+        content: const Text(
+          'This will also remove the VA health care selection and VA emergency notice from this profile.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Veteran Status'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() {
+        _isVeteran = false;
+        _usesVaHealthcare = false;
+      });
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -132,6 +170,8 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       profile.city = newCity;
       profile.state = newState;
       profile.zip = newZip;
+      profile.isVeteran = _isVeteran;
+      profile.usesVaHealthcare = _isVeteran && _usesVaHealthcare;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
@@ -261,6 +301,21 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   controller: _zipCtrl,
                   decoration: const InputDecoration(labelText: "Zip Code"),
                 ),
+
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _isVeteran,
+                  onChanged: _changeVeteranStatus,
+                  title: const Text('Are you a Veteran?'),
+                ),
+                if (_isVeteran)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _usesVaHealthcare,
+                    onChanged: (value) =>
+                        setState(() => _usesVaHealthcare = value),
+                    title: const Text('Do you use VA health care?'),
+                  ),
 
                 const SizedBox(height: 24),
 

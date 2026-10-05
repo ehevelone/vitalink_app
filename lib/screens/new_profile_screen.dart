@@ -28,6 +28,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   final _implantsCtrl = TextEditingController();
   final _proceduresCtrl = TextEditingController();
   bool _organDonor = false;
+  bool _isVeteran = false;
+  bool _usesVaHealthcare = false;
 
   bool _saving = false;
 
@@ -64,6 +66,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
     final newProfile = Profile(
       fullName: _nameCtrl.text.trim(),
       dob: _dobCtrl.text.trim(),
+      isVeteran: _isVeteran,
+      usesVaHealthcare: _isVeteran && _usesVaHealthcare,
       emergency: EmergencyInfo(
         contact: _contactCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
@@ -220,6 +224,23 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
               ),
               const SizedBox(height: 12),
 
+              SwitchListTile(
+                value: _isVeteran,
+                onChanged: (value) => setState(() {
+                  _isVeteran = value;
+                  if (!value) _usesVaHealthcare = false;
+                }),
+                title: const Text('Veteran'),
+                activeThumbColor: Colors.blue,
+              ),
+              if (_isVeteran)
+                SwitchListTile(
+                  value: _usesVaHealthcare,
+                  onChanged: (value) =>
+                      setState(() => _usesVaHealthcare = value),
+                  title: const Text('Do you use VA health care?'),
+                  activeThumbColor: Colors.blue,
+                ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
