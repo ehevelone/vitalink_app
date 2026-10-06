@@ -9,7 +9,7 @@ import Security
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate, EKEventEditViewDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, MessagingDelegate, EKEventEditViewDelegate {
   private let eventStore = EKEventStore()
 
   override func application(
@@ -34,25 +34,28 @@ import UserNotifications
 
     application.registerForRemoteNotifications()
 
-    GeneratedPluginRegistrant.register(with: self)
-
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let calendarChannel = FlutterMethodChannel(
-        name: "com.etnaturals.vitalinkapp/calendar",
-        binaryMessenger: controller.binaryMessenger
-      )
-
-      calendarChannel.setMethodCallHandler { [weak self] call, result in
-        guard call.method == "insertEvent" else {
-          result(FlutterMethodNotImplemented)
-          return
-        }
-
-        self?.openCalendarEvent(arguments: call.arguments, result: result)
-      }
-    }
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "VitaLinkCalendarPlugin"
+    )
+    let calendarChannel = FlutterMethodChannel(
+      name: "com.etnaturals.vitalinkapp/calendar",
+      binaryMessenger: registrar.messenger()
+    )
+
+    calendarChannel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "insertEvent" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      self?.openCalendarEvent(arguments: call.arguments, result: result)
+    }
   }
 
   override func application(
@@ -139,7 +142,12 @@ import UserNotifications
         editor.event = event
         editor.editViewDelegate = self
 
-        self.window?.rootViewController?.present(editor, animated: true)
+        guard let presenter = self.activeViewController() else {
+          result(false)
+          return
+        }
+
+        presenter.present(editor, animated: true)
         result(true)
       }
     }
@@ -153,6 +161,24 @@ import UserNotifications
         granted ? presentEditor() : result(false)
       }
     }
+  }
+
+  private func activeViewController() -> UIViewController? {
+    let windowScenes = UIApplication.shared.connectedScenes.compactMap {
+      $0 as? UIWindowScene
+    }
+    let activeScene = windowScenes.first {
+      $0.activationState == .foregroundActive
+    } ?? windowScenes.first
+    let rootViewController = activeScene?.windows.first {
+      $0.isKeyWindow
+    }?.rootViewController ?? activeScene?.windows.first?.rootViewController
+
+    var presenter = rootViewController
+    while let presented = presenter?.presentedViewController {
+      presenter = presented
+    }
+    return presenter
   }
 
   func eventEditViewController(
