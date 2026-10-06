@@ -62,6 +62,9 @@ class AppStrings {
       _es ? 'Cargando traslado...' : 'Loading transfer...';
   String get copyCode => _es ? 'Copiar codigo' : 'Copy Code';
   String get copied => _es ? 'Copiado.' : 'Copied.';
+  String get about => _es ? 'Acerca de' : 'About';
+  String get version => _es ? 'Version' : 'Version';
+  String get build => _es ? 'Compilacion' : 'Build';
 
   String welcome(String name) => _es ? 'Bienvenido $name' : 'Welcome $name';
   String get user => _es ? 'Usuario' : 'User';

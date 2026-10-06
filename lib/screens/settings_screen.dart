@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
@@ -19,19 +20,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _languageCode = 'system';
   bool _loading = true;
   bool _transferWorking = false;
+  String _version = '';
+  String _buildNumber = '';
   final _transferService = DeviceTransferService();
 
   @override
   void initState() {
     super.initState();
-    _loadLanguage();
+    _loadSettings();
   }
 
-  Future<void> _loadLanguage() async {
-    final code = await LanguageService.getLanguageCode();
+  Future<void> _loadSettings() async {
+    final results = await Future.wait([
+      LanguageService.getLanguageCode(),
+      PackageInfo.fromPlatform(),
+    ]);
+    final code = results[0] as String;
+    final packageInfo = results[1] as PackageInfo;
     if (!mounted) return;
     setState(() {
       _languageCode = code;
+      _version = packageInfo.version;
+      _buildNumber = packageInfo.buildNumber;
       _loading = false;
     });
   }
@@ -272,6 +282,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 OutlinedButton(
                   onPressed: _transferWorking ? null : _redeemTransfer,
                   child: Text(strings.haveTransferCode),
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  strings.about,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('VitaLink'),
+                  subtitle: SelectableText(
+                    '${strings.version} $_version  |  ${strings.build} $_buildNumber',
+                  ),
                 ),
               ],
             ),
