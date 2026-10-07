@@ -40,9 +40,11 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    let registrar = engineBridge.pluginRegistry.registrar(
+    guard let registrar = engineBridge.pluginRegistry.registrar(
       forPlugin: "VitaLinkCalendarPlugin"
-    )
+    ) else {
+      return
+    }
     let calendarChannel = FlutterMethodChannel(
       name: "com.etnaturals.vitalinkapp/calendar",
       binaryMessenger: registrar.messenger()
