@@ -1,4 +1,8 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/widgets.dart';
+
+import '../services/language_service.dart';
 
 class AppStrings {
   final String languageCode;
@@ -7,6 +11,14 @@ class AppStrings {
 
   static AppStrings of(BuildContext context) {
     final code = Localizations.localeOf(context).languageCode;
+    return AppStrings(code == 'es' ? 'es' : 'en');
+  }
+
+  // For services without a BuildContext: the saved app language, else the
+  // phone language.
+  static AppStrings current() {
+    final code = LanguageService.localeNotifier.value?.languageCode ??
+        PlatformDispatcher.instance.locale.languageCode;
     return AppStrings(code == 'es' ? 'es' : 'en');
   }
 
@@ -115,8 +127,8 @@ class AppStrings {
   String get clientAccountActivation =>
       _es ? 'Activacion de cuenta de cliente' : 'Client Account Activation';
   String get clientActivationBody => _es
-      ? 'Las cuentas de cliente de VitaLink requieren un codigo de acceso antes del registro. El codigo puede venir de su agente de seguros o llegar por correo electronico despues de ser emitido.\n\nYa tiene un codigo de acceso de VitaLink?'
-      : 'VitaLink client accounts require an access code before registration. The code may come from your insurance agent or be delivered by email after it is issued.\n\nDo you already have a VitaLink access code?';
+      ? 'Las cuentas de cliente de VitaLink requieren un codigo de acceso antes del registro. Este codigo puede venir de su agente de seguros o llegar por correo electronico despues de ser emitido.\n\nYa tiene un codigo de activacion de VitaLink?'
+      : 'VitaLink client accounts require an access code before registration. This code may come from your insurance agent or be delivered by email after it is issued.\n\nDo you already have a VitaLink activation code?';
   String get iHaveCode => _es ? 'Tengo un codigo' : 'I Have a Code';
   String get agentPortalActivation =>
       _es ? 'Activacion del portal de agente' : 'Agent Portal Activation';
@@ -244,6 +256,17 @@ class AppStrings {
   String get procedures => _es ? 'Procedimientos' : 'Procedures';
   String get bloodType => _es ? 'Tipo de sangre' : 'Blood Type';
   String get organDonor => _es ? 'Donante de organos' : 'Organ Donor';
+  String get dnrPolstOnFile =>
+      _es ? 'DNR / POLST firmado' : 'DNR / POLST on file';
+  String get signedFormLocation =>
+      _es ? 'Ubicación del formulario firmado' : 'Location of signed form';
+  String get enterSignedFormLocation => _es
+      ? 'Ingrese dónde se guarda el formulario firmado.'
+      : 'Enter where the signed form is kept.';
+  String get notProvided => _es ? 'No proporcionada' : 'Not provided';
+  String get dnrPolstDisclaimer => _es
+      ? 'VitaLink no es una orden legal de DNR/POLST y no reemplaza el formulario firmado.'
+      : 'VitaLink is not a legal DNR/POLST order and does not replace the signed form.';
   String get unknown => _es ? 'Desconocido' : 'Unknown';
   String get noPhone => _es ? 'Sin telefono' : 'No phone';
   String get showEmergencyQr =>
@@ -297,10 +320,10 @@ class AppStrings {
   String get hipaaAuthorizationText => _es
       ? '''AUTORIZACIÓN HIPAA Y ALCANCE DE CITA DE MEDICARE
 
-Al firmar abajo, autorizo a mi agente de seguros con licencia y/o agencia afiliada a acceder, recibir y usar SOLAMENTE la siguiente información con el propósito de ayudarme con educación e inscripción en planes de Medicare:
+Al firmar abajo, autorizo a mi agente de seguros con licencia y/o agencia afiliada a acceder, recibir y usar SOLAMENTE la siguiente información con el fin de ayudarme a comprender los planes de Medicare y a inscribirme en ellos:
 
-- Mis medicamentos listados
-- Mis médicos / proveedores de atención médica listados
+- Los medicamentos que he incluido en mi lista
+- Los médicos y proveedores de atención médica que he incluido en mi lista
 
 No se compartirán otros registros médicos, diagnósticos, notas de tratamiento, información financiera ni información personal no relacionada mediante esta autorización.
 
@@ -319,8 +342,8 @@ Acepto hablar sobre los siguientes tipos de productos de Medicare con mi agente 
 
 - Medicare Advantage (Parte C)
 - Planes de medicamentos recetados (Parte D)
-- Suplemento de Medicare (Medigap)
-- Dental / Visión / Audición
+- Seguro suplementario de Medicare (Medigap)
+- Cobertura dental, de la visión y de la audición
 - Indemnización hospitalaria y productos relacionados
 
 Entiendo:
@@ -432,4 +455,91 @@ I understand:
   String get newPassword => _es ? 'Nueva contrasena' : 'New Password';
   String get passwordsDoNotMatch =>
       _es ? 'Las contrasenas no coinciden' : 'Passwords do not match';
+
+  // ---------------------------------------------------------------------
+  // Moving to a new phone (transfer code, device switch, disabled device)
+  // ---------------------------------------------------------------------
+  String get continueLabel => _es ? 'Continuar' : 'Continue';
+  String get dismiss => _es ? 'Cerrar' : 'Dismiss';
+  String get servingLabel => _es ? 'Porcion' : 'Serving';
+  String get supplementFactsLabel =>
+      _es ? 'Informacion del suplemento' : 'Supplement Facts';
+  String get otherIngredientsLabel =>
+      _es ? 'Otros ingredientes' : 'Other Ingredients';
+  String get openLabel => _es ? 'Abrir' : 'Open';
+  String get tryAgain => _es ? 'Intentar de nuevo' : 'Try Again';
+  String get enterYourTransferCode =>
+      _es ? 'Ingrese su codigo de traslado' : 'Enter Your Transfer Code';
+  String get transferCodeInstructions => _es
+      ? 'Ingrese el codigo que aparece en su telefono anterior en Configuracion > Mover a un dispositivo nuevo.'
+      : 'Enter the code shown on your old phone under Settings > Move to New Device.';
+  String get transferCodeLabel => _es ? 'Codigo de traslado' : 'Transfer code';
+  String get transferCodeWrongLength => _es
+      ? 'Los codigos de traslado tienen 18 letras y numeros. Revise el codigo en su telefono anterior.'
+      : 'Transfer codes are 18 letters and numbers. Check the code on your old phone.';
+  String get transferCodeDoesNotMatch => _es
+      ? 'Ese codigo de traslado no coincide. Revise el codigo en su telefono anterior e intente de nuevo.'
+      : "That transfer code doesn't match. Check the code on your old phone and try again.";
+  String get transferRequired => _es
+      ? 'Cree un codigo de traslado en el dispositivo anterior antes de reemplazarlo.'
+      : 'Create a transfer code on the old device before replacing it.';
+  String get transferNotLoadedYet =>
+      _es ? 'El traslado aun no se cargo' : 'Transfer Not Loaded Yet';
+  String get transferRetryHint => _es
+      ? 'Puede intentarlo de nuevo ahora, o mas tarde desde Configuracion > "Tengo un codigo de traslado" dentro de 6 horas.'
+      : 'You can try again now, or later from Settings > "I Have a Transfer Code" within 6 hours.';
+  String get transferCompleteTitle =>
+      _es ? 'Traslado completado' : 'Transfer Complete';
+  String get transferCompleteBody => _es
+      ? 'Sus perfiles de VitaLink y la informacion guardada en el telefono ahora estan en este dispositivo.'
+      : 'Your VitaLink profiles and locally stored information are now on this device.';
+  String get newInstallationDetected => _es
+      ? 'Se detecto una nueva instalacion de la aplicacion'
+      : 'New App Installation Detected';
+  String get newInstallationBody => _es
+      ? 'VitaLink encontro otra instalacion para esta cuenta.\n\nSi es el mismo telefono despues de una actualizacion o reinstalacion, confirmelo abajo. Si se cambia a otro telefono, primero use Transferir perfil a un dispositivo nuevo. La recuperacion de la cuenta no restaura la informacion guardada solo en otro dispositivo.'
+      : 'VitaLink found another installation for this account.\n\nIf this is the same phone after an update or reinstall, confirm it below. If you are moving to a different phone, use Transfer Profile to New Device first. Account recovery does not restore information stored only on another device.';
+  String get thisIsMyCurrentPhone =>
+      _es ? 'Este es mi telefono actual' : 'This Is My Current Phone';
+  String get installationRecoveryNotVerified => _es
+      ? 'No se pudo verificar esta instalación como el teléfono actual. Use un código de traslado o elija Perdido o robado si el teléfono anterior no está disponible.'
+      : 'This installation could not be verified as the current phone. Use a transfer code, or choose Lost or Stolen if the old phone is unavailable.';
+  String get iCreatedTransferCode =>
+      _es ? 'Cree un codigo de traslado' : 'I Created a Transfer Code';
+  String get itWasLostOrStolen =>
+      _es ? 'Se perdio o fue robado' : 'It Was Lost or Stolen';
+  String get disableOldDeviceTitle =>
+      _es ? 'Desactivar el dispositivo anterior?' : 'Disable the old device?';
+  String get disableOldDeviceBody => _es
+      ? 'El dispositivo anterior se desactivara la proxima vez que se conecte. La informacion guardada fuera de VitaLink, incluidas capturas de pantalla o archivos exportados, no se puede recuperar ni eliminar a distancia.'
+      : 'The old device will be disabled the next time it connects. Information stored outside VitaLink, including screenshots or exported files, cannot be recalled.';
+  String get lost => _es ? 'Perdido' : 'Lost';
+  String get stolen => _es ? 'Robado' : 'Stolen';
+  String get loginCouldNotFinish => _es
+      ? 'No se pudo completar el inicio de sesion. Cierre VitaLink, vuelva a abrirlo e intente de nuevo.'
+      : "Login couldn't finish. Please close VitaLink, reopen it, and try again.";
+  String get deviceDisabledTitle => _es
+      ? 'Este dispositivo fue desactivado'
+      : 'This device has been disabled';
+  String get deviceMovedBody => _es
+      ? 'VitaLink se movio a un dispositivo nuevo. Sus perfiles locales no se borraron de este dispositivo anterior.'
+      : 'VitaLink was moved to a new device. Your local profiles have not been erased from this old device.';
+  String get deviceLostStolenBody => _es
+      ? 'Este dispositivo fue reportado como perdido o robado. Se desactivo el acceso a VitaLink y se borraron los perfiles de VitaLink guardados en el telefono.'
+      : 'This device was reported lost or stolen. VitaLink access was disabled and locally stored VitaLink profiles were erased.';
+  String get deviceDisabledBody => _es
+      ? 'El acceso a VitaLink fue desactivado en este dispositivo.'
+      : 'VitaLink access has been disabled on this device.';
+  String get eraseVitaLinkData =>
+      _es ? 'Borrar datos de VitaLink' : 'Erase VitaLink Data';
+  String get eraseVitaLinkDataTitle =>
+      _es ? 'Borrar datos de VitaLink?' : 'Erase VitaLink data?';
+  String get eraseVitaLinkDataBody => _es
+      ? 'Primero confirme que sus perfiles estan disponibles en el dispositivo nuevo. Esto borra permanentemente los perfiles y archivos de VitaLink de este dispositivo anterior y no se puede deshacer.'
+      : 'Confirm your profiles are available on the new device first. This permanently deletes VitaLink profiles and files from this old device and cannot be undone.';
+  String get keepData => _es ? 'Conservar datos' : 'Keep Data';
+  String get eraseFromThisDevice =>
+      _es ? 'Borrar de este dispositivo' : 'Erase From This Device';
+  String get returnToLogin =>
+      _es ? 'Volver al inicio de sesion' : 'Return to Login';
 }

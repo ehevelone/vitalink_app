@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 
 import 'secure_store.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/screen_strings.dart';
 
 class ProfileShareCryptoService {
   ProfileShareCryptoService([SecureStore? store])
@@ -48,7 +50,7 @@ class ProfileShareCryptoService {
   ({String code, String encodedKey}) parseToken(String token) {
     final separator = token.indexOf('.');
     if (separator <= 0 || separator == token.length - 1) {
-      throw const FormatException('Enter the complete code.');
+      throw FormatException(AppStrings.current().enterCompleteCode);
     }
     final code = token.substring(0, separator).trim().toUpperCase();
     final encodedKey = token.substring(separator + 1).trim();
@@ -80,7 +82,7 @@ class ProfileShareCryptoService {
   ) async {
     final parts = encrypted.split('.');
     if (parts.length != 4 || parts.first != 'v1') {
-      throw const FormatException('Unsupported shared profile package.');
+      throw FormatException(AppStrings.current().unsupportedSharePackage);
     }
     final clear = await _cipher.decrypt(
       SecretBox(
@@ -95,7 +97,9 @@ class ProfileShareCryptoService {
 
   List<int> _decodeKey(String encoded) {
     final bytes = _decodeBase64(encoded);
-    if (bytes.length != 32) throw const FormatException('Invalid share key.');
+    if (bytes.length != 32) {
+      throw FormatException(AppStrings.current().invalidShareKey);
+    }
     return bytes;
   }
 

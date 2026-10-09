@@ -2,6 +2,7 @@
 
 const db = require("./services/db");
 const { createMailer, fromAddress } = require("./services/mailer");
+const { requestLanguage } = require("./services/notification-language");
 
 const CORS_HEADERS = {
   "Content-Type": "application/json",
@@ -26,7 +27,11 @@ function getResetTable(role) {
   return null;
 }
 
-function getEmailSubject(role) {
+function getEmailSubject(role, language = "en") {
+  if (language === "es") {
+    if (role === "agents") return "Código para restablecer la contraseña de agente de VitaLink";
+    return "Código para restablecer la contraseña de VitaLink";
+  }
   if (role === "agents") return "VitaLink Agent Password Reset Code";
   if (role === "admins") return "VitaLink Admin Password Reset Code";
   if (role === "rsms") return "VitaLink RSM Password Reset Code";
@@ -71,6 +76,7 @@ exports.handler = async (event) => {
     }
 
     const { emailOrPhone, role } = body;
+    const language = requestLanguage(event, body) || "en";
 
     if (!emailOrPhone || !role) {
       return reply(400, {
@@ -143,7 +149,19 @@ exports.handler = async (event) => {
     stage = "create_mailer";
     const transporter = createMailer();
 
-    const message = `
+    const message = language === "es" ? `
+Hola:
+
+Su código para restablecer la contraseña de VitaLink es:
+
+${resetCode}
+
+Este código vence en 20 minutos.
+
+Si usted no lo solicitó, puede ignorar este correo.
+
+- Soporte de VitaLink
+`.trim() : `
 Hi,
 
 Your VitaLink password reset code is:
@@ -161,7 +179,7 @@ If you did not request this, you can ignore this email.
     await transporter.sendMail({
       from: fromAddress("VitaLink Support"),
       to: user.email,
-      subject: getEmailSubject(role),
+      subject: getEmailSubject(role, language),
       text: message,
     });
 

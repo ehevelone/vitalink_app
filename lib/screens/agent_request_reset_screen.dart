@@ -1,5 +1,7 @@
 // lib/screens/agent_request_reset_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 
 class AgentRequestResetScreen extends StatefulWidget {
@@ -31,7 +33,8 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Reset code sent ✅")),
+          SnackBar(
+              content: Text(AppStrings.of(context).resetCodeSentCheckShort)),
         );
 
         Navigator.pushNamed(
@@ -43,14 +46,15 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['error'] ?? "Request failed ❌"),
+            content:
+                Text(data['error'] ?? AppStrings.of(context).requestFailedX),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text(AppStrings.of(context).errorMessage('$e'))),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -66,7 +70,7 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Agent Request Reset")),
+      appBar: AppBar(title: Text(AppStrings.of(context).agentRequestReset)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -75,16 +79,18 @@ class _AgentRequestResetScreenState extends State<AgentRequestResetScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Agent Email"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email" : null,
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).agentEmail),
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).enterYourEmail
+                    : null,
               ),
               const SizedBox(height: 24),
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.send),
-                      label: const Text("Send Reset Code"),
+                      label: Text(AppStrings.of(context).sendResetCode),
                       onPressed: _doRequest,
                     ),
             ],

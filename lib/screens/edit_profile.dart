@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -34,8 +36,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   final _implantsCtrl = TextEditingController();
   final _proceduresCtrl = TextEditingController();
+  final _dnrPolstLocationCtrl = TextEditingController();
 
   bool _organDonor = false;
+  bool _dnrPolstOnFile = false;
   bool _isVeteran = false;
   bool _usesVaHealthcare = false;
 
@@ -50,6 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _conditionsCtrl.dispose();
     _implantsCtrl.dispose();
     _proceduresCtrl.dispose();
+    _dnrPolstLocationCtrl.dispose();
     for (final controller in _extraContactCtrls) {
       controller.dispose();
     }
@@ -79,10 +84,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _dobCtrl.text = _p!.dob ?? '';
       _bloodCtrl.text = e.bloodType;
       final contacts = e.effectiveContacts;
-      _contactCtrl.text =
-          contacts.isNotEmpty ? contacts.first.name : e.contact;
-      _phoneCtrl.text =
-          contacts.isNotEmpty ? contacts.first.phone : e.phone;
+      _contactCtrl.text = contacts.isNotEmpty ? contacts.first.name : e.contact;
+      _phoneCtrl.text = contacts.isNotEmpty ? contacts.first.phone : e.phone;
       _extraContactCtrls.clear();
       _extraPhoneCtrls.clear();
       for (final contact in contacts.skip(1)) {
@@ -94,8 +97,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       _implantsCtrl.text = e.implants;
       _proceduresCtrl.text = e.procedures;
+      _dnrPolstLocationCtrl.text = e.dnrPolstLocation;
 
       _organDonor = e.organDonor;
+      _dnrPolstOnFile = e.dnrPolstOnFile;
       _isVeteran = _p!.isVeteran;
       _usesVaHealthcare = _p!.usesVaHealthcare;
     });
@@ -110,18 +115,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove Veteran status?'),
-        content: const Text(
-          'This will also remove the VA health care selection and VA emergency notice from this profile.',
+        title: Text(AppStrings.of(context).removeVeteranStatus),
+        content: Text(
+          AppStrings.of(context).removeVeteranStatusBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep Veteran Status'),
+            child: Text(AppStrings.of(context).keepVeteranStatus),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -170,10 +175,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         implants: _implantsCtrl.text.trim(),
         procedures: _proceduresCtrl.text.trim(),
         organDonor: _organDonor,
+        dnrPolstOnFile: _dnrPolstOnFile,
+        dnrPolstLocation:
+            _dnrPolstOnFile ? _dnrPolstLocationCtrl.text.trim() : '',
       ),
     );
 
     await _repo.saveProfile(_p!);
+    await ApiService.syncProfilesToServer();
 
     if (!mounted) return;
 
@@ -193,20 +202,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       } catch (_) {}
 
+      if (!mounted) return;
+      final strings = AppStrings.of(context);
       final contact = contactsToText.first;
       final agentLine = (agentName.isNotEmpty && agentPhone.isNotEmpty)
-          ? "\n\nVitaLink was provided through ${_p!.fullName}'s insurance agent:\n"
-              "$agentName\n"
-              "$agentPhone\n"
-              "Contact the agent if you have questions or would like more information."
+          ? strings.emergencyContactTextAgent(
+              _p!.fullName, agentName, agentPhone)
           : "";
 
       final message =
-          "Hi ${contact.name},\n\n"
-          "${_p!.fullName} selected you as an emergency contact in VitaLink.\n\n"
-          "VitaLink stores important health information that can help in an emergency if someone is unconscious or unable to communicate."
-          "$agentLine\n\n"
-          "More information: https://myvitalink.app";
+          '${strings.emergencyContactTextIntro(contact.name, _p!.fullName)}'
+          '$agentLine\n\n'
+          '${strings.emergencyContactTextMoreInfo()}';
 
       await _openEmergencyContactText(contact, message);
     }
@@ -309,7 +316,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).editProfile)),
       body: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           24,
@@ -323,17 +330,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Full Name (First & Last)",
-                  hintText: "First and Last Name",
-                  helperText: "Required for emergency identification",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).fullNameFirstLast,
+                  hintText: AppStrings.of(context).firstAndLastName,
+                  helperText: AppStrings.of(context).requiredForEmergencyId,
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return "Required";
+                    return AppStrings.of(context).requiredField;
                   }
                   if (!_validFullName(v)) {
-                    return "Enter first & last name";
+                    return AppStrings.of(context).enterFirstLastName;
                   }
                   return null;
                 },
@@ -344,9 +351,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   TextField(
                     controller: _dobCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: "Date of Birth (MM/DD/YYYY)",
-                      suffixIcon: Icon(Icons.calendar_today),
+                    decoration: InputDecoration(
+                      labelText: AppStrings.of(context).dobMmDdYyyy,
+                      suffixIcon: const Icon(Icons.calendar_today),
                     ),
                     onTap: _pickDob,
                   ),
@@ -358,7 +365,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _bloodCtrl,
-                    decoration: const InputDecoration(labelText: "Blood Type"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).bloodType),
                   ),
                   const Divider(height: 1),
                 ],
@@ -366,14 +374,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _contactCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Emergency Contact"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).emergencyContactLabel),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return "Required";
+                    return AppStrings.of(context).requiredField;
                   }
                   if (!_validFullName(v)) {
-                    return "Enter full name";
+                    return AppStrings.of(context).enterFullName;
                   }
                   return null;
                 },
@@ -385,13 +393,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 inputFormatters: [
                   PhoneNumberFormatter(),
                 ],
-                decoration: const InputDecoration(
-                  labelText: "Emergency Phone",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).emergencyPhone,
                 ),
                 validator: (v) {
                   final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
                   if (digits.length != 10) {
-                    return "Enter valid phone";
+                    return AppStrings.of(context).enterValidPhone;
                   }
                   return null;
                 },
@@ -402,12 +410,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        "Emergency Contact ${i + 2}",
+                        AppStrings.of(context)
+                            .emergencyContactNumberTitle(i + 2),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                     IconButton(
-                      tooltip: "Remove emergency contact",
+                      tooltip: AppStrings.of(context).removeEmergencyContact,
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _removeEmergencyContact(i),
                     ),
@@ -415,14 +424,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 TextFormField(
                   controller: _extraContactCtrls[i],
-                  decoration:
-                      const InputDecoration(labelText: "Emergency Contact"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).emergencyContactLabel),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return "Required";
+                      return AppStrings.of(context).requiredField;
                     }
                     if (!_validFullName(v)) {
-                      return "Enter full name";
+                      return AppStrings.of(context).enterFullName;
                     }
                     return null;
                   },
@@ -434,13 +443,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   inputFormatters: [
                     PhoneNumberFormatter(),
                   ],
-                  decoration: const InputDecoration(
-                    labelText: "Emergency Phone",
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).emergencyPhone,
                   ),
                   validator: (v) {
                     final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
                     if (digits.length != 10) {
-                      return "Enter valid phone";
+                      return AppStrings.of(context).enterValidPhone;
                     }
                     return null;
                   },
@@ -452,7 +461,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _addEmergencyContact,
                   icon: const Icon(Icons.add_circle_outline),
-                  label: const Text("Add Another Emergency Contact"),
+                  label:
+                      Text(AppStrings.of(context).addAnotherEmergencyContact),
                 ),
               ),
               const SizedBox(height: 12),
@@ -460,7 +470,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _allergiesCtrl,
-                    decoration: const InputDecoration(labelText: "Allergies"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).allergies),
                   ),
                   const Divider(height: 1),
                 ],
@@ -470,7 +481,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _conditionsCtrl,
-                    decoration: const InputDecoration(labelText: "Conditions"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).conditions),
                   ),
                   const Divider(height: 1),
                 ],
@@ -480,8 +492,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _implantsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Implanted Devices"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).implantedDevices),
                   ),
                   const Divider(height: 1),
                 ],
@@ -491,8 +503,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextField(
                     controller: _proceduresCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Major Procedures"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).majorProcedures),
                   ),
                   const Divider(height: 1),
                 ],
@@ -501,7 +513,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               SwitchListTile(
                 value: _isVeteran,
                 onChanged: _changeVeteranStatus,
-                title: const Text('Veteran'),
+                title: Text(AppStrings.of(context).veteran),
                 activeThumbColor: Colors.blue,
               ),
               if (_isVeteran)
@@ -509,15 +521,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   value: _usesVaHealthcare,
                   onChanged: (value) =>
                       setState(() => _usesVaHealthcare = value),
-                  title: const Text('Do you use VA health care?'),
+                  title: Text(AppStrings.of(context).useVaHealthCare),
                   activeThumbColor: Colors.blue,
                 ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
-                title: const Text("Organ Donor"),
+                title: Text(AppStrings.of(context).organDonor),
                 activeThumbColor: Colors.red,
               ),
+              SwitchListTile(
+                value: _dnrPolstOnFile,
+                onChanged: (value) =>
+                    setState(() => _dnrPolstOnFile = value),
+                title: Text(AppStrings.of(context).dnrPolstOnFile),
+                activeThumbColor: Colors.red,
+              ),
+              if (_dnrPolstOnFile) ...[
+                TextFormField(
+                  controller: _dnrPolstLocationCtrl,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).signedFormLocation,
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? AppStrings.of(context).enterSignedFormLocation
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppStrings.of(context).dnrPolstDisclaimer,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _save,
@@ -525,7 +560,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   minimumSize: const Size.fromHeight(48),
                 ),
-                child: const Text("Save"),
+                child: Text(AppStrings.of(context).save),
               ),
             ],
           ),

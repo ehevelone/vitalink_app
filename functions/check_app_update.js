@@ -1,3 +1,5 @@
+const DEFAULT_IOS_STORE_URL =
+  "https://apps.apple.com/us/app/vitalink-by-et-enterprises/id6759175096";
 const DEFAULT_ANDROID_STORE_URL =
   "https://play.google.com/store/apps/details?id=com.etnaturals.vitalinkapp";
 
@@ -44,12 +46,12 @@ function platformConfig(platform) {
   return {
     latestBuild: parseInteger(
       process.env[`${normalized}_LATEST_BUILD`],
-      isAndroid ? 110 : 0
+      isAndroid ? 117 : 0
     ),
     minRequiredBuild: parseInteger(process.env[`${normalized}_MIN_BUILD`], 0),
     latestVersion: readString(
       `${normalized}_LATEST_VERSION`,
-      isAndroid ? "2.0.17" : ""
+      isAndroid ? "2.0.24" : ""
     ),
     title: readString(
       `${normalized}_UPDATE_TITLE`,
@@ -61,7 +63,7 @@ function platformConfig(platform) {
     ),
     storeUrl: readString(
       `${normalized}_STORE_URL`,
-      isAndroid ? DEFAULT_ANDROID_STORE_URL : ""
+      isAndroid ? DEFAULT_ANDROID_STORE_URL : DEFAULT_IOS_STORE_URL
     ),
     releaseNotes: readReleaseNotes(`${normalized}_RELEASE_NOTES`, [
       "Improved update reminders inside the app.",

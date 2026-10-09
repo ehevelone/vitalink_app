@@ -1,5 +1,6 @@
 const db = require("./services/db");
 const { createMailer, fromAddress } = require("./services/mailer");
+const { requestLanguage } = require("./services/notification-language");
 
 const headers = {
   "Content-Type": "application/json",
@@ -14,7 +15,9 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") return reply(200, {});
     if (event.httpMethod !== "POST") return reply(405, { success: false, error: "Method Not Allowed" });
-    const email = String(JSON.parse(event.body || "{}").email || "").trim().toLowerCase();
+    const parsedBody = JSON.parse(event.body || "{}");
+    const email = String(parsedBody.email || "").trim().toLowerCase();
+    const language = requestLanguage(event, parsedBody) || "en";
     if (!email) return reply(200, neutral);
 
     const result = await db.query(
@@ -30,8 +33,12 @@ exports.handler = async (event) => {
       await createMailer().sendMail({
         from: fromAddress("VitaLink Support"),
         to: user.email,
-        subject: "Your VitaLink Personal Access Code",
-        text: `Your VitaLink personal access code is:\n\n${user.purchase_code}\n\nEnter this code in VitaLink to continue. If you did not request this email, you can ignore it.`,
+        subject: language === "es"
+          ? "Su código de acceso personal de VitaLink"
+          : "Your VitaLink Personal Access Code",
+        text: language === "es"
+          ? `Su código de acceso personal de VitaLink es:\n\n${user.purchase_code}\n\nIngrese este código en VitaLink para continuar. Si usted no solicitó este correo, puede ignorarlo.`
+          : `Your VitaLink personal access code is:\n\n${user.purchase_code}\n\nEnter this code in VitaLink to continue. If you did not request this email, you can ignore it.`,
       });
     }
     return reply(200, neutral);

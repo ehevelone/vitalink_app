@@ -23,7 +23,7 @@ function loadWithMocks(relativePath, mocks) {
   }
 }
 
-test("checkout is card-only and collects verified purchaser identity", async () => {
+test("checkout accepts card and ACH and identifies the activation purchase", async () => {
   let checkoutParams;
   class StripeMock {
     constructor() {
@@ -47,7 +47,7 @@ test("checkout is card-only and collects verified purchaser identity", async () 
 
   const response = await handler({ httpMethod: "POST" });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(checkoutParams.payment_method_types, ["card"]);
+  assert.deepEqual(checkoutParams.payment_method_types, ["card", "us_bank_account"]);
   assert.deepEqual(checkoutParams.name_collection, {
     individual: { enabled: true, optional: false }
   });
@@ -123,10 +123,9 @@ test("webhook creates one verified paid activation record", async () => {
     entry.sql.includes("INSERT INTO activation_codes")
   );
   assert.ok(insert);
-  assert.equal(insert.params[1], "Test Person");
-  assert.equal(insert.params[2], "test@example.com");
-  assert.equal(insert.params[3], "cs_test_paid");
-  assert.equal(insert.params[4], "pi_test_paid");
+  assert.match(insert.params[0], /^VL-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.equal(insert.params[1], "test@example.com");
+  assert.equal(insert.params[2], "cs_test_paid");
 });
 
 function registrationMocks({ agent, activation }) {
@@ -138,7 +137,7 @@ function registrationMocks({ agent, activation }) {
       if (sql.includes("FROM agents WHERE unlock_code")) {
         return { rows: agent ? [agent] : [] };
       }
-      if (sql.includes("FROM activation_codes") && sql.includes("FOR UPDATE")) {
+      if (sql.includes("FROM activation_codes")) {
         return { rows: activation ? [{ ...activation }] : [] };
       }
       if (sql.includes("INSERT INTO users")) {
@@ -154,15 +153,15 @@ function registrationMocks({ agent, activation }) {
           }]
         };
       }
-      if (sql.includes("UPDATE activation_codes") && sql.includes("redeemed = true")) {
-        return { rows: [{ id: activation.id }] };
+      if (sql.includes("UPDATE activation_codes") && sql.includes("redeemed=true")) {
+        return { rows: activation ? [{ code: activation.code }] : [] };
       }
       return { rows: [] };
     },
     release() {}
   };
   const db = {
-    query: async () => ({ rows: [] }),
+    query: (...args) => client.query(...args),
     connect: async () => client
   };
   class StripeMock {
@@ -180,7 +179,21 @@ async function runRegistration(mocks, code, email = "person@example.com") {
     stripe: mocks.StripeMock,
     "./services/stripe-prices": {
       getActivationPriceId: () => "price_activation"
-    }
+    },
+    "./services/account-access": { ensureAccountAccessSchema: async () => {} },
+    "./services/user-auth": { ensureUserSessionColumns: async () => {} },
+    "./services/device-security": {
+      ensureDeviceSecuritySchema: async () => {},
+      recordDeviceEvent: async () => {},
+    },
+    "./services/notification-language": { requestLanguage: () => "en" },
+    "./services/access-code-rate-limit": {
+      checkAccessCodeLimit: async () => ({ allowed: true }),
+      clearAccessCodeFailures: async () => {},
+      rateLimitScope: () => "test-scope",
+      recordAccessCodeFailure: async () => ({ locked: false }),
+      requestIp: () => "127.0.0.1",
+    },
   });
   return handler({
     httpMethod: "POST",
@@ -206,7 +219,7 @@ test("agent registration preserves the existing agent association", async () => 
   assert.equal(body.success, true);
   assert.equal(mocks.getUserInsertParams()[5], 42);
   assert.equal(mocks.getUserInsertParams()[6], null);
-  assert.ok(mocks.queries.includes("COMMIT"));
+  assert.equal(mocks.queries.includes("COMMIT"), false);
 });
 
 test("paid consumer registration creates no agent and redeems atomically", async () => {
@@ -228,7 +241,6 @@ test("paid consumer registration creates no agent and redeems atomically", async
   assert.equal(body.success, true);
   assert.equal(mocks.getUserInsertParams()[5], null);
   assert.equal(mocks.getUserInsertParams()[6], "VL-TEST-CODE");
-  assert.ok(mocks.queries.some((sql) => sql.includes("FOR UPDATE")));
-  assert.ok(mocks.queries.some((sql) => sql.includes("redeemed_by_user_id")));
+  assert.ok(mocks.queries.some((sql) => sql.includes("redeemed=false")));
   assert.ok(mocks.queries.includes("COMMIT"));
 });

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -24,6 +26,35 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   final SignatureController _sigCtrl = SignatureController(penStrokeWidth: 3);
   final ScrollController _scrollCtrl = ScrollController();
 
+  // One line per medication or supplement for the signed form, including
+  // serving size and ingredients for supplements.
+  String _medicationSummary(Medication m, AppStrings strings) {
+    final parts = <String>[
+      m.name,
+      if (m.dose.isNotEmpty) m.dose,
+      if (m.frequency.isNotEmpty) m.frequency,
+      if (m.servingSize.isNotEmpty) "${strings.servingLabel}: ${m.servingSize}",
+      if (m.activeIngredients.isNotEmpty)
+        "${strings.supplementFactsLabel}: ${m.activeIngredients.join(", ")}",
+      if (m.otherIngredients.isNotEmpty)
+        "${strings.otherIngredientsLabel}: ${m.otherIngredients.join(", ")}",
+    ].where((part) => part.trim().isNotEmpty).toList();
+    return parts.join(" - ");
+  }
+
+  // The built-in PDF font cannot draw "•" or "—"; without this the bullets
+  // and dashes silently disappear from the signed PDF.
+  String _pdfSafe(String text) => text
+      .replaceAll('\u2022', '-')
+      .replaceAll('\u2014', '-')
+      .replaceAll('\u2013', '-');
+
+  // English copy sent to the agent when the client signed in Spanish.
+  static const String _englishReferenceNotice =
+      'ENGLISH TRANSLATION FOR AGENT REFERENCE ONLY. This is not the signed '
+      'document. The client read and signed the Spanish version (attached), '
+      'which is the official record.';
+
   String clean(String? value) {
     if (value == null) return "";
 
@@ -44,43 +75,6 @@ class _HipaaFormScreenState extends State<HipaaFormScreen> {
   String? _agentEmail;
   String? _agentName;
   String? _agentPhone;
-
-  static const String _authorizationText = """
-HIPAA AUTHORIZATION & MEDICARE SCOPE OF APPOINTMENT
-
-By signing below, I authorize my licensed insurance agent and/or affiliated agency to access, receive, and use ONLY the following information for the purpose of assisting me with Medicare plan education and enrollment:
-
-• My listed medications
-• My listed physicians / healthcare providers
-
-No other medical records, diagnoses, treatment notes, financial data, or unrelated personal information will be shared through this authorization.
-
-I understand:
-
-• This authorization is voluntary.
-• I may refuse to sign without affecting my eligibility, treatment, or benefits.
-• I may revoke this authorization at any time in writing.
-• Revocation will not apply to information already disclosed.
-• Information disclosed may be subject to redisclosure and may no longer be protected by federal privacy regulations.
-• This authorization expires one (1) year from the date signed unless revoked earlier.
-
-MEDICARE SCOPE OF APPOINTMENT (CMS Required)
-
-I agree to discuss the following Medicare product types with my licensed agent:
-
-• Medicare Advantage (Part C)
-• Prescription Drug Plans (Part D)
-• Medicare Supplement (Medigap)
-• Dental / Vision / Hearing
-• Hospital Indemnity and related products
-
-I understand:
-
-• I am not required to enroll in any plan.
-• The agent may only discuss the product types listed above.
-• Signing does not obligate me to enroll.
-• This Scope of Appointment remains valid for twelve (12) months unless revoked.
-""";
 
   @override
   void initState() {
@@ -138,10 +132,8 @@ I understand:
     final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : "";
 
     // 🔥 Medications field
-    final medsStr = p.meds
-        .map((m) =>
-            "${m.name}${m.dose.isNotEmpty ? " (${m.dose})" : ""}${m.frequency.isNotEmpty ? " ${m.frequency}" : ""}")
-        .join("; ");
+    const en = AppStrings('en');
+    final medsStr = p.meds.map((m) => _medicationSummary(m, en)).join("; ");
 
     // 🔥 Doctors field
     final docsStr = p.doctors
@@ -207,7 +199,7 @@ I understand:
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: const Text("Sign Authorization"),
+        title: Text(AppStrings.of(context).signAuthorization),
         content: SizedBox(
           height: 200,
           width: 300,
@@ -219,11 +211,11 @@ I understand:
         actions: [
           TextButton(
             onPressed: () => _sigCtrl.clear(),
-            child: const Text("Clear"),
+            child: Text(AppStrings.of(context).clear),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -231,7 +223,7 @@ I understand:
               Navigator.pop(context);
               _saveAndSend();
             },
-            child: const Text("Submit"),
+            child: Text(AppStrings.of(context).submit),
           ),
         ],
       ),
@@ -243,11 +235,10 @@ I understand:
       context: context,
       barrierDismissible: false,
       builder: (_) => _VitaLinkConfirmDialog(
-        title: "Almost ready!",
-        message:
-            "Before signing, please confirm your medications and doctors are current. Your agent uses this to help find you the best coverage.",
-        secondaryLabel: "Let me update first",
-        primaryLabel: "Everything looks good",
+        title: AppStrings.of(context).almostReady,
+        message: AppStrings.of(context).confirmMedsDoctorsBeforeSigning,
+        secondaryLabel: AppStrings.of(context).letMeUpdateFirst,
+        primaryLabel: AppStrings.of(context).everythingLooksGood,
         onSecondary: () => Navigator.pop(context, false),
         onPrimary: () => Navigator.pop(context, true),
       ),
@@ -264,10 +255,9 @@ I understand:
       context: context,
       barrierDismissible: false,
       builder: (_) => _VitaLinkNoticeDialog(
-        title: "No problem!",
-        message:
-            "Review your medications and doctors, then come back to sign when everything looks right.",
-        buttonLabel: "Review my info",
+        title: AppStrings.of(context).noProblem,
+        message: AppStrings.of(context).reviewThenComeBack,
+        buttonLabel: AppStrings.of(context).reviewMyInfo,
         onPressed: () => Navigator.pop(context),
       ),
     );
@@ -277,173 +267,233 @@ I understand:
     Navigator.pushReplacementNamed(context, '/menu');
   }
 
+  pw.Document _buildAuthorizationPdf({
+    required AppStrings strings,
+    required String signedOn,
+    pw.MemoryImage? signature,
+    String? notice,
+  }) {
+    final pdf = pw.Document();
+    final meds = _profile!.meds;
+    final doctors = _profile!.doctors;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (_) => [
+          if (notice != null) ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.5)),
+              child: pw.Text(
+                notice,
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+            pw.SizedBox(height: 12),
+          ],
+          pw.Text(
+            strings.hipaaSoaAuthorization,
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(_pdfSafe(strings.hipaaAuthorizationText)),
+          pw.SizedBox(height: 18),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            strings.userInfoShared,
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text(strings.medications,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 6),
+          if (meds.isEmpty)
+            pw.Text(strings.noneListed)
+          else
+            ...meds.map(
+              (m) => pw.Bullet(text: _pdfSafe(_medicationSummary(m, strings))),
+            ),
+          pw.SizedBox(height: 12),
+          pw.Text(strings.physiciansProviders,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 6),
+          if (doctors.isEmpty)
+            pw.Text(strings.noneListed)
+          else
+            ...doctors.map(
+              (d) => pw.Bullet(
+                text: _pdfSafe(
+                  "${d.name}${d.specialty.isNotEmpty ? " - ${d.specialty}" : ""}${d.phone.isNotEmpty ? " - ${d.phone}" : ""}",
+                ),
+              ),
+            ),
+          pw.SizedBox(height: 16),
+          pw.Divider(),
+          pw.SizedBox(height: 14),
+          pw.Text(strings.recipientAgent,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+              "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
+          pw.SizedBox(height: 24),
+          if (signature != null)
+            pw.Row(children: [
+              pw.Text(strings.signature),
+              pw.Container(width: 150, height: 60, child: pw.Image(signature)),
+            ])
+          else
+            pw.Text(
+              'Signed electronically by the client on the Spanish original '
+              '(see the attached signed document).',
+              style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+            ),
+          pw.SizedBox(height: 8),
+          pw.Text("${strings.date}: $signedOn"),
+        ],
+      ),
+    );
+    return pdf;
+  }
+
   Future<void> _saveAndSend() async {
     if (_sigCtrl.isEmpty || _profile == null) return;
 
     if (_agentEmail == null || _agentEmail!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ No agent is linked to this account.")),
+        SnackBar(content: Text("❌ ${AppStrings.of(context).noAgentLinked}")),
       );
       return;
     }
+
+    // Read the language before any await; it decides the signed PDF.
+    final strings = AppStrings.of(context);
+    final meds = _profile!.meds;
+    final doctors = _profile!.doctors;
 
     setState(() => _saving = true);
 
     try {
       final sigBytes = await _sigCtrl.toPngBytes();
       if (sigBytes == null || sigBytes.isEmpty) {
-        throw Exception("Signature image missing");
+        throw Exception(AppStrings.current().signatureImageMissing);
       }
 
-      final pdf = pw.Document();
-      final sigImg = pw.MemoryImage(sigBytes);
+      final signedInSpanish = strings.languageCode == 'es';
+      final signedOn = DateTime.now().toLocal().toString().split(' ')[0];
 
-      final meds = _profile!.meds;
-      final doctors = _profile!.doctors;
-
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          build: (_) => [
-            pw.Text(
-              "HIPAA & SOA Authorization",
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            pw.SizedBox(height: 12),
-            pw.Text(_authorizationText),
-            pw.SizedBox(height: 18),
-            pw.Divider(),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              "User Information Shared (Per Authorization)",
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            pw.SizedBox(height: 10),
-            pw.Text("Medications",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 6),
-            if (meds.isEmpty)
-              pw.Text("None listed.")
-            else
-              ...meds.map(
-                (m) => pw.Bullet(
-                  text:
-                      "${m.name}${m.dose.isNotEmpty ? " — ${m.dose}" : ""}${m.frequency.isNotEmpty ? " — ${m.frequency}" : ""}",
-                ),
-              ),
-            pw.SizedBox(height: 12),
-            pw.Text("Physicians / Healthcare Providers",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 6),
-            if (doctors.isEmpty)
-              pw.Text("None listed.")
-            else
-              ...doctors.map(
-                (d) => pw.Bullet(
-                  text:
-                      "${d.name}${d.specialty.isNotEmpty ? " — ${d.specialty}" : ""}${d.phone.isNotEmpty ? " — ${d.phone}" : ""}",
-                ),
-              ),
-            pw.SizedBox(height: 16),
-            pw.Divider(),
-            pw.SizedBox(height: 14),
-            pw.Text("Recipient (Agent):",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Text(
-                "${_agentName ?? ''}\n${_agentEmail ?? ''}\n${_agentPhone ?? ''}"),
-            pw.SizedBox(height: 24),
-            pw.Row(children: [
-              pw.Text("Signature: "),
-              pw.Container(
-                width: 150,
-                height: 60,
-                child: pw.Image(sigImg),
-              ),
-            ]),
-            pw.SizedBox(height: 8),
-            pw.Text(
-                "Date: ${DateTime.now().toLocal().toString().split(' ')[0]}"),
-          ],
-        ),
+      // The signed original is in the language the client read and signed.
+      final signedPdf = _buildAuthorizationPdf(
+        strings: strings,
+        signature: pw.MemoryImage(sigBytes),
+        signedOn: signedOn,
       );
 
       final dir = await getTemporaryDirectory();
-      final pdfFile = File("${dir.path}/HIPAA_SOA_Authorization.pdf");
-      await pdfFile.writeAsBytes(await pdf.save());
+      final pdfFile = File(
+        signedInSpanish
+            ? "${dir.path}/HIPAA_SOA_Authorization_Signed_Spanish.pdf"
+            : "${dir.path}/HIPAA_SOA_Authorization.pdf",
+      );
+      await pdfFile.writeAsBytes(await signedPdf.save());
+
+      // Spanish signers: the agent also gets an English reference copy. It
+      // has no signature image and says it is not the signed document.
+      String? englishReferenceBase64;
+      if (signedInSpanish) {
+        final englishPdf = _buildAuthorizationPdf(
+          strings: const AppStrings('en'),
+          signedOn: signedOn,
+          notice: _englishReferenceNotice,
+        );
+        englishReferenceBase64 = base64Encode(await englishPdf.save());
+      }
 
       final csvFile = await _buildCsv(_profile!);
       final store = SecureStore();
       final userEmail = await store.getString('userEmail') ?? "";
       final userId = await store.getString('userId') ?? "";
+      final sessionToken = await store.getString('userSessionToken') ?? "";
       final signedAt = DateTime.now().toIso8601String();
       final reviewedAt = signedAt;
       final hipaaSoaPdfBase64 = base64Encode(await pdfFile.readAsBytes());
       final vitalinkCsvBase64 = base64Encode(await csvFile.readAsBytes());
 
-      final resp = await http.post(
-        Uri.parse(
-          "https://vitalink-app.netlify.app/.netlify/functions/send_form_email",
-        ),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "agent": {
-            "name": _agentName ?? "",
-            "email": _agentEmail,
-            "phone": _agentPhone ?? ""
-          },
-          "user": _profile!.fullName,
-          "user_email": userEmail,
-          "user_phone": _profile!.userPhone,
-          "user_dob": _profile!.dob ?? "",
-          "user_address": _profile!.address ?? "",
-          "user_city": _profile!.city ?? "",
-          "user_state": _profile!.state ?? "",
-          "user_zip": _profile!.zip ?? "",
-          "app_user_id": userId,
-          "app_profile_id": _profile!.id,
-          "signed_at": signedAt,
-          "meds_reviewed_at": reviewedAt,
-          "doctors_reviewed_at": reviewedAt,
-          "emergency_contacts": _profile!.emergency.effectiveContacts
-              .map((c) => {
-                    "name": c.name,
-                    "phone": c.phone,
-                  })
-              .toList(),
-          "pharmacies": _pharmacyList(_profile!),
-          "medications": meds
-              .map((m) => {
-                    "name": m.name,
-                    "dose": m.dose,
-                    "frequency": m.frequency,
-                    "pharmacy": m.prescriber,
-                  })
-              .toList(),
-          "providers": doctors
-              .map((d) => {
-                    "name": d.name,
-                    "specialty": d.specialty,
-                    "phone": d.phone,
-                  })
-              .toList(),
-          "attachments": [
-            {
-              "name": "HIPAA_SOA_Authorization.pdf",
-              "content": hipaaSoaPdfBase64,
-            },
-            {
-              "name": "vitalink_user_info.csv",
-              "content": vitalinkCsvBase64,
-            }
-          ]
-        }),
-      );
+      final resp = await http
+          .post(
+            Uri.parse(
+              "https://vitalink-app.netlify.app/.netlify/functions/send_form_email",
+            ),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "agent": {
+                "name": _agentName ?? "",
+                "email": _agentEmail,
+                "phone": _agentPhone ?? ""
+              },
+              "user": _profile!.fullName,
+              "user_email": userEmail,
+              "user_phone": _profile!.userPhone,
+              "user_dob": _profile!.dob ?? "",
+              "user_address": _profile!.address ?? "",
+              "user_city": _profile!.city ?? "",
+              "user_state": _profile!.state ?? "",
+              "user_zip": _profile!.zip ?? "",
+              "app_user_id": userId,
+              "sessionToken": sessionToken,
+              "app_profile_id": _profile!.id,
+              "signed_at": signedAt,
+              "meds_reviewed_at": reviewedAt,
+              "doctors_reviewed_at": reviewedAt,
+              "emergency_contacts": _profile!.emergency.effectiveContacts
+                  .map((c) => {
+                        "name": c.name,
+                        "phone": c.phone,
+                      })
+                  .toList(),
+              "pharmacies": _pharmacyList(_profile!),
+              "medications": meds
+                  .map((m) => {
+                        "name": m.name,
+                        "dose": m.dose,
+                        "frequency": m.frequency,
+                        "pharmacy": m.prescriber,
+                        "itemType": m.itemType,
+                        "servingSize": m.servingSize,
+                        "activeIngredients": m.activeIngredients,
+                        "otherIngredients": m.otherIngredients,
+                      })
+                  .toList(),
+              "providers": doctors
+                  .map((d) => {
+                        "name": d.name,
+                        "specialty": d.specialty,
+                        "phone": d.phone,
+                      })
+                  .toList(),
+              // The signed original stays first: the server files the first
+              // "HIPAA" attachment in the CRM.
+              "attachments": [
+                {
+                  "name": signedInSpanish
+                      ? "HIPAA_SOA_Authorization_Signed_Spanish.pdf"
+                      : "HIPAA_SOA_Authorization.pdf",
+                  "content": hipaaSoaPdfBase64,
+                },
+                if (englishReferenceBase64 != null)
+                  {
+                    "name": "English_Translation_For_Agent_Reference.pdf",
+                    "content": englishReferenceBase64,
+                  },
+                {
+                  "name": "vitalink_user_info.csv",
+                  "content": vitalinkCsvBase64,
+                }
+              ],
+              "signed_language": strings.languageCode,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (resp.statusCode != 200) {
         throw Exception(resp.body);
@@ -461,14 +511,14 @@ I understand:
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text("Sent Successfully"),
-            content: const Text(
-              "Your HIPAA & SOA authorization has been sent to your agent.",
+            title: Text(AppStrings.of(context).sentSuccessfully),
+            content: Text(
+              AppStrings.of(context).hipaaSentToAgent,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
+                child: Text(AppStrings.of(context).ok),
               )
             ],
           ),
@@ -484,18 +534,18 @@ I understand:
     final canSubmit = _acknowledged && _canScroll && !_saving;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("HIPAA & SOA Authorization")),
+      appBar: AppBar(title: Text(AppStrings.of(context).hipaaSoaAuthorization)),
       body: Stack(
         children: [
           ListView(
             controller: _scrollCtrl,
             padding: const EdgeInsets.all(16),
-            children: const [
+            children: [
               Text(
-                _authorizationText,
-                style: TextStyle(fontSize: 16, height: 1.4),
+                AppStrings.of(context).hipaaAuthorizationText,
+                style: const TextStyle(fontSize: 16, height: 1.4),
               ),
-              SizedBox(height: 300),
+              const SizedBox(height: 300),
             ],
           ),
           if (_saving)
@@ -518,9 +568,9 @@ I understand:
                     onChanged: (v) =>
                         setState(() => _acknowledged = v ?? false),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      "I acknowledge and authorize my agent as described above.",
+                      AppStrings.of(context).acknowledgeAgentDescription,
                     ),
                   ),
                 ],
@@ -538,9 +588,9 @@ I understand:
                     ),
                   ),
                   icon: const Icon(Icons.send),
-                  label: const Text(
-                    "Sign & Send My Information",
-                    style: TextStyle(
+                  label: Text(
+                    AppStrings.of(context).signSendMyInformation,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),

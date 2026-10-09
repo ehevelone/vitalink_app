@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_update_service.dart';
@@ -7,9 +9,11 @@ class AppUpdateGate extends StatefulWidget {
   const AppUpdateGate({
     super.key,
     required this.child,
+    required this.navigatorKey,
   });
 
   final Widget child;
+  final GlobalKey<NavigatorState> navigatorKey;
 
   @override
   State<AppUpdateGate> createState() => _AppUpdateGateState();
@@ -38,8 +42,20 @@ class _AppUpdateGateState extends State<AppUpdateGate> {
       final shouldShow = await AppUpdateService.shouldShow(update);
       if (!shouldShow || !mounted) return;
 
+      final dialogContext =
+          widget.navigatorKey.currentState?.overlay?.context ??
+              widget.navigatorKey.currentContext;
+      if (dialogContext == null) {
+        _checkedThisSession = false;
+        return;
+      }
+      if (!dialogContext.mounted) {
+        _checkedThisSession = false;
+        return;
+      }
+
       await showDialog<void>(
-        context: context,
+        context: dialogContext,
         barrierDismissible: !update.required,
         builder: (_) => _AppUpdateDialog(update: update),
       );
@@ -173,9 +189,9 @@ class _AppUpdateDialog extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.open_in_new),
-                  label: const Text(
-                    'Update VitaLink',
-                    style: TextStyle(
+                  label: Text(
+                    AppStrings.of(context).updateVitalink,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -191,9 +207,9 @@ class _AppUpdateDialog extends StatelessWidget {
                       await AppUpdateService.remindLater(update);
                       if (context.mounted) Navigator.pop(context);
                     },
-                    child: const Text(
-                      'Remind me later',
-                      style: TextStyle(color: Colors.white70),
+                    child: Text(
+                      AppStrings.of(context).remindMeLater,
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ),
                 ),

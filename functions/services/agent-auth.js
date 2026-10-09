@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 async function ensureAgentSessionColumns() {
   await db.query(`
@@ -64,6 +65,9 @@ async function verifyAgentSession({ agentId, agentEmail, token }) {
 
   return result.rows[0] || null;
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureAgentSessionColumns = schemaOnce("agent-auth:ensureAgentSessionColumns", ensureAgentSessionColumns);
 
 module.exports = {
   createAgentSession,

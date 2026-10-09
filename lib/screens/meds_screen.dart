@@ -1,5 +1,7 @@
 // lib/screens/meds_screen.dart
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +10,7 @@ import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/npi_verification_service.dart';
+import '../services/api_service.dart';
 import '../widgets/npi_verification_widgets.dart';
 import '../widgets/working_overlay.dart';
 import 'vitalink_camera_capture_screen.dart';
@@ -48,6 +51,7 @@ class _MedsScreenState extends State<MedsScreen> {
   Future<void> _save() async {
     _p!.updatedAt = DateTime.now();
     await _repo.saveProfile(_p!);
+    await ApiService.syncProfilesToServer();
     if (mounted) setState(() {});
   }
 
@@ -93,10 +97,8 @@ class _MedsScreenState extends State<MedsScreen> {
   }
 
   String _toLastFirstFormat(String name) {
-    final cleaned = name
-        .replaceAll(",", " ")
-        .replaceAll(RegExp(r'\s+'), " ")
-        .trim();
+    final cleaned =
+        name.replaceAll(",", " ").replaceAll(RegExp(r'\s+'), " ").trim();
 
     final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
     if (parts.length < 2) return cleaned;
@@ -143,7 +145,9 @@ class _MedsScreenState extends State<MedsScreen> {
   Map<String, dynamic> _normalizeParsed(dynamic parsed) {
     if (parsed == null) return {};
     if (parsed is Map<String, dynamic>) {
-      if (parsed.containsKey("name") || parsed.containsKey("dose")) {
+      if (parsed.containsKey("name") ||
+          parsed.containsKey("dose") ||
+          parsed.containsKey("item_type")) {
         return parsed;
       }
       if (parsed.containsKey("rawText")) {
@@ -160,6 +164,65 @@ class _MedsScreenState extends State<MedsScreen> {
       }
     }
     return {};
+  }
+
+  String _normalizeItemType(dynamic value) {
+    final type = value?.toString().toLowerCase().trim() ?? '';
+    if (type == 'supplement' || type == 'otc' || type == 'unknown') {
+      return type;
+    }
+    return 'prescription';
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value
+          .split(RegExp(r'[\n;]'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return [];
+  }
+
+  String _joinLines(List<String> values) => values.join('\n');
+
+  String _supplementPreview(Medication m) {
+    final parts = <String>[
+      if (m.dose.isNotEmpty) m.dose,
+      if (m.frequency.isNotEmpty) m.frequency,
+      if (m.servingSize.isNotEmpty)
+        '${AppStrings.of(context).servingLabel}: ${m.servingSize}',
+      if (m.activeIngredients.isNotEmpty)
+        '${AppStrings.of(context).supplementFactsLabel}: ${m.activeIngredients.take(3).join(", ")}',
+    ];
+    return parts.join(' • ');
+  }
+
+  // Supplement labels are full of ™/® marks (and mis-encoded versions of
+  // them); keep them out of saved names and ingredients.
+  String _stripBrandMarks(String value) {
+    return value
+        .replaceAll(RegExp(r'(™|®|℠|©)'), '')
+        .replaceAll(
+          RegExp(r'(â„¢|Â®|â„ |Â©|&trade;|&reg;)', caseSensitive: false),
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  List<String> _stripBrandMarksFromList(List<String> values) {
+    return values
+        .map(_stripBrandMarks)
+        .where((value) => value.isNotEmpty)
+        .toList();
   }
 
   String _buildPharmacyDisplay(Map<String, dynamic> data) {
@@ -193,16 +256,16 @@ class _MedsScreenState extends State<MedsScreen> {
     return showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Is $name a mail-order pharmacy?'),
+        title: Text(AppStrings.of(context).isMailOrderPharmacy(name)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('No, local pharmacy'),
+              title: Text(AppStrings.of(context).noLocalPharmacy),
               onTap: () => Navigator.pop(dialogContext, 'retail'),
             ),
             ListTile(
-              title: const Text('Yes, mail order'),
+              title: Text(AppStrings.of(context).yesMailOrder),
               onTap: () => Navigator.pop(dialogContext, 'mail_order'),
             ),
           ],
@@ -210,7 +273,7 @@ class _MedsScreenState extends State<MedsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Not sure'),
+            child: Text(AppStrings.of(context).notSure),
           ),
         ],
       ),
@@ -271,15 +334,14 @@ class _MedsScreenState extends State<MedsScreen> {
       medication.pharmacyVerificationStatus = result.status;
       medication.pharmacyNpiCandidates = result.candidates;
       medication.pharmacyVerifiedAt = result.isVerified ? DateTime.now() : null;
-      medication.pharmacyVerifiedBy = result.isVerified
-          ? result.verifiedBy ?? 'auto'
-          : null;
+      medication.pharmacyVerifiedBy =
+          result.isVerified ? result.verifiedBy ?? 'auto' : null;
       await _save();
       if (result.isVerified || !mounted) return;
 
       final selected = await showNpiCandidatePicker(
         context: context,
-        title: 'Which pharmacy is $name?',
+        title: AppStrings.of(context).whichPharmacyIs(name),
         candidates: result.candidates,
         allowAlternateZip: pharmacyType != 'mail_order',
         candidateLimit: 10,
@@ -325,11 +387,11 @@ class _MedsScreenState extends State<MedsScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Could not check $item'),
+        title: Text(AppStrings.of(context).couldNotCheck(item)),
         content: Text(
           unauthorized
-              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry.'
-              : 'VitaLink could not reach the provider search. Please try again.',
+              ? AppStrings.of(context).sessionNotVerifiedRetry
+              : AppStrings.of(context).providerSearchUnreachable,
         ),
         actions: [
           FilledButton(
@@ -395,7 +457,7 @@ class _MedsScreenState extends State<MedsScreen> {
 
     final selected = await showNpiCandidatePicker(
       context: context,
-      title: 'Which provider is ${doctor.name}?',
+      title: AppStrings.of(context).whichProviderIs(doctor.name),
       candidates: result.candidates,
     );
     if (selected == null) return;
@@ -425,6 +487,27 @@ class _MedsScreenState extends State<MedsScreen> {
     Map<String, dynamic>? prefill,
   }) async {
     int? targetIndex = index;
+    String itemType = _normalizeItemType(
+      prefill?['item_type'] ?? prefill?['itemType'] ?? existing?.itemType,
+    );
+    if (itemType == 'unknown') itemType = 'prescription';
+    final servingSizeCtrl = TextEditingController(
+      text: (prefill?['serving_size'] ??
+              prefill?['servingSize'] ??
+              existing?.servingSize ??
+              '')
+          .toString(),
+    );
+    final activeIngredientsCtrl = TextEditingController(
+      text: _joinLines(_stringList(prefill?['active_ingredients'] ??
+          prefill?['activeIngredients'] ??
+          existing?.activeIngredients)),
+    );
+    final otherIngredientsCtrl = TextEditingController(
+      text: _joinLines(_stringList(prefill?['other_ingredients'] ??
+          prefill?['otherIngredients'] ??
+          existing?.otherIngredients)),
+    );
     final nameCtrl = TextEditingController(
       text: prefill?['name'] ?? existing?.name ?? '',
     );
@@ -434,6 +517,9 @@ class _MedsScreenState extends State<MedsScreen> {
     final freqCtrl = TextEditingController(
       text: prefill?['frequency'] ?? existing?.frequency ?? '',
     );
+    final quantityCtrl = TextEditingController(
+      text: prefill?['quantity'] ?? existing?.quantity ?? '',
+    );
     final pharmacyCtrl = TextEditingController(
       text: prefill?['prescriber'] ?? existing?.prescriber ?? '',
     );
@@ -442,114 +528,199 @@ class _MedsScreenState extends State<MedsScreen> {
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF111111),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          existing == null ? 'Add Medication' : 'Edit Medication',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isSupplementOrOtc =
+              itemType == 'supplement' || itemType == 'otc';
+          return AlertDialog(
+            backgroundColor: const Color(0xFF111111),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              existing == null
+                  ? AppStrings.of(context).addMedicationOrSupplement
+                  : AppStrings.of(context).editMedicationOrSupplement,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: nameCtrl,
+                  DropdownButtonFormField<String>(
+                    initialValue: itemType,
+                    dropdownColor: const Color(0xFF111111),
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      labelStyle: TextStyle(color: Colors.white70),
+                    decoration: InputDecoration(
+                      labelText: AppStrings.of(context).typeLabel,
+                      labelStyle: const TextStyle(color: Colors.white70),
                     ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'prescription',
+                        child: Text(AppStrings.of(context).typePrescription),
+                      ),
+                      DropdownMenuItem(
+                        value: 'supplement',
+                        child: Text(AppStrings.of(context).typeSupplement),
+                      ),
+                      DropdownMenuItem(
+                          value: 'otc',
+                          child: Text(AppStrings.of(context).typeOtc)),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => itemType = value);
+                    },
                   ),
                   const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: doseCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Dose / Strength',
-                      labelStyle: TextStyle(color: Colors.white70),
-                    ),
+                  Column(
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: AppStrings.of(context).name,
+                          labelStyle: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
                   ),
-                  const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: freqCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Frequency',
-                      labelStyle: TextStyle(color: Colors.white70),
-                    ),
+                  Column(
+                    children: [
+                      TextField(
+                        controller: quantityCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: AppStrings.of(context).quantity,
+                          labelStyle: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
                   ),
-                  const Divider(height: 1),
-                ],
-              ),
-              Column(
-                children: [
-                  TextField(
-                    controller: pharmacyCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Pharmacy (and phone)',
-                      labelStyle: TextStyle(color: Colors.white70),
-                    ),
-                    maxLines: 2,
+                  Column(
+                    children: [
+                      TextField(
+                        controller: doseCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: isSupplementOrOtc
+                              ? AppStrings.of(context).amountTaken
+                              : AppStrings.of(context).doseStrength,
+                          labelStyle: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
                   ),
-                  const Divider(height: 1),
+                  Column(
+                    children: [
+                      TextField(
+                        controller: freqCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: AppStrings.of(context).frequency,
+                          labelStyle: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
+                  ),
+                  if (isSupplementOrOtc) ...[
+                    TextField(
+                      controller: servingSizeCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: AppStrings.of(context).servingSize,
+                        labelStyle: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    TextField(
+                      controller: activeIngredientsCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: AppStrings.of(context).supplementFactsLabel,
+                        labelStyle: const TextStyle(color: Colors.white70),
+                      ),
+                      minLines: 2,
+                      maxLines: 5,
+                    ),
+                    const Divider(height: 1),
+                    TextField(
+                      controller: otherIngredientsCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: AppStrings.of(context).otherIngredientsLabel,
+                        labelStyle: const TextStyle(color: Colors.white70),
+                      ),
+                      minLines: 2,
+                      maxLines: 4,
+                    ),
+                    const Divider(height: 1),
+                  ] else ...[
+                    Column(
+                      children: [
+                        TextField(
+                          controller: pharmacyCtrl,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: AppStrings.of(context).pharmacyAndPhone,
+                            labelStyle: const TextStyle(color: Colors.white70),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const Divider(height: 1),
+                      ],
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: pharmacyType,
+                      dropdownColor: const Color(0xFF111111),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: AppStrings.of(context).pharmacyType,
+                        labelStyle: const TextStyle(color: Colors.white70),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'retail',
+                          child: Text(AppStrings.of(context).localPharmacy),
+                        ),
+                        DropdownMenuItem(
+                          value: 'mail_order',
+                          child: Text(AppStrings.of(context).mailOrder),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        pharmacyType = value;
+                        pharmacyTypeChanged = true;
+                      },
+                    ),
+                  ],
                 ],
               ),
-              DropdownButtonFormField<String>(
-                initialValue: pharmacyType,
-                dropdownColor: const Color(0xFF111111),
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Pharmacy type',
-                  labelStyle: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+                child: Text(AppStrings.of(context).cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'retail',
-                    child: Text('Local pharmacy'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'mail_order',
-                    child: Text('Mail order'),
-                  ),
-                ],
-                onChanged: (value) {
-                  pharmacyType = value;
-                  pharmacyTypeChanged = true;
-                },
+                child: Text(AppStrings.of(context).save),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Save'),
-          ),
-        ],
+          );
+        },
       ),
     );
 
@@ -572,9 +743,14 @@ class _MedsScreenState extends State<MedsScreen> {
         name: nameCtrl.text.trim(),
         dose: doseCtrl.text.trim(),
         frequency: freqCtrl.text.trim(),
+        quantity: quantityCtrl.text.trim(),
         prescriber: pharmacyCtrl.text.trim(),
         pharmacyFulfillmentType: pharmacyType,
         source: existing?.source ?? (prefill != null ? 'Scanned' : 'Manual'),
+        itemType: itemType,
+        servingSize: servingSizeCtrl.text.trim(),
+        activeIngredients: _stringList(activeIngredientsCtrl.text),
+        otherIngredients: _stringList(otherIngredientsCtrl.text),
         updatedAt: DateTime.now(),
       );
 
@@ -588,7 +764,8 @@ class _MedsScreenState extends State<MedsScreen> {
       });
 
       await _save();
-      await _verifyPharmacy(targetIndex!);
+      // Supplements and OTC items have no pharmacy to verify.
+      if (!m.isSupplementOrOtc) await _verifyPharmacy(targetIndex!);
     } finally {
       if (ownsWorkingOverlay && mounted) {
         setState(() => _manualWorking = false);
@@ -599,6 +776,284 @@ class _MedsScreenState extends State<MedsScreen> {
   // ----------------------------
   // SCAN LABEL
   // ----------------------------
+
+  Future<List<Map<String, String>>?> _resolveScannedMedicationDuplicates(
+    List<Map<String, String>> medications,
+  ) async {
+    final groups = <String, List<int>>{};
+    for (var index = 0; index < medications.length; index++) {
+      final key = _normalizeMed(medications[index]['name'] ?? '');
+      groups.putIfAbsent(key, () => <int>[]).add(index);
+    }
+
+    final included = List<bool>.filled(medications.length, true);
+    for (final indexes in groups.values.where((group) => group.length > 1)) {
+      final doses = indexes
+          .map((index) => medications[index]['dose']!.trim().toLowerCase())
+          .toSet();
+
+      if (doses.length == 1) {
+        if (!mounted) return null;
+        final medication = medications[indexes.first];
+        final keepBoth = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(AppStrings.of(context)
+                .appearsMoreThanOnce('${medication['name']}')),
+            content: Text(
+              AppStrings.of(context).listShowsTimes(
+                '${medication['name']}',
+                '${medication['dose']}',
+                indexes.length,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(AppStrings.of(context).saveOnce),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(
+                  indexes.length == 2
+                      ? AppStrings.of(context).iTakeBoth
+                      : AppStrings.of(context).iTakeAll,
+                ),
+              ),
+            ],
+          ),
+        );
+        if (keepBoth == null) return null;
+        if (!keepBoth) {
+          for (final index in indexes.skip(1)) {
+            included[index] = false;
+          }
+        }
+        continue;
+      }
+
+      if (!mounted) return null;
+      final selected = <int>{...indexes};
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(
+              '${medications[indexes.first]['name']} has multiple strengths',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AppStrings.of(context).selectEveryStrength()),
+                const SizedBox(height: 12),
+                ...indexes.map(
+                  (index) {
+                    final details = <String>[
+                      if (medications[index]['frequency']!.isNotEmpty)
+                        medications[index]['frequency']!,
+                      if (medications[index]['quantity']!.isNotEmpty)
+                        AppStrings.of(context)
+                            .quantityValue('${medications[index]['quantity']}'),
+                    ];
+                    return CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(index),
+                      title: Text(
+                        AppStrings.of(context).rowStrength(
+                          index + 1,
+                          medications[index]['dose']!.isEmpty
+                              ? AppStrings.of(context).strengthNotShown
+                              : medications[index]['dose']!,
+                        ),
+                      ),
+                      subtitle:
+                          details.isEmpty ? null : Text(details.join(' - ')),
+                      onChanged: (value) => setDialogState(() {
+                        if (value ?? false) {
+                          selected.add(index);
+                        } else {
+                          selected.remove(index);
+                        }
+                      }),
+                    );
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(AppStrings.of(context).cancelScan),
+              ),
+              FilledButton(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.pop(dialogContext, true),
+                child: Text(AppStrings.of(context).useSelected),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (confirmed != true) return null;
+      for (final index in indexes) {
+        included[index] = selected.contains(index);
+      }
+    }
+
+    return [
+      for (var index = 0; index < medications.length; index++)
+        if (included[index]) medications[index],
+    ];
+  }
+
+  Future<List<Map<String, String>>?> _reviewScannedMedicationList(
+    List<Map<String, String>> medications,
+  ) async {
+    final controllers = medications
+        .map(
+          (medication) => {
+            'name': TextEditingController(text: medication['name']),
+            'dose': TextEditingController(text: medication['dose']),
+            'frequency': TextEditingController(text: medication['frequency']),
+            'quantity': TextEditingController(text: medication['quantity']),
+          },
+        )
+        .toList();
+    final included = List<bool>.filled(controllers.length, true);
+
+    final reviewed = await showDialog<List<Map<String, String>>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(AppStrings.of(context)
+              .reviewMedicationsTitle(controllers.length)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(AppStrings.of(context).confirmEveryMedication()),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: controllers.length,
+                    separatorBuilder: (_, __) => const Divider(height: 24),
+                    itemBuilder: (_, index) {
+                      final row = controllers[index];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: included[index],
+                            onChanged: (value) => setDialogState(
+                              () => included[index] = value ?? false,
+                            ),
+                            title: Text(AppStrings.of(context)
+                                .medicationNumber(index + 1)),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          TextField(
+                            controller: row['name'],
+                            enabled: included[index],
+                            decoration: InputDecoration(
+                                labelText: AppStrings.of(context).name),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: row['dose'],
+                                  enabled: included[index],
+                                  decoration: InputDecoration(
+                                    labelText: AppStrings.of(context).strength,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: row['quantity'],
+                                  enabled: included[index],
+                                  decoration: InputDecoration(
+                                    labelText: AppStrings.of(context).quantity,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextField(
+                            controller: row['frequency'],
+                            enabled: included[index],
+                            decoration: InputDecoration(
+                              labelText:
+                                  AppStrings.of(context).directionsFrequency,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(AppStrings.of(context).cancel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final result = <Map<String, String>>[];
+                for (var index = 0; index < controllers.length; index++) {
+                  if (!included[index]) continue;
+                  final row = controllers[index];
+                  final name = row['name']!.text.trim();
+                  if (name.isEmpty) continue;
+                  result.add({
+                    'name': name,
+                    'dose': row['dose']!.text.trim(),
+                    'frequency': row['frequency']!.text.trim(),
+                    'quantity': row['quantity']!.text.trim(),
+                  });
+                }
+                Navigator.pop(dialogContext, result);
+              },
+              child: Text(AppStrings.of(context).saveSelected),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return reviewed;
+  }
+
+  List<Map<String, String>> _parsedMedicationList(
+    Map<String, dynamic> data,
+  ) {
+    final raw = data['medications'];
+    if (raw is List) {
+      return raw
+          .whereType<Map>()
+          .map((item) => {
+                'name': (item['name'] ?? '').toString().trim(),
+                'dose': (item['dose'] ?? '').toString().trim(),
+                'frequency': (item['frequency'] ?? '').toString().trim(),
+                'quantity': (item['quantity'] ?? '').toString().trim(),
+              })
+          .where((item) => item['name']!.isNotEmpty)
+          .toList();
+    }
+    return [];
+  }
 
   Future<String?> _showScanIssueDialog({
     required String title,
@@ -635,7 +1090,7 @@ class _MedsScreenState extends State<MedsScreen> {
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(44),
                     ),
-                    child: const Text("Enter Manually"),
+                    child: Text(AppStrings.of(context).enterManually),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -663,12 +1118,11 @@ class _MedsScreenState extends State<MedsScreen> {
       final imagePaths = await Navigator.push<List<String>>(
         context,
         MaterialPageRoute(
-          builder: (_) => const VitalinkCameraCaptureScreen(
-            title: 'Scan Medication Label',
-            reviewTitle: 'Can you read the medication label?',
-            instructions:
-                'Hold the phone steady and fill the screen with the prescription label.',
-            addAnotherLabel: 'Add Another Side',
+          builder: (_) => VitalinkCameraCaptureScreen(
+            title: AppStrings.of(context).scanLabelOrList,
+            reviewTitle: AppStrings.of(context).canYouReadEveryItem,
+            instructions: AppStrings.of(context).scanLabelInstructions,
+            addAnotherLabel: AppStrings.of(context).addAnotherPage,
           ),
         ),
       );
@@ -699,25 +1153,35 @@ class _MedsScreenState extends State<MedsScreen> {
           userId.isEmpty ||
           sessionToken == null ||
           sessionToken.isEmpty) {
-        throw Exception("Please log in again before scanning.");
+        if (!mounted) return;
+        throw Exception(AppStrings.of(context).logInAgainBeforeScanning);
       }
 
-      final resp = await http.post(
-        Uri.parse(url),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "images": base64Images,
-          "userId": userId,
-          "sessionToken": sessionToken,
-        }),
-      );
+      final resp = await http
+          .post(
+            Uri.parse(url),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "images": base64Images,
+              "userId": userId,
+              "sessionToken": sessionToken,
+            }),
+          )
+          .timeout(const Duration(seconds: 90));
 
       if (resp.statusCode != 200) {
         if (!mounted) return;
+        var listTooLong = false;
+        try {
+          listTooLong = jsonDecode(resp.body)['code'] == 'LIST_TOO_LONG';
+        } catch (_) {}
         final choice = await _showScanIssueDialog(
-          title: "Could Not Read Label",
-          message:
-              "VitaLink could not read this medication label. Please try again with brighter lighting, hold the phone steady, or enter the medication manually.",
+          title: listTooLong
+              ? AppStrings.of(context).listTooLong
+              : AppStrings.of(context).couldNotReadLabel,
+          message: listTooLong
+              ? AppStrings.of(context).listTooLongBody
+              : AppStrings.of(context).couldNotReadLabelBody,
           allowManualEntry: true,
         );
         if (choice == "manual" && mounted) {
@@ -728,18 +1192,30 @@ class _MedsScreenState extends State<MedsScreen> {
 
       final parsed = jsonDecode(resp.body);
       final data = _normalizeParsed(parsed['data'] ?? parsed);
+      final medicationList = _parsedMedicationList(data);
 
-      final scannedName = (data['name'] ?? "").toString().trim();
-      final scannedDose = (data['dose'] ?? "").toString().trim();
+      final scannedName =
+          _stripBrandMarks((data['name'] ?? "").toString().trim());
+      final scannedDose =
+          _stripBrandMarks((data['dose'] ?? "").toString().trim());
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
+      var itemType = _normalizeItemType(data['item_type'] ?? data['itemType']);
+      final servingSize = _stripBrandMarks(
+        (data['serving_size'] ?? data['servingSize'] ?? "").toString().trim(),
+      );
+      final activeIngredients = _stripBrandMarksFromList(
+        _stringList(data['active_ingredients'] ?? data['activeIngredients']),
+      );
+      final otherIngredients = _stripBrandMarksFromList(
+        _stringList(data['other_ingredients'] ?? data['otherIngredients']),
+      );
 
-      if (scannedName.isEmpty) {
+      if (medicationList.isEmpty && scannedName.isEmpty) {
         if (!mounted) return;
         final choice = await _showScanIssueDialog(
-          title: "No Medication Found",
-          message:
-              "The scan completed, but no medication name was found. Retake the photo with the label flat, close, and well-lit, or enter it manually.",
+          title: AppStrings.of(context).noMedicationFound,
+          message: AppStrings.of(context).noMedicationFoundBody,
           allowManualEntry: true,
         );
         if (choice == "manual" && mounted) {
@@ -748,160 +1224,262 @@ class _MedsScreenState extends State<MedsScreen> {
         return;
       }
 
-      final normalizedScannedName = _normalizeMed(scannedName);
+      if (medicationList.length > 1) {
+        final resolved =
+            await _resolveScannedMedicationDuplicates(medicationList);
+        if (!mounted || resolved == null) return;
+        final reviewed = await _reviewScannedMedicationList(resolved);
+        if (!mounted || reviewed == null) return;
 
-      final existingIndex = _p!.meds.indexWhere(
-        (m) => _normalizeMed(m.name) == normalizedScannedName,
-      );
+        var addedCount = 0;
+        var updatedCount = 0;
+        final availableExistingIndexes = <int>{
+          for (var index = 0; index < _p!.meds.length; index++) index,
+        };
+        for (final item in reviewed) {
+          final name = item['name']!;
+          final dose = item['dose']!;
+          final frequency = item['frequency']!;
+          final quantity = item['quantity']!;
+          int? existingIndex;
+          for (final index in availableExistingIndexes) {
+            final medication = _p!.meds[index];
+            if (_normalizeMed(medication.name) == _normalizeMed(name) &&
+                medication.dose.trim().toLowerCase() ==
+                    dose.trim().toLowerCase()) {
+              existingIndex = index;
+              break;
+            }
+          }
 
-      if (existingIndex != -1) {
-        final existing = _p!.meds[existingIndex];
-
-        if (!mounted) return;
-        final choice = await showDialog<String>(
-          context: context,
-          builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF111111),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text(
-              "This Medication Is Already Saved",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+          if (existingIndex != null) {
+            availableExistingIndexes.remove(existingIndex);
+            final existing = _p!.meds[existingIndex];
+            existing.name = name;
+            existing.dose = dose;
+            existing.frequency = frequency;
+            existing.quantity = quantity;
+            if (pharmacyDisplay.isNotEmpty) {
+              existing.prescriber = pharmacyDisplay;
+            }
+            existing.source = 'Scanned medication list';
+            existing.updatedAt = DateTime.now();
+            updatedCount++;
+          } else {
+            _p!.meds.add(
+              Medication(
+                name: name,
+                dose: dose,
+                frequency: frequency,
+                quantity: quantity,
+                prescriber: pharmacyDisplay,
+                source: 'Scanned medication list',
+                updatedAt: DateTime.now(),
               ),
+            );
+            addedCount++;
+          }
+        }
+        await _save();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppStrings.of(context)
+                  .medicationListSaved(addedCount, updatedCount),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "You already have:",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
-                  ),
+          ),
+        );
+      } else {
+        // The label reader decides the type; never ask the user. An older
+        // server may still say "unknown", so decide from the label instead.
+        if (itemType == 'unknown') {
+          itemType = pharmacyDisplay.isNotEmpty
+              ? 'prescription'
+              : (servingSize.isNotEmpty || activeIngredients.isNotEmpty)
+                  ? 'supplement'
+                  : 'prescription';
+        }
+
+        final normalizedScannedName = _normalizeMed(scannedName);
+
+        final existingIndex = _p!.meds.indexWhere(
+          (m) =>
+              _normalizeMed(m.name) == normalizedScannedName &&
+              m.itemType == itemType,
+        );
+
+        if (existingIndex != -1) {
+          final existing = _p!.meds[existingIndex];
+
+          if (!mounted) return;
+          final choice = await showDialog<String>(
+            context: context,
+            builder: (_) => AlertDialog(
+              backgroundColor: const Color(0xFF111111),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                AppStrings.of(context).alreadySavedTitle(existing.itemType),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  "${existing.name} ${existing.dose}".trim(),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  "The bottle says:",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "$scannedName $scannedDose".trim(),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "What would you like to do?",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            actionsPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
-            actions: [
-              Column(
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, "replace"),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      child: const Text("Update This Medication"),
+                  Text(
+                    AppStrings.of(context).youAlreadyHave,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, "add"),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      child: const Text("Keep Both"),
+                  const SizedBox(height: 6),
+                  Text(
+                    "${existing.name} ${existing.dose}".trim(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    AppStrings.of(context).theLabelSays,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, "cancel"),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
+                  const SizedBox(height: 6),
+                  Text(
+                    "$scannedName $scannedDose".trim(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    AppStrings.of(context).whatWouldYouLikeToDo,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
-                    child: const Text("Cancel"),
                   ),
                 ],
               ),
-            ],
-          ),
-        );
+              actionsPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              actions: [
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, "replace"),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: Text(
+                          AppStrings.of(context)
+                              .updateThisItem(existing.itemType),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, "add"),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: Text(AppStrings.of(context).keepBoth),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, "cancel"),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                      ),
+                      child: Text(AppStrings.of(context).cancel),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
 
-        if (choice == "replace") {
-          setState(() {
-            _p!.meds[existingIndex] = Medication(
-              name: scannedName,
-              dose: scannedDose,
-              frequency: scannedFreq,
-              prescriber: pharmacyDisplay,
-              source: "Scanned",
-              updatedAt: DateTime.now(),
-            );
-          });
-          await _save();
-          await _verifyPharmacy(existingIndex);
-        } else if (choice == "add") {
-          late final int addedIndex;
-          setState(() {
-            _p!.meds.add(
-              Medication(
+          if (choice == "replace") {
+            setState(() {
+              _p!.meds[existingIndex] = Medication(
                 name: scannedName,
                 dose: scannedDose,
                 frequency: scannedFreq,
                 prescriber: pharmacyDisplay,
                 source: "Scanned",
+                itemType: itemType,
+                servingSize: servingSize,
+                activeIngredients: activeIngredients,
+                otherIngredients: otherIngredients,
                 updatedAt: DateTime.now(),
-              ),
-            );
-            addedIndex = _p!.meds.length - 1;
-          });
-          await _save();
-          await _verifyPharmacy(addedIndex);
+              );
+            });
+            await _save();
+            if (itemType == 'prescription') {
+              await _verifyPharmacy(existingIndex);
+            }
+          } else if (choice == "add") {
+            late final int addedIndex;
+            setState(() {
+              _p!.meds.add(
+                Medication(
+                  name: scannedName,
+                  dose: scannedDose,
+                  frequency: scannedFreq,
+                  prescriber: pharmacyDisplay,
+                  source: "Scanned",
+                  itemType: itemType,
+                  servingSize: servingSize,
+                  activeIngredients: activeIngredients,
+                  otherIngredients: otherIngredients,
+                  updatedAt: DateTime.now(),
+                ),
+              );
+              addedIndex = _p!.meds.length - 1;
+            });
+            await _save();
+            if (itemType == 'prescription') {
+              await _verifyPharmacy(addedIndex);
+            }
+          }
+        } else {
+          await _addOrEdit(
+            prefill: {
+              "name": scannedName,
+              "dose": scannedDose,
+              "frequency": scannedFreq,
+              "quantity": (data['quantity'] ?? '').toString().trim(),
+              "prescriber": pharmacyDisplay,
+              "item_type": itemType,
+              "serving_size": servingSize,
+              "active_ingredients": activeIngredients,
+              "other_ingredients": otherIngredients,
+            },
+          );
         }
-      } else {
-        await _addOrEdit(
-          prefill: {
-            "name": scannedName,
-            "dose": scannedDose,
-            "frequency": scannedFreq,
-            "prescriber": pharmacyDisplay,
-          },
-        );
       }
 
       final docName = (data['prescribing_doctor'] ?? "").toString().trim();
-      if (docName.isNotEmpty) {
+      // Supplement labels have no prescriber; only add doctors from
+      // prescriptions and pill-pack lists.
+      if (itemType != 'supplement' && itemType != 'otc' && docName.isNotEmpty) {
         final normalizedParsed = _normalizeName(docName);
         final normalizedProfile = _normalizeName(_p!.fullName);
 
@@ -935,16 +1513,16 @@ class _MedsScreenState extends State<MedsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Remove medication?"),
+        title: Text(AppStrings.of(context).removeMedication),
         content: Text(_p!.meds[i].name),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Remove"),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -956,6 +1534,83 @@ class _MedsScreenState extends State<MedsScreen> {
     }
   }
 
+  Widget _buildMedicationTile(int i) {
+    final m = _p!.meds[i];
+    if (m.isSupplementOrOtc) {
+      final preview = _supplementPreview(m);
+      return ListTile(
+        tileColor: Colors.transparent,
+        shape: const Border(bottom: BorderSide(color: Colors.black12)),
+        leading: const Icon(Icons.spa_outlined),
+        title: Text(m.name),
+        subtitle: preview.isEmpty ? null : Text(preview),
+        onTap: () => _addOrEdit(existing: m, index: i),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _delete(i),
+        ),
+      );
+    }
+    return ListTile(
+      leading: const Icon(Icons.medication_outlined),
+      tileColor: Colors.transparent,
+      shape: const Border(
+        bottom: BorderSide(color: Colors.black12),
+      ),
+      title: Text(m.name),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            [
+              m.dose,
+              m.frequency,
+              if (m.quantity.isNotEmpty) 'Qty ${m.quantity}',
+            ].where((value) => value.isNotEmpty).join(' - '),
+          ),
+          if (_pharmacyName(m.prescriber).isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    '${_pharmacyName(m.prescriber)}${m.pharmacyFulfillmentType == 'mail_order' ? ' (${AppStrings.of(context).mailOrder})' : ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                npiStatusIcon(
+                  m.pharmacyVerificationStatus,
+                ),
+              ],
+            ),
+        ],
+      ),
+      onTap: () => _addOrEdit(existing: m, index: i),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline),
+        onPressed: () => _delete(i),
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List<int> indexes) {
+    if (indexes.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ...indexes.map(_buildMedicationTile),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -963,9 +1618,15 @@ class _MedsScreenState extends State<MedsScreen> {
     }
 
     final meds = _p!.meds;
+    final prescriptionIndexes = <int>[];
+    final supplementIndexes = <int>[];
+    for (var i = 0; i < meds.length; i++) {
+      (meds[i].isSupplementOrOtc ? supplementIndexes : prescriptionIndexes)
+          .add(i);
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Medications')),
+      appBar: AppBar(title: Text(AppStrings.of(context).medications)),
       body: Stack(
         children: [
           Column(
@@ -986,67 +1647,39 @@ class _MedsScreenState extends State<MedsScreen> {
                     ),
                   ),
                   icon: const Icon(Icons.camera_alt),
-                  label: const Text(
-                    'Scan Medication Label',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  label: Text(
+                    AppStrings.of(context).scanLabelOrList,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
               Expanded(
                 child: meds.isEmpty
-                    ? const Center(
-                        child: Text('No medications yet. Tap + to add.'),
+                    ? Center(
+                        child: Text(AppStrings.of(context).noMedicationsYet),
                       )
-                    : ListView.builder(
-                        itemCount: meds.length,
-                        itemBuilder: (_, i) {
-                          final m = meds[i];
-                          return ListTile(
-                            tileColor: Colors.transparent,
-                            shape: const Border(
-                              bottom: BorderSide(color: Colors.black12),
-                            ),
-                            title: Text(m.name),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("${m.dose} ${m.frequency}".trim()),
-                                if (_pharmacyName(m.prescriber).isNotEmpty)
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          '${_pharmacyName(m.prescriber)}${m.pharmacyFulfillmentType == 'mail_order' ? ' (Mail order)' : ''}',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      npiStatusIcon(
-                                        m.pharmacyVerificationStatus,
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                            onTap: () => _addOrEdit(existing: m, index: i),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => _delete(i),
-                            ),
-                          );
-                        },
+                    : ListView(
+                        children: [
+                          _buildSection(
+                              AppStrings.of(context).prescriptionsSection,
+                              prescriptionIndexes),
+                          _buildSection(
+                            AppStrings.of(context).supplementsOtcSection,
+                            supplementIndexes,
+                          ),
+                        ],
                       ),
               ),
             ],
           ),
           if (_scanning)
-            const WorkingOverlay(
-              message: 'Processing and saving your medication...',
+            WorkingOverlay(
+              message: AppStrings.of(context).readingMedicationInfo,
             ),
           if (_manualWorking)
-            const WorkingOverlay(
-              message: 'Saving and checking your medication...',
+            WorkingOverlay(
+              message: AppStrings.of(context).savingCheckingMedication,
             ),
         ],
       ),

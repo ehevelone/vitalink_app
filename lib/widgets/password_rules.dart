@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
 
 class PasswordRules extends StatelessWidget {
   final TextEditingController controller;
@@ -7,8 +8,7 @@ class PasswordRules extends StatelessWidget {
 
   bool _hasMinLen(String pw) => pw.length >= 10;
   bool _hasUpper(String pw) => RegExp(r'[A-Z]').hasMatch(pw);
-  bool _hasSpecial(String pw) =>
-      RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(pw);
+  bool _hasSpecial(String pw) => RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(pw);
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +30,9 @@ class PasswordRules extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        rule("≥ 10 characters", _hasMinLen(pw)),
-        rule("At least 1 uppercase letter", _hasUpper(pw)),
-        rule("At least 1 special character", _hasSpecial(pw)),
+        rule(AppStrings.of(context).passwordMinLength, _hasMinLen(pw)),
+        rule(AppStrings.of(context).passwordUppercase, _hasUpper(pw)),
+        rule(AppStrings.of(context).passwordSpecial, _hasSpecial(pw)),
       ],
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -65,7 +67,9 @@ class _PolicyFormPageState extends State<PolicyFormPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final titleBase = widget.policy == null ? "New Policy" : "Edit Policy";
+    final titleBase = widget.policy == null
+        ? AppStrings.of(context).newPolicy
+        : AppStrings.of(context).editPolicy;
     final title = _p?.fullName.isNotEmpty == true
         ? "$titleBase – ${_p!.fullName}"
         : titleBase;
@@ -80,7 +84,8 @@ class _PolicyFormPageState extends State<PolicyFormPage> {
               children: [
                 TextField(
                   controller: companyController,
-                  decoration: const InputDecoration(labelText: "Company"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).company),
                 ),
                 const Divider(height: 1),
               ],
@@ -89,7 +94,8 @@ class _PolicyFormPageState extends State<PolicyFormPage> {
               children: [
                 TextField(
                   controller: planController,
-                  decoration: const InputDecoration(labelText: "Plan"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).plan),
                 ),
                 const Divider(height: 1),
               ],
@@ -100,12 +106,12 @@ class _PolicyFormPageState extends State<PolicyFormPage> {
               children: [
                 TextButton(
                   onPressed: _cancel,
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
                 const SizedBox(width: 12),
                 FilledButton(
                   onPressed: _save,
-                  child: const Text("Save"),
+                  child: Text(AppStrings.of(context).save),
                 ),
               ],
             ),

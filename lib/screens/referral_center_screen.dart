@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
@@ -63,23 +65,11 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
     required String referralLink,
   }) {
     final agent = (_agentName == null || _agentName!.isEmpty)
-        ? 'my insurance agent'
-        : 'my agent, $_agentName';
+        ? AppStrings.of(context).myInsuranceAgent
+        : AppStrings.of(context).myAgentNamed(_agentName!);
 
-    return "Hey $name,\n\n"
-        "I recently started using VitaLink to keep my medications, doctors, "
-        "insurance cards, appointments, and emergency information all in one "
-        "place.\n\n"
-        "What surprised me most was how useful it would be if there was ever "
-        "an emergency and my family needed access to important information.\n\n"
-        "The more I used it, the more I realized how many people could benefit "
-        "from having something like this, and I immediately thought of you.\n\n"
-        "If you'd like to learn a little more about it, I'd be happy to connect "
-        "you with $agent, who helped me get everything set up.\n\n"
-        "Would it be okay if I had them reach out to you? If so, would you "
-        "prefer a text message, phone call, or email?\n\n"
-        "Tap here to learn more:\n"
-        "$referralLink";
+    return AppStrings.of(context)
+        .referralIntroMessage(name, agent, referralLink);
   }
 
   void _openForm({
@@ -96,8 +86,9 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
 
   Future<void> _submitReferral() async {
     final userId = await _store.getString('userId');
+    if (!mounted) return;
     if (userId == null || userId.isEmpty) {
-      _showMessage('Please log in again before submitting a referral.');
+      _showMessage(AppStrings.of(context).logInBeforeReferral);
       return;
     }
 
@@ -105,12 +96,12 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
     final phone = _phoneCtrl.text.trim();
 
     if (name.isEmpty) {
-      _showMessage('Enter the referral name first.');
+      _showMessage(AppStrings.of(context).enterReferralNameFirst);
       return;
     }
 
     if (phone.isEmpty) {
-      _showMessage('Enter a phone number for the introduction.');
+      _showMessage(AppStrings.of(context).enterPhoneForIntro);
       return;
     }
 
@@ -146,15 +137,16 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
         if (!mounted) return;
         _showMessage(
           opened
-              ? 'Introduction text opened. Send it when ready.'
-              : 'Could not open text message.',
+              ? AppStrings.of(context).introTextOpened
+              : AppStrings.of(context).couldNotOpenText,
         );
       } catch (_) {
         if (!mounted) return;
-        _showMessage('Could not open text message.');
+        _showMessage(AppStrings.of(context).couldNotOpenText);
       }
     } else {
-      _showMessage(res['error']?.toString() ?? 'Referral failed.');
+      _showMessage(
+          res['error']?.toString() ?? AppStrings.of(context).referralFailed);
     }
   }
 
@@ -170,9 +162,9 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
-        title: const Text(
-          'Referral Center',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).referralCenter,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -197,13 +189,13 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(
-          'Referral Center',
-          'Know someone who could benefit from keeping their medications, doctors, insurance cards, and emergency information organized?',
+          AppStrings.of(context).referralCenter,
+          AppStrings.of(context).referralCenterBody,
         ),
         _optionCard(
           icon: Icons.sms,
-          title: 'Send Introduction',
-          subtitle: 'Create a text message you can review and send.',
+          title: AppStrings.of(context).sendIntroduction,
+          subtitle: AppStrings.of(context).createTextToReview,
           onTap: _openForm,
         ),
       ],
@@ -215,13 +207,14 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(
-          title ?? 'Send Introduction',
-          prompt ?? 'Create a simple introduction text for someone outside your household.',
+          title ?? AppStrings.of(context).sendIntroduction,
+          prompt ?? AppStrings.of(context).createIntroOutsideHousehold,
         ),
-        _field(_nameCtrl, 'Name'),
-        _field(_phoneCtrl, 'Phone Number', keyboardType: TextInputType.phone),
+        _field(_nameCtrl, AppStrings.of(context).name),
+        _field(_phoneCtrl, AppStrings.of(context).phoneNumber,
+            keyboardType: TextInputType.phone),
         _dropdown(
-          label: 'Relationship Optional',
+          label: AppStrings.of(context).relationshipOptional,
           value: _relationship,
           options: _relationships.contains(_relationship)
               ? _relationships
@@ -229,8 +222,10 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
           onChanged: (v) => setState(() => _relationship = v),
         ),
         const SizedBox(height: 12),
-        _primaryButton('Generate Introduction Text', _saving ? null : _submitReferral),
-        _textButton('Back', () => setState(() => _mode = 'home')),
+        _primaryButton(AppStrings.of(context).generateIntroText,
+            _saving ? null : _submitReferral),
+        _textButton(
+            AppStrings.of(context).back, () => setState(() => _mode = 'home')),
       ],
     );
   }
@@ -269,7 +264,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
       color: const Color(0xFF111827),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.lightBlue.shade200.withValues(alpha: .35)),
+        side:
+            BorderSide(color: Colors.lightBlue.shade200.withValues(alpha: .35)),
       ),
       child: ListTile(
         leading: Icon(icon, color: Colors.lightBlueAccent, size: 30),
@@ -312,7 +308,8 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.lightBlueAccent, width: 2),
+            borderSide:
+                const BorderSide(color: Colors.lightBlueAccent, width: 2),
           ),
         ),
       ),
@@ -344,7 +341,7 @@ class _ReferralCenterScreenState extends State<ReferralCenterScreen> {
         items: options
             .map((option) => DropdownMenuItem(
                   value: option,
-                  child: Text(option),
+                  child: Text(AppStrings.of(context).relationshipLabel(option)),
                 ))
             .toList(),
         onChanged: (value) {

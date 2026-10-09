@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
@@ -53,7 +55,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     final token = _codeCtrl.text.trim();
 
     if (token.isEmpty) {
-      setState(() => _message = 'Enter the profile invite code first.');
+      setState(() => _message = AppStrings.of(context).enterInviteCodeFirst);
       return;
     }
 
@@ -69,7 +71,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     if (userId == null || userId.isEmpty) {
       setState(() {
         _working = false;
-        _message = 'Please log in before accepting a profile invite.';
+        _message = AppStrings.of(context).logInBeforeAcceptingInvite;
       });
       return;
     }
@@ -95,8 +97,9 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     if (accept['success'] != true) {
       setState(() {
         _working = false;
-        _message = (accept['error'] ?? 'Unable to accept this profile invite.')
-            .toString();
+        _message =
+            (accept['error'] ?? AppStrings.of(context).unableToAcceptInvite)
+                .toString();
       });
       return;
     }
@@ -106,7 +109,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     if (shareId.isEmpty) {
       setState(() {
         _working = false;
-        _message = 'This profile invite could not be completed.';
+        _message = AppStrings.of(context).inviteCouldNotComplete;
       });
       return;
     }
@@ -119,8 +122,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
     if (packages.isEmpty) {
       setState(() {
         _working = false;
-        _message =
-            'Profile invite accepted. The shared profile will appear when the sender sends the current profile update.';
+        _message = AppStrings.of(context).profileInviteAccepted;
       });
       return;
     }
@@ -155,7 +157,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
 
     setState(() {
       _working = false;
-      _message = 'Shared profile added.';
+      _message = AppStrings.of(context).sharedProfileAdded;
     });
 
     await showDialog<void>(
@@ -163,13 +165,13 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF111827),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Profile Added',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).profileAdded,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'The shared profile has been added. You can switch to it now.',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          AppStrings.of(context).sharedProfileAddedSwitch,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           FilledButton(
@@ -212,7 +214,7 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Profile from Invite'),
+        title: Text(AppStrings.of(context).addProfileFromInvite),
         backgroundColor: const Color(0xFF0E5A88),
       ),
       body: Container(
@@ -224,26 +226,26 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Profile Invite',
-                    style: TextStyle(
+                  Text(
+                    AppStrings.of(context).profileInvite,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Enter the invite code from a family member or caregiver to add their shared VitaLink profile.',
-                    style: TextStyle(color: Colors.white70, fontSize: 15),
+                  Text(
+                    AppStrings.of(context).enterInviteCodeExplainer,
+                    style: const TextStyle(color: Colors.white70, fontSize: 15),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _codeCtrl,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Invite Code',
-                      labelStyle: TextStyle(color: Colors.white70),
+                    decoration: InputDecoration(
+                      labelText: AppStrings.of(context).inviteCode,
+                      labelStyle: const TextStyle(color: Colors.white70),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -257,7 +259,9 @@ class _ProfileAcceptInviteScreenState extends State<ProfileAcceptInviteScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: Text(
-                        _working ? 'Adding Profile...' : 'Add Shared Profile',
+                        _working
+                            ? AppStrings.of(context).addingProfile
+                            : AppStrings.of(context).addSharedProfile,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

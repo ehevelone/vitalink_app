@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
 import '../services/persistent_file_store.dart';
@@ -39,7 +41,7 @@ class _ScanCardState extends State<ScanCard> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Scan failed: $e")),
+          SnackBar(content: Text(AppStrings.of(context).scanFailed(e))),
         );
       }
 
@@ -62,11 +64,11 @@ class _ScanCardState extends State<ScanCard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan Insurance Card")),
+      appBar: AppBar(title: Text(AppStrings.of(context).scanInsuranceCard)),
       body: Center(
         child: _scanning
             ? const CircularProgressIndicator()
-            : const Text("Preparing scanner..."),
+            : Text(AppStrings.of(context).preparingScanner),
       ),
     );
   }

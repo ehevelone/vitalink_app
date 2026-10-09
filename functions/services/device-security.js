@@ -1,4 +1,29 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
+const { deviceLanguage, notificationText } = require("./notification-language");
+
+const REVOCATION_PUSH_TIMEOUT_MS = 3000;
+
+async function sendRevocationPushWithTimeout(
+  messaging,
+  message,
+  timeoutMs = REVOCATION_PUSH_TIMEOUT_MS
+) {
+  let timeout;
+  try {
+    return await Promise.race([
+      messaging.sendEachForMulticast(message),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("Revocation push timed out")),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 async function ensureDeviceSecuritySchema() {
   await db.query(`
@@ -25,7 +50,8 @@ async function ensureDeviceSecuritySchema() {
     ADD COLUMN IF NOT EXISTS last_push_error TEXT,
     ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS revocation_reason TEXT
+    ADD COLUMN IF NOT EXISTS revocation_reason TEXT,
+    ADD COLUMN IF NOT EXISTS app_language TEXT
   `);
   await db.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_devices_user_device_id
@@ -54,10 +80,17 @@ async function recordDeviceEvent(userId, deviceId, eventType, reason, platform) 
 }
 
 async function notifyRevokedDevices(rows, reason) {
-  const tokens = rows
-    .map((row) => String(row.device_token || "").trim())
-    .filter((token) => token && token !== "NO_TOKEN");
-  if (!tokens.length) return;
+  const targets = rows
+    .map((row) => ({
+      token: String(row.device_token || "").trim(),
+      userId: String(row.user_id || ""),
+      deviceId: String(row.device_id || ""),
+      language: deviceLanguage(row),
+    }))
+    .filter((target) =>
+      target.token && target.token !== "NO_TOKEN" && target.userId && target.deviceId
+    );
+  if (!targets.length) return;
 
   try {
     const admin = require("firebase-admin");
@@ -72,24 +105,46 @@ async function notifyRevokedDevices(rows, reason) {
         }),
       });
     }
-    await admin.messaging().sendEachForMulticast({
-      tokens,
-      data: {
-        type: "device_revoked",
-        reason: reason || "replaced",
-        title: reason === "replaced"
-          ? "VitaLink moved to a new device"
-          : "VitaLink device disabled",
-        body: reason === "replaced"
-          ? "This old device has been disabled. Its local VitaLink profiles were not erased."
-          : "This lost or stolen device has been disabled and its local VitaLink profiles will be erased.",
-      },
-      android: { priority: "high" },
-      apns: { headers: { "apns-priority": "10" }, payload: { aps: { "content-available": 1 } } },
-    });
+    await Promise.all(targets.map(async (target) => {
+      try {
+        await sendRevocationPushWithTimeout(admin.messaging(), {
+          tokens: [target.token],
+          data: {
+            type: "device_revoked",
+            reason: reason || "replaced",
+            userId: target.userId,
+            deviceId: target.deviceId,
+            title: notificationText(
+              reason === "replaced" ? "deviceMovedTitle" : "deviceDisabledTitle",
+              target.language
+            ),
+            body: notificationText(
+              reason === "replaced" ? "deviceMovedBody" : "deviceDisabledBody",
+              target.language
+            ),
+          },
+          android: { priority: "high" },
+          apns: { headers: { "apns-priority": "10" }, payload: { aps: { "content-available": 1 } } },
+        });
+      } catch (error) {
+        console.error("Device revocation push failed for one device:", {
+          userId: target.userId,
+          deviceId: target.deviceId,
+          message: error.message,
+        });
+      }
+    }));
   } catch (err) {
     console.error("Device revocation push failed:", err.message);
   }
 }
 
-module.exports = { ensureDeviceSecuritySchema, recordDeviceEvent, notifyRevokedDevices };
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureDeviceSecuritySchema = schemaOnce("device-security:ensureDeviceSecuritySchema", ensureDeviceSecuritySchema);
+
+module.exports = {
+  ensureDeviceSecuritySchema,
+  recordDeviceEvent,
+  notifyRevokedDevices,
+  sendRevocationPushWithTimeout,
+};

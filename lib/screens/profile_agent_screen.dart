@@ -1,5 +1,7 @@
 // lib/screens/profile_agent_screen.dart
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'dart:io';
 
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
@@ -72,25 +74,18 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     _nameCtrl.text = await store.getString('agentName') ?? '';
     _emailCtrl.text = await store.getString('agentEmail') ?? '';
     _phoneCtrl.text = await store.getString('agentPhone') ?? '';
-    _agencyNameCtrl.text =
-        await store.getString('agencyName') ??
+    _agencyNameCtrl.text = await store.getString('agencyName') ??
         await store.getString('agentAgency') ??
         '';
-    _agencyAddressCtrl.text =
-        await store.getString('agencyAddress') ?? '';
+    _agencyAddressCtrl.text = await store.getString('agencyAddress') ?? '';
 
-    _agencyPhoneCtrl.text =
-        await store.getString('agencyPhone') ?? '';
-    _calendlyUrlCtrl.text =
-        await store.getString('agentCalendlyUrl') ?? '';
+    _agencyPhoneCtrl.text = await store.getString('agencyPhone') ?? '';
+    _calendlyUrlCtrl.text = await store.getString('agentCalendlyUrl') ?? '';
 
     // 🔥 LOAD NEW ADDRESS FIELDS
-    _agencyCityCtrl.text =
-        await store.getString('agencyCity') ?? '';
-    _agencyStateCtrl.text =
-        await store.getString('agencyState') ?? '';
-    _agencyZipCtrl.text =
-        await store.getString('agencyZip') ?? '';
+    _agencyCityCtrl.text = await store.getString('agencyCity') ?? '';
+    _agencyStateCtrl.text = await store.getString('agencyState') ?? '';
+    _agencyZipCtrl.text = await store.getString('agencyZip') ?? '';
 
     final email = _emailCtrl.text.trim();
     if (email.isEmpty) return;
@@ -105,8 +100,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     _phoneCtrl.text = agent['phone']?.toString() ?? _phoneCtrl.text;
     _agencyNameCtrl.text =
         agent['agency_name']?.toString() ?? _agencyNameCtrl.text;
-    _agencyAddressCtrl.text =
-        agent['agency_street']?.toString() ??
+    _agencyAddressCtrl.text = agent['agency_street']?.toString() ??
         agent['agency_address']?.toString() ??
         _agencyAddressCtrl.text;
     _agencyPhoneCtrl.text =
@@ -140,16 +134,15 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return base64Encode(bytes);
 
-    final resized = decoded.width > 1000
-        ? img.copyResize(decoded, width: 1000)
-        : decoded;
+    final resized =
+        decoded.width > 1000 ? img.copyResize(decoded, width: 1000) : decoded;
     return base64Encode(img.encodeJpg(resized, quality: 78));
   }
 
   Future<void> _scanBusinessCard() async {
     if (_emailCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Agent email is required before scanning.")),
+        SnackBar(content: Text(AppStrings.of(context).agentEmailRequiredScan)),
       );
       return;
     }
@@ -165,7 +158,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       if (!mounted) return;
 
       messenger.showSnackBar(
-        const SnackBar(content: Text("Camera permission not granted")),
+        SnackBar(
+            content: Text(AppStrings.of(context).cameraPermissionNotGranted)),
       );
       return;
     }
@@ -189,7 +183,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
       if (res['success'] != true) {
         messenger.showSnackBar(
-          SnackBar(content: Text(res['error'] ?? "Business card scan failed")),
+          SnackBar(
+              content: Text(res['error'] ??
+                  AppStrings.of(context).businessCardScanFailed)),
         );
         return;
       }
@@ -197,7 +193,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       final data = res['data'];
       if (data is! Map) {
         messenger.showSnackBar(
-          const SnackBar(content: Text("No business card details found")),
+          SnackBar(content: Text(AppStrings.of(context).noBusinessCardDetails)),
         );
         return;
       }
@@ -206,7 +202,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text("Business card scan failed: $e")),
+        SnackBar(
+            content:
+                Text(AppStrings.of(context).businessCardScanFailedError('$e'))),
       );
     } finally {
       if (mounted) setState(() => _scanningCard = false);
@@ -217,9 +215,10 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
     final parsedEmail = _value(data, 'email');
     final notes = <String>[
       if (parsedEmail.isNotEmpty && parsedEmail != _emailCtrl.text.trim())
-        "Card email found: $parsedEmail",
-      if (data['hasLogo'] == true) "Logo detected on card.",
-      if (data['hasHeadshot'] == true) "Headshot detected on card.",
+        AppStrings.of(context).cardEmailFound(parsedEmail),
+      if (data['hasLogo'] == true) AppStrings.of(context).logoDetected(),
+      if (data['hasHeadshot'] == true)
+        AppStrings.of(context).headshotDetected(),
     ];
 
     final apply = await showDialog<bool>(
@@ -227,21 +226,24 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF111111),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Review Business Card",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).reviewBusinessCard,
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _previewLine("Name", _value(data, 'name')),
-              _previewLine("Phone", _value(data, 'phone')),
-              _previewLine("Agency", _value(data, 'agencyName')),
-              _previewLine("Address", _value(data, 'address')),
-              _previewLine("City", _value(data, 'city')),
-              _previewLine("State", _value(data, 'state')),
+              _previewLine(AppStrings.of(context).name, _value(data, 'name')),
+              _previewLine(AppStrings.of(context).phone, _value(data, 'phone')),
+              _previewLine(
+                  AppStrings.of(context).agency, _value(data, 'agencyName')),
+              _previewLine(
+                  AppStrings.of(context).addressLabel, _value(data, 'address')),
+              _previewLine(AppStrings.of(context).city, _value(data, 'city')),
+              _previewLine(AppStrings.of(context).state, _value(data, 'state')),
               _previewLine("ZIP", _value(data, 'zip')),
               _previewLine("Calendly", _value(data, 'calendlyUrl')),
               if (notes.isNotEmpty) ...[
@@ -249,7 +251,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 ...notes.map(
                   (note) => Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(note, style: const TextStyle(color: Colors.white70)),
+                    child: Text(note,
+                        style: const TextStyle(color: Colors.white70)),
                   ),
                 ),
               ],
@@ -259,11 +262,11 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Apply"),
+            child: Text(AppStrings.of(context).apply),
           ),
         ],
       ),
@@ -316,10 +319,12 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
   String? _validatePassword(String? pw) {
     if (pw == null || pw.isEmpty) return null;
-    if (pw.length < 10) return "≥ 10 characters";
-    if (!RegExp(r'[A-Z]').hasMatch(pw)) return "1 uppercase required";
+    if (pw.length < 10) return AppStrings.of(context).tenCharsMin;
+    if (!RegExp(r'[A-Z]').hasMatch(pw)) {
+      return AppStrings.of(context).oneUppercaseRequired;
+    }
     if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(pw)) {
-      return "1 special character required";
+      return AppStrings.of(context).oneSpecialRequired;
     }
     return null;
   }
@@ -366,8 +371,11 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
       );
 
       if (res['success'] != true) {
+        if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text(res['error'] ?? "Update failed")),
+          SnackBar(
+              content:
+                  Text(res['error'] ?? AppStrings.of(context).updateFailed)),
         );
         return;
       }
@@ -391,7 +399,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
 
       if (!mounted) return;
       messenger.showSnackBar(
-        const SnackBar(content: Text("Agent profile updated ✅")),
+        SnackBar(content: Text(AppStrings.of(context).agentProfileUpdated)),
       );
       navigator.pop();
     } finally {
@@ -402,7 +410,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("My Agent Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).myAgentProfile)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -411,17 +419,19 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).fullName),
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).requiredField
+                    : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _emailCtrl,
                 enabled: false,
-                decoration: const InputDecoration(
-                  labelText: "Email (cannot be changed)",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).emailCannotChange,
                 ),
               ),
               const SizedBox(height: 12),
@@ -446,7 +456,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                         )
                       : const Icon(Icons.badge),
                   label: Text(
-                    _scanningCard ? "Scanning Business Card..." : "Scan Business Card",
+                    _scanningCard
+                        ? AppStrings.of(context).scanningBusinessCard
+                        : AppStrings.of(context).scanBusinessCard,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -460,21 +472,25 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                decoration: const InputDecoration(labelText: "Phone"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).phone),
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).requiredField
+                    : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _agencyNameCtrl,
-                decoration: const InputDecoration(labelText: "Agency Name"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).agencyName),
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _agencyAddressCtrl,
-                decoration: const InputDecoration(labelText: "Agency Address"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).agencyAddress),
                 maxLines: 2,
               ),
 
@@ -483,7 +499,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               // 🔥 NEW CITY / STATE / ZIP
               TextFormField(
                 controller: _agencyCityCtrl,
-                decoration: const InputDecoration(labelText: "City"),
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).city),
               ),
               const SizedBox(height: 12),
 
@@ -492,7 +509,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _agencyStateCtrl,
-                      decoration: const InputDecoration(labelText: "State"),
+                      decoration: InputDecoration(
+                          labelText: AppStrings.of(context).state),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -512,7 +530,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 controller: _agencyPhoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                decoration: const InputDecoration(labelText: "Agency Phone Number"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).agencyPhoneNumber),
               ),
 
               const SizedBox(height: 12),
@@ -520,8 +539,8 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               TextFormField(
                 controller: _calendlyUrlCtrl,
                 keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: "Calendly Link",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).calendlyLink,
                   hintText: "https://calendly.com/your-link",
                 ),
                 validator: (v) {
@@ -531,7 +550,7 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                   if (uri == null ||
                       !uri.hasScheme ||
                       !['http', 'https'].contains(uri.scheme.toLowerCase())) {
-                    return "Enter a valid link";
+                    return AppStrings.of(context).enterValidLink;
                   }
                   return null;
                 },
@@ -540,9 +559,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
               const Divider(),
               const SizedBox(height: 12),
 
-              const Text(
-                "Change Password (optional)",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                AppStrings.of(context).changePasswordOptional,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
 
@@ -550,12 +569,10 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: "New Password",
+                  labelText: AppStrings.of(context).newPassword,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
@@ -571,21 +588,18 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                 controller: _confirmCtrl,
                 obscureText: !_showConfirm,
                 decoration: InputDecoration(
-                  labelText: "Confirm Password",
+                  labelText: AppStrings.of(context).confirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _showConfirm
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _showConfirm ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _showConfirm = !_showConfirm),
                   ),
                 ),
                 validator: (v) =>
-                    _passwordCtrl.text.isNotEmpty &&
-                            v != _passwordCtrl.text
-                        ? "Passwords don’t match"
+                    _passwordCtrl.text.isNotEmpty && v != _passwordCtrl.text
+                        ? AppStrings.of(context).passwordsDontMatchCurly
                         : null,
               ),
 
@@ -606,9 +620,9 @@ class _ProfileAgentScreenState extends State<ProfileAgentScreen> {
                           ),
                         ),
                         icon: const Icon(Icons.save),
-                        label: const Text(
-                          "Save Changes",
-                          style: TextStyle(
+                        label: Text(
+                          AppStrings.of(context).saveChanges,
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

@@ -1,6 +1,13 @@
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
+const {
+  deviceLanguage,
+  ensureLanguageColumns,
+  notificationText,
+  sendLocalizedMulticast,
+} = require("./notification-language");
 
 const corsHeaders = {
   "Content-Type": "application/json",
@@ -129,6 +136,11 @@ async function ensureSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE profile_update_packages
+    ADD COLUMN IF NOT EXISTS share_link_id UUID REFERENCES profile_share_links(id) ON DELETE CASCADE
+  `);
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS profile_update_recipients (
       id UUID PRIMARY KEY,
       package_id UUID NOT NULL REFERENCES profile_update_packages(id) ON DELETE CASCADE,
@@ -180,6 +192,11 @@ async function ensureSchema() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_profile_update_packages_expires
     ON profile_update_packages (expires_at)
+  `);
+
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_profile_update_recipients_package_user
+    ON profile_update_recipients (package_id, recipient_user_id)
   `);
 }
 
@@ -247,9 +264,10 @@ async function sendProfileUpdatePush({ recipientUserIds, packageId, profileName 
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
 
+  await ensureLanguageColumns();
   const devicesRes = await db.query(
     `
-    SELECT id, user_id, device_token
+    SELECT id, user_id, device_token, app_language
     FROM user_devices
     WHERE user_id::TEXT = ANY($1::TEXT[])
       AND device_token IS NOT NULL
@@ -260,34 +278,34 @@ async function sendProfileUpdatePush({ recipientUserIds, packageId, profileName 
   );
 
   const seen = new Set();
-  const tokens = [];
+  const targets = [];
 
   for (const row of devicesRes.rows) {
     const token = clean(row.device_token);
     if (!token || seen.has(token)) continue;
     seen.add(token);
-    tokens.push(token);
+    targets.push({ token, language: deviceLanguage(row) });
   }
 
-  if (!tokens.length) {
+  if (!targets.length) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
 
-  const response = await admin.messaging().sendEachForMulticast({
+  const response = await sendLocalizedMulticast(admin.messaging(), targets, (language, tokens) => ({
     tokens,
     notification: {
-      title: "Profile update available",
-      body: `${profileName || "A VitaLink profile"} has an update ready to apply.`,
+      title: notificationText("profileUpdateTitle", language),
+      body: notificationText("profileUpdateBody", language, { profile: profileName }),
     },
     data: {
       route: "/profile_updates",
       type: "profile_update",
       packageId,
     },
-  });
+  }));
 
   return {
-    devicesTargeted: tokens.length,
+    devicesTargeted: targets.length,
     successCount: response.successCount,
     failureCount: response.failureCount,
   };
@@ -297,38 +315,55 @@ async function sendProfileShareAcceptedPush({ ownerUserId, profileName }) {
   if (!ownerUserId || !initFirebase()) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
+  await ensureLanguageColumns();
   const devicesRes = await db.query(
-    `SELECT device_token FROM user_devices
+    `SELECT device_token, app_language FROM user_devices
      WHERE user_id::TEXT=$1 AND device_status='active'
        AND device_token IS NOT NULL AND TRIM(device_token) <> ''
        AND TRIM(device_token) <> 'NO_TOKEN'`,
     [String(ownerUserId)]
   );
-  const tokens = [...new Set(devicesRes.rows.map((row) => clean(row.device_token)).filter(Boolean))];
-  if (!tokens.length) {
+  const targets = uniqueTargets(devicesRes.rows);
+  if (!targets.length) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
-  const response = await admin.messaging().sendEachForMulticast({
+  const response = await sendLocalizedMulticast(admin.messaging(), targets, (language, tokens) => ({
     tokens,
     notification: {
-      title: "Caregiver connected",
-      body: `Open VitaLink to send ${profileName || "the shared profile"}.`,
+      title: notificationText("caregiverConnectedTitle", language),
+      body: notificationText("caregiverConnectedBody", language, { profile: profileName }),
     },
     data: {
       route: "/profile_sharing",
       type: "profile_share_accepted",
     },
-  });
+  }));
   return {
-    devicesTargeted: tokens.length,
+    devicesTargeted: targets.length,
     successCount: response.successCount,
     failureCount: response.failureCount,
   };
 }
 
+// One target per token, with that phone's language.
+function uniqueTargets(rows) {
+  const seen = new Set();
+  const targets = [];
+  for (const row of rows) {
+    const token = clean(row.device_token);
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    targets.push({ token, language: deviceLanguage(row) });
+  }
+  return targets;
+}
+
 function createInviteCode() {
   return `VL-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureSchema = schemaOnce("profile-share-sync:ensureSchema", ensureSchema);
 
 module.exports = {
   clean,
@@ -341,5 +376,6 @@ module.exports = {
   reply,
   sendProfileShareAcceptedPush,
   sendProfileUpdatePush,
+  uniqueTargets,
   verifyUserSession,
 };

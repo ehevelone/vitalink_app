@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:flutter/material.dart';
 
@@ -69,8 +71,8 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
         _prospectLifeConsent =
             (prospectConsents['life'] as Map?)?['status'] == 'granted';
       } else {
-        _error =
-            result['error']?.toString() ?? 'Unable to check account access.';
+        _error = result['error']?.toString() ??
+            AppStrings.of(context).unableToCheckAccess;
       }
     });
   }
@@ -82,8 +84,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
 
   Future<void> _confirm() async {
     if (!_userAttestation || !_agreementAccepted) {
-      setState(
-          () => _error = 'The client/user must check both required boxes.');
+      setState(() => _error = AppStrings.of(context).clientMustCheckBoth);
       return;
     }
     setState(() {
@@ -101,8 +102,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
         'relationship': _relationship,
         'messagingConsent': _relationship == 'client' && _messagingConsent,
         'prospectConsents': {
-          'medicare':
-              _relationship == 'prospect' && _prospectMedicareConsent,
+          'medicare': _relationship == 'prospect' && _prospectMedicareConsent,
           'life': _relationship == 'prospect' && _prospectLifeConsent,
         },
       },
@@ -122,17 +122,17 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("This doesn't look right"),
-        content: const Text(
-          'This will pause agent messages and future information sharing. It will not delete your account or your information. You can enter the correct agent code afterward.',
+        title: Text(AppStrings.of(context).thisDoesntLookRight),
+        content: Text(
+          AppStrings.of(context).pauseConnectionBody,
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Go Back')),
+              child: Text(AppStrings.of(context).goBack)),
           ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Pause Connection')),
+              child: Text(AppStrings.of(context).pauseConnection)),
         ],
       ),
     );
@@ -179,31 +179,31 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     final email = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Recover personal access code'),
+        title: Text(AppStrings.of(context).recoverPersonalCode),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email address'),
+          decoration:
+              InputDecoration(labelText: AppStrings.of(context).emailAddress),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(AppStrings.of(context).cancel)),
           ElevatedButton(
               onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('Send Email')),
+              child: Text(AppStrings.of(context).sendEmail)),
         ],
       ),
     );
-    controller.dispose();
     if (email == null || email.isEmpty || !mounted) return;
     await ApiService.recoverPersonalAccessCode(email);
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Check your email'),
-        content: const Text(
-            'If a matching account was found, an email has been sent.'),
+        title: Text(AppStrings.of(context).checkYourEmail),
+        content: Text(AppStrings.of(context).matchingAccountEmailSent),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
@@ -216,20 +216,20 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('VitaLink User Agreement'),
-        content: const SizedBox(
+        title: Text(AppStrings.of(context).vitalinkUserAgreement),
+        content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
             child: Text(
-              userAgreementText,
-              style: TextStyle(height: 1.4),
+              userAgreementTextFor(AppStrings.of(context).languageCode),
+              style: const TextStyle(height: 1.4),
             ),
           ),
         ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Done'),
+            child: Text(AppStrings.of(context).done),
           ),
         ],
       ),
@@ -244,9 +244,10 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     final access = _access ?? const <String, dynamic>{};
     final hasAccess = access['hasAccess'] == true;
     final sponsor = access['sponsor']?.toString();
-    final agentName =
-        (access['agentName'] ?? access['agencyName'] ?? 'this agent')
-            .toString();
+    final agentName = (access['agentName'] ??
+            access['agencyName'] ??
+            AppStrings.of(context).thisAgent)
+        .toString();
     final prospectOptions = Map<String, dynamic>.from(
       access['prospectOptions'] as Map? ?? {},
     );
@@ -260,7 +261,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        appBar: AppBar(title: const Text('VitaLink Access')),
+        appBar: AppBar(title: Text(AppStrings.of(context).vitalinkAccess)),
         body: ListView(
           padding: const EdgeInsets.all(22),
           children: [
@@ -268,62 +269,68 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                 access['relationshipStatus'] == 'review_requested') ...[
               const Icon(Icons.lock_outline, size: 58, color: Colors.blue),
               const SizedBox(height: 16),
-              const Text(
-                'VitaLink access required',
+              Text(
+                AppStrings.of(context).vitalinkAccessRequired,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Enter a valid agent code or personal access code to continue.',
+              Text(
+                AppStrings.of(context).enterValidAccessCode,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, height: 1.4),
+                style: const TextStyle(fontSize: 16, height: 1.4),
               ),
               const SizedBox(height: 24),
               TextField(
                 controller: _codeCtrl,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                    labelText: 'Agent or personal access code'),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).agentOrPersonalCode),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _working ? null : _connectCode,
-                child: Text(_working ? 'Checking...' : 'Verify Code'),
+                child: Text(_working
+                    ? AppStrings.of(context).checking
+                    : AppStrings.of(context).verifyCode),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Personal access codes are delivered by email after they are issued. Check your inbox and spam folder, then enter your code above.',
-                style: TextStyle(color: Colors.black54, height: 1.35),
+              Text(
+                AppStrings.of(context).personalCodesByEmail,
+                style: const TextStyle(color: Colors.black54, height: 1.35),
               ),
               TextButton(
                 onPressed: _recoverPersonalCode,
-                child: const Text('Recover a code I already received'),
+                child: Text(AppStrings.of(context).recoverCodeReceived),
               ),
             ] else ...[
               if (sponsor == 'agent') ...[
-                const Text(
-                  'Please hand the device to the client/user',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                Text(
+                  AppStrings.of(context).handDeviceToClient,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'All confirmations and consent choices below must be completed by the client/user, never by the agent.',
-                  style: TextStyle(fontSize: 16, height: 1.4),
+                Text(
+                  AppStrings.of(context).choicesByClientOnly,
+                  style: const TextStyle(fontSize: 16, height: 1.4),
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  'Is $agentName your current insurance agent?',
+                  AppStrings.of(context).isAgentYourCurrent(agentName),
                   style: const TextStyle(
                       fontSize: 19, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 SegmentedButton<String>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
-                        value: 'client', label: Text('Current client')),
+                        value: 'client',
+                        label: Text(AppStrings.of(context).currentClient)),
                     ButtonSegment(
-                        value: 'prospect', label: Text('Not a client yet')),
+                        value: 'prospect',
+                        label: Text(AppStrings.of(context).notClientYet)),
                   ],
                   selected: {_relationship},
                   onSelectionChanged: (value) => setState(() {
@@ -340,7 +347,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: _working ? null : _reportWrongAgent,
-                    child: const Text("This doesn't look right"),
+                    child: Text(AppStrings.of(context).thisDoesntLookRight),
                   ),
                 ),
               ],
@@ -349,8 +356,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                 value: _userAttestation,
                 onChanged: (value) =>
                     setState(() => _userAttestation = value ?? false),
-                title: const Text(
-                    'I am the client/user and I am making these choices myself.'),
+                title: Text(AppStrings.of(context).iAmTheClient),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               CheckboxListTile(
@@ -360,8 +366,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                     ? null
                     : (value) =>
                         setState(() => _agreementAccepted = value ?? false),
-                title: const Text(
-                    'I have reviewed and agree to the VitaLink User Agreement and Privacy Policy.'),
+                title: Text(AppStrings.of(context).agreeUserAgreement),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               Align(
@@ -369,7 +374,7 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                 child: TextButton.icon(
                   onPressed: _showUserAgreement,
                   icon: const Icon(Icons.description_outlined),
-                  label: const Text('Review User Agreement and Privacy Notice'),
+                  label: Text(AppStrings.of(context).reviewUserAgreement),
                 ),
               ),
               if (sponsor == 'agent' && _relationship == 'client')
@@ -379,23 +384,23 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   onChanged: (value) =>
                       setState(() => _messagingConsent = value ?? false),
                   title: Text(
-                    'I agree to receive in-app and push messages from $agentName, a licensed insurance agent, including coverage reminders and enrollment-period outreach. I understand the agent may be compensated if I enroll in a plan. This consent is optional and may be withdrawn. Leave this unchecked to decide later.',
+                    AppStrings.of(context).agentMessagingConsent(agentName),
                   ),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
               if (sponsor == 'agent' && _relationship == 'prospect') ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Optional messages from $agentName',
+                  AppStrings.of(context).optionalMessagesFrom(agentName),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Choose either, both, or neither. These choices do not make you a client and may be changed later.',
-                  style: TextStyle(color: Colors.black54, height: 1.35),
+                Text(
+                  AppStrings.of(context).chooseEitherBothNeither,
+                  style: const TextStyle(color: Colors.black54, height: 1.35),
                 ),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
@@ -403,10 +408,12 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   onChanged: (value) => setState(
                     () => _prospectMedicareConsent = value ?? false,
                   ),
-                  title: const Text('Medicare messages'),
+                  title: Text(AppStrings.of(context).medicareMessages),
                   subtitle: Text(
-                    prospectText('medicare',
-                        'I agree to receive optional in-app and push Medicare messages from $agentName.'),
+                    prospectText(
+                        'medicare',
+                        AppStrings.of(context)
+                            .agreeMedicareMessagesFrom(agentName)),
                   ),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
@@ -416,10 +423,12 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
                   onChanged: (value) => setState(
                     () => _prospectLifeConsent = value ?? false,
                   ),
-                  title: const Text('Life insurance messages'),
+                  title: Text(AppStrings.of(context).lifeInsuranceMessages),
                   subtitle: Text(
-                    prospectText('life',
-                        'I agree to receive optional in-app and push life insurance messages from $agentName.'),
+                    prospectText(
+                        'life',
+                        AppStrings.of(context)
+                            .agreeLifeMessagesFrom(agentName)),
                   ),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
@@ -433,7 +442,9 @@ class _AccountAccessScreenState extends State<AccountAccessScreen> {
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: _working ? null : _confirm,
-                child: Text(_working ? 'Saving...' : 'Confirm and Continue'),
+                child: Text(_working
+                    ? AppStrings.of(context).saving
+                    : AppStrings.of(context).confirmAndContinue),
               ),
             ],
             if (_error != null &&

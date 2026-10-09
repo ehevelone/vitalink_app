@@ -20,6 +20,26 @@ module.exports = async function generateClientReportPdf(client) {
     y -= size + 8;
   };
 
+  // Medications and supplements (serving size and ingredients for
+  // supplements; restored from the Aug 18 version).
+  const joinList = (value) =>
+    Array.isArray(value) ? value.filter(Boolean).join(", ") : "";
+  const formatMedication = (m) => {
+    const activeIngredients = joinList(m.activeIngredients || m.active_ingredients);
+    const otherIngredients = joinList(m.otherIngredients || m.other_ingredients);
+    const servingSize = m.servingSize || m.serving_size;
+    return [
+      m.name || "Unknown",
+      m.dose,
+      m.frequency,
+      servingSize ? `Serving: ${servingSize}` : "",
+      activeIngredients ? `Supplement Facts: ${activeIngredients}` : "",
+      otherIngredients ? `Other Ingredients: ${otherIngredients}` : "",
+    ]
+      .filter(Boolean)
+      .join(" - ");
+  };
+
   // ===== HEADER =====
   drawText("VitaLink – Client Information Summary", 18);
   y -= 10;
@@ -41,9 +61,7 @@ module.exports = async function generateClientReportPdf(client) {
 
   if (Array.isArray(client.medications) && client.medications.length) {
     client.medications.forEach((m, i) => {
-      drawText(
-        `${i + 1}. ${m.name || "Unknown"} — ${m.dose || ""} ${m.frequency || ""}`
-      );
+      drawText(`${i + 1}. ${formatMedication(m)}`);
     });
   } else {
     drawText("No medications listed.");

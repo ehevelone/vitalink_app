@@ -1,4 +1,5 @@
 const db = require('./db');
+const { schemaOnce } = require("./schema-once");
 
 async function ensureAuthorizationSchema() {
   await db.query(`
@@ -99,6 +100,9 @@ async function markCrmRevoked(userId, crmAgentId, revokedAt) {
   `, [String(userId), String(crmAgentId), revokedAt]);
   return result.rowCount > 0;
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureAuthorizationSchema = schemaOnce("authorization-status:ensureAuthorizationSchema", ensureAuthorizationSchema);
 
 module.exports = {
   ensureAuthorizationSchema,

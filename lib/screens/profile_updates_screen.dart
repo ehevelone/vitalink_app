@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
@@ -38,7 +40,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
     if (userId == null || userId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Please log in again to check profile updates.';
+        _error = AppStrings.of(context).logInAgainToCheckUpdates;
       });
       return;
     }
@@ -72,7 +74,9 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
 
     setState(() {
       _loading = false;
-      _error = (res['error'] ?? 'Unable to load profile updates.').toString();
+      _error =
+          (res['error'] ?? AppStrings.of(context).unableToLoadProfileUpdates)
+              .toString();
     });
   }
 
@@ -85,7 +89,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
     updatePayload['_shareRelationshipId'] = item['shareId']?.toString();
 
     if (packageId.isEmpty || updatePayload.isEmpty) {
-      _showMessage('This update could not be applied.');
+      _showMessage(AppStrings.of(context).updateCouldNotApply);
       return;
     }
 
@@ -102,7 +106,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
 
     if (!mounted) return;
 
-    _showMessage('Profile update applied.');
+    _showMessage(AppStrings.of(context).profileUpdateApplied);
     await _loadUpdates();
   }
 
@@ -117,7 +121,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
     final sections = payload['allowedSections'];
 
     if (sections is! List || sections.isEmpty) {
-      return 'Emergency profile';
+      return AppStrings.of(context).emergencyProfile;
     }
 
     return sections.map((s) => s.toString().replaceAll('_', ' ')).join(', ');
@@ -127,7 +131,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Updates'),
+        title: Text(AppStrings.of(context).profileUpdates),
         backgroundColor: const Color(0xFF0E5A88),
       ),
       body: Container(
@@ -139,18 +143,18 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    const Text(
-                      'Connected profile updates',
-                      style: TextStyle(
+                    Text(
+                      AppStrings.of(context).connectedProfileUpdates,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Updates are temporarily stored, encrypted, and removed after connected devices apply them.',
-                      style: TextStyle(color: Colors.white70, fontSize: 15),
+                    Text(
+                      AppStrings.of(context).updatesTemporarilyStored,
+                      style: const TextStyle(color: Colors.white70, fontSize: 15),
                     ),
                     const SizedBox(height: 18),
                     if (_error != null)
@@ -161,10 +165,10 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                         ),
                       )
                     else if (_packages.isEmpty)
-                      const _InfoCard(
+                      _InfoCard(
                         child: Text(
-                          'No profile updates are waiting right now.',
-                          style: TextStyle(color: Colors.white),
+                          AppStrings.of(context).noProfileUpdatesWaiting,
+                          style: const TextStyle(color: Colors.white),
                         ),
                       )
                     else
@@ -179,7 +183,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                               Text(
                                 profileName?.isNotEmpty == true
                                     ? profileName!
-                                    : 'Shared Profile',
+                                    : AppStrings.of(context).sharedProfileTitle,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -206,9 +210,9 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                                     ),
                                   ),
                                   onPressed: () => _applyUpdate(item),
-                                  child: const Text(
-                                    'Apply Update',
-                                    style: TextStyle(
+                                  child: Text(
+                                    AppStrings.of(context).applyUpdate,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),

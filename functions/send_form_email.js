@@ -4,10 +4,25 @@ const { createMailer, fromAddress } = require("./services/mailer");
 const {
   syncVitalinkPackageToCrm,
 } = require("./services/crm-sync");
+const {
+  getAuthorizedUser,
+  recordSigning,
+} = require("./services/authorization-status");
 
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
+
+    const authorizedUser = await getAuthorizedUser(
+      body.app_user_id,
+      body.sessionToken,
+    );
+    if (!authorizedUser) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ success: false, error: "Unauthorized" }),
+      };
+    }
 
     if (!body.agent || !body.agent.email || !Array.isArray(body.attachments)) {
       return {
@@ -16,18 +31,39 @@ exports.handler = async (event) => {
       };
     }
 
+    const hipaaSoaAttachment = body.attachments.find((att) =>
+      String(att.name || "").toLowerCase().includes("hipaa") && att.content
+    );
+    if (!hipaaSoaAttachment) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          success: false,
+          error: "The signed HIPAA and Scope of Appointment PDF is required",
+        }),
+      };
+    }
+
     const transporter = createMailer();
+
+    // Clients sign in their own language. For Spanish, the app also sends an
+    // English reference copy that is clearly marked as not the signed form.
+    const signedInSpanish = body.signed_language === "es";
+    const attachmentLines = signedInSpanish
+      ? `• Signed HIPAA & SOA PDF (in Spanish - this is the signed document and official record)
+• English translation of the form, for your reference only (not the signed document)`
+      : "• Signed HIPAA & SOA PDF";
 
     const mailOptions = {
       from: fromAddress("VitaLink"),
       to: body.agent.email,
-      subject: `VitaLink - Signed HIPAA & SOA from ${body.user || "Client"}`,
+      subject: `VitaLink - Signed HIPAA & SOA from ${body.user || "Client"}${signedInSpanish ? " (signed in Spanish)" : ""}`,
       text: `Hello ${body.agent.name || "Agent"},
 
-Your client ${body.user || "Client"} has signed their HIPAA & SOA authorization.
+Your client ${body.user || "Client"} has signed their HIPAA & SOA authorization${signedInSpanish ? " in Spanish" : ""}.
 
 Attached:
-• Signed HIPAA & SOA PDF
+${attachmentLines}
 • Client information report (PDF)
 • Client medication/doctor CSV
 
@@ -81,6 +117,12 @@ Attached:
     // 🔥 Send email and capture confirmation
     const info = await transporter.sendMail(mailOptions);
 
+    await recordSigning(
+      authorizedUser.id,
+      authorizedUser.agent_id,
+      body.signed_at || new Date().toISOString(),
+    );
+
     // Update user record
     if (body.user) {
       await db.query(
@@ -96,10 +138,6 @@ Attached:
     let crmSync = null;
 
     try {
-      const hipaaSoaAttachment = (body.attachments || []).find((att) =>
-        String(att.name || "").toLowerCase().includes("hipaa")
-      );
-
       crmSync = await syncVitalinkPackageToCrm({
         agentEmail: body.agent.email,
         clientData: {

@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:flutter/material.dart';
 
@@ -27,7 +29,7 @@ class _ProspectContactRequestScreenState
     if (_channels.isEmpty || _sending) return;
     final userId = await SecureStore().getString('userId');
     if (userId == null || userId.isEmpty) {
-      setState(() => _error = 'Please sign in again.');
+      setState(() => _error = AppStrings.of(context).pleaseSignInAgain);
       return;
     }
     setState(() {
@@ -45,12 +47,14 @@ class _ProspectContactRequestScreenState
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Request sent'),
-          content: Text('${_args['agentName'] ?? 'Your agent'} has been notified.'),
+          title: Text(AppStrings.of(context).requestSent),
+          content: Text(AppStrings.of(context).agentHasBeenNotified(
+              _args['agentName']?.toString() ??
+                  AppStrings.of(context).yourAgent)),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Done'),
+              child: Text(AppStrings.of(context).done),
             ),
           ],
         ),
@@ -60,7 +64,8 @@ class _ProspectContactRequestScreenState
     }
     setState(() {
       _sending = false;
-      _error = result['error']?.toString() ?? 'Unable to send your request.';
+      _error = result['error']?.toString() ??
+          AppStrings.of(context).unableToSendRequest;
     });
   }
 
@@ -85,29 +90,32 @@ class _ProspectContactRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    final agentName = _args['agentName']?.toString() ?? 'Your agent';
-    final topic = _args['topic']?.toString() ?? 'insurance';
+    final agentName =
+        _args['agentName']?.toString() ?? AppStrings.of(context).yourAgent;
+    final topic = AppStrings.of(context)
+        .prospectTopicLabel(_args['topic']?.toString() ?? 'insurance');
     return Scaffold(
-      appBar: AppBar(title: const Text('Contact My Agent')),
+      appBar: AppBar(title: Text(AppStrings.of(context).contactMyAgent)),
       body: ListView(
         padding: const EdgeInsets.all(22),
         children: [
           Text(
-            '$agentName would like to help with $topic.',
+            AppStrings.of(context).agentWouldLikeToHelp(agentName, topic),
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          const Text(
-            'How would you like to be contacted?',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          Text(
+            AppStrings.of(context).howToBeContacted,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          _choice('call', 'Call me', Icons.phone_outlined),
-          _choice('text', 'Text me', Icons.sms_outlined),
-          _choice('email', 'Email me', Icons.email_outlined),
+          _choice('call', AppStrings.of(context).callMe, Icons.phone_outlined),
+          _choice('text', AppStrings.of(context).textMe, Icons.sms_outlined),
+          _choice(
+              'email', AppStrings.of(context).emailMe, Icons.email_outlined),
           const SizedBox(height: 14),
           Text(
-            '$agentName may contact me about $topic using the methods I selected.',
+            AppStrings.of(context).agentMayContactAbout(agentName, topic),
             style: const TextStyle(color: Colors.black54, height: 1.35),
           ),
           if (_error != null) ...[
@@ -117,7 +125,9 @@ class _ProspectContactRequestScreenState
           const SizedBox(height: 22),
           ElevatedButton(
             onPressed: _channels.isEmpty || _sending ? null : _submit,
-            child: Text(_sending ? 'Sending...' : 'Send'),
+            child: Text(_sending
+                ? AppStrings.of(context).sending
+                : AppStrings.of(context).send),
           ),
         ],
       ),

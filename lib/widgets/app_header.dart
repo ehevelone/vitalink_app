@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 
@@ -41,7 +43,7 @@ class _AppHeaderState extends State<AppHeader> {
       if (profile.fullName.isNotEmpty) {
         _userName = profile.fullName;
       } else {
-        _userName = "Guest";
+        _userName = AppStrings.of(context).guest;
       }
     });
   }
@@ -49,8 +51,8 @@ class _AppHeaderState extends State<AppHeader> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor:
-          widget.backgroundColor ?? Theme.of(context).appBarTheme.backgroundColor,
+      backgroundColor: widget.backgroundColor ??
+          Theme.of(context).appBarTheme.backgroundColor,
       title: Row(
         children: [
           Expanded(

@@ -16,6 +16,87 @@ function reply(statusCode, obj) {
   };
 }
 
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function normalizeMedicationList(parsed) {
+  const rawItems = Array.isArray(parsed?.medications)
+    ? parsed.medications
+    : parsed?.name || parsed?.dose
+      ? [parsed]
+      : [];
+
+  const medications = rawItems
+    .slice(0, 50)
+    .map((item) => ({
+      name: clean(item?.name),
+      dose: clean(item?.dose),
+      frequency: clean(item?.frequency),
+      quantity: clean(item?.quantity),
+    }))
+    .filter((item) => item.name);
+
+  const first = medications[0] || {
+    name: "",
+    dose: "",
+    frequency: "",
+    quantity: "",
+  };
+
+  const list = (value) =>
+    (Array.isArray(value) ? value : [])
+      .map(clean)
+      .filter(Boolean)
+      .slice(0, 60);
+  const servingSize = clean(parsed?.serving_size);
+  const activeIngredients = list(parsed?.active_ingredients);
+  const itemType = classifyItemType({
+    aiType: parsed?.item_type,
+    pharmacy: clean(parsed?.pharmacy),
+    prescribingDoctor: clean(parsed?.prescribing_doctor),
+    listRows: medications.length,
+    servingSize,
+    activeIngredients,
+  });
+
+  return {
+    medications,
+    name: first.name,
+    dose: first.dose,
+    frequency: first.frequency,
+    quantity: first.quantity,
+    prescribing_doctor: clean(parsed?.prescribing_doctor),
+    pharmacy: clean(parsed?.pharmacy),
+    pharmacy_phone: clean(parsed?.pharmacy_phone),
+    // Supplement and OTC labels (restored from the Aug 18 scanner; lost in
+    // the Aug 25 overwrite). The app files these under Supplements & OTC.
+    item_type: itemType,
+    serving_size: servingSize,
+    active_ingredients: activeIngredients,
+    other_ingredients: list(parsed?.other_ingredients),
+  };
+}
+
+const SCANNED_ITEM_TYPES = ["prescription", "supplement", "otc"];
+
+// The app never asks the user what a scanned item is, so this always returns
+// a type: the AI's answer when valid, otherwise what the label itself shows.
+function classifyItemType({
+  aiType,
+  pharmacy,
+  prescribingDoctor,
+  listRows,
+  servingSize,
+  activeIngredients,
+}) {
+  const type = String(aiType || "").trim().toLowerCase();
+  if (SCANNED_ITEM_TYPES.includes(type)) return type;
+  if (pharmacy || prescribingDoctor || listRows > 1) return "prescription";
+  if (servingSize || activeIngredients.length) return "supplement";
+  return "prescription";
+}
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
@@ -89,33 +170,73 @@ exports.handler = async (event) => {
         {
           role: "system",
           content: `
-You are a prescription bottle label parser.
+You extract medications from prescription bottles, pharmacy pill-pack manifests,
+medication lists, and dispensing labels, and supplement or over-the-counter labels.
 
 You MUST return valid JSON only.
 
-Extract and return EXACTLY these fields:
+Return exactly this JSON structure:
 
 {
+  "medications": [
+    {
+      "name": "",
+      "dose": "",
+      "frequency": "",
+      "quantity": ""
+    }
+  ],
   "name": "",
   "dose": "",
   "frequency": "",
   "prescribing_doctor": "",
   "pharmacy": "",
-  "pharmacy_phone": ""
+  "pharmacy_phone": "",
+  "item_type": "prescription",
+  "serving_size": "",
+  "active_ingredients": [],
+  "other_ingredients": []
 }
 
 Rules:
 
-1. Combine information across all images.
-2. Do NOT guess.
-3. If a field is not visible, return an empty string.
-4. Pharmacy examples: VA, Walmart, CVS, Walgreens, Hy-Vee, Target, etc.
-5. pharmacy_phone must be a visible 10-digit phone number.
-6. Remove credentials like MD, DO, NP from doctor name.
-7. Return medication name only (no dosage in name).
-8. Return dose separately (e.g., "500 mg", "4 mg").
-9. Return frequency as written (e.g., "Take 1 tablet twice daily").
-10. No commentary outside JSON.
+1. Combine information across all images of the same label or list.
+2. Extract EVERY visible medication row in top-to-bottom order.
+3. Preserve repeated rows. Do not merge or deduplicate medications, even when
+   the name and strength match, because separate pill-pack rows may be intentional.
+4. Do NOT guess, infer, or expand dosing instructions.
+5. If strength, frequency, or quantity is not visible for a row, return an empty string.
+6. Put medication name only in name and strength only in dose.
+7. quantity is the visible dispensed quantity, without inventing units.
+8. The legacy top-level name, dose, frequency, and quantity must repeat the first
+   medication row, or be empty when no medication is found.
+9. Pharmacy examples include VA, Walmart, CVS, Walgreens, Hy-Vee, and independent drugstores.
+10. pharmacy_phone must be a visible phone number.
+11. Remove credentials like MD, DO, NP from doctor name.
+12. item_type must be exactly one of: "prescription", "supplement", "otc".
+    Never leave it empty and never answer "unknown"; the app does not ask the
+    user, so always choose the best match from the evidence below.
+13. "prescription": the label or list shows an Rx number, prescriber or
+    "Dr." name, pharmacy name, refills, a patient's name, "Caution: Federal
+    law prohibits transfer", or pharmacy-printed directions.
+    Pharmacy pill-pack manifests are always "prescription".
+14. "supplement": the label has a "Supplement Facts" panel, says "Dietary
+    Supplement", lists a serving size or "suggested use", or is a
+    vitamin/mineral/botanical/herbal/probiotic/protein product.
+15. "otc": the label has a "Drug Facts" panel (required on every US
+    over-the-counter medicine) or lists "Active ingredient (in each tablet)"
+    with Uses/Warnings, e.g. aspirin, acetaminophen, ibuprofen, allergy,
+    antacid, cold, or sleep-aid medicine.
+16. If signals conflict, a pharmacy/prescription label wins (a pharmacy can
+    dispense an OTC or vitamin by prescription). With no clear signal, choose
+    from the product name: a vitamin/herbal name is "supplement", a known
+    non-prescription drug is "otc", otherwise "prescription".
+17. For supplements, return serving_size exactly as shown, such as "3 capsules".
+18. For supplements, active_ingredients lists Supplement Facts items with their
+    amount when visible, such as "Ginger Root Extract - 700 mg".
+19. For supplements, other_ingredients lists the Other Ingredients when visible.
+20. Do not put marketing claims or benefit bullets into active_ingredients.
+21. No commentary outside JSON.
 `
         },
         {
@@ -124,20 +245,35 @@ Rules:
             {
               type: "text",
               text:
-                "Extract medication, prescribing doctor, pharmacy name, and pharmacy phone number from these prescription bottle images."
+                "Extract every medication row plus any visible prescribing doctor, pharmacy name, and pharmacy phone number. The image may show a prescription bottle, a multi-medication pill-pack manifest, or a supplement / over-the-counter label. Classify item_type."
             },
             ...imageInputs,
           ],
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 700,
+      max_tokens: 1800,
     });
 
-    const parsed = JSON.parse(response.choices[0].message.content);
+    // A very long pill-pack list can exceed max_tokens; the JSON is then cut
+    // off and unusable. Tell the app so it can suggest scanning in parts.
+    const choice = response.choices[0];
+    let raw;
+    try {
+      raw = JSON.parse(choice.message.content);
+    } catch (_) {
+      raw = null;
+    }
+    if (!raw || choice.finish_reason === "length") {
+      return reply(422, {
+        code: "LIST_TOO_LONG",
+        error: "The medication list was too long to read in one photo.",
+      });
+    }
+    const parsed = normalizeMedicationList(raw);
 
     return reply(200, {
-      version: "v5-multi-image-pharmacy-phone",
+      version: "v7-medication-list-supplements",
       data: parsed,
     });
   } catch (err) {
@@ -149,3 +285,5 @@ Rules:
     });
   }
 };
+
+exports.normalizeMedicationList = normalizeMedicationList;

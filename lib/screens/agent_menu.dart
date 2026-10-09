@@ -1,11 +1,15 @@
 import 'dart:async';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/secure_store.dart';
+import '../services/fcm_token_service.dart';
 import '../services/app_state.dart';
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 
 class AgentMenuScreen extends StatefulWidget {
   const AgentMenuScreen({super.key});
@@ -45,21 +49,21 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Agent Agreement Update'),
+          title: Text(AppStrings.of(context).agentAgreementUpdate),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'You are solely responsible for compliance with applicable CMS and state marketing rules. Client relationship confirmations and messaging consent must always be completed by the client/user, never by the agent. Messaging is allowed only for confirmed clients with active consent. VitaLink records an audit trail of these actions.',
+                Text(
+                  AppStrings.of(context).agentResponsibilitiesBody,
                 ),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: checked,
                   onChanged: (value) =>
                       setDialogState(() => checked = value ?? false),
-                  title: const Text(
-                      'I understand and agree to these agent responsibilities.'),
+                  title:
+                      Text(AppStrings.of(context).agreeAgentResponsibilities),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
               ],
@@ -68,13 +72,45 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
           actions: [
             ElevatedButton(
               onPressed: checked ? () => Navigator.pop(ctx, true) : null,
-              child: const Text('Accept'),
+              child: Text(AppStrings.of(context).accept),
             ),
           ],
         ),
       ),
     );
     if (accepted == true) await ApiService.acceptAgentAgreement(agentId);
+  }
+
+  // Agents switch the app language here (Settings is client-only). The
+  // device is re-registered so notifications follow the new language.
+  Future<void> _chooseLanguage() async {
+    final strings = AppStrings.of(context);
+    final current = await LanguageService.getLanguageCode();
+    if (!mounted) return;
+    final labels = {
+      'system': strings.usePhoneLanguage,
+      'en': strings.english,
+      'es': 'Español (${strings.spanish})',
+    };
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(strings.language),
+        children: [
+          for (final option in LanguageService.supportedLanguages)
+            ListTile(
+              leading: Icon(option.code == current
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked),
+              title: Text(labels[option.code] ?? option.label),
+              onTap: () => Navigator.pop(ctx, option.code),
+            ),
+        ],
+      ),
+    );
+    if (chosen == null || chosen == current) return;
+    await LanguageService.setLanguageCode(chosen);
+    await _registerAgentToken();
   }
 
   Future<void> _registerAgentToken() async {
@@ -84,7 +120,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       final agentId = int.tryParse(agentIdText ?? "");
       if (agentId == null || agentId <= 0) return;
 
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await FcmTokenService.getToken();
       if (token == null || token.isEmpty) return;
 
       await ApiService.registerAgentDeviceToken(
@@ -142,23 +178,23 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            "Allow Notifications",
-            style: TextStyle(
+          title: Text(
+            AppStrings.of(context).allowNotifications,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            "VitaLink needs notifications turned on so you can receive referral alerts, profile updates, and client messages.",
-            style: TextStyle(color: Colors.white70),
+          content: Text(
+            AppStrings.of(context).agentNotificationsNeeded,
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 if (Navigator.canPop(context)) Navigator.pop(context);
               },
-              child: const Text("Later"),
+              child: Text(AppStrings.of(context).later),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -169,7 +205,7 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                 backgroundColor: const Color(0xFF7ED6F8),
                 foregroundColor: Colors.black,
               ),
-              child: const Text("Open Settings"),
+              child: Text(AppStrings.of(context).openSettings),
             ),
           ],
         ),
@@ -255,8 +291,8 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
 
       if (code.isEmpty) {
         _showSetupMessage(
-          "Agent Code Needed",
-          "We couldn't load your agent code. Open My Agent once, then try again.",
+          AppStrings.of(context).agentCodeNeeded,
+          AppStrings.of(context).couldntLoadAgentCode,
         );
         return;
       }
@@ -346,10 +382,17 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
         title: Text(
-          "Welcome $agentName",
+          AppStrings.of(context).welcomeAgent(agentName == 'Agent'
+              ? AppStrings.of(context).agentWord
+              : agentName),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: AppStrings.of(context).language,
+            icon: const Icon(Icons.language),
+            onPressed: _chooseLanguage,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Image.asset(
@@ -382,28 +425,43 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           children: [
-                            _item(Icons.badge, "My Agent", '/my_agent_agent'),
-                            _item(Icons.person, "My Profile",
+                            _item(Icons.badge, AppStrings.of(context).myAgent,
+                                '/my_agent_agent'),
+                            _item(
+                                Icons.person,
+                                AppStrings.of(context).myProfile,
                                 '/my_profile_agent'),
                             _item(
                               Icons.document_scanner,
-                              "Business Card Scanner",
+                              AppStrings.of(context).businessCardScanner,
                               '/my_profile_agent',
                               arguments: {'autoScan': true},
                             ),
 
                             // NEW BUTTON
-                            _item(Icons.groups, "My Clients", '/agent_clients'),
-                            _item(Icons.favorite, "Referral Center",
+                            _item(
+                                Icons.groups,
+                                AppStrings.of(context).myClients,
+                                '/agent_clients'),
+                            _item(
+                                Icons.favorite,
+                                AppStrings.of(context).referralCenter,
                                 '/agent_referrals'),
-                            _item(Icons.task_alt, "Notes / Tasks",
+                            _item(
+                                Icons.task_alt,
+                                AppStrings.of(context).notesTasks,
                                 '/agent_notes'),
-                            _item(Icons.medical_information, "Medications",
-                                '/meds'),
-                            _item(Icons.people, "Doctors", '/doctors'),
-                            _item(Icons.credit_card, "Insurance Cards",
+                            _item(Icons.medical_information,
+                                AppStrings.of(context).medications, '/meds'),
+                            _item(Icons.people, AppStrings.of(context).doctors,
+                                '/doctors'),
+                            _item(
+                                Icons.credit_card,
+                                AppStrings.of(context).insuranceCards,
                                 '/insurance_cards_menu'),
-                            _item(Icons.policy, "Insurance Policies",
+                            _item(
+                                Icons.policy,
+                                AppStrings.of(context).insurancePolicies,
                                 '/insurance_policies'),
                           ],
                         ),
@@ -438,9 +496,10 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                             ),
                                           )
                                         : const Icon(Icons.person_add_alt_1),
-                                    label: const Text(
-                                      "Register User Account",
-                                      style: TextStyle(
+                                    label: Text(
+                                      AppStrings.of(context)
+                                          .registerUserAccount,
+                                      style: const TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -465,9 +524,9 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                     ),
                                   ),
                                   icon: const Icon(Icons.warning_amber_rounded),
-                                  label: const Text(
-                                    "Emergency Info",
-                                    style: TextStyle(fontSize: 17),
+                                  label: Text(
+                                    AppStrings.of(context).emergencyInfo,
+                                    style: const TextStyle(fontSize: 17),
                                   ),
                                   onPressed: () => Navigator.pushNamed(
                                       context, '/emergency'),
@@ -487,9 +546,9 @@ class _AgentMenuScreenState extends State<AgentMenuScreen> {
                                     ),
                                   ),
                                   icon: const Icon(Icons.logout),
-                                  label: const Text(
-                                    "Log Out",
-                                    style: TextStyle(fontSize: 17),
+                                  label: Text(
+                                    AppStrings.of(context).logOut,
+                                    style: const TextStyle(fontSize: 17),
                                   ),
                                   onPressed: () => _logout(context),
                                 ),

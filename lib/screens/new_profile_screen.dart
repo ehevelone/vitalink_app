@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -27,7 +29,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   // 🔥 ADDED
   final _implantsCtrl = TextEditingController();
   final _proceduresCtrl = TextEditingController();
+  final _dnrPolstLocationCtrl = TextEditingController();
   bool _organDonor = false;
+  bool _dnrPolstOnFile = false;
   bool _isVeteran = false;
   bool _usesVaHealthcare = false;
 
@@ -37,6 +41,21 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   void initState() {
     super.initState();
     _repo = DataRepository(SecureStore());
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _dobCtrl.dispose();
+    _contactCtrl.dispose();
+    _phoneCtrl.dispose();
+    _allergiesCtrl.dispose();
+    _conditionsCtrl.dispose();
+    _bloodCtrl.dispose();
+    _implantsCtrl.dispose();
+    _proceduresCtrl.dispose();
+    _dnrPolstLocationCtrl.dispose();
+    super.dispose();
   }
 
   bool _validFullName(String v) {
@@ -79,6 +98,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
         implants: _implantsCtrl.text.trim(),
         procedures: _proceduresCtrl.text.trim(),
         organDonor: _organDonor,
+        dnrPolstOnFile: _dnrPolstOnFile,
+        dnrPolstLocation:
+            _dnrPolstOnFile ? _dnrPolstLocationCtrl.text.trim() : '',
       ),
     );
 
@@ -91,7 +113,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("New Household Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).newHouseholdProfile)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(22),
         child: Form(
@@ -100,17 +122,17 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Full Name (First & Last)",
-                  hintText: "First and Last Name",
-                  helperText: "Required for emergency identification",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).fullNameFirstLast,
+                  hintText: AppStrings.of(context).firstAndLastName,
+                  helperText: AppStrings.of(context).requiredForEmergencyId,
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return "Name is required";
+                    return AppStrings.of(context).nameIsRequired;
                   }
                   if (!_validFullName(v)) {
-                    return "Enter first & last name";
+                    return AppStrings.of(context).enterFirstLastName;
                   }
                   return null;
                 },
@@ -122,9 +144,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   TextField(
                     controller: _dobCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: "Date of Birth (MM/DD/YYYY)",
-                      suffixIcon: Icon(Icons.calendar_today),
+                    decoration: InputDecoration(
+                      labelText: AppStrings.of(context).dobMmDdYyyy,
+                      suffixIcon: const Icon(Icons.calendar_today),
                     ),
                     onTap: _pickDob,
                   ),
@@ -137,8 +159,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _bloodCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Blood Type (optional)"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).bloodTypeOptional),
                   ),
                   const Divider(height: 1),
                 ],
@@ -147,14 +169,14 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
 
               TextFormField(
                 controller: _contactCtrl,
-                decoration:
-                    const InputDecoration(labelText: "Emergency Contact"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).emergencyContactLabel),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return "Required";
+                    return AppStrings.of(context).requiredField;
                   }
                   if (!_validFullName(v)) {
-                    return "Enter full name";
+                    return AppStrings.of(context).enterFullName;
                   }
                   return null;
                 },
@@ -165,11 +187,12 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                decoration: const InputDecoration(labelText: "Emergency Phone"),
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).emergencyPhone),
                 validator: (v) {
                   final digits = v?.replaceAll(RegExp(r'\D'), '') ?? "";
                   if (digits.length != 10) {
-                    return "Enter valid phone";
+                    return AppStrings.of(context).enterValidPhone;
                   }
                   return null;
                 },
@@ -180,7 +203,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _allergiesCtrl,
-                    decoration: const InputDecoration(labelText: "Allergies"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).allergies),
                   ),
                   const Divider(height: 1),
                 ],
@@ -191,8 +215,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _conditionsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Medical Conditions"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).medicalConditions),
                   ),
                   const Divider(height: 1),
                 ],
@@ -204,8 +228,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _implantsCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Implanted Devices"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).implantedDevices),
                   ),
                   const Divider(height: 1),
                 ],
@@ -216,8 +240,8 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                 children: [
                   TextField(
                     controller: _proceduresCtrl,
-                    decoration:
-                        const InputDecoration(labelText: "Major Procedures"),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).majorProcedures),
                   ),
                   const Divider(height: 1),
                 ],
@@ -230,7 +254,7 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   _isVeteran = value;
                   if (!value) _usesVaHealthcare = false;
                 }),
-                title: const Text('Veteran'),
+                title: Text(AppStrings.of(context).veteran),
                 activeThumbColor: Colors.blue,
               ),
               if (_isVeteran)
@@ -238,15 +262,38 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                   value: _usesVaHealthcare,
                   onChanged: (value) =>
                       setState(() => _usesVaHealthcare = value),
-                  title: const Text('Do you use VA health care?'),
+                  title: Text(AppStrings.of(context).useVaHealthCare),
                   activeThumbColor: Colors.blue,
                 ),
               SwitchListTile(
                 value: _organDonor,
                 onChanged: (v) => setState(() => _organDonor = v),
-                title: const Text("Organ Donor"),
+                title: Text(AppStrings.of(context).organDonor),
                 activeThumbColor: Colors.red,
               ),
+              SwitchListTile(
+                value: _dnrPolstOnFile,
+                onChanged: (value) =>
+                    setState(() => _dnrPolstOnFile = value),
+                title: Text(AppStrings.of(context).dnrPolstOnFile),
+                activeThumbColor: Colors.red,
+              ),
+              if (_dnrPolstOnFile) ...[
+                TextFormField(
+                  controller: _dnrPolstLocationCtrl,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).signedFormLocation,
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? AppStrings.of(context).enterSignedFormLocation
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppStrings.of(context).dnrPolstDisclaimer,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 26),
 
               SizedBox(
@@ -270,9 +317,9 @@ class _NewProfileScreenState extends State<NewProfileScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          "Save Household Profile",
-                          style: TextStyle(
+                      : Text(
+                          AppStrings.of(context).saveHouseholdProfile,
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

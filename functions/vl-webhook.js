@@ -1,5 +1,7 @@
 const Stripe = require("stripe");
 const { Pool } = require("pg");
+const crypto = require("crypto");
+const { getActivationPriceId } = require("./services/stripe-prices");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -13,7 +15,7 @@ function generateCode() {
 
   const part = (len) =>
     Array.from({ length: len }, () =>
-      chars[Math.floor(Math.random() * chars.length)]
+      chars[crypto.randomInt(chars.length)]
     ).join("");
 
   return `VL-${part(4)}-${part(4)}`;
@@ -48,38 +50,49 @@ exports.handler = async (event) => {
 
   }
 
-  // 🔥 HANDLE ALL SUCCESS PATHS (CARD + ACH)
-  if (
+  const paidCheckoutEvent =
     stripeEvent.type === "checkout.session.completed" ||
-    stripeEvent.type === "checkout.session.async_payment_succeeded" ||
-    stripeEvent.type === "invoice.paid" // ✅ ADDED FOR ACH SAFETY
-  ) {
+    stripeEvent.type === "checkout.session.async_payment_succeeded";
+
+  if (paidCheckoutEvent) {
 
     console.log("Payment event detected");
 
-    const obj = stripeEvent.data.object;
+    const eventSession = stripeEvent.data.object;
+    const session = await stripe.checkout.sessions.retrieve(eventSession.id, {
+      expand: ["line_items.data.price"],
+    });
+    const activationPriceId = getActivationPriceId();
+    const lineItems = session.line_items?.data || [];
+    const validActivationPurchase =
+      session.mode === "payment" &&
+      session.payment_status === "paid" &&
+      lineItems.length === 1 &&
+      lineItems[0].price?.id === activationPriceId &&
+      lineItems[0].quantity === 1;
 
-    // 🔥 HANDLE DIFFERENT EVENT TYPES
-    let sessionId = null;
-    let email = null;
-
-    if (stripeEvent.type === "invoice.paid") {
-      // ACH final settlement
-      sessionId = obj.subscription || obj.id;
-      email = obj.customer_email || null;
-
-      console.log("Invoice paid (ACH cleared)");
-    } else {
-      // Checkout session
-      sessionId = obj.id;
-      email = obj.customer_details?.email || null;
+    if (!validActivationPurchase) {
+      console.log("Checkout ignored: not a paid VitaLink activation purchase");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ received: true, activation_created: false }),
+      };
     }
+
+    const sessionId = session.id;
+    const email = session.customer_details?.email?.trim().toLowerCase() || null;
 
     const code = generateCode();
 
     const client = await pool.connect();
 
     try {
+
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        [sessionId]
+      );
 
       const existing = await client.query(
         `SELECT id FROM activation_codes
@@ -107,9 +120,20 @@ exports.handler = async (event) => {
 
       }
 
+      await client.query("COMMIT");
+
     } catch (err) {
 
       console.error("DB error:", err);
+
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ received: false, error: "Activation could not be saved" }),
+      };
 
     } finally {
 

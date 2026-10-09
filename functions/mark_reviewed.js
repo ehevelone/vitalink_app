@@ -1,5 +1,6 @@
 // functions/mark_reviewed.js
 const db = require("./services/db");
+const { verifyUserSession } = require("./services/user-auth");
 
 const headers = {
   "Content-Type": "application/json",
@@ -37,11 +38,14 @@ exports.handler = async (event) => {
     if (!email) {
       return reply(400, { success: false, error: "Missing email" });
     }
+    if (!(await verifyUserSession(body.userId, body.sessionToken))) {
+      return reply(403, { success: false, error: "Unauthorized" });
+    }
 
     // ✅ Find user
     const userRes = await db.query(
-      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [email]
+      `SELECT id FROM users WHERE id = $1 AND LOWER(email) = LOWER($2) LIMIT 1`,
+      [body.userId, email]
     );
 
     if (!userRes.rows.length) {

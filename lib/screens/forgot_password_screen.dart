@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -15,7 +17,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _requestReset() async {
     if (_emailCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter your email")),
+        SnackBar(content: Text(AppStrings.of(context).enterYourEmail)),
       );
       return;
     }
@@ -32,7 +34,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       if (res['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Reset code sent to your email ✅")),
+          SnackBar(content: Text(AppStrings.of(context).resetCodeSentCheck)),
         );
         Navigator.pushReplacementNamed(
           context,
@@ -41,13 +43,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(res['error'] ?? "Request failed ❌")),
+          SnackBar(
+              content:
+                  Text(res['error'] ?? AppStrings.of(context).requestFailedX)),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text(AppStrings.of(context).errorMessage('$e'))),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -57,13 +61,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Forgot Password")),
+      appBar: AppBar(title: Text(AppStrings.of(context).forgotPassword)),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            const Text(
-              "Enter your email and we'll send you a reset code.",
+            Text(
+              AppStrings.of(context).forgotPasswordBody,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -71,8 +75,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               children: [
                 TextField(
                   controller: _emailCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).email,
                     border: InputBorder.none,
                   ),
                 ),
@@ -85,7 +89,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 : ElevatedButton.icon(
                     onPressed: _requestReset,
                     icon: const Icon(Icons.send),
-                    label: const Text("Send Reset Code"),
+                    label: Text(AppStrings.of(context).sendResetCode),
                   ),
           ],
         ),

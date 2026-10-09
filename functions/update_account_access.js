@@ -14,6 +14,7 @@ const {
   recordAccessCodeFailure,
 } = require("./services/access-code-rate-limit");
 const { createMailer, fromAddress } = require("./services/mailer");
+const { requestLanguage } = require("./services/notification-language");
 
 const headers = {
   "Content-Type": "application/json",
@@ -96,6 +97,7 @@ exports.handler = async (event) => {
             userId,
             agentId,
             agentName: current.rows[0].agent_name,
+            language: requestLanguage(event, body) || "en",
             category,
             granted: selections[category] === true,
             platform: body.platform,
@@ -202,6 +204,7 @@ exports.handler = async (event) => {
         userId,
         agentId,
         agentName: current.rows[0].agent_name,
+        language: requestLanguage(event, body) || "en",
         category,
         granted,
         declinedStatus: granted ? null : "withdrawn",
@@ -247,8 +250,12 @@ exports.handler = async (event) => {
         await createMailer().sendMail({
           from: fromAddress("VitaLink"),
           to: current.rows[0].email,
-          subject: "Your VitaLink agent connection has ended",
-          text: "Your agent connection has ended. You can enter another agent's code or an access code in the app.",
+          subject: requestLanguage(event, body) === "es"
+            ? "Terminó su conexión con el agente en VitaLink"
+            : "Your VitaLink agent connection has ended",
+          text: requestLanguage(event, body) === "es"
+            ? "Su conexión con el agente terminó. Puede ingresar el código de otro agente o un código de acceso en la aplicación."
+            : "Your agent connection has ended. You can enter another agent's code or an access code in the app.",
         });
         await recordConsentEvent({
           userId,
@@ -308,13 +315,48 @@ exports.handler = async (event) => {
       }
 
       await db.query(`ALTER TABLE activation_codes ADD COLUMN IF NOT EXISTS redeemed BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS redeemed_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS redeemed_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
-      const personal = await db.query(
-        "SELECT code, redeemed, redeemed_user_id FROM activation_codes WHERE code=$1 LIMIT 1",
-        [code]
-      );
-      const owned = current.rows[0].purchase_code === code ||
-        Number(personal.rows[0]?.redeemed_user_id) === Number(userId);
-      if (!personal.rows.length || (personal.rows[0].redeemed === true && !owned)) {
+      const transaction = await db.connect();
+      let claimed;
+      try {
+        await transaction.query("BEGIN");
+        claimed = await transaction.query(
+          `UPDATE activation_codes
+           SET redeemed=true,
+               redeemed_at=COALESCE(redeemed_at,NOW()),
+               redeemed_user_id=$2,
+               email=COALESCE(NULLIF(TRIM(email),''), $3)
+           WHERE code=$1
+             AND (redeemed=false OR redeemed_user_id=$2 OR $4=true)
+             AND (NULLIF(TRIM(email),'') IS NULL OR LOWER(email)=LOWER($3))
+           RETURNING code`,
+          [
+            code,
+            userId,
+            current.rows[0].email,
+            current.rows[0].purchase_code === code,
+          ]
+        );
+        if (!claimed.rows.length) {
+          await transaction.query("ROLLBACK");
+        } else {
+          await transaction.query(
+            `UPDATE users SET purchase_code=$1, agent_id=NULL, access_sponsor='personal',
+               relationship_status='not_applicable', messaging_consent_status='not_applicable',
+               messaging_consent_version=NULL, messaging_consented_at=NULL,
+               messaging_withdrawn_at=NOW()
+             WHERE id=$2`,
+            [code, userId]
+          );
+          await transaction.query("COMMIT");
+        }
+      } catch (claimError) {
+        await transaction.query("ROLLBACK").catch(() => {});
+        throw claimError;
+      } finally {
+        transaction.release();
+      }
+
+      if (!claimed.rows.length) {
         const failure = await recordAccessCodeFailure(scope, code);
         if (failure.locked) {
           return reply(429, {
@@ -325,15 +367,6 @@ exports.handler = async (event) => {
         }
         return reply(404, { success: false, error: "That access code is not valid" });
       }
-      await db.query("UPDATE activation_codes SET redeemed=true, redeemed_at=COALESCE(redeemed_at,NOW()), redeemed_user_id=$2 WHERE code=$1", [code, userId]);
-      await db.query(
-        `UPDATE users SET purchase_code=$1, agent_id=NULL, access_sponsor='personal',
-           relationship_status='not_applicable', messaging_consent_status='not_applicable',
-           messaging_consent_version=NULL, messaging_consented_at=NULL,
-           messaging_withdrawn_at=NOW()
-         WHERE id=$2`,
-        [code, userId]
-      );
       await recordConsentEvent({ userId, agentId, eventType: "personal_access_connected", platform: body.platform, deviceId: body.deviceId });
       await clearAccessCodeFailures(scope);
       return reply(200, { success: true, sponsor: "personal" });

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -48,8 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final title = _p!.fullName.isNotEmpty
-        ? "VitaLink Home for ${_p!.fullName}"
-        : "VitaLink Home";
+        ? AppStrings.of(context).vitalinkHomeFor(_p!.fullName)
+        : AppStrings.of(context).vitalinkHome;
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
@@ -71,9 +73,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
 
             // “Tap to open” text
-            const Text(
-              'Tap logo to open menu',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+            Text(
+              AppStrings.of(context).tapLogoToOpenMenu,
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 24),
 
@@ -86,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               icon: const Icon(Icons.warning, size: 20),
-              label: const Text("911 Emergency Info"),
+              label: Text(AppStrings.of(context).emergencyInfo911),
               onPressed: () => _openEmergency(context),
             ),
             const SizedBox(height: 16),
@@ -97,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white70),
               ),
-              child: const Text("Open Menu"),
+              child: Text(AppStrings.of(context).openMenu),
               onPressed: () => _openMenu(context),
             ),
           ],

@@ -9,6 +9,11 @@ const {
   ensureProspectMarketingSchema,
   marketingEnabled,
 } = require("./services/prospect-marketing");
+const {
+  deviceLanguage,
+  ensureLanguageColumns,
+  notificationText,
+} = require("./services/notification-language");
 
 const reply = (statusCode, body) => ({
   statusCode,
@@ -46,11 +51,12 @@ exports.handler = async (event) => {
     }
 
     await ensureAccountAccessSchema();
+    await ensureLanguageColumns();
     await ensureProspectMarketingSchema();
     initFirebase();
 
     const eligible = await db.query(
-      `SELECT u.id AS user_id, ud.id AS device_row_id, ud.device_token
+      `SELECT u.id AS user_id, ud.id AS device_row_id, ud.device_token, ud.app_language
        FROM users u
        JOIN prospect_marketing_consents c
          ON c.user_id=u.id AND c.agent_id=u.agent_id
@@ -80,8 +86,12 @@ exports.handler = async (event) => {
 
     let successCount = 0;
     let failureCount = 0;
-    const messageText = template.text(agent.name || "Your Agent");
     for (const row of recipients.values()) {
+      // The message is shown in the prospect's own app language.
+      const language = deviceLanguage(row);
+      const agentName = agent.name || (language === "es" ? "su agente" : "Your Agent");
+      const messageText = language === "es" ? template.textEs(agentName) : template.text(agentName);
+      const title = notificationText("messageFrom", language, { name: agent.name });
       const deliveryId = crypto.randomUUID();
       await db.query(
         `INSERT INTO prospect_marketing_deliveries
@@ -92,7 +102,7 @@ exports.handler = async (event) => {
       try {
         await admin.messaging().send({
           token: row.token,
-          notification: { title: `Message from ${agent.name || "Your Agent"}`, body: messageText },
+          notification: { title, body: messageText },
           android: { priority: "high", notification: { channelId: "vitalink_high_importance" } },
           data: {
             click_action: "FLUTTER_NOTIFICATION_CLICK",
@@ -102,8 +112,8 @@ exports.handler = async (event) => {
             category: template.category,
             templateId,
             topic: template.topic,
-            agentName: agent.name || "Your Agent",
-            title: `Message from ${agent.name || "Your Agent"}`,
+            agentName,
+            title,
             body: messageText,
           },
         });

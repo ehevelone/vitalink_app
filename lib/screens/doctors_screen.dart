@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/npi_verification_service.dart';
+import '../services/api_service.dart';
 import '../utils/phone_formatter.dart'; // ← NEW
 import '../widgets/npi_verification_widgets.dart';
 import '../widgets/working_overlay.dart';
@@ -41,6 +44,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
   Future<void> _save() async {
     _p!.updatedAt = DateTime.now();
     await _repo.saveProfile(_p!);
+    await ApiService.syncProfilesToServer();
     setState(() {});
   }
 
@@ -107,29 +111,35 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? 'Add Doctor' : 'Edit Doctor'),
+          title: Text(existing == null
+              ? AppStrings.of(context).addDoctor
+              : AppStrings.of(context).editDoctor),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 if (!isVerifiedRecord) ...[
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(labelText: 'Name'),
+                    decoration:
+                        InputDecoration(labelText: AppStrings.of(context).name),
                   ),
                   const Divider(height: 1),
                   TextField(
                     controller: specialty,
-                    decoration: const InputDecoration(labelText: 'Specialty'),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).specialty),
                   ),
                   const Divider(height: 1),
                   TextField(
                     controller: clinic,
-                    decoration: const InputDecoration(labelText: 'Clinic'),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).clinic),
                   ),
                   const Divider(height: 1),
                   TextField(
                     controller: phone,
-                    decoration: const InputDecoration(labelText: 'Phone'),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).phone),
                     keyboardType: TextInputType.phone,
                     inputFormatters: [PhoneNumberFormatter()],
                   ),
@@ -137,7 +147,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                 ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Primary care provider'),
+                  title: Text(AppStrings.of(context).primaryCareProvider),
                   value: isPrimaryCareProvider,
                   onChanged: (value) =>
                       setDialogState(() => isPrimaryCareProvider = value),
@@ -149,12 +159,15 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                     child: Text(
                       existing.verificationStatus == 'verified' &&
                               existing.npi != null
-                          ? 'NPI verified: ${existing.npi}'
+                          ? AppStrings.of(context)
+                              .npiVerifiedValue('${existing.npi}')
                           : existing.verificationStatus == 'va_verified'
-                              ? 'VA provider verified: ${existing.vaFacility ?? 'VA directory'}'
+                              ? AppStrings.of(context).vaProviderVerifiedAt(
+                                  existing.vaFacility ??
+                                      AppStrings.of(context).vaDirectory)
                               : existing.verificationStatus == 'needs_review'
-                                  ? 'NPI needs review. Save to review matches.'
-                                  : 'NPI not verified. Save to retry lookup.',
+                                  ? AppStrings.of(context).npiNeedsReviewSave
+                                  : AppStrings.of(context).npiNotVerifiedSave,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -163,7 +176,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Registry record',
+                        AppStrings.of(context).registryRecord,
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                     ),
@@ -208,11 +221,11 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(AppStrings.of(context).cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Save'),
+              child: Text(AppStrings.of(context).save),
             ),
           ],
         ),
@@ -244,7 +257,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     );
 
     setState(() {
-      _workingMessage = 'Saving and checking your doctor...';
+      _workingMessage = AppStrings.of(context).savingCheckingDoctor;
       if (existing == null) {
         _p!.doctors.add(doc);
         targetIndex = _p!.doctors.length - 1;
@@ -260,9 +273,10 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       }
     } catch (_) {
       if (mounted) {
+        if (!mounted) return;
         await _showDoctorLookupMessage(
-          'We could not check this doctor right now. Your information was saved, so you can try again.',
-          title: 'Could not check doctor',
+          AppStrings.of(context).couldNotCheckDoctorBody,
+          title: AppStrings.of(context).couldNotCheckDoctor,
         );
       }
     } finally {
@@ -272,13 +286,14 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
 
   Future<void> _showDoctorLookupMessage(
     String message, {
-    String title = 'Doctor not verified',
+    String? title,
   }) async {
     if (!mounted) return;
+    final dialogTitle = title ?? AppStrings.of(context).doctorNotVerified;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(title),
+        title: Text(dialogTitle),
         content: Text(message),
         actions: [
           FilledButton(
@@ -313,11 +328,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     );
 
     if (result.hasError) {
+      if (!mounted) return;
       await _showDoctorLookupMessage(
         result.error == 'Unauthorized'
-            ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
-            : 'VitaLink could not reach the provider search. Please try again.',
-        title: 'Could not check doctor',
+            ? AppStrings.of(context).sessionNotVerifiedRetryDoctor
+            : AppStrings.of(context).providerSearchUnreachable,
+        title: AppStrings.of(context).couldNotCheckDoctor,
       );
       return;
     }
@@ -342,11 +358,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         includeVa: _p!.isVeteran,
       );
       if (result.hasError) {
+        if (!mounted) return;
         await _showDoctorLookupMessage(
           result.error == 'Unauthorized'
-              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
-              : 'VitaLink could not reach the provider search. Please try again.',
-          title: 'Could not check doctor',
+              ? AppStrings.of(context).sessionNotVerifiedRetryDoctor
+              : AppStrings.of(context).providerSearchUnreachable,
+          title: AppStrings.of(context).couldNotCheckDoctor,
         );
         return;
       }
@@ -358,8 +375,9 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     while (mounted) {
       if (result.status != 'needs_review' || result.candidates.isEmpty) {
         if (result.candidates.isEmpty) {
+          if (!mounted) return;
           await _showDoctorLookupMessage(
-            'We could not find ${doctor.name} within 15 miles of that ZIP code. Check the name and ZIP, then try again.',
+            AppStrings.of(context).couldNotFindDoctorNearZip(doctor.name),
           );
         }
         return;
@@ -368,7 +386,7 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
       if (!mounted) return;
       selected = await showNpiCandidatePicker(
         context: context,
-        title: 'Which provider is ${doctor.name}?',
+        title: AppStrings.of(context).whichProviderIs(doctor.name),
         candidates: result.candidates,
         allowAlternateZip: true,
       );
@@ -393,11 +411,12 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
         includeVa: _p!.isVeteran,
       );
       if (result.hasError) {
+        if (!mounted) return;
         await _showDoctorLookupMessage(
           result.error == 'Unauthorized'
-              ? 'VitaLink could not verify your signed-in session. Please sign in again, then retry this doctor.'
-              : 'VitaLink could not reach the provider search. Please try again.',
-          title: 'Could not check doctor',
+              ? AppStrings.of(context).sessionNotVerifiedRetryDoctor
+              : AppStrings.of(context).providerSearchUnreachable,
+          title: AppStrings.of(context).couldNotCheckDoctor,
         );
         return;
       }
@@ -467,16 +486,16 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Remove doctor?'),
+        title: Text(AppStrings.of(context).removeDoctor),
         content: Text(_p!.doctors[i].name),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -497,11 +516,11 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
     final docs = _p!.doctors;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Doctors")),
+      appBar: AppBar(title: Text(AppStrings.of(context).doctors)),
       body: Stack(
         children: [
           docs.isEmpty
-              ? const Center(child: Text("No doctors added."))
+              ? Center(child: Text(AppStrings.of(context).noDoctorsAdded))
               : ListView.separated(
                   itemCount: docs.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -529,7 +548,9 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                           ].any((value) => value.isNotEmpty))
                             Text(
                               [
-                                if (d.specialty.isNotEmpty) d.specialty,
+                                if (d.specialty.isNotEmpty)
+                                  AppStrings.of(context)
+                                      .doctorSpecialtyLabel(d.specialty),
                                 if (d.clinic.isNotEmpty) d.clinic,
                                 if (d.phone.isNotEmpty) d.phone,
                               ].join(" • "),
@@ -542,8 +563,9 @@ class _DoctorsScreenState extends State<DoctorsScreen> {
                             const SizedBox(height: 3),
                             Text(
                               d.vaFacility?.trim().isNotEmpty == true
-                                  ? 'VA Provider - ${d.vaFacility}'
-                                  : 'VA Provider',
+                                  ? AppStrings.of(context)
+                                      .vaProviderAt('${d.vaFacility}')
+                                  : AppStrings.of(context).vaProvider,
                               style: const TextStyle(
                                 color: Colors.blue,
                                 fontWeight: FontWeight.w600,

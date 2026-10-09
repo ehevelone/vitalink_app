@@ -1,4 +1,5 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 const CONTACT_REQUEST_VERSION = "2026-10-01";
 const MAX_SENDS_PER_30_DAYS = Number(process.env.PROSPECT_MESSAGE_30_DAY_LIMIT || 3);
@@ -9,30 +10,35 @@ const TEMPLATES = {
     topic: "Medicare",
     label: "AEP reminder",
     text: (name) => `AEP begins October 15. Would you like to schedule a Medicare coverage review? Contact ${name}.`,
+    textEs: (name) => `El AEP comienza el 15 de octubre. ¿Desea programar una revisión de su cobertura de Medicare? Comuníquese con ${name}.`,
   },
   medicare_window: {
     category: "medicare",
     topic: "Medicare",
     label: "Enrollment window",
     text: (name) => `Your Medicare enrollment window is approaching. Tap here if you'd like ${name} to reach out.`,
+    textEs: (name) => `Se acerca su período de inscripción en Medicare. Toque aquí si desea que ${name} se comunique con usted.`,
   },
   medicare_options: {
     category: "medicare",
     topic: "Medicare",
     label: "Medicare conversation",
     text: (name) => `Would you like to talk about your Medicare options? Contact ${name}.`,
+    textEs: (name) => `¿Desea hablar sobre sus opciones de Medicare? Comuníquese con ${name}.`,
   },
   life_awareness: {
     category: "life",
     topic: "Life Insurance",
     label: "Life Insurance Awareness Month",
     text: (name) => `It's Life Insurance Awareness Month. Would you like to talk with ${name}?`,
+    textEs: (name) => `Es el mes de concientización sobre el seguro de vida. ¿Desea hablar con ${name}?`,
   },
   life_family: {
     category: "life",
     topic: "Life Insurance",
     label: "Family coverage",
     text: (name) => `Would you like to discuss life insurance options for you or your family? Contact ${name}.`,
+    textEs: (name) => `¿Desea hablar sobre opciones de seguro de vida para usted o su familia? Comuníquese con ${name}.`,
   },
 };
 
@@ -77,6 +83,9 @@ async function ensureProspectMarketingSchema() {
     )
   `);
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureProspectMarketingSchema = schemaOnce("prospect-marketing:ensureProspectMarketingSchema", ensureProspectMarketingSchema);
 
 module.exports = {
   CONTACT_REQUEST_VERSION,

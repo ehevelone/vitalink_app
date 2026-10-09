@@ -4,8 +4,14 @@ const {
   ensureSchema,
   parseBody,
   reply,
+  uniqueTargets,
   verifyUserSession,
 } = require("./services/profile-share-sync");
+const {
+  ensureLanguageColumns,
+  notificationText,
+  sendLocalizedMulticast,
+} = require("./services/notification-language");
 
 async function notifyRecipient(recipientUserId, shareId) {
   if (!recipientUserId) return;
@@ -22,24 +28,25 @@ async function notifyRecipient(recipientUserId, shareId) {
         }),
       });
     }
+    await ensureLanguageColumns();
     const devices = await db.query(
-      `SELECT device_token FROM user_devices
+      `SELECT device_token, app_language FROM user_devices
        WHERE user_id=$1 AND device_status='active' AND device_token IS NOT NULL`,
       [recipientUserId]
     );
-    const tokens = devices.rows.map((row) => row.device_token).filter(Boolean);
-    if (tokens.length) {
-      await admin.messaging().sendEachForMulticast({
+    const targets = uniqueTargets(devices.rows);
+    if (targets.length) {
+      await sendLocalizedMulticast(admin.messaging(), targets, (language, tokens) => ({
         tokens,
         data: {
           type: "profile_share_revoked",
           shareId: String(shareId),
-          title: "Profile sharing ended",
-          body: "A shared VitaLink profile is no longer receiving updates.",
+          title: notificationText("sharingEndedTitle", language),
+          body: notificationText("sharingEndedBody", language),
         },
         android: { priority: "high" },
         apns: { payload: { aps: { "content-available": 1 } } },
-      });
+      }));
     }
   } catch (err) {
     console.error("Profile revocation push failed:", err.message);

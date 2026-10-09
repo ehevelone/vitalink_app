@@ -4,6 +4,7 @@ const {
   clean,
   db,
   ensureSchema,
+  generateShortCode,
   parseBody,
   reply,
   verifyActiveUserDevice,
@@ -33,15 +34,27 @@ exports.handler = async (event) => {
        WHERE user_id=$1 AND status IN ('pending','downloaded')`,
       [userId]
     );
-    const transferCode = `VT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
-    const transferId = crypto.randomUUID();
-    const transfer = await db.query(
-      `INSERT INTO device_transfer_packages
-        (id, user_id, transfer_code, chunk_count)
-       VALUES ($1,$2,$3,$4)
-       RETURNING id`,
-      [transferId, userId, transferCode, chunkCount]
-    );
+    // Current apps ask for a short, typeable code; older apps still get the
+    // long "VT-" code they know how to display.
+    const shortCode = body.codeFormat === "short";
+    let transferCode;
+    let transfer;
+    for (let attempt = 0; attempt < 3 && !transfer; attempt += 1) {
+      transferCode = shortCode
+        ? generateShortCode()
+        : `VT-${crypto.randomBytes(16).toString("hex").toUpperCase()}`;
+      try {
+        transfer = await db.query(
+          `INSERT INTO device_transfer_packages
+            (id, user_id, transfer_code, chunk_count)
+           VALUES ($1,$2,$3,$4)
+           RETURNING id`,
+          [crypto.randomUUID(), userId, transferCode, chunkCount]
+        );
+      } catch (err) {
+        if (err.code !== "23505" || attempt === 2) throw err; // unique collision
+      }
+    }
     return reply(200, {
       success: true,
       transferId: transfer.rows[0].id,

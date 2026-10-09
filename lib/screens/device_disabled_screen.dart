@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../services/device_security_service.dart';
 
 class DeviceDisabledScreen extends StatefulWidget {
@@ -22,18 +23,18 @@ class _DeviceDisabledScreenState extends State<DeviceDisabledScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Erase VitaLink data?'),
-        content: const Text(
-          'Confirm your profiles are available on the new device first. This permanently deletes VitaLink profiles and files from this old device and cannot be undone.',
+        title: Text(AppStrings.of(context).eraseVitaLinkDataTitle),
+        content: Text(
+          AppStrings.of(context).eraseVitaLinkDataBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep Data'),
+            child: Text(AppStrings.of(context).keepData),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Erase From This Device'),
+            child: Text(AppStrings.of(context).eraseFromThisDevice),
           ),
         ],
       ),
@@ -64,41 +65,42 @@ class _DeviceDisabledScreenState extends State<DeviceDisabledScreen> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                  Icon(Icons.phonelink_erase,
-                      size: 72, color: Colors.red.shade700),
-                  const SizedBox(height: 22),
-                  const Text(
-                    'This device has been disabled',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    replaced && !erased
-                        ? 'VitaLink was moved to a new device. Your local profiles have not been erased from this old device.'
-                        : lostOrStolen && erased
-                            ? 'This device was reported lost or stolen. VitaLink access was disabled and locally stored VitaLink profiles were erased.'
-                            : 'VitaLink access has been disabled on this device.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, height: 1.4),
-                  ),
-                  if (replaced && !erased) ...[
-                    const SizedBox(height: 18),
-                    OutlinedButton.icon(
-                      onPressed: _eraseData,
-                      icon: const Icon(Icons.delete_forever_outlined),
-                      label: const Text('Erase VitaLink Data'),
-                    ),
-                  ],
-                  const SizedBox(height: 26),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
-                    ),
-                    child: const Text('Return to Login'),
-                  ),
+                      Icon(Icons.phonelink_erase,
+                          size: 72, color: Colors.red.shade700),
+                      const SizedBox(height: 22),
+                      Text(
+                        AppStrings.of(context).deviceDisabledTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 25, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        replaced && !erased
+                            ? AppStrings.of(context).deviceMovedBody
+                            : lostOrStolen && erased
+                                ? AppStrings.of(context).deviceLostStolenBody
+                                : AppStrings.of(context).deviceDisabledBody,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, height: 1.4),
+                      ),
+                      if (replaced && !erased) ...[
+                        const SizedBox(height: 18),
+                        OutlinedButton.icon(
+                          onPressed: _eraseData,
+                          icon: const Icon(Icons.delete_forever_outlined),
+                          label: Text(AppStrings.of(context).eraseVitaLinkData),
+                        ),
+                      ],
+                      const SizedBox(height: 26),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/login',
+                          (route) => false,
+                        ),
+                        child: Text(AppStrings.of(context).returnToLogin),
+                      ),
                     ],
                   );
                 },

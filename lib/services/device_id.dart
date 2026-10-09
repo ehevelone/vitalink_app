@@ -31,6 +31,16 @@ class DeviceId {
     return fresh;
   }
 
+  /// Forgets this install's id so the next [getOrCreate] makes a new one.
+  /// Used when the server disables this phone: the old id stays revoked on
+  /// the server forever, and on iPhone the keychain keeps it even across a
+  /// reinstall, so without a fresh id the phone could never log in again.
+  static Future<void> reset() async {
+    final prefs = await SharedPreferences.getInstance();
+    await SecureStore().remove(_key);
+    await prefs.remove(_fallbackKey);
+  }
+
   // 32-hex chars (128-bit) from a cryptographically secure RNG.
   static String _generate() {
     final rnd = Random.secure();

@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -9,16 +11,13 @@ import 'insurance_card_detail.dart';
 class InsuranceCardsScreen extends StatefulWidget {
   final int index;
 
-  const InsuranceCardsScreen(
-      {super.key, required this.index});
+  const InsuranceCardsScreen({super.key, required this.index});
 
   @override
-  State<InsuranceCardsScreen> createState() =>
-      _InsuranceCardsScreenState();
+  State<InsuranceCardsScreen> createState() => _InsuranceCardsScreenState();
 }
 
-class _InsuranceCardsScreenState
-    extends State<InsuranceCardsScreen> {
+class _InsuranceCardsScreenState extends State<InsuranceCardsScreen> {
   late final DataRepository _repo;
   Profile? _p;
   bool _loading = true;
@@ -88,19 +87,13 @@ class _InsuranceCardsScreenState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_error ||
-        _p == null ||
-        widget.index >=
-            _p!.insurances.length) {
-      return const Scaffold(
-        body: Center(
-            child:
-                Text("Unable to load cards")),
+    if (_error || _p == null || widget.index >= _p!.insurances.length) {
+      return Scaffold(
+        body: Center(child: Text(AppStrings.of(context).unableToLoadCards)),
       );
     }
 
@@ -111,7 +104,7 @@ class _InsuranceCardsScreenState
         title: Text(
           ins.carrier.isNotEmpty
               ? "${ins.carrier} – Cards"
-              : "Insurance Cards",
+              : AppStrings.of(context).insuranceCards,
         ),
       ),
       body: Column(
@@ -131,9 +124,9 @@ class _InsuranceCardsScreenState
                   ),
                 ),
                 icon: const Icon(Icons.camera_alt),
-                label: const Text(
-                  'Scan Insurance Card',
-                  style: TextStyle(
+                label: Text(
+                  AppStrings.of(context).scanInsuranceCard,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -141,25 +134,18 @@ class _InsuranceCardsScreenState
               ),
             ),
           ),
-
           Expanded(
             child: ins.cards.isEmpty
-                ? const Center(
-                    child:
-                        Text("No cards for this policy"))
+                ? Center(child: Text(AppStrings.of(context).noCardsForPolicy))
                 : ListView.builder(
                     itemCount: ins.cards.length,
-                    itemBuilder:
-                        (context, index) {
+                    itemBuilder: (context, index) {
                       final card = ins.cards[index];
 
-                      final path =
-                          card.frontImagePath;
+                      final path = card.frontImagePath;
 
                       final hasImage =
-                          path.isNotEmpty &&
-                              File(path)
-                                  .existsSync();
+                          path.isNotEmpty && File(path).existsSync();
                       final hasMedicarePlan =
                           _detectMedicarePlanId(card).isNotEmpty;
 
@@ -178,10 +164,10 @@ class _InsuranceCardsScreenState
                                   Icons.credit_card,
                                   size: 40,
                                 ),
-                          title:
-                              Text("Card ${index + 1}"),
-                          subtitle:
-                              Text("Source: ${card.source}"),
+                          title: Text(
+                              AppStrings.of(context).cardNumber(index + 1)),
+                          subtitle: Text(
+                              AppStrings.of(context).sourceValue(card.source)),
                           onTap: () => _openCard(card),
                           trailing: hasMedicarePlan
                               ? SizedBox(
@@ -201,7 +187,7 @@ class _InsuranceCardsScreenState
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
-                                    child: const Text("Co-pays"),
+                                    child: Text(AppStrings.of(context).copays),
                                   ),
                                 )
                               : null,
@@ -219,49 +205,33 @@ class _InsuranceCardsScreenState
 class CardDetailViewer extends StatefulWidget {
   final InsuranceCard card;
 
-  const CardDetailViewer(
-      {super.key, required this.card});
+  const CardDetailViewer({super.key, required this.card});
 
   @override
-  State<CardDetailViewer> createState() =>
-      _CardDetailViewerState();
+  State<CardDetailViewer> createState() => _CardDetailViewerState();
 }
 
-class _CardDetailViewerState
-    extends State<CardDetailViewer> {
+class _CardDetailViewerState extends State<CardDetailViewer> {
   bool showingFront = true;
 
   @override
   Widget build(BuildContext context) {
-    final front =
-        widget.card.frontImagePath;
-    final back =
-        widget.card.backImagePath;
+    final front = widget.card.frontImagePath;
+    final back = widget.card.backImagePath;
 
-    final path = showingFront
-        ? front
-        : back;
+    final path = showingFront ? front : back;
 
-    if (path == null ||
-        path.isEmpty ||
-        !File(path).existsSync()) {
-      return const Scaffold(
-        body: Center(
-            child:
-                Text("No image available")),
+    if (path == null || path.isEmpty || !File(path).existsSync()) {
+      return Scaffold(
+        body: Center(child: Text(AppStrings.of(context).noImageAvailable)),
       );
     }
 
     return Scaffold(
-      appBar:
-          AppBar(title: const Text("Card Viewer")),
+      appBar: AppBar(title: Text(AppStrings.of(context).cardViewer)),
       body: GestureDetector(
-        onTap: (back != null &&
-                back.isNotEmpty)
-            ? () => setState(
-                () =>
-                    showingFront =
-                        !showingFront)
+        onTap: (back != null && back.isNotEmpty)
+            ? () => setState(() => showingFront = !showingFront)
             : null,
         child: Center(
           child: Image.file(

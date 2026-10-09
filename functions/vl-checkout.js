@@ -27,6 +27,14 @@ exports.handler = async (event) => {
 
       mode: "payment",
 
+      name_collection: {
+        individual: { enabled: true, optional: false }
+      },
+
+      metadata: {
+        purchase_type: "consumer_activation"
+      },
+
       line_items: [
         {
           price: getActivationPriceId(),

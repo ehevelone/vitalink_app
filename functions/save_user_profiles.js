@@ -1,11 +1,8 @@
-const { Pool } = require("pg");
 const crypto = require("crypto");
 const { encrypt } = require("./encrypt.js");
-
-const pool = new Pool({
-  connectionString: process.env.SUPABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+// Shared pool (services/db.js) so this hot endpoint does not open its own.
+const pool = require("./services/db");
+const { verifyUserSession } = require("./services/user-auth");
 
 // 🔥 NEW: merge insurance entries BEFORE save
 function reply(statusCode, obj) {
@@ -21,29 +18,6 @@ function reply(statusCode, obj) {
   };
 }
 
-async function verifyUserSession(userId, token) {
-  if (!userId || !token) return false;
-
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_token TEXT,
-    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
-  `);
-
-  const result = await pool.query(
-    `
-    SELECT id
-    FROM users
-    WHERE id = $1
-      AND session_token = $2
-      AND session_expires > NOW()
-    LIMIT 1
-    `,
-    [userId, token]
-  );
-
-  return result.rows.length > 0;
-}
 
 function mergeInsuranceEntries(profile) {
   if (!profile.insurance || !Array.isArray(profile.insurance)) return profile;
@@ -122,9 +96,14 @@ exports.handler = async (event) => {
         const encrypted_data = encrypt(JSON.stringify(cleanedProfile));
 
         const existing = await pool.query(
-          `SELECT id, qr_token FROM profiles WHERE id = $1 LIMIT 1`,
+          `SELECT id, user_id, qr_token FROM profiles WHERE id = $1 LIMIT 1`,
           [profileId]
         );
+
+        if (existing.rows.length && String(existing.rows[0].user_id) !== String(id)) {
+          console.error("save_user_profiles ownership mismatch", { profileId });
+          continue;
+        }
 
         let token;
         let token_hash;
@@ -164,6 +143,7 @@ exports.handler = async (event) => {
             name = EXCLUDED.name,
             encrypted_data = EXCLUDED.encrypted_data,
             token_hash = EXCLUDED.token_hash
+          WHERE profiles.user_id = EXCLUDED.user_id
           `,
           [
             profileId,

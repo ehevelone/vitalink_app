@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test functions/tests/*.test.js"
+    "test": "node --test functions/tests/*.test.js test-js/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

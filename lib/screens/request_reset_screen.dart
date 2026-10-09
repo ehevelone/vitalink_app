@@ -1,5 +1,6 @@
 // lib/screens/request_reset_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 
 class RequestResetScreen extends StatefulWidget {
@@ -30,7 +31,7 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Reset code sent ✅")),
+          SnackBar(content: Text("${AppStrings.of(context).resetCodeSent} ✅")),
         );
 
         Navigator.pushNamed(
@@ -42,14 +43,15 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['error'] ?? "Request failed ❌"),
+            content: Text(
+                data['error'] ?? "${AppStrings.of(context).requestFailed} ❌"),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text(AppStrings.of(context).errorMessage('$e'))),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -65,7 +67,7 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Request Password Reset")),
+      appBar: AppBar(title: Text(AppStrings.of(context).requestPasswordReset)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -74,16 +76,18 @@ class _RequestResetScreenState extends State<RequestResetScreen> {
             children: [
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Email or Phone"),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter email or phone" : null,
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).emailOrPhone),
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).enterEmailOrPhone
+                    : null,
               ),
               const SizedBox(height: 24),
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.send),
-                      label: const Text("Send Reset Code"),
+                      label: Text(AppStrings.of(context).sendResetCode),
                       onPressed: _doRequest,
                     ),
             ],

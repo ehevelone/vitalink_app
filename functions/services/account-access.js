@@ -1,4 +1,5 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 const AGREEMENT_VERSION = "2026-10-01";
 const MESSAGING_CONSENT_VERSION = "2026-09-30";
@@ -15,9 +16,12 @@ const PROSPECT_CATEGORIES = {
   },
 };
 
-function prospectConsentText(category, agentName) {
+// The exact text the user sees is stored with the consent, so a Spanish
+// user's record holds the Spanish wording they agreed to.
+function prospectConsentText(category, agentName, language = "en") {
   const config = PROSPECT_CATEGORIES[category];
   if (!config) return null;
+  if (language === "es") return prospectConsentTextEs(category, config, agentName);
   const name = String(agentName || "your connected agent").trim();
   const topic = category === "medicare"
     ? "Medicare coverage options, enrollment periods, and invitations to request an appointment"
@@ -27,6 +31,19 @@ function prospectConsentText(category, agentName) {
     : "purchase coverage";
 
   return `I agree to receive in-app and push marketing messages from ${name}, a licensed insurance agent, about ${topic}. ${name} may be compensated if I ${compensation}. This permission applies only to ${name} and only to ${config.label} messages delivered through VitaLink. It does not authorize phone calls, text messages, or email. This consent is optional, is not required to use VitaLink, expires ${config.durationDays} days after I provide it, and may be withdrawn at any time.`;
+}
+
+function prospectConsentTextEs(category, config, agentName) {
+  const name = String(agentName || "su agente conectado").trim();
+  const topic = category === "medicare"
+    ? "opciones de cobertura de Medicare, períodos de inscripción e invitaciones para solicitar una cita"
+    : "información sobre seguros de vida e invitaciones para solicitar una conversación";
+  const compensation = category === "medicare"
+    ? "me inscribo en un plan"
+    : "compro una cobertura";
+  const label = category === "medicare" ? "Medicare" : "seguro de vida";
+
+  return `Acepto recibir mensajes de mercadeo dentro de la aplicación y notificaciones de ${name}, agente de seguros con licencia, sobre ${topic}. ${name} puede recibir una compensación si ${compensation}. Este permiso se aplica solo a ${name} y solo a mensajes de ${label} enviados por medio de VitaLink. No autoriza llamadas telefónicas, mensajes de texto ni correos electrónicos. Este consentimiento es opcional, no es necesario para usar VitaLink, vence ${config.durationDays} días después de otorgarlo y puede retirarse en cualquier momento.`;
 }
 
 async function ensureAccountAccessSchema() {
@@ -145,9 +162,10 @@ async function setProspectConsent({
   declinedStatus,
   platform,
   deviceId,
+  language,
 }) {
   const config = PROSPECT_CATEGORIES[category];
-  const consentText = prospectConsentText(category, agentName);
+  const consentText = prospectConsentText(category, agentName, language);
   if (!config || !consentText) throw new Error("Unsupported prospect category");
 
   const status = granted ? "granted" : (declinedStatus || "deferred");
@@ -209,6 +227,9 @@ async function recordConsentEvent({
     ]
   );
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureAccountAccessSchema = schemaOnce("account-access:ensureAccountAccessSchema", ensureAccountAccessSchema);
 
 module.exports = {
   AGREEMENT_VERSION,

@@ -5,6 +5,12 @@ const {
   MESSAGING_CONSENT_VERSION,
   ensureAccountAccessSchema,
 } = require("./services/account-access");
+const {
+  deviceLanguage,
+  ensureLanguageColumns,
+  notificationText,
+  sendLocalizedMulticast,
+} = require("./services/notification-language");
 
 /* INIT FIREBASE (SAFE ENV ONLY) */
 if (!admin.apps.length) {
@@ -157,47 +163,32 @@ function pickCampaign(now = new Date()) {
 }
 
 /* CAMPAIGN MESSAGES */
-function campaignText(campaign, agentName) {
-  const name = agentName || "Your Agent";
+function campaignText(campaign, agentName, language = "en") {
+  const text = (key, vars) => notificationText(key, language, vars);
+  const title = text("messageFrom", { name: agentName });
 
   if (campaign === "PREP") {
-    return {
-      title: `Message from ${name}`,
-      body: "Medicare enrollment is approaching. Please tap here to securely send your information before your upcoming appointment.",
-      route: "/authorization_form",
-    };
+    return { title, body: text("campaignPrep"), route: "/authorization_form" };
   }
 
   if (campaign === "AEP") {
-    return {
-      title: `Message from ${name}`,
-      body: "It's time for your Medicare Enrollment Review! Please tap here to securely send your updated information to your agent.",
-      route: "/authorization_form",
-    };
+    return { title, body: text("campaignAep"), route: "/authorization_form" };
   }
 
   if (campaign === "OEP") {
-    return {
-      title: `Message from ${name}`,
-      body: "There’s still time to review your Medicare coverage. Tap here to securely send your updated information to your agent.",
-      route: "/authorization_form",
-    };
+    return { title, body: text("campaignOep"), route: "/authorization_form" };
   }
 
   // 🔥 NEW UPDATE NOTIFICATION
   if (campaign === "UPDATE") {
     return {
-      title: "VitaLink Updated",
-      body: "VitaLink has been updated with improvements and new features. Open the app to see what's new.",
+      title: text("appUpdatedTitle"),
+      body: text("appUpdatedBody"),
       route: "/update_app",
     };
   }
 
-  return {
-    title: `Message from ${name}`,
-    body: "Tap here to securely send your Medicare information so your agent can keep your coverage up to date.",
-    route: "/authorization_form",
-  };
+  return { title, body: text("campaignGeneral"), route: "/authorization_form" };
 }
 
 /* SEASON LOGIC */
@@ -227,6 +218,7 @@ exports.handler = async (event) => {
     }
 
     await ensureDeviceDeliveryColumns();
+    await ensureLanguageColumns();
     await ensureAccountAccessSchema();
 
     let body = {};
@@ -280,7 +272,8 @@ exports.handler = async (event) => {
       SELECT
         ud.id AS device_row_id,
         ud.device_token AS device_token,
-        ud.user_id AS user_id
+        ud.user_id AS user_id,
+        ud.app_language AS app_language
       FROM user_devices ud
       JOIN users u ON u.id = ud.user_id
       WHERE u.agent_id = $1
@@ -319,29 +312,34 @@ exports.handler = async (event) => {
         deviceRowId: row.device_row_id,
         userId: row.user_id,
         token,
+        language: deviceLanguage(row),
       });
     }
 
     const tokens = devices.map(d => d.token);
 
-    const notif = campaignText(campaign, agent.name);
-
-    const message = {
-      tokens,
-      notification: {
-        title: notif.title,
-        body: notif.body,
-      },
-      android: {
-        priority: "high",
-      },
-      data: {
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-        route: notif.route,
-      },
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
+    // Each phone gets the message in its own app language.
+    const response = await sendLocalizedMulticast(
+      admin.messaging(),
+      devices,
+      (language, languageTokens) => {
+        const notif = campaignText(campaign, agent.name, language);
+        return {
+          tokens: languageTokens,
+          notification: {
+            title: notif.title,
+            body: notif.body,
+          },
+          android: {
+            priority: "high",
+          },
+          data: {
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
+            route: notif.route,
+          },
+        };
+      }
+    );
 
     await recordDeliveryResults(devices, response);
     await db.query(

@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -96,19 +98,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   }
 
   Future<void> _addToDeviceCalendar(UserAppointment appointment) async {
+    // Read wording before any await so it is safe to use after them.
+    final strings = AppStrings.of(context);
     final start = appointment.appointmentAt.toLocal();
     final end = start.add(const Duration(hours: 1));
     final description = [
-      if (appointment.specialty.isNotEmpty) 'Specialty: ${appointment.specialty}',
+      if (appointment.specialty.isNotEmpty)
+        strings.specialtyValue(
+            strings.doctorSpecialtyLabel(appointment.specialty)),
       if (appointment.notes.isNotEmpty) appointment.notes,
-      'Created from VitaLink.',
+      strings.createdFromVitaLink,
     ].join('\n');
 
     if (Platform.isAndroid || Platform.isIOS) {
       final opened = await _calendarChannel.invokeMethod<bool>(
             'insertEvent',
             {
-              'title': 'Appointment with ${appointment.doctorName}',
+              'title': strings.appointmentWith(appointment.doctorName),
               'description': description,
               'startMillis': start.millisecondsSinceEpoch,
               'endMillis': end.millisecondsSinceEpoch,
@@ -123,7 +129,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         .replaceAll(RegExp(r'^-+|-+$'), '')
         .toLowerCase();
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/${fileName.isEmpty ? 'vitalink-appointment' : fileName}.ics');
+    final file = File(
+        '${dir.path}/${fileName.isEmpty ? 'vitalink-appointment' : fileName}.ics');
     final now = DateTime.now().toUtc();
     final ics = [
       'BEGIN:VCALENDAR',
@@ -134,7 +141,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       'DTSTAMP:${_icsDate(now)}',
       'DTSTART:${_icsDate(start)}',
       'DTEND:${_icsDate(end)}',
-      'SUMMARY:${_icsText('Appointment with ${appointment.doctorName}')}',
+      'SUMMARY:${_icsText(strings.appointmentWith(appointment.doctorName))}',
       'DESCRIPTION:${_icsText(description)}',
       'END:VEVENT',
       'END:VCALENDAR',
@@ -143,7 +150,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     await file.writeAsString(ics);
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'text/calendar')],
-      text: 'Add this VitaLink appointment to your calendar.',
+      text: strings.addAppointmentToCalendarShare,
     );
   }
 
@@ -153,19 +160,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     final shouldAdd = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add to phone calendar?'),
+        title: Text(AppStrings.of(context).addToPhoneCalendar),
         content: Text(
           '${appointment.doctorName}\n${_dateLabel(appointment.appointmentAt)}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not Now'),
+            child: Text(AppStrings.of(context).notNow),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.calendar_month),
-            label: const Text('Add to Calendar'),
+            label: Text(AppStrings.of(context).addToCalendar),
           ),
         ],
       ),
@@ -213,7 +220,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(
-            existing == null ? 'Add Appointment' : 'Edit Appointment',
+            existing == null
+                ? AppStrings.of(context).addAppointment
+                : AppStrings.of(context).editAppointment,
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -226,26 +235,26 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       : selectedDoctorIndex == null
                           ? null
                           : 'doctor_$selectedDoctorIndex',
-                  decoration: const InputDecoration(
-                    labelText: 'Doctor',
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).doctor,
                   ),
                   items: [
                     ...doctors.asMap().entries.map(
-                      (entry) => DropdownMenuItem<String>(
-                        value: 'doctor_${entry.key}',
-                        child: Text(
-                          entry.value.specialty.isEmpty
-                              ? entry.value.name
-                              : '${entry.value.name} - ${entry.value.specialty}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          (entry) => DropdownMenuItem<String>(
+                            value: 'doctor_${entry.key}',
+                            child: Text(
+                              entry.value.specialty.isEmpty
+                                  ? entry.value.name
+                                  : '${entry.value.name} - ${AppStrings.of(context).doctorSpecialtyLabel(entry.value.specialty)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const DropdownMenuItem<String>(
+                    DropdownMenuItem<String>(
                       value: addNewDoctorValue,
                       child: Text(
-                        'Add New Doctor',
+                        AppStrings.of(context).addNewDoctor,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -278,8 +287,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: doctorName,
-                    decoration: const InputDecoration(
-                      labelText: 'Doctor Name',
+                    decoration: InputDecoration(
+                      labelText: AppStrings.of(context).doctorName,
                     ),
                     textInputAction: TextInputAction.next,
                   ),
@@ -287,8 +296,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: specialty,
-                  decoration: const InputDecoration(
-                    labelText: 'Specialty',
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).specialty,
                   ),
                   textInputAction: TextInputAction.next,
                 ),
@@ -296,7 +305,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.event),
-                  title: const Text('Date / Time'),
+                  title: Text(AppStrings.of(context).dateTime),
                   subtitle: Text(_dateLabel(selected)),
                   onTap: () async {
                     final date = await showDatePicker(
@@ -330,8 +339,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: notes,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).notes,
                   ),
                   maxLines: 3,
                 ),
@@ -341,11 +350,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(AppStrings.of(context).cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save'),
+              child: Text(AppStrings.of(context).save),
             ),
           ],
         ),
@@ -373,7 +382,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     if (appointment.doctorName.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Doctor name is required')),
+        SnackBar(content: Text(AppStrings.of(context).doctorNameRequired)),
       );
       return;
     }
@@ -419,18 +428,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Remove appointment?'),
+        title: Text(AppStrings.of(context).removeAppointment),
         content: Text(
           '${item.doctorName}\n${_dateLabel(item.appointmentAt)}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -455,7 +464,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Appointments'),
+        title: Text(AppStrings.of(context).appointments),
         actions: [
           if (_syncing)
             const Padding(
@@ -471,11 +480,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         ],
       ),
       body: appointments.isEmpty
-          ? const Center(
+          ? Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
-                  'No appointments added.',
+                  AppStrings.of(context).noAppointmentsAdded,
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -502,9 +511,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   subtitle: Text(subtitle),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: originalIndex < 0
-                        ? null
-                        : () => _delete(originalIndex),
+                    onPressed:
+                        originalIndex < 0 ? null : () => _delete(originalIndex),
                   ),
                   onTap: originalIndex < 0
                       ? null

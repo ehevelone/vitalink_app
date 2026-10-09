@@ -1,13 +1,19 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
+
+// Runs once per warm instance (see schema-once.js).
+const ensureUserSessionColumns = schemaOnce("user-auth:session-columns", () =>
+  db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_token TEXT,
+    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
+  `)
+);
 
 async function verifyUserSession(userId, token) {
   if (!userId || !token) return false;
 
-  await db.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_token TEXT,
-    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
-  `);
+  await ensureUserSessionColumns();
 
   const result = await db.query(
     `
@@ -25,5 +31,6 @@ async function verifyUserSession(userId, token) {
 }
 
 module.exports = {
+  ensureUserSessionColumns,
   verifyUserSession,
 };

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -44,14 +46,16 @@ class _MedsViewState extends State<MedsView> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "Medications${_p?.fullName.isNotEmpty == true ? " – ${_p!.fullName}" : ""}",
+          _p?.fullName.isNotEmpty == true
+              ? AppStrings.of(context).medicationsFor(_p!.fullName)
+              : AppStrings.of(context).medications,
         ),
       ),
       body: meds.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
-                "No medications available.",
-                style: TextStyle(fontSize: 16, color: Colors.black54),
+                AppStrings.of(context).noMedicationsAvailable,
+                style: const TextStyle(fontSize: 16, color: Colors.black54),
               ),
             )
           : ListView.separated(
@@ -60,19 +64,32 @@ class _MedsViewState extends State<MedsView> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final m = meds[i];
+                final subtitle = m.isSupplementOrOtc
+                    ? [
+                        if (m.dose.isNotEmpty) m.dose,
+                        if (m.frequency.isNotEmpty) m.frequency,
+                        if (m.servingSize.isNotEmpty)
+                          '${AppStrings.of(context).servingLabel}: ${m.servingSize}',
+                        if (m.activeIngredients.isNotEmpty)
+                          '${AppStrings.of(context).supplementFactsLabel}: ${m.activeIngredients.take(3).join(", ")}',
+                      ].join(" • ")
+                    : [m.dose, m.frequency, m.prescriber]
+                        .where((s) => s.isNotEmpty)
+                        .join(" • ");
                 return ListTile(
                   tileColor: Colors.transparent,
                   shape: const Border(
                     bottom: BorderSide(color: Colors.black12),
                   ),
-                  leading: const Icon(Icons.medication_outlined),
-                  title:
-                      Text(m.name.isNotEmpty ? m.name : "Unnamed Medication"),
-                  subtitle: Text(
-                    [m.dose, m.frequency, m.prescriber]
-                        .where((s) => s.isNotEmpty)
-                        .join(" • "),
+                  leading: Icon(
+                    m.isSupplementOrOtc
+                        ? Icons.spa_outlined
+                        : Icons.medication_outlined,
                   ),
+                  title: Text(m.name.isNotEmpty
+                      ? m.name
+                      : AppStrings.of(context).unnamedMedication),
+                  subtitle: subtitle.isEmpty ? null : Text(subtitle),
                 );
               },
             ),

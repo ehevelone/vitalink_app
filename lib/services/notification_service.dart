@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../services/secure_store.dart';
+import 'fcm_token_service.dart';
 
 class NotificationService {
   // Called on app launch AND on token refresh
@@ -14,7 +15,7 @@ class NotificationService {
       return;
     }
 
-    final token = await FirebaseMessaging.instance.getToken();
+    final token = await FcmTokenService.getToken();
     if (token != null) {
       await _sendToBackend(userId, token);
     }

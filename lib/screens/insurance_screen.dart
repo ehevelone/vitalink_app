@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -51,8 +53,8 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(existing == null
-            ? "Add Insurance Policy"
-            : "Edit Insurance Policy"),
+            ? AppStrings.of(context).addInsurancePolicy
+            : AppStrings.of(context).editInsurancePolicy),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -60,7 +62,8 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
               children: [
                 TextField(
                     controller: carrier,
-                    decoration: const InputDecoration(labelText: "Carrier")),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).carrier)),
                 const Divider(height: 1),
               ],
             ),
@@ -68,7 +71,8 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
               children: [
                 TextField(
                     controller: policy,
-                    decoration: const InputDecoration(labelText: "Policy #")),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).policyNumber)),
                 const Divider(height: 1),
               ],
             ),
@@ -76,7 +80,8 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
               children: [
                 TextField(
                     controller: memberId,
-                    decoration: const InputDecoration(labelText: "Member ID")),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).memberId)),
                 const Divider(height: 1),
               ],
             ),
@@ -84,8 +89,8 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
               children: [
                 TextField(
                     controller: policyType,
-                    decoration:
-                        const InputDecoration(labelText: "Policy Type")),
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).policyType)),
                 const Divider(height: 1),
               ],
             ),
@@ -94,10 +99,10 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+              child: Text(AppStrings.of(context).cancel)),
           FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("Save")),
+              child: Text(AppStrings.of(context).save)),
         ],
       ),
     );
@@ -134,15 +139,15 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Remove insurance policy?"),
+        title: Text(AppStrings.of(context).removeInsurancePolicy),
         content: Text(_p!.insurances[i].carrier),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+              child: Text(AppStrings.of(context).cancel)),
           FilledButton.tonal(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("Remove")),
+              child: Text(AppStrings.of(context).remove)),
         ],
       ),
     );
@@ -159,13 +164,14 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_p == null) {
-      return const Scaffold(body: Center(child: Text("No profile found")));
+      return Scaffold(
+          body: Center(child: Text(AppStrings.of(context).noProfileFound)));
     }
 
     final insurances = _p!.insurances;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Insurance Policies")),
+      appBar: AppBar(title: Text(AppStrings.of(context).insurancePolicies)),
       body: Stack(
         children: [
           Column(
@@ -173,12 +179,13 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
               ElevatedButton.icon(
                 onPressed: () => _addOrEdit(),
                 icon: const Icon(Icons.add_card),
-                label: const Text("Add Insurance Policy"),
+                label: Text(AppStrings.of(context).addInsurancePolicy),
               ),
               Expanded(
                 child: insurances.isEmpty
-                    ? const Center(
-                        child: Text("No insurance policies yet. Tap + to add."))
+                    ? Center(
+                        child:
+                            Text(AppStrings.of(context).noInsurancePoliciesYet))
                     : ListView.builder(
                         itemCount: insurances.length,
                         itemBuilder: (_, i) {
@@ -190,7 +197,7 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                             ),
                             title: Text(ins.carrier.isNotEmpty
                                 ? ins.carrier
-                                : "Unnamed Policy"),
+                                : AppStrings.of(context).unnamedPolicy),
                             subtitle: Text("${ins.policyType} – ${ins.policy}"),
                             onTap: () => _addOrEdit(existing: ins, index: i),
                             trailing: IconButton(
@@ -208,15 +215,15 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
           if (_isParsing)
             Container(
               color: Colors.black.withValues(alpha: 0.6),
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 16),
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 16),
                     Text(
-                      "Processing insurance...",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      AppStrings.of(context).processingInsurance,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],
                 ),

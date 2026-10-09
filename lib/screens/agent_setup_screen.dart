@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/secure_store.dart';
 import '../utils/phone_formatter.dart';
 
@@ -88,7 +90,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Agent Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).agentProfile)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -98,9 +100,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
               children: [
                 TextFormField(
                   controller: _nameCtrl,
-                  decoration: const InputDecoration(labelText: "Full Name"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your name" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).fullName),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterYourName
+                      : null,
                 ),
                 const SizedBox(height: 12),
 
@@ -108,15 +112,18 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [PhoneNumberFormatter()],
-                  decoration: const InputDecoration(labelText: "Phone"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your phone" : null,
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).phone),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterYourPhone
+                      : null,
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _agencyCtrl,
-                  decoration: const InputDecoration(labelText: "Agency"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).agency),
                 ),
                 const SizedBox(height: 12),
 
@@ -125,22 +132,23 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                   controller: _agencyPhoneCtrl,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [PhoneNumberFormatter()],
-                  decoration:
-                      const InputDecoration(labelText: "Agency Phone Number"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).agencyPhoneNumber),
                 ),
                 const SizedBox(height: 12),
 
                 // 🔥 ADDRESS BLOCK
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration:
-                      const InputDecoration(labelText: "Street Address"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).streetAddress),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _cityCtrl,
-                  decoration: const InputDecoration(labelText: "City"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).city),
                 ),
                 const SizedBox(height: 12),
 
@@ -149,8 +157,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _stateCtrl,
-                        decoration:
-                            const InputDecoration(labelText: "State"),
+                        decoration: InputDecoration(
+                            labelText: AppStrings.of(context).state),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -158,8 +166,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                       child: TextFormField(
                         controller: _zipCtrl,
                         keyboardType: TextInputType.number,
-                        decoration:
-                            const InputDecoration(labelText: "ZIP"),
+                        decoration: const InputDecoration(labelText: "ZIP"),
                       ),
                     ),
                   ],
@@ -169,38 +176,40 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
                 TextFormField(
                   controller: _licenseCtrl,
-                  decoration:
-                      const InputDecoration(labelText: "NPN / License #"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your NPN" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).npnLicense),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterYourNpn
+                      : null,
                 ),
 
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 12),
 
-                const Text(
-                  "Update Password (optional)",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  AppStrings.of(context).updatePasswordOptional,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: "New Password"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).newPassword),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: "Confirm Password"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).confirmPassword),
                   validator: (v) {
                     if (_passwordCtrl.text.isNotEmpty &&
                         v != _passwordCtrl.text) {
-                      return "Passwords don’t match";
+                      return AppStrings.of(context).passwordsDontMatchCurly;
                     }
                     return null;
                   },
@@ -212,7 +221,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
                         onPressed: _save,
-                        child: const Text("Save Profile"),
+                        child: Text(AppStrings.of(context).saveProfile),
                       ),
               ],
             ),

@@ -3,7 +3,9 @@ const db = require("./services/db");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { ensureAccountAccessSchema } = require("./services/account-access");
+const { ensureUserSessionColumns } = require("./services/user-auth");
 const { ensureDeviceSecuritySchema, recordDeviceEvent } = require("./services/device-security");
+const { requestLanguage } = require("./services/notification-language");
 const {
   checkAccessCodeLimit,
   clearAccessCodeFailures,
@@ -62,14 +64,6 @@ function getEmailValidationError(value) {
   }
 
   return null;
-}
-
-async function ensureUserSessionColumns() {
-  await db.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_token TEXT,
-    ADD COLUMN IF NOT EXISTS session_expires TIMESTAMPTZ
-  `);
 }
 
 async function createUserSession(userId) {
@@ -165,7 +159,7 @@ if (event.httpMethod !== "POST") {
     } else {
       // Personal access code issued by the VitaLink website.
       const purchaseResult = await db.query(
-        `SELECT code, redeemed FROM activation_codes WHERE code = $1 LIMIT 1`,
+        `SELECT code, email, redeemed FROM activation_codes WHERE code = $1 LIMIT 1`,
         [promoCode]
       );
 
@@ -177,6 +171,15 @@ if (event.httpMethod !== "POST") {
             error: failure.locked
               ? "Too many incorrect codes. Try again in 15 minutes."
               : "That access code has already been used",
+          }, failure.locked ? 429 : 200);
+        }
+
+        if (normalizeEmail(pc.email) && normalizeEmail(pc.email) !== email) {
+          const failure = await recordAccessCodeFailure(codeScope, promoCode);
+          return reply(false, {
+            error: failure.locked
+              ? "Too many incorrect codes. Try again in 15 minutes."
+              : "Use the email address that purchased this access code",
           }, failure.locked ? 429 : 200);
         }
 
@@ -194,8 +197,30 @@ if (event.httpMethod !== "POST") {
 
     await clearAccessCodeFailures(codeScope);
 
-    // ✅ Insert user
-    const result = await db.query(
+    let result;
+    let transaction = null;
+    try {
+      if (purchaseCode) {
+        transaction = await db.connect();
+        await transaction.query("BEGIN");
+        const claimed = await transaction.query(
+          `UPDATE activation_codes
+           SET redeemed=true, redeemed_at=NOW(),
+               email=COALESCE(NULLIF(TRIM(email),''), $2)
+           WHERE code=$1 AND redeemed=false
+             AND (NULLIF(TRIM(email),'') IS NULL OR LOWER(email)=LOWER($2))
+           RETURNING code`,
+          [purchaseCode, email]
+        );
+        if (!claimed.rows.length) {
+          await transaction.query("ROLLBACK");
+          transaction.release();
+          return reply(false, { error: "That access code has already been used" });
+        }
+      }
+
+      const executor = transaction || db;
+      result = await executor.query(
       `INSERT INTO users
         (first_name, last_name, email, phone, password_hash, agent_id, purchase_code,
          access_sponsor, relationship_status, messaging_consent_status)
@@ -214,28 +239,40 @@ if (event.httpMethod !== "POST") {
         agentId ? (relationshipType === "prospect" ? "pending_prospect_confirmation" : "pending_confirmation") : "not_applicable",
         agentId ? "pending" : "not_applicable",
       ]
-    );
+      );
+
+      if (transaction) {
+        const createdUser = result.rows[0];
+        await transaction.query(
+          `UPDATE activation_codes SET redeemed_user_id=$1 WHERE code=$2`,
+          [createdUser.id, purchaseCode]
+        );
+        await transaction.query("COMMIT");
+        transaction.release();
+        transaction = null;
+      }
+    } catch (registrationError) {
+      if (transaction) {
+        await transaction.query("ROLLBACK");
+        transaction.release();
+      }
+      throw registrationError;
+    }
 
     const user = result.rows[0];
-    if (purchaseCode) {
-      await db.query(
-        `UPDATE activation_codes
-         SET redeemed=true, redeemed_at=NOW(), redeemed_user_id=$1
-         WHERE code=$2`,
-        [user.id, purchaseCode]
-      );
-    }
     const sessionToken = await createUserSession(user.id);
 
     // ✅ Correct device upsert (1 device per user)
     if (deviceId) {
       await db.query(
         `INSERT INTO user_devices
-          (user_id, agent_id, device_id, platform, device_status, last_seen_at, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,'active',NOW(),NOW(),NOW())
+          (user_id, agent_id, device_id, platform, device_status, last_seen_at, created_at, updated_at, app_language)
+         VALUES ($1,$2,$3,$4,'active',NOW(),NOW(),NOW(),$5)
          ON CONFLICT (user_id, device_id) WHERE user_id IS NOT NULL AND device_id IS NOT NULL
-         DO UPDATE SET platform=EXCLUDED.platform, device_status='active', last_seen_at=NOW(), updated_at=NOW()`,
-        [user.id, agentId, deviceId, platform || "unknown"]
+         DO UPDATE SET platform=EXCLUDED.platform, device_status='active',
+           app_language=COALESCE(EXCLUDED.app_language, user_devices.app_language),
+           last_seen_at=NOW(), updated_at=NOW()`,
+        [user.id, null, deviceId, platform || "unknown", requestLanguage(event, body)]
       );
       await recordDeviceEvent(user.id, deviceId, "registration", null, platform);
     }

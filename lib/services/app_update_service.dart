@@ -4,6 +4,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/screen_strings.dart';
 
 class AppUpdateInfo {
   const AppUpdateInfo({
@@ -67,9 +69,9 @@ class AppUpdateService {
       latestBuild: latestBuild,
       currentVersion: packageInfo.version,
       latestVersion: (res['latestVersion'] ?? '').toString(),
-      title: (res['title'] ?? 'VitaLink Update Available').toString(),
-      message: (res['message'] ??
-              'A newer version of VitaLink is available. Please update for the latest fixes and improvements.')
+      title: (res['title'] ?? AppStrings.current().updateAvailableTitle)
+          .toString(),
+      message: (res['message'] ?? AppStrings.current().updateAvailableMessage)
           .toString(),
       storeUrl: (res['storeUrl'] ?? '').toString(),
       releaseNotes: releaseNotes,

@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,12 +16,10 @@ class IOSCardScanScreen extends StatefulWidget {
   const IOSCardScanScreen({super.key});
 
   @override
-  State<IOSCardScanScreen> createState() =>
-      _IOSCardScanScreenState();
+  State<IOSCardScanScreen> createState() => _IOSCardScanScreenState();
 }
 
-class _IOSCardScanScreenState
-    extends State<IOSCardScanScreen> {
+class _IOSCardScanScreenState extends State<IOSCardScanScreen> {
   late final DataRepository _repo;
 
   Profile? _p;
@@ -70,7 +70,8 @@ class _IOSCardScanScreenState
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Camera permission not granted")),
+          SnackBar(
+              content: Text(AppStrings.of(context).cameraPermissionNotGranted)),
         );
         return;
       }
@@ -81,8 +82,7 @@ class _IOSCardScanScreenState
       bool keepScanning = true;
 
       while (keepScanning) {
-        final result =
-            await CunningDocumentScanner.getPictures();
+        final result = await CunningDocumentScanner.getPictures();
 
         if (result == null || result.isEmpty) break;
 
@@ -93,20 +93,18 @@ class _IOSCardScanScreenState
         keepScanning = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
-                title: const Text("Scan Back of Card?"),
+                title: Text(AppStrings.of(context).scanBackOfCard),
                 content: Text(
-                  "You have ${images.length} image(s).\n\nFlip the card and scan the back.",
+                  AppStrings.of(context).scanBackPrompt(images.length),
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () =>
-                        Navigator.pop(context, false),
-                    child: const Text("Done"),
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(AppStrings.of(context).done),
                   ),
                   FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(context, true),
-                    child: const Text("Scan Back"),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text(AppStrings.of(context).scanBack),
                   ),
                 ],
               ),
@@ -145,8 +143,7 @@ class _IOSCardScanScreenState
           policy: (parsed['policy'] ?? '').toString().trim(),
           memberId: (parsed['memberId'] ?? '').toString().trim(),
           policyType: (parsed['planType'] ?? '').toString().trim(),
-          medicarePlanId:
-              (parsed['medicarePlanId'] ?? '').toString().trim(),
+          medicarePlanId: (parsed['medicarePlanId'] ?? '').toString().trim(),
           medicarePlanKind:
               (parsed['medicarePlanKind'] ?? '').toString().trim(),
           ocrText: (parsed['notes'] ?? '').toString().trim(),
@@ -160,13 +157,13 @@ class _IOSCardScanScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Card saved (front + back)")),
+        SnackBar(content: Text(AppStrings.of(context).cardSavedFrontBack)),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Scanner error: $e")),
+        SnackBar(content: Text(AppStrings.of(context).scannerError(e))),
       );
     }
   }
@@ -184,7 +181,7 @@ class _IOSCardScanScreenState
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Card deleted")),
+      SnackBar(content: Text(AppStrings.of(context).cardDeleted)),
     );
   }
 
@@ -231,9 +228,9 @@ class _IOSCardScanScreenState
 
     if (_error || _p == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Insurance Cards")),
-        body: const Center(
-          child: Text("Unable to load insurance cards."),
+        appBar: AppBar(title: Text(AppStrings.of(context).insuranceCards)),
+        body: Center(
+          child: Text(AppStrings.of(context).unableToLoadInsuranceCards),
         ),
       );
     }
@@ -244,7 +241,7 @@ class _IOSCardScanScreenState
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Insurance Cards")),
+      appBar: AppBar(title: Text(AppStrings.of(context).insuranceCards)),
       body: Column(
         children: [
           Padding(
@@ -253,18 +250,19 @@ class _IOSCardScanScreenState
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _scanCard,
-style: FilledButton.styleFrom(
-  backgroundColor: Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
-  foregroundColor: Colors.white,
-  padding: const EdgeInsets.symmetric(vertical: 16),
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(12),
-  ),
-),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      Colors.blue.shade700, // 🔥 MATCH OTHER SCREENS
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 icon: const Icon(Icons.camera_alt),
-                label: const Text(
-                  "Scan Insurance Card",
-                  style: TextStyle(
+                label: Text(
+                  AppStrings.of(context).scanInsuranceCard,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -274,8 +272,8 @@ style: FilledButton.styleFrom(
           ),
           Expanded(
             child: allCards.isEmpty
-                ? const Center(
-                    child: Text("No insurance cards found"),
+                ? Center(
+                    child: Text(AppStrings.of(context).noInsuranceCardsFound),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -301,12 +299,13 @@ style: FilledButton.styleFrom(
                           title: Text(
                             card.carrier.isNotEmpty
                                 ? card.carrier
-                                : "Insurance Card",
+                                : AppStrings.of(context).insuranceCard,
                           ),
                           subtitle: Text(
                             card.source.isNotEmpty
-                                ? "Source: ${card.source}"
-                                : "Insurance card",
+                                ? AppStrings.of(context)
+                                    .sourceValue(card.source)
+                                : AppStrings.of(context).insuranceCardLower,
                           ),
                           onTap: () => _openCard(card),
                           trailing: Row(
@@ -330,12 +329,12 @@ style: FilledButton.styleFrom(
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                     ),
-                                    child: const Text("Co-pays"),
+                                    child: Text(AppStrings.of(context).copays),
                                   ),
                                 ),
                               IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Colors.red),
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => _deleteCard(card),
                               ),
                             ],

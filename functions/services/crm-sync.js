@@ -1,9 +1,11 @@
 const crypto = require("crypto");
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 const DOCUMENT_TYPES = Object.freeze({
   HIPAA: "hipaa",
   SOA: "soa",
+  HIPAA_SOA: "hipaa_soa",
   VITALINK_CSV: "vitalink_csv",
 });
 
@@ -51,6 +53,40 @@ function splitName(name) {
   };
 }
 
+// Medications and supplements for the CRM medication field, including
+// serving size, ingredients and a non-prescription type label.
+function formatMedicationList(items) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+
+  const joinList = (value) =>
+    Array.isArray(value) ? value.filter(Boolean).join(", ") : clean(value);
+
+  const lines = items
+    .map((item) => {
+      const type = clean(item?.itemType || item?.item_type);
+      const activeIngredients = joinList(item?.activeIngredients || item?.active_ingredients);
+      const otherIngredients = joinList(item?.otherIngredients || item?.other_ingredients);
+
+      return [
+        clean(item?.name),
+        clean(item?.dose || item?.dosage),
+        clean(item?.frequency),
+        clean(item?.pharmacy),
+        clean(item?.servingSize || item?.serving_size),
+        activeIngredients ? `Supplement Facts: ${activeIngredients}` : null,
+        otherIngredients ? `Other Ingredients: ${otherIngredients}` : null,
+        type && type !== "prescription" ? `Type: ${type}` : null,
+      ]
+        .filter(Boolean)
+        .join(" - ");
+    })
+    .filter(Boolean);
+
+  return lines.length ? lines.join("; ") : null;
+}
+
 function formatList(items, fields) {
   if (!Array.isArray(items)) {
     return null;
@@ -73,9 +109,9 @@ function normalizeClientInput(input = {}) {
     splitName(input.fullName || input.name);
   const medicationList =
     Array.isArray(input.meds)
-      ? formatList(input.meds, ["name", "dose", "dosage", "frequency", "pharmacy"])
+      ? formatMedicationList(input.meds)
       : Array.isArray(input.medications)
-        ? formatList(input.medications, ["name", "dose", "dosage", "frequency", "pharmacy"])
+        ? formatMedicationList(input.medications)
       : null;
   const doctorList =
     Array.isArray(input.doctors)
@@ -164,6 +200,8 @@ async function ensureCrmSyncSchema() {
     ADD COLUMN IF NOT EXISTS doctors_reviewed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS hipaa_signed_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS soa_signed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS archived_by TEXT,
     ADD COLUMN IF NOT EXISTS vitalink_emergency_contacts TEXT,
     ADD COLUMN IF NOT EXISTS vitalink_pharmacy_list TEXT
   `);
@@ -219,6 +257,37 @@ async function ensureCrmSyncSchema() {
     ADD COLUMN IF NOT EXISTS document_data BYTEA,
     ADD COLUMN IF NOT EXISTS document_size_bytes INTEGER,
     ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+  `);
+
+  await db.query(`
+    DO $$
+    DECLARE
+      current_definition TEXT;
+    BEGIN
+      SELECT pg_get_constraintdef(oid)
+      INTO current_definition
+      FROM pg_constraint
+      WHERE conrelid = 'crm_client_documents'::regclass
+        AND conname = 'crm_client_documents_type_check';
+
+      IF current_definition IS NULL OR current_definition NOT LIKE '%hipaa_soa%' THEN
+        ALTER TABLE crm_client_documents
+        DROP CONSTRAINT IF EXISTS crm_client_documents_type_check;
+
+        ALTER TABLE crm_client_documents
+        ADD CONSTRAINT crm_client_documents_type_check
+        CHECK (document_type IN (
+          'hipaa',
+          'soa',
+          'hipaa_soa',
+          'vitalink_csv',
+          'other',
+          'insurance',
+          'insurance_card',
+          'insurance_cards'
+        )) NOT VALID;
+      END IF;
+    END $$
   `);
 
   await db.query(`
@@ -548,6 +617,7 @@ async function recordVitalinkPackage({
   signedAt,
   medsReviewedAt,
   doctorsReviewedAt,
+  previousArchivedAt = null,
 }) {
   await db.query(
     `
@@ -560,6 +630,9 @@ async function recordVitalinkPackage({
       doctors_reviewed_at = COALESCE($5, doctors_reviewed_at),
       hipaa_signed_at = COALESCE($1, hipaa_signed_at),
       soa_signed_at = COALESCE($1, soa_signed_at),
+      authorization_revoked_at = NULL,
+      archived_at = NULL,
+      archived_by = NULL,
       updated_at = NOW()
     WHERE id = $2
       AND agent_id = $3
@@ -633,6 +706,19 @@ async function recordVitalinkPackage({
     eventType: "soa_received",
     packageId: pkg.id,
   });
+
+  if (previousArchivedAt) {
+    await logCrmAuditEvent({
+      crmAgentId,
+      crmClientId,
+      eventType: "client_restored",
+      packageId: pkg.id,
+      metadata: {
+        source: "new_signed_vitalink_package",
+        previousArchivedAt,
+      },
+    });
+  }
 
   return pkg;
 }
@@ -738,26 +824,17 @@ async function syncVitalinkPackageToCrm({
     signedAt,
     medsReviewedAt,
     doctorsReviewedAt,
+    previousArchivedAt: clean(sync.client?.archived_at),
   });
 
   const pdfBase64 = packageData.hipaaSoaPdfBase64;
 
-  const hipaa = await recordCrmClientDocument({
+  const hipaaSoa = await recordCrmClientDocument({
     crmAgentId: sync.crmAgentId,
     crmClientId: sync.crmClientId,
     packageId: pkg.id,
-    documentType: DOCUMENT_TYPES.HIPAA,
-    documentName: "VitaLink HIPAA Authorization",
-    documentBase64: pdfBase64,
-    signedAt,
-  });
-
-  const soa = await recordCrmClientDocument({
-    crmAgentId: sync.crmAgentId,
-    crmClientId: sync.crmClientId,
-    packageId: pkg.id,
-    documentType: DOCUMENT_TYPES.SOA,
-    documentName: "VitaLink Scope of Appointment",
+    documentType: DOCUMENT_TYPES.HIPAA_SOA,
+    documentName: "VitaLink HIPAA Authorization and Scope of Appointment",
     documentBase64: pdfBase64,
     signedAt,
   });
@@ -768,8 +845,9 @@ async function syncVitalinkPackageToCrm({
     eventType: "vitalink_import_completed",
     packageId: pkg.id,
     metadata: {
-      hipaaDocumentId: hipaa?.id,
-      soaDocumentId: soa?.id,
+      hipaaDocumentId: hipaaSoa?.id,
+      soaDocumentId: hipaaSoa?.id,
+      combinedDocumentId: hipaaSoa?.id,
     },
   });
 
@@ -777,8 +855,9 @@ async function syncVitalinkPackageToCrm({
     ...sync,
     packageId: pkg.id,
     documents: {
-      hipaa: hipaa?.id || null,
-      soa: soa?.id || null,
+      hipaa: hipaaSoa?.id || null,
+      soa: hipaaSoa?.id || null,
+      hipaaSoa: hipaaSoa?.id || null,
     },
   };
 }
@@ -856,6 +935,9 @@ async function syncAppClientToCrm({
     client: createdClient,
   };
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureCrmSyncSchema = schemaOnce("crm-sync:ensureCrmSyncSchema", ensureCrmSyncSchema);
 
 module.exports = {
   ensureCrmSyncSchema,

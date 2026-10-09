@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
@@ -6,6 +8,7 @@ import '../services/data_repository.dart';
 import '../services/deep_link_service.dart';
 import '../services/profile_share_crypto_service.dart';
 import '../services/profile_update_sync_service.dart';
+import '../services/persistent_file_store.dart';
 import '../services/secure_store.dart';
 
 class ProfileSharingScreen extends StatefulWidget {
@@ -106,7 +109,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
   Future<void> _createShareLink() async {
     if (_selectedSections.isEmpty) {
-      _showMessage('Choose at least one section to share.');
+      _showMessage(AppStrings.of(context).chooseOneSectionToShare);
       return;
     }
 
@@ -114,7 +117,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final phone = _phoneCtrl.text.trim();
 
     if (email.isEmpty || phone.isEmpty) {
-      _showMessage('Enter both email and phone number for this share.');
+      _showMessage(AppStrings.of(context).enterEmailAndPhoneForShare);
       return;
     }
 
@@ -130,7 +133,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     if (!mounted) return;
 
     if (userId == null || userId.isEmpty) {
-      _showMessage('Please log in again before sharing a profile.');
+      _showMessage(AppStrings.of(context).logInAgainBeforeSharing);
       setState(() => _saving = false);
       return;
     }
@@ -153,24 +156,59 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       if (shareId.isEmpty || inviteCode.isEmpty) {
         setState(() {
           _saving = false;
-          _message = 'Unable to finish creating this share code.';
+          _message = AppStrings.of(context).unableToFinishShareCode;
         });
         return;
       }
       final key = await _crypto.createAndStoreKey(shareId);
       final inviteToken = _crypto.makeInviteToken(inviteCode, key);
+      final selectedSections = List<String>.from(_selectedSections);
+      final initialPayload = await PersistentFileStore.attachProfileFileBytes(
+        ProfileUpdateSyncService().buildPayload(
+          profile,
+          sections: selectedSections,
+        ),
+      );
+      final encryptedPayload = await _crypto.encryptJson({
+        'profileId': profile.id,
+        'profileName': profile.fullName,
+        'allowedSections': selectedSections,
+        'payload': initialPayload,
+        'createdAt': DateTime.now().toIso8601String(),
+      }, key);
+      final staged = await ApiService.createProfileUpdatePackage(
+        userId: userId,
+        profileId: profile.id,
+        profileName: profile.fullName,
+        packages: [
+          {
+            'shareId': shareId,
+            'allowedSections': selectedSections,
+            'encryptedPayload': encryptedPayload,
+          },
+        ],
+      );
+      if (staged['success'] != true) {
+        if (!mounted) return;
+        setState(() {
+          _saving = false;
+          _message = AppStrings.of(context).unableToFinishShareCode;
+        });
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _saving = false;
         _lastInviteCode = inviteToken;
-        _message =
-            'Share code created. Give it to the caregiver in person within 6 hours.';
+        _message = AppStrings.of(context).shareCodeCreated;
       });
       await _loadShares();
     } else {
       setState(() {
         _saving = false;
-        _message = (res['error'] ?? 'Unable to create share link.').toString();
+        _message =
+            (res['error'] ?? AppStrings.of(context).unableToCreateShareLink)
+                .toString();
       });
     }
   }
@@ -179,7 +217,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final token = _inviteCtrl.text.trim();
 
     if (token.isEmpty) {
-      _showMessage('Enter the share code first.');
+      _showMessage(AppStrings.of(context).enterShareCodeFirst);
       return;
     }
 
@@ -193,7 +231,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     if (!mounted) return;
 
     if (userId == null || userId.isEmpty) {
-      _showMessage('Please log in again before accepting a profile share.');
+      _showMessage(AppStrings.of(context).logInAgainBeforeAccepting);
       setState(() => _saving = false);
       return;
     }
@@ -227,8 +265,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     setState(() {
       _saving = false;
       _message = res['success'] == true
-          ? 'Profile share accepted. Updates will appear in Profile Updates.'
-          : (res['error'] ?? 'Unable to accept share code.').toString();
+          ? AppStrings.of(context).profileShareAccepted
+          : (res['error'] ?? AppStrings.of(context).unableToAcceptShareCode)
+              .toString();
     });
   }
 
@@ -236,18 +275,16 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => _VitaLinkDialog(
-        title: 'Revoke Access?',
-        message: 'This caregiver will no longer receive new or updated '
-            'information for this profile. Information previously shared may '
-            'remain on their device and cannot be recalled.',
+        title: AppStrings.of(context).revokeAccessQuestion,
+        message: AppStrings.of(context).revokeAccessBody(),
         actions: [
           _DialogButton(
-            label: 'Cancel',
+            label: AppStrings.of(context).cancel,
             outlined: true,
             onPressed: () => Navigator.pop(context, false),
           ),
           _DialogButton(
-            label: 'Stop Sharing Updates',
+            label: AppStrings.of(context).stopSharingUpdates,
             danger: true,
             onPressed: () => Navigator.pop(context, true),
           ),
@@ -275,7 +312,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     if (!mounted) return;
 
     if (userId == null || userId.isEmpty) {
-      _showMessage('Please log in again before changing profile sharing.');
+      _showMessage(AppStrings.of(context).logInAgainBeforeChangingSharing);
       setState(() => _saving = false);
       return;
     }
@@ -290,8 +327,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     setState(() {
       _saving = false;
       _message = res['success'] == true
-          ? 'Profile access revoked.'
-          : (res['error'] ?? 'Unable to revoke profile access.').toString();
+          ? AppStrings.of(context).profileAccessRevoked
+          : (res['error'] ?? AppStrings.of(context).unableToRevokeAccess)
+              .toString();
     });
 
     if (res['success'] == true) {
@@ -304,18 +342,18 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final inviteCode = share['invite_token']?.toString();
 
     if (inviteCode == null || inviteCode.isEmpty) {
-      _showMessage('This share does not have an invite code.');
+      _showMessage(AppStrings.of(context).shareHasNoInviteCode);
       return;
     }
 
+    final copiedMessage = AppStrings.of(context).shareCodeCopied;
     await Clipboard.setData(ClipboardData(text: inviteCode));
-    _showMessage('Share code copied. Give it to the caregiver in person.');
+    _showMessage(copiedMessage);
   }
 
   Future<void> _sendCurrentProfileUpdate() async {
     if (!_shares.any((share) => share['status']?.toString() == 'accepted')) {
-      _showMessage(
-          'A shared profile must be accepted before updates can be sent.');
+      _showMessage(AppStrings.of(context).shareMustBeAccepted);
       return;
     }
 
@@ -335,11 +373,11 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     setState(() {
       _saving = false;
       if (res['success'] == true && (res['recipients'] ?? 0) > 0) {
-        _message = 'Current profile update sent.';
+        _message = AppStrings.of(context).currentProfileUpdateSent;
       } else {
         _message = (res['message'] ??
                 res['error'] ??
-                'No connected recipients are ready for this update.')
+                AppStrings.of(context).noRecipientsReady)
             .toString();
       }
     });
@@ -348,8 +386,8 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       await showDialog<void>(
         context: context,
         builder: (context) => _VitaLinkDialog(
-          title: 'Profile Sent',
-          message: 'The current profile update was sent to connected profiles.',
+          title: AppStrings.of(context).profileSent,
+          message: AppStrings.of(context).profileUpdateSentToConnected,
           actions: [
             _DialogButton(
               label: 'OK',
@@ -371,7 +409,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Sharing'),
+        title: Text(AppStrings.of(context).profileSharing),
         backgroundColor: const Color(0xFF0E5A88),
       ),
       body: Container(
@@ -379,72 +417,73 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
-              'Connected profiles',
-              style: TextStyle(
+            Text(
+              AppStrings.of(context).connectedProfiles,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Share selected profile updates with a family member or caregiver. Updates are temporary, encrypted, and removed after connected devices apply them.',
-              style: TextStyle(color: Colors.white70, fontSize: 15),
+            Text(
+              AppStrings.of(context).shareProfileExplainer,
+              style: const TextStyle(color: Colors.white70, fontSize: 15),
             ),
             const SizedBox(height: 18),
             _InfoCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Share this profile',
-                    style: TextStyle(
+                  Text(
+                    AppStrings.of(context).shareThisProfile,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _field(_emailCtrl, 'Family member email'),
+                  _field(_emailCtrl, AppStrings.of(context).familyMemberEmail),
                   const SizedBox(height: 10),
-                  _field(_phoneCtrl, 'Family member phone'),
+                  _field(_phoneCtrl, AppStrings.of(context).familyMemberPhone),
                   const SizedBox(height: 14),
                   _sectionToggle(
-                    label: 'Emergency profile',
+                    label: AppStrings.of(context).emergencyProfile,
                     value: _emergency,
                     onChanged: (v) => setState(() => _emergency = v),
                   ),
                   _sectionToggle(
-                    label: 'Medications',
+                    label: AppStrings.of(context).medications,
                     value: _medications,
                     onChanged: (v) => setState(() => _medications = v),
                   ),
                   _sectionToggle(
-                    label: 'Doctors',
+                    label: AppStrings.of(context).doctors,
                     value: _doctors,
                     onChanged: (v) => setState(() => _doctors = v),
                   ),
                   _sectionToggle(
-                    label: 'Insurance cards',
+                    label: AppStrings.of(context).insuranceCardsLower,
                     value: _insuranceCards,
                     onChanged: (v) => setState(() => _insuranceCards = v),
                   ),
                   _sectionToggle(
-                    label: 'Insurance policies',
+                    label: AppStrings.of(context).insurancePoliciesLower,
                     value: _policies,
                     onChanged: (v) => setState(() => _policies = v),
                   ),
                   _sectionToggle(
-                    label: 'Appointments',
+                    label: AppStrings.of(context).appointments,
                     value: _appointments,
                     onChanged: (v) => setState(() => _appointments = v),
                   ),
                   const SizedBox(height: 14),
-                  _button('Create Share Code', _createShareLink),
+                  _button(
+                      AppStrings.of(context).createShareCode, _createShareLink),
                   const SizedBox(height: 10),
                   _button(
-                    'Send Current Profile Update',
+                    AppStrings.of(context).sendCurrentProfileUpdate,
                     _sendCurrentProfileUpdate,
                   ),
                 ],
@@ -454,9 +493,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Who has access',
-                    style: TextStyle(
+                  Text(
+                    AppStrings.of(context).whoHasAccess,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -466,9 +505,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   if (_loadingShares)
                     const Center(child: CircularProgressIndicator())
                   else if (_shares.isEmpty)
-                    const Text(
-                      'No active profile shares yet.',
-                      style: TextStyle(color: Colors.white70),
+                    Text(
+                      AppStrings.of(context).noActiveProfileShares,
+                      style: const TextStyle(color: Colors.white70),
                     )
                   else
                     ..._shares.map(_shareRow),
@@ -479,18 +518,19 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Accept a shared profile',
-                    style: TextStyle(
+                  Text(
+                    AppStrings.of(context).acceptSharedProfile,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _field(_inviteCtrl, 'Share code'),
+                  _field(_inviteCtrl, AppStrings.of(context).shareCodeLower),
                   const SizedBox(height: 14),
-                  _button('Accept Share Code', _acceptInvite),
+                  _button(
+                      AppStrings.of(context).acceptShareCode, _acceptInvite),
                 ],
               ),
             ),
@@ -499,9 +539,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Share Code',
-                      style: TextStyle(
+                    Text(
+                      AppStrings.of(context).shareCodeTitle,
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
                         letterSpacing: 1,
@@ -582,7 +622,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     final sections = share['allowed_sections'];
     final sectionText = sections is List && sections.isNotEmpty
         ? sections.map((s) => s.toString().replaceAll('_', ' ')).join(', ')
-        : 'Emergency profile';
+        : AppStrings.of(context).emergencyProfile;
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -612,13 +652,13 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               inviteCode.isNotEmpty) ...[
             const SizedBox(height: 6),
             SelectableText(
-              'Code: $inviteCode',
+              AppStrings.of(context).codeValue(inviteCode),
               style: const TextStyle(color: Color(0xFF78C7E7)),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Expires 6 hours after it was created',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            Text(
+              AppStrings.of(context).expiresSixHours,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
           const SizedBox(height: 10),
@@ -633,7 +673,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                     side: const BorderSide(color: Color(0xFF78C7E7)),
                   ),
                   onPressed: _saving ? null : () => _sendInvite(share),
-                  child: const Text('Copy Share Code'),
+                  child: Text(AppStrings.of(context).copyShareCode),
                 ),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
@@ -641,7 +681,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   side: BorderSide(color: Colors.red.shade300),
                 ),
                 onPressed: _saving ? null : () => _confirmRevokeShare(share),
-                child: const Text('Revoke Access'),
+                child: Text(AppStrings.of(context).revokeAccess),
               ),
             ],
           ),
@@ -656,7 +696,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
 
     if (email != null && email.isNotEmpty) return email;
     if (phone != null && phone.isNotEmpty) return phone;
-    return 'Shared profile';
+    return AppStrings.of(context).sharedProfileLower;
   }
 
   Widget _button(String label, VoidCallback onPressed) {

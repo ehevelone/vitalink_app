@@ -8,6 +8,7 @@ const {
   ensureAccountAccessSchema,
   prospectConsentText,
 } = require("./services/account-access");
+const { requestLanguage } = require("./services/notification-language");
 
 const headers = {
   "Content-Type": "application/json",
@@ -26,6 +27,7 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return reply(405, { success: false, error: "Method Not Allowed" });
 
     const body = JSON.parse(event.body || "{}");
+    const language = requestLanguage(event, body) || "en";
     const userId = body.userId || body.user_id;
     if (!(await verifyUserSession(userId, body.sessionToken))) {
       return reply(403, { success: false, error: "Unauthorized" });
@@ -93,9 +95,11 @@ exports.handler = async (event) => {
       };
       prospectOptions[category] = {
         category,
-        label: PROSPECT_CATEGORIES[category].label,
+        label: language === "es"
+          ? (category === "medicare" ? "Medicare" : "Seguro de vida")
+          : PROSPECT_CATEGORIES[category].label,
         durationDays: PROSPECT_CATEGORIES[category].durationDays,
-        text: prospectConsentText(category, row.agent_name),
+        text: prospectConsentText(category, row.agent_name, language),
       };
     }
 

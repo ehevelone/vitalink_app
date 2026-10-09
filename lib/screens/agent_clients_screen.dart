@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/api_service.dart';
 import '../services/secure_store.dart';
@@ -28,7 +30,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
 
       if (agentIdStr == null) {
         setState(() {
-          error = "Missing agent session";
+          error = AppStrings.of(context).missingAgentSession;
           loading = false;
         });
         return;
@@ -38,7 +40,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
 
       if (agentId == null) {
         setState(() {
-          error = "Invalid agent ID";
+          error = AppStrings.of(context).invalidAgentId;
           loading = false;
         });
         return;
@@ -48,7 +50,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
 
       if (res["success"] != true) {
         setState(() {
-          error = res["error"] ?? "Failed to load clients";
+          error = res["error"] ?? AppStrings.of(context).failedToLoadClients;
           loading = false;
         });
         return;
@@ -60,7 +62,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
       });
     } catch (e) {
       setState(() {
-        error = "Failed to load clients";
+        error = AppStrings.of(context).failedToLoadClients;
         loading = false;
       });
     }
@@ -70,7 +72,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Clients"),
+        title: Text(AppStrings.of(context).myClients),
         backgroundColor: Colors.blue.shade700,
       ),
       body: loading
@@ -78,7 +80,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
           : error != null
               ? Center(child: Text(error!))
               : clients.isEmpty
-                  ? const Center(child: Text("No clients found"))
+                  ? Center(child: Text(AppStrings.of(context).noClientsFound))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: clients.length,
@@ -125,7 +127,10 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        active ? "Active" : "Inactive",
+                                        active
+                                            ? AppStrings.of(context).activeLabel
+                                            : AppStrings.of(context)
+                                                .inactiveLabel,
                                         style: TextStyle(
                                           color: active
                                               ? Colors.green.shade800
@@ -156,7 +161,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
 
                                 // 🔥 OPTIONAL DEBUG LINE (safe)
                                 Text(
-                                  "Device: ${hasDevice ? "YES" : "NO"}",
+                                  AppStrings.of(context).deviceYesNo(hasDevice),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color:

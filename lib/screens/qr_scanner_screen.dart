@@ -1,5 +1,7 @@
 // lib/screens/qr_scanner_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:camera/camera.dart';
 import 'dart:developer';
 
@@ -85,7 +87,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan QR Code")),
+      appBar: AppBar(title: Text(AppStrings.of(context).scanQrCode)),
       body: _controller == null || !_controller!.value.isInitialized
           ? const Center(child: CircularProgressIndicator())
           : Stack(

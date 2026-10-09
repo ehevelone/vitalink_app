@@ -1,4 +1,6 @@
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'dart:typed_data';
 import 'dart:io';
 
@@ -116,7 +118,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
     final uri = Uri(scheme: "tel", path: phone);
     final opened = await launchUrl(uri);
     if (!opened && mounted) {
-      _showActionError("Unable to open the phone app.");
+      _showActionError(AppStrings.of(context).unableToOpenPhone);
     }
   }
 
@@ -125,13 +127,13 @@ class _MyAgentUserState extends State<MyAgentUser> {
     final uri = Uri(
       scheme: "mailto",
       path: _agentEmail,
-      queryParameters: const {
-        "subject": "VitaLink Client Inquiry",
+      queryParameters: {
+        "subject": AppStrings.of(context).clientInquirySubject,
       },
     );
     final opened = await launchUrl(uri);
     if (!opened && mounted) {
-      _showActionError("Unable to open the email app.");
+      _showActionError(AppStrings.of(context).unableToOpenEmail);
     }
   }
 
@@ -154,7 +156,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
     );
 
     if (!opened && mounted) {
-      _showActionError("Unable to open directions.");
+      _showActionError(AppStrings.of(context).unableToOpenDirections);
     }
   }
 
@@ -174,17 +176,17 @@ class _MyAgentUserState extends State<MyAgentUser> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Disconnect from your agent?'),
-        content: const Text(
-          'Disconnecting from your agent will end your sponsored VitaLink access. To continue using VitaLink, you will need another agent\'s code or a personal access code.\n\nAgent messaging and future information sharing will stop. Information already stored on this device will not be deleted.',
+        title: Text(AppStrings.of(context).disconnectFromAgentQ),
+        content: Text(
+          AppStrings.of(context).disconnectAgentBody(),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Keep My Current Agent')),
+              child: Text(AppStrings.of(context).keepMyCurrentAgent)),
           ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Disconnect and Lock My Account')),
+              child: Text(AppStrings.of(context).disconnectAndLock)),
         ],
       ),
     );
@@ -208,8 +210,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
       Navigator.pushNamedAndRemoveUntil(
           context, '/account_access', (_) => false);
     } else {
-      _showActionError(
-          result['error']?.toString() ?? 'Unable to disconnect your agent.');
+      _showActionError(result['error']?.toString() ??
+          AppStrings.of(context).unableToDisconnectAgent);
     }
   }
 
@@ -235,7 +237,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
     });
     if (result['success'] != true) {
       _showActionError(
-        result['error']?.toString() ?? 'Unable to update message consent.',
+        result['error']?.toString() ??
+            AppStrings.of(context).unableToUpdateConsent,
       );
     }
   }
@@ -246,20 +249,20 @@ class _MyAgentUserState extends State<MyAgentUser> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(category == 'medicare'
-              ? 'Medicare messages'
-              : 'Life insurance messages'),
+              ? AppStrings.of(context).medicareMessages
+              : AppStrings.of(context).lifeInsuranceMessages),
           content: Text(
             _prospectConsentText[category] ??
-                'I agree to receive optional in-app and push marketing messages from my connected agent.',
+                AppStrings.of(context).agreeMarketingFromConnected,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text(AppStrings.of(context).cancel),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('I Agree'),
+              child: Text(AppStrings.of(context).iAgree),
             ),
           ],
         ),
@@ -287,7 +290,8 @@ class _MyAgentUserState extends State<MyAgentUser> {
     });
     if (result['success'] != true) {
       _showActionError(
-        result['error']?.toString() ?? 'Unable to update message consent.',
+        result['error']?.toString() ??
+            AppStrings.of(context).unableToUpdateConsent,
       );
     }
   }
@@ -357,7 +361,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
     return Column(
       children: [
         Text(
-          _agentName ?? "No Agent Assigned",
+          _agentName ?? AppStrings.of(context).noAgentAssigned,
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 22,
@@ -409,7 +413,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 Expanded(
                   child: _contactButton(
                     icon: Icons.phone,
-                    label: "Call",
+                    label: AppStrings.of(context).call,
                     onPressed: _call,
                   ),
                 ),
@@ -419,7 +423,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 Expanded(
                   child: _contactButton(
                     icon: Icons.email,
-                    label: "Email",
+                    label: AppStrings.of(context).email,
                     onPressed: _email,
                   ),
                 ),
@@ -432,7 +436,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
             width: double.infinity,
             child: _contactButton(
               icon: Icons.directions,
-              label: "Directions",
+              label: AppStrings.of(context).directions,
               onPressed: _openDirections,
             ),
           ),
@@ -510,9 +514,9 @@ class _MyAgentUserState extends State<MyAgentUser> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue,
-        title: const Text(
-          "My Agent",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).myAgent,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -535,7 +539,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 if (_calendlyUrl?.isNotEmpty == true) ...[
                   _actionButton(
                     icon: Icons.calendar_month,
-                    label: "Schedule with My Agent",
+                    label: AppStrings.of(context).scheduleWithMyAgent,
                     light: true,
                     onPressed: _schedule,
                   ),
@@ -543,7 +547,7 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 ],
                 _actionButton(
                   icon: Icons.refresh,
-                  label: "Reload Info",
+                  label: AppStrings.of(context).reloadInfo,
                   onPressed: _loadAgent,
                 ),
                 if (_agentMessagesEnabled != null) ...[
@@ -553,9 +557,9 @@ class _MyAgentUserState extends State<MyAgentUser> {
                       value: _agentMessagesEnabled!,
                       onChanged: _updatingMessages ? null : _setAgentMessages,
                       secondary: const Icon(Icons.notifications_outlined),
-                      title: const Text('Messages from my agent'),
-                      subtitle: const Text(
-                        'Coverage reminders and enrollment-period outreach. You can change this at any time.',
+                      title: Text(AppStrings.of(context).messagesFromMyAgent),
+                      subtitle: Text(
+                        AppStrings.of(context).coverageRemindersBody,
                       ),
                     ),
                   ),
@@ -571,10 +575,11 @@ class _MyAgentUserState extends State<MyAgentUser> {
                               ? null
                               : (value) =>
                                   _setProspectMessages('medicare', value),
-                          secondary: const Icon(Icons.health_and_safety_outlined),
-                          title: const Text('Medicare messages'),
-                          subtitle: const Text(
-                            'Optional in-app and push marketing messages from my agent.',
+                          secondary:
+                              const Icon(Icons.health_and_safety_outlined),
+                          title: Text(AppStrings.of(context).medicareMessages),
+                          subtitle: Text(
+                            AppStrings.of(context).optionalMarketingFromAgent,
                           ),
                         ),
                         const Divider(height: 1),
@@ -582,12 +587,12 @@ class _MyAgentUserState extends State<MyAgentUser> {
                           value: _prospectMessages['life']!,
                           onChanged: _updatingMessages
                               ? null
-                              : (value) =>
-                                  _setProspectMessages('life', value),
+                              : (value) => _setProspectMessages('life', value),
                           secondary: const Icon(Icons.favorite_outline),
-                          title: const Text('Life insurance messages'),
-                          subtitle: const Text(
-                            'Optional in-app and push marketing messages from my agent.',
+                          title: Text(
+                              AppStrings.of(context).lifeInsuranceMessages),
+                          subtitle: Text(
+                            AppStrings.of(context).optionalMarketingFromAgent,
                           ),
                         ),
                       ],
@@ -598,18 +603,18 @@ class _MyAgentUserState extends State<MyAgentUser> {
                 OutlinedButton.icon(
                   onPressed: _disconnectAgent,
                   icon: const Icon(Icons.link_off),
-                  label: const Text('Change or Disconnect My Agent'),
+                  label: Text(AppStrings.of(context).changeOrDisconnectAgent),
                 ),
                 const SizedBox(height: 20),
                 _actionButton(
                   icon: Icons.send,
-                  label: "Send My Info to Agent",
+                  label: AppStrings.of(context).sendMyInfoToAgent,
                   onPressed: _sendToAgent,
                 ),
                 const SizedBox(height: 14),
                 _actionButton(
                   icon: Icons.favorite,
-                  label: "Referral Center",
+                  label: AppStrings.of(context).referralCenter,
                   light: true,
                   onPressed: () => Navigator.pushNamed(
                     context,

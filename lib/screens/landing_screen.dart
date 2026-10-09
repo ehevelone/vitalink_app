@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/deep_link_service.dart'; // ✅ FIX ADDED
 
 class LandingScreen extends StatefulWidget {
@@ -64,9 +66,9 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Log In",
-                  style: TextStyle(
+                Text(
+                  AppStrings.of(context).logIn,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -82,9 +84,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/login');
                   },
-                  child: const Text(
-                    "User Login",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  child: Text(
+                    AppStrings.of(context).userLogin,
+                    style: const TextStyle(fontSize: 18, color: Colors.black),
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -97,9 +99,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/agent_login');
                   },
-                  child: const Text(
-                    "Agent Login",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  child: Text(
+                    AppStrings.of(context).agentLogin,
+                    style: const TextStyle(fontSize: 18, color: Colors.black),
                   ),
                 ),
               ],
@@ -124,19 +126,19 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Create Account",
-                  style: TextStyle(
+                Text(
+                  AppStrings.of(context).createAccount,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "Choose the account type that matches how you use VitaLink.",
+                Text(
+                  AppStrings.of(context).chooseAccountType,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                   ),
@@ -144,8 +146,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 const SizedBox(height: 24),
                 _registerOption(
                   icon: Icons.family_restroom,
-                  title: "Create Client Account",
-                  subtitle: "For VitaLink users and families",
+                  title: AppStrings.of(context).createClientAccount,
+                  subtitle: AppStrings.of(context).forUsersAndFamilies,
                   color: Colors.green,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -155,8 +157,8 @@ class _LandingScreenState extends State<LandingScreen> {
                 const SizedBox(height: 15),
                 _registerOption(
                   icon: Icons.business_center,
-                  title: "Create Agent Account",
-                  subtitle: "For licensed agents with a registration code",
+                  title: AppStrings.of(context).activateAgentPortal,
+                  subtitle: AppStrings.of(context).agentActivationSubtitle,
                   color: vitalinkBlue,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -294,21 +296,20 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Client Account Activation",
+                Text(
+                  AppStrings.of(context).clientAccountActivation,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  "VitaLink client accounts require an access code before registration. This code may come from your insurance agent or be delivered by email after it is issued.\n\n"
-                  "Do you already have a VitaLink activation code?",
+                Text(
+                  AppStrings.of(context).clientActivationBody,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
                     height: 1.4,
@@ -316,7 +317,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "I Have a Code",
+                  label: AppStrings.of(context).iHaveCode,
                   primary: true,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -325,7 +326,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
               ],
             ),
@@ -349,20 +350,20 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Agent Portal Activation",
+                Text(
+                  AppStrings.of(context).agentPortalActivation,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  "Enter an already-issued agent registration code to continue.",
+                Text(
+                  AppStrings.of(context).agentActivationBody,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
                     height: 1.4,
@@ -370,7 +371,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "Continue With Registration Code",
+                  label: AppStrings.of(context).continueWithRegistrationCode,
                   primary: true,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -383,7 +384,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
               ],
             ),
@@ -427,7 +428,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             children: [
                               SizedBox(height: topGap),
                               Text(
-                                "Welcome To",
+                                AppStrings.of(context).welcomeTo,
                                 style: TextStyle(
                                   fontSize: titleSize,
                                   fontWeight: FontWeight.bold,
@@ -449,9 +450,9 @@ class _LandingScreenState extends State<LandingScreen> {
                                   minimumSize: const Size(double.infinity, 55),
                                 ),
                                 onPressed: _showLoginPopup,
-                                child: const Text(
-                                  "Log In to Your Account",
-                                  style: TextStyle(
+                                child: Text(
+                                  AppStrings.of(context).loginToYourAccount,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     color: Colors.black,
                                   ),
@@ -464,9 +465,9 @@ class _LandingScreenState extends State<LandingScreen> {
                                   minimumSize: const Size(double.infinity, 55),
                                 ),
                                 onPressed: _showRegisterPopup,
-                                child: const Text(
-                                  "Register for an Account",
-                                  style: TextStyle(
+                                child: Text(
+                                  AppStrings.of(context).registerForAccount,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     color: Colors.black,
                                   ),

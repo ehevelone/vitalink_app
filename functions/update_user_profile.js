@@ -1,6 +1,7 @@
 // functions/update_user_profile.js
 const db = require("./services/db");
 const bcrypt = require("bcryptjs");
+const { verifyUserSession } = require("./services/user-auth");
 
 function reply(statusCode, obj) {
   return {
@@ -44,13 +45,27 @@ exports.handler = async (event) => {
       name,
       phone,
       password,
+      userId,
+      sessionToken,
     } = body;
 
-    if (!currentEmail) {
+    if (!currentEmail || !userId) {
       return reply(400, {
         success: false,
-        error: "currentEmail is required",
+        error: "currentEmail and userId are required",
       });
+    }
+
+    if (!(await verifyUserSession(userId, sessionToken))) {
+      return reply(403, { success: false, error: "Unauthorized" });
+    }
+
+    const owner = await db.query(
+      `SELECT id FROM users WHERE id = $1 AND LOWER(email) = LOWER($2) LIMIT 1`,
+      [userId, currentEmail.trim()]
+    );
+    if (!owner.rows.length) {
+      return reply(403, { success: false, error: "Account does not match the active session" });
     }
 
     const updates = [];
@@ -71,8 +86,16 @@ exports.handler = async (event) => {
     }
 
     if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const duplicate = await db.query(
+        `SELECT id FROM users WHERE LOWER(email) = $1 AND id <> $2 LIMIT 1`,
+        [normalizedEmail, userId]
+      );
+      if (duplicate.rows.length) {
+        return reply(409, { success: false, error: "That email address is already in use" });
+      }
       updates.push(`email = $${idx++}`);
-      values.push(email);
+      values.push(normalizedEmail);
     }
 
     if (phone) {
@@ -93,12 +116,12 @@ exports.handler = async (event) => {
       });
     }
 
-    values.push(currentEmail.trim());
+    values.push(userId);
 
     const query = `
       UPDATE users
       SET ${updates.join(", ")}
-      WHERE LOWER(email) = LOWER($${idx})
+      WHERE id = $${idx}
       RETURNING id, email, first_name, last_name, phone;
     `;
 

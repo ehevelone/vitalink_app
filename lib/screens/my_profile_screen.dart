@@ -1,5 +1,7 @@
 // lib/screens/my_profile.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
@@ -72,8 +74,8 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       await repo.saveProfile(p);
 
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text("Profile updated")));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppStrings.of(context).profileUpdated)));
         Navigator.pop(context, true);
       }
     } else {
@@ -95,14 +97,16 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         await store.setString("agencyAddress", _addressCtrl.text.trim());
 
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text("Profile updated")));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(AppStrings.of(context).profileUpdated)));
           Navigator.pop(context, true);
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['error'] ?? "Update error")),
+            SnackBar(
+                content: Text(
+                    result['error'] ?? AppStrings.of(context).updateError)),
           );
         }
       }
@@ -120,7 +124,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("My Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).myProfile)),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -131,7 +135,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    "Email: $_email",
+                    AppStrings.of(context).emailValue(_email),
                     style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w600),
                   ),
@@ -139,47 +143,52 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) => (v == null || v.isEmpty) ? "Required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).fullName),
+                validator: (v) => (v == null || v.isEmpty)
+                    ? AppStrings.of(context).requiredField
+                    : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: "Phone"),
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).phone),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
-                validator: (v) => (v == null || v.isEmpty) ? "Required" : null,
+                validator: (v) => (v == null || v.isEmpty)
+                    ? AppStrings.of(context).requiredField
+                    : null,
               ),
 
               if (_role == "agent") ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _agencyNameCtrl,
-                  decoration: const InputDecoration(labelText: "Agency Name"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).agencyName),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration:
-                      const InputDecoration(labelText: "Agency Address"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).agencyAddress),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _npnCtrl,
                   enabled: false,
-                  decoration: const InputDecoration(
-                    labelText: "NPN (not editable)",
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).npnNotEditable,
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText: "New Password (optional)"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).newPasswordOptional),
                 ),
               ],
 
@@ -198,9 +207,9 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    "Save Changes",
-                    style: TextStyle(
+                  child: Text(
+                    AppStrings.of(context).saveChanges,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),

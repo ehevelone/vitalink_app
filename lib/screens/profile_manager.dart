@@ -1,5 +1,7 @@
 // lib/screens/profile_manager_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../models.dart';
@@ -43,7 +45,8 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
   Future<void> _delete(int index) async {
     if (index == _activeIndex) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Cannot delete the active profile")),
+        SnackBar(
+            content: Text(AppStrings.of(context).cannotDeleteActiveProfile)),
       );
       return;
     }
@@ -51,18 +54,18 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
     final confirmed = await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Remove Household Profile"),
+        title: Text(AppStrings.of(context).removeHouseholdProfile),
         content: Text(
-          "Are you sure you want to remove ${_profiles[index].fullName}? "
-          "This cannot be undone.",
+          AppStrings.of(context)
+              .confirmRemoveHouseholdProfile(_profiles[index].fullName),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+              child: Text(AppStrings.of(context).cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("Delete")),
+              child: Text(AppStrings.of(context).delete)),
         ],
       ),
     );
@@ -80,7 +83,7 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Profile Manager")),
+      appBar: AppBar(title: Text(AppStrings.of(context).profileManager)),
       body: ListView.builder(
         itemCount: _profiles.length,
         itemBuilder: (_, i) {
@@ -96,21 +99,25 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
               isActive ? Icons.check_circle : Icons.person,
               color: isActive ? Colors.green : Colors.grey,
             ),
-            title: Text(p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile"),
-            subtitle: Text(isActive ? "ACTIVE PROFILE" : "HOUSEHOLD MEMBER"),
+            title: Text(p.fullName.isNotEmpty
+                ? p.fullName
+                : AppStrings.of(context).unnamedProfile),
+            subtitle: Text(isActive
+                ? AppStrings.of(context).activeProfileCaps
+                : AppStrings.of(context).householdMemberCaps),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!isActive)
                   IconButton(
                     icon: const Icon(Icons.swap_horiz, color: Colors.blue),
-                    tooltip: "Switch to this profile",
+                    tooltip: AppStrings.of(context).switchToThisProfile,
                     onPressed: () => _switch(i),
                   ),
                 if (!isActive)
                   IconButton(
                     icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    tooltip: "Delete Profile",
+                    tooltip: AppStrings.of(context).deleteProfile,
                     onPressed: () => _delete(i),
                   ),
               ],

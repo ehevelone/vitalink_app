@@ -1,5 +1,12 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 const admin = require("firebase-admin");
+const { ensureAgentDevicesSchema } = require("./agent-devices");
+const {
+  deviceLanguage,
+  ensureLanguageColumns,
+  sendLocalizedMulticast,
+} = require("./notification-language");
 
 function initFirebase() {
   if (admin.apps.length) return true;
@@ -134,6 +141,8 @@ async function verifyUserSession(userId, token) {
   return result.rows[0] || null;
 }
 
+// title and body may be strings or (language) => string, so each phone
+// gets the text in its own app language.
 async function sendReferralPush({ recipient, referral, title, body }) {
   if (!recipient || !recipient.id || !initFirebase()) {
     console.log("Referral push skipped", {
@@ -146,38 +155,30 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     return { devicesTargeted: 0, successCount: 0, failureCount: 0 };
   }
 
-  const devices = recipient.type === "agent"
-    ? await db.query(
-      `
-      SELECT ud.id, ud.device_token
-      FROM user_devices ud
-      WHERE ud.agent_device_registered IS TRUE
-        AND (
-          ud.agent_id = $1
-          OR ud.user_id IN (
-            SELECT u.id
-            FROM users u
-            JOIN agents a ON LOWER(a.email) = LOWER(u.email)
-            WHERE a.id = $1
-          )
-        )
-        AND ud.device_token IS NOT NULL
-        AND TRIM(ud.device_token) <> ''
-        AND TRIM(ud.device_token) <> 'NO_TOKEN'
-      `,
-      [recipient.id]
-    )
-    : await db.query(
-      `
-      SELECT id, device_token
-      FROM user_devices
-      WHERE user_id = $1
-        AND device_token IS NOT NULL
-        AND TRIM(device_token) <> ''
-        AND TRIM(device_token) <> 'NO_TOKEN'
-      `,
+  let devices;
+  if (recipient.type === "agent") {
+    await ensureAgentDevicesSchema();
+    devices = await db.query(
+      `SELECT id, device_token, app_language
+       FROM agent_devices
+       WHERE agent_id = $1
+         AND device_token IS NOT NULL
+         AND TRIM(device_token) <> ''
+         AND TRIM(device_token) <> 'NO_TOKEN'`,
       [recipient.id]
     );
+  } else {
+    await ensureLanguageColumns();
+    devices = await db.query(
+      `SELECT id, device_token, app_language
+       FROM user_devices
+       WHERE user_id = $1
+         AND device_token IS NOT NULL
+         AND TRIM(device_token) <> ''
+         AND TRIM(device_token) <> 'NO_TOKEN'`,
+      [recipient.id]
+    );
+  }
 
   const seen = new Set();
   const targets = [];
@@ -186,7 +187,7 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     const token = clean(row.device_token);
     if (!token || seen.has(token)) continue;
     seen.add(token);
-    targets.push({ id: row.id, token });
+    targets.push({ id: row.id, token, language: deviceLanguage(row) });
   }
 
   if (!targets.length) {
@@ -209,11 +210,12 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     tokenTails: targets.map((item) => item.token.slice(-8)),
   });
 
-  const response = await admin.messaging().sendEachForMulticast({
-    tokens: targets.map((item) => item.token),
+  const textFor = (value, language) => (typeof value === "function" ? value(language) : value);
+  const response = await sendLocalizedMulticast(admin.messaging(), targets, (language, tokens) => ({
+    tokens,
     notification: {
-      title,
-      body,
+      title: textFor(title, language),
+      body: textFor(body, language),
     },
     android: {
       priority: "high",
@@ -228,10 +230,10 @@ async function sendReferralPush({ recipient, referral, title, body }) {
       route: recipient.type === "agent" ? "/agent_referrals" : "/referral_center",
       type: "agent_referral",
       referralId: referral.id,
-      title,
-      body,
+      title: textFor(title, language),
+      body: textFor(body, language),
     },
-  });
+  }));
 
   const errors = (response.responses || [])
     .filter((item) => !item.success)
@@ -242,9 +244,12 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     const result = results[i];
     if (!result) continue;
 
+    const deviceTable = recipient.type === "agent"
+      ? "agent_devices"
+      : "user_devices";
     await db.query(
       `
-      UPDATE user_devices
+      UPDATE ${deviceTable}
       SET push_status = $1,
           last_push_at = NOW(),
           last_push_success_at = CASE WHEN $2 THEN NOW() ELSE last_push_success_at END,
@@ -281,6 +286,9 @@ async function sendReferralPush({ recipient, referral, title, body }) {
     errors,
   };
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureReferralSchema = schemaOnce("referral-center:ensureReferralSchema", ensureReferralSchema);
 
 module.exports = {
   clean,

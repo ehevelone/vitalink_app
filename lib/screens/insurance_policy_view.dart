@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -81,7 +83,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
 
       if (mounted) {
         setState(() {});
-        _showSnack("Card linked to policy");
+        _showSnack(AppStrings.of(context).cardLinkedToPolicy);
       }
     }
   }
@@ -99,16 +101,16 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Delete Policy?"),
-        content: const Text("This will permanently remove this policy."),
+        title: Text(AppStrings.of(context).deletePolicyQuestion),
+        content: Text(AppStrings.of(context).deletePolicyBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete"),
+            child: Text(AppStrings.of(context).delete),
           ),
         ],
       ),
@@ -119,7 +121,8 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
         _p!.insurances.removeAt(widget.index);
       });
       await _save();
-      _showSnack("Policy deleted");
+      if (!mounted) return;
+      _showSnack(AppStrings.of(context).policyDeleted);
       if (mounted) Navigator.pop(context);
     }
   }
@@ -143,7 +146,9 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
     });
 
     await _save();
-    _showSnack("Declaration page added");
+
+    if (!mounted) return;
+    _showSnack(AppStrings.of(context).declarationPageAdded);
   }
 
   Future<void> _addDecPageFromCamera() async {
@@ -165,7 +170,9 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
     });
 
     await _save();
-    _showSnack("Declaration page captured");
+
+    if (!mounted) return;
+    _showSnack(AppStrings.of(context).declarationPageCaptured);
   }
 
   @override
@@ -177,13 +184,14 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
     }
 
     final ins = _p!.insurances[widget.index];
-    final profileName =
-        (_p!.fullName.isNotEmpty ? " – ${_p!.fullName}" : "");
+    final profileName = (_p!.fullName.isNotEmpty ? " – ${_p!.fullName}" : "");
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          (ins.carrier.isNotEmpty ? ins.carrier : "Insurance Policy") +
+          (ins.carrier.isNotEmpty
+                  ? ins.carrier
+                  : AppStrings.of(context).insurancePolicy) +
               profileName,
         ),
         actions: [
@@ -205,7 +213,8 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
                   _p!.insurances[widget.index] = updated;
                 });
                 await _save();
-                _showSnack("Policy updated");
+                if (!context.mounted) return;
+                _showSnack(AppStrings.of(context).policyUpdated);
               }
             },
           ),
@@ -215,14 +224,11 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
           ),
         ],
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           // CARD IMAGE
-          if (ins.cards.isNotEmpty &&
-              ins.cards.first.frontImagePath.isNotEmpty)
+          if (ins.cards.isNotEmpty && ins.cards.first.frontImagePath.isNotEmpty)
             Column(
               children: [
                 GestureDetector(
@@ -255,42 +261,52 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
 
           // BASIC INFO
           ListTile(
-            title: const Text("Carrier"),
-            subtitle: Text(ins.carrier.isNotEmpty ? ins.carrier : "N/A"),
+            title: Text(AppStrings.of(context).carrier),
+            subtitle: Text(ins.carrier.isNotEmpty
+                ? ins.carrier
+                : AppStrings.of(context).notAvailable),
           ),
           ListTile(
-            title: const Text("Policy #"),
-            subtitle: Text(ins.policy.isNotEmpty ? ins.policy : "N/A"),
+            title: Text(AppStrings.of(context).policyNumber),
+            subtitle: Text(ins.policy.isNotEmpty
+                ? ins.policy
+                : AppStrings.of(context).notAvailable),
           ),
           ListTile(
-            title: const Text("Member ID"),
-            subtitle: Text(ins.memberId.isNotEmpty ? ins.memberId : "N/A"),
+            title: Text(AppStrings.of(context).memberId),
+            subtitle: Text(ins.memberId.isNotEmpty
+                ? ins.memberId
+                : AppStrings.of(context).notAvailable),
           ),
           ListTile(
-            title: const Text("Policy Type"),
-            subtitle: Text(ins.policyType.isNotEmpty ? ins.policyType : "N/A"),
+            title: Text(AppStrings.of(context).policyType),
+            subtitle: Text(ins.policyType.isNotEmpty
+                ? ins.policyType
+                : AppStrings.of(context).notAvailable),
           ),
 
           // 🔥 NEW FIELDS
           ListTile(
-            title: const Text("Insured"),
-            subtitle: Text(
-                ins.insuredName.isNotEmpty ? ins.insuredName : "N/A"),
+            title: Text(AppStrings.of(context).insured),
+            subtitle: Text(ins.insuredName.isNotEmpty
+                ? ins.insuredName
+                : AppStrings.of(context).notAvailable),
           ),
           ListTile(
-            title: const Text("Beneficiary"),
-            subtitle: Text(
-                ins.beneficiary.isNotEmpty ? ins.beneficiary : "N/A"),
+            title: Text(AppStrings.of(context).beneficiary),
+            subtitle: Text(ins.beneficiary.isNotEmpty
+                ? ins.beneficiary
+                : AppStrings.of(context).notAvailable),
           ),
 
           const Divider(),
 
           // 🔥 BENEFITS SECTION
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              "Benefits",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              AppStrings.of(context).benefits,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
 
@@ -306,20 +322,19 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
               }).toList(),
             )
           else
-            const Text("No benefits extracted."),
+            Text(AppStrings.of(context).noBenefitsExtracted),
 
           const Divider(),
 
           // CARDS BUTTON
           ElevatedButton.icon(
             icon: const Icon(Icons.credit_card),
-            label: const Text("View Cards"),
+            label: Text(AppStrings.of(context).viewCards),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      InsuranceCardsScreen(index: widget.index),
+                  builder: (_) => InsuranceCardsScreen(index: widget.index),
                 ),
               );
             },
@@ -328,11 +343,11 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
           const Divider(),
 
           // DECLARATION PAGES
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              "Declaration Pages",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              AppStrings.of(context).declarationPages,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
 
@@ -340,13 +355,13 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
             children: [
               ElevatedButton.icon(
                 icon: const Icon(Icons.photo_library),
-                label: const Text("Upload"),
+                label: Text(AppStrings.of(context).upload),
                 onPressed: _addDecPageFromGallery,
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
                 icon: const Icon(Icons.camera_alt),
-                label: const Text("Camera"),
+                label: Text(AppStrings.of(context).camera),
                 onPressed: _addDecPageFromCamera,
               ),
             ],
@@ -362,13 +377,13 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
                     margin: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
                       leading: const Icon(Icons.picture_as_pdf),
-                      title: Text("Page: ${path.split('/').last}"),
+                      title: Text(AppStrings.of(context)
+                          .pageValue(path.split('/').last)),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                DeclarationPageViewer(path: path),
+                            builder: (_) => DeclarationPageViewer(path: path),
                           ),
                         );
                       },
@@ -377,7 +392,7 @@ class _InsurancePolicyViewState extends State<InsurancePolicyView> {
               ],
             )
           else
-            const Text("No declaration pages uploaded."),
+            Text(AppStrings.of(context).noDeclarationPagesUploaded),
         ],
       ),
     );

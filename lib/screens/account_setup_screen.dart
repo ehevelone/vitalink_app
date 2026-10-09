@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/secure_store.dart';
 import '../services/data_repository.dart';
 import '../models.dart';
@@ -56,7 +58,7 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Account Setup")),
+      appBar: AppBar(title: Text(AppStrings.of(context).accountSetup)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -66,56 +68,60 @@ class _AccountSetupScreenState extends State<AccountSetupScreen> {
               children: [
                 TextFormField(
                   controller: _usernameCtrl,
-                  decoration: const InputDecoration(labelText: "Username"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter a username" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).username),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterUsername
+                      : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: "Password"),
-                  validator: (v) =>
-                      v == null || v.length < 6 ? "Min 6 characters" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).password),
+                  validator: (v) => v == null || v.length < 6
+                      ? AppStrings.of(context).minSixChars
+                      : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: "Confirm Password"),
-                  validator: (v) =>
-                      v != _passwordCtrl.text ? "Passwords don’t match" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).confirmPassword),
+                  validator: (v) => v != _passwordCtrl.text
+                      ? AppStrings.of(context).passwordsDontMatchCurly
+                      : null,
                 ),
                 const SizedBox(height: 24),
-
                 TextFormField(
                   controller: _nameCtrl,
-                  decoration: const InputDecoration(labelText: "Full Name"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your name" : null,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).fullName),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterYourName
+                      : null,
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [
                     PhoneNumberFormatter(),
                   ],
-                  decoration: const InputDecoration(labelText: "Phone"),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter your phone" : null,
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).phone),
+                  validator: (v) => v == null || v.isEmpty
+                      ? AppStrings.of(context).enterYourPhone
+                      : null,
                 ),
                 const SizedBox(height: 24),
-
                 _loading
                     ? const CircularProgressIndicator()
                     : ElevatedButton(
                         onPressed: _completeSetup,
-                        child: const Text("Finish Setup"),
+                        child: Text(AppStrings.of(context).finishSetup),
                       ),
               ],
             ),

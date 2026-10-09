@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart'; // ✅ SAFE replacement
 import '../widgets/app_header.dart';
@@ -37,18 +39,18 @@ class _DeclarationPageViewerState extends State<DeclarationPageViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final profileName = (_p != null && _p!.fullName.isNotEmpty)
-        ? " – ${_p!.fullName}"
-        : "";
+    final profileName =
+        (_p != null && _p!.fullName.isNotEmpty) ? " – ${_p!.fullName}" : "";
 
     final file = File(widget.path);
 
     return Scaffold(
-      appBar: AppHeader(title: "Declaration Page$profileName"),
+      appBar: AppHeader(
+          title: AppStrings.of(context).declarationPageTitle(profileName)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : !file.existsSync()
-              ? const Center(child: Text("File not found"))
+              ? Center(child: Text(AppStrings.of(context).fileNotFound))
               : _isPdf(widget.path)
                   ? _buildPdfView(file)
                   : _buildImageView(file),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/api_service.dart';
 import '../services/secure_store.dart';
@@ -43,7 +45,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
     if (agentId == null) {
       setState(() {
         _loading = false;
-        _error = 'Please log in again before viewing referrals.';
+        _error = AppStrings.of(context).logInBeforeViewingReferrals;
       });
       return;
     }
@@ -67,13 +69,15 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       });
     } else {
       setState(() {
-        _error = res['error']?.toString() ?? 'Failed to load referrals.';
+        _error = res['error']?.toString() ??
+            AppStrings.of(context).failedToLoadReferrals;
         _loading = false;
       });
     }
   }
 
-  Future<void> _updateStatus(Map<String, dynamic> referral, String status) async {
+  Future<void> _updateStatus(
+      Map<String, dynamic> referral, String status) async {
     final agentId = await _agentId();
     final referralId = referral['id']?.toString();
     if (agentId == null || referralId == null || referralId.isEmpty) return;
@@ -90,13 +94,16 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       await _loadReferrals();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['error']?.toString() ?? 'Update failed.')),
+        SnackBar(
+            content: Text(res['error']?.toString() ??
+                AppStrings.of(context).updateFailedDot)),
       );
     }
   }
 
   Future<void> _confirmDeleteReferral(Map<String, dynamic> referral) async {
-    final referralName = referral['referral_name']?.toString() ?? 'this referral';
+    final referralName = referral['referral_name']?.toString() ??
+        AppStrings.of(context).thisReferral;
 
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -109,20 +116,21 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
               color: Colors.lightBlueAccent.withValues(alpha: .35),
             ),
           ),
-          title: const Text(
-            'Delete Referral?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          title: Text(
+            AppStrings.of(context).deleteReferralQ,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Remove $referralName from your referral list? This only removes the referral record from your agent screen.',
+            AppStrings.of(context).removeReferralBody(referralName),
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.lightBlueAccent),
+              child: Text(
+                AppStrings.of(context).cancel,
+                style: const TextStyle(color: Colors.lightBlueAccent),
               ),
             ),
             FilledButton(
@@ -131,7 +139,7 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Delete'),
+              child: Text(AppStrings.of(context).delete),
             ),
           ],
         );
@@ -157,12 +165,14 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
 
     if (res['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Referral deleted.')),
+        SnackBar(content: Text(AppStrings.of(context).referralDeleted)),
       );
       await _loadReferrals();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['error']?.toString() ?? 'Delete failed.')),
+        SnackBar(
+            content: Text(res['error']?.toString() ??
+                AppStrings.of(context).deleteFailed)),
       );
     }
   }
@@ -173,9 +183,9 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
-        title: const Text(
-          'Referral Center',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).referralCenter,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -193,13 +203,15 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_error != null)
-                      Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                      Text(_error!,
+                          style: const TextStyle(color: Colors.redAccent)),
                     _buildMetrics(),
                     const SizedBox(height: 16),
                     if (_referrals.isEmpty)
-                      const Text(
-                        'No referrals yet.',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      Text(
+                        AppStrings.of(context).noReferralsYet,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 16),
                       )
                     else
                       ..._referrals.map(_referralCard),
@@ -222,12 +234,12 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _metric('Activity', '$total'),
-        _metric('Leads', '$leads'),
-        _metric('Introductions', '$pending'),
-        _metric('Contact', contact),
-        _metric('Appointments', appointment),
-        _metric('Conversion', conversion),
+        _metric(AppStrings.of(context).metricActivity, '$total'),
+        _metric(AppStrings.of(context).metricLeads, '$leads'),
+        _metric(AppStrings.of(context).metricIntroductions, '$pending'),
+        _metric(AppStrings.of(context).metricContact, contact),
+        _metric(AppStrings.of(context).appointments, appointment),
+        _metric(AppStrings.of(context).metricConversion, conversion),
       ],
     );
   }
@@ -263,7 +275,8 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: .35)),
+        border:
+            Border.all(color: Colors.lightBlueAccent.withValues(alpha: .35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +315,8 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              referral['referral_name']?.toString() ?? 'Referral',
+              referral['referral_name']?.toString() ??
+                  AppStrings.of(context).referralWord,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -310,29 +324,38 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            _line('Phone', referral['referral_phone']),
-            _line('Email', referral['referral_email']),
-            _line('Relationship', referral['relationship']),
-            if (referral['source'] == 'prospect_marketing')
-              _line('Request Type', 'Prospect request'),
-            _line('Topic', referral['reason']),
-            _line('Preferred Contact', referral['contact_preference']),
-            _line('Referred By', referral['referring_client']),
-            _line('Received', _formatDateTime(referral['submitted_at'])),
-            _line('Link Opened', _formatDateTime(referral['link_opened_at'])),
+            _line(AppStrings.of(context).phone, referral['referral_phone']),
+            _line(AppStrings.of(context).email, referral['referral_email']),
             _line(
-              'Preference Submitted',
+              AppStrings.of(context).relationshipWord,
+              AppStrings.of(context).relationshipLabel(
+                  referral['relationship']?.toString() ?? ''),
+            ),
+            if (referral['source'] == 'prospect_marketing')
+              _line(AppStrings.of(context).requestType,
+                  AppStrings.of(context).prospectRequest),
+            _line(AppStrings.of(context).topicLabel, referral['reason']),
+            _line(AppStrings.of(context).preferredContact,
+                referral['contact_preference']),
+            _line(AppStrings.of(context).referredBy,
+                referral['referring_client']),
+            _line(AppStrings.of(context).received,
+                _formatDateTime(referral['submitted_at'])),
+            _line(AppStrings.of(context).linkOpened,
+                _formatDateTime(referral['link_opened_at'])),
+            _line(
+              AppStrings.of(context).preferenceSubmitted,
               _formatDateTime(referral['contact_preference_submitted_at']),
             ),
-            _line('Contacted', contactedAt),
+            _line(AppStrings.of(context).contacted, contactedAt),
             if ((referral['notes']?.toString() ?? '').isNotEmpty)
-              _line('Notes', referral['notes']),
+              _line(AppStrings.of(context).notes, referral['notes']),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: currentStatus,
               dropdownColor: const Color(0xFF111827),
               decoration: InputDecoration(
-                labelText: 'Status',
+                labelText: AppStrings.of(context).statusLabel,
                 labelStyle: const TextStyle(color: Colors.white70),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -343,7 +366,8 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
               items: _statuses
                   .map((status) => DropdownMenuItem(
                         value: status,
-                        child: Text(status),
+                        child: Text(
+                            AppStrings.of(context).referralStatusLabel(status)),
                       ))
                   .toList(),
               onChanged: (status) {
@@ -360,9 +384,9 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 icon: const Icon(Icons.phone_callback),
-                label: const Text(
-                  'Mark Contacted',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                label: Text(
+                  AppStrings.of(context).markContacted,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -375,9 +399,9 @@ class _AgentReferralsScreenState extends State<AgentReferralsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               icon: const Icon(Icons.delete_outline),
-              label: const Text(
-                'Delete Referral',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              label: Text(
+                AppStrings.of(context).deleteReferral,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],

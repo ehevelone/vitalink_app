@@ -2,10 +2,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/secure_store.dart';
+import '../services/fcm_token_service.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../models.dart';
@@ -26,7 +28,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Profile? _p;
   bool _loading = true;
-  String _displayName = "User";
+  // Empty until the profile loads; build() shows the translated "User".
+  String _displayName = "";
   bool _notificationPermissionDialogShown = false;
 
   bool _syncRan = false;
@@ -132,15 +135,13 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         }
       }
 
-      match ??= profiles.isNotEmpty ? profiles.first : null;
-
       final qrToken = match?["qr_token"]?.toString();
 
       if (qrToken == null || qrToken.isEmpty) return;
 
       final qrUrl = "https://myvitalink.app/emergency.html?token=$qrToken";
 
-      await _store.setString("qr_url", qrUrl);
+      await _store.setString("qr_url:${_p!.id}", qrUrl);
 
       debugPrint("QR UPDATED");
     } catch (e) {
@@ -150,7 +151,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Future<void> _registerToken() async {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await FcmTokenService.getToken();
 
       if (token != null && token.isNotEmpty) {
         final userId = await _store.getString("userId");
@@ -181,8 +182,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
         await _store.setString("userName", name);
       } else if (storedName != null && storedName.trim().isNotEmpty) {
         name = storedName.trim();
-      } else {
-        name = "User";
       }
 
       if (!mounted) return;
@@ -201,7 +200,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       if (!mounted) return;
 
       setState(() {
-        _displayName = "User";
+        _displayName = "";
         _loading = false;
       });
     }
@@ -277,23 +276,23 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            "Allow Notifications",
-            style: TextStyle(
+          title: Text(
+            AppStrings.of(context).allowNotifications,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            "VitaLink needs notifications turned on so you can receive important alerts, profile updates, and messages from your agent.",
-            style: TextStyle(color: Colors.white70),
+          content: Text(
+            AppStrings.of(context).notificationsNeeded,
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 if (Navigator.canPop(context)) Navigator.pop(context);
               },
-              child: const Text("Later"),
+              child: Text(AppStrings.of(context).later),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -304,7 +303,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                 backgroundColor: const Color(0xFF7ED6F8),
                 foregroundColor: Colors.black,
               ),
-              child: const Text("Open Settings"),
+              child: Text(AppStrings.of(context).openSettings),
             ),
           ],
         ),
@@ -314,10 +313,11 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
 
   Future<void> _logout(BuildContext context) async {
     await _store.remove('userLoggedIn');
-    await _store.remove('rememberMe');
     await _store.remove('role');
     await _store.remove('authToken');
     await _store.remove('userEmail');
+    await _store.remove('userId');
+    await _store.remove('userSessionToken');
 
     await AppState.clearAuth();
 
@@ -344,7 +344,9 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         backgroundColor: Colors.green.shade700,
         title: Text(
-          "Welcome $_displayName",
+          AppStrings.of(context).welcome(
+            _displayName.isEmpty ? AppStrings.of(context).user : _displayName,
+          ),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -379,29 +381,45 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            _item(Icons.person_pin_circle, "My Agent",
+                            _item(
+                                Icons.person_pin_circle,
+                                AppStrings.of(context).myAgent,
                                 '/my_agent_user'),
-                            _item(Icons.medical_information, "Medications",
-                                '/meds'),
-                            _item(Icons.people, "Doctors", '/doctors'),
-                            _item(Icons.event_available, "Appointments",
+                            _item(Icons.medical_information,
+                                AppStrings.of(context).medications, '/meds'),
+                            _item(Icons.people, AppStrings.of(context).doctors,
+                                '/doctors'),
+                            _item(
+                                Icons.event_available,
+                                AppStrings.of(context).appointments,
                                 '/appointments'),
-                            _item(Icons.credit_card, "Insurance Cards",
+                            _item(
+                                Icons.credit_card,
+                                AppStrings.of(context).insuranceCards,
                                 '/insurance_cards_menu'),
-                            _item(Icons.policy, "Insurance Policies",
+                            _item(
+                                Icons.policy,
+                                AppStrings.of(context).insurancePolicies,
                                 '/insurance_policies'),
                             _item(
-                                Icons.person, "My Profile", '/my_profile_user'),
-                            _item(Icons.share, "Profile Sharing",
+                                Icons.person,
+                                AppStrings.of(context).myProfile,
+                                '/my_profile_user'),
+                            _item(
+                                Icons.share,
+                                AppStrings.of(context).profileSharing,
                                 '/profile_sharing'),
-                            _item(Icons.sync, "Profile Updates",
+                            _item(
+                                Icons.sync,
+                                AppStrings.of(context).profileUpdates,
                                 '/profile_updates'),
-                            _item(Icons.settings, "Settings", '/settings'),
+                            _item(Icons.settings,
+                                AppStrings.of(context).settings, '/settings'),
                           ],
                         ),
                       ),
                       SafeBottomButton(
-                        label: "Add Family Member",
+                        label: AppStrings.of(context).addFamilyMember,
                         icon: Icons.group_add,
                         color: Colors.blue.shade700,
                         onPressed: () => Navigator.pushNamed(
@@ -410,7 +428,7 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: "Switch Profile",
+                        label: AppStrings.of(context).switchProfile,
                         icon: Icons.swap_horiz,
                         color: Colors.grey.shade900,
                         onPressed: () => Navigator.pushNamed(
@@ -419,14 +437,14 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
                         ).then((_) => _loadProfile()),
                       ),
                       SafeBottomButton(
-                        label: "Emergency Info",
+                        label: AppStrings.of(context).emergencyInfo,
                         icon: Icons.warning_amber_rounded,
                         color: Colors.red.shade800,
                         onPressed: () =>
                             Navigator.pushNamed(context, '/emergency'),
                       ),
                       SafeBottomButton(
-                        label: "Log Out",
+                        label: AppStrings.of(context).logOut,
                         icon: Icons.logout,
                         color: Colors.pink.shade100,
                         onPressed: () => _logout(context),

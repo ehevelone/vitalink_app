@@ -4,6 +4,21 @@ import 'package:vitalink/services/npi_verification_service.dart';
 import 'package:vitalink/widgets/npi_verification_widgets.dart';
 
 void main() {
+  test('medication quantity survives a JSON round trip', () {
+    final medication = Medication(
+      name: 'Levetiracetam',
+      dose: '250 mg',
+      quantity: '26',
+      source: 'Scanned medication list',
+    );
+
+    final restored = Medication.fromJson(medication.toJson());
+    expect(restored.name, 'Levetiracetam');
+    expect(restored.dose, '250 mg');
+    expect(restored.quantity, '26');
+    expect(restored.source, 'Scanned medication list');
+  });
+
   test(
     'NPI lookup prefers the active user session on a dual-account device',
     () {
@@ -126,6 +141,26 @@ void main() {
       }).usesVaHealthcare,
       isTrue,
     );
+  });
+
+  test('DNR and POLST details survive JSON round trips', () {
+    final emergency = EmergencyInfo(
+      dnrPolstOnFile: true,
+      dnrPolstLocation: 'Refrigerator door',
+    );
+
+    final restored = EmergencyInfo.fromJson(emergency.toJson());
+
+    expect(restored.dnrPolstOnFile, isTrue);
+    expect(restored.dnrPolstLocation, 'Refrigerator door');
+  });
+
+  test('legacy emergency data loads without DNR fields', () {
+    final restored = EmergencyInfo.fromJson({'allergies': 'Penicillin'});
+
+    expect(restored.dnrPolstOnFile, isFalse);
+    expect(restored.dnrPolstLocation, isEmpty);
+    expect(restored.allergies, 'Penicillin');
   });
 
   test('provider specialty and primary-care role remain independent', () {

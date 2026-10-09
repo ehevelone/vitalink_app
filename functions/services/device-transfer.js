@@ -1,4 +1,5 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 const headers = {
   "Content-Type": "application/json",
@@ -24,15 +25,35 @@ function clean(value) {
   return text || null;
 }
 
+// Crockford base32: no I, L, O or U, so codes are easy to read aloud and type.
+const SHORT_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const SHORT_CODE_LENGTH = 8;
+
 function normalizeCode(value) {
-  return String(value || "")
+  const code = String(value || "")
     .replace(/[\u2010-\u2015\u2212]/g, "-")
     .replace(/[^A-Za-z0-9-]/g, "")
     .trim()
     .toUpperCase();
+  // Legacy codes keep their "VT-" form; short codes are stored without
+  // dashes and forgive look-alike letters.
+  if (code.startsWith("VT-")) return code;
+  return code
+    .replace(/-/g, "")
+    .replace(/O/g, "0")
+    .replace(/[IL]/g, "1");
 }
 
-async function ensureSchema({ cleanup = true } = {}) {
+function generateShortCode() {
+  const bytes = require("crypto").randomBytes(SHORT_CODE_LENGTH);
+  let code = "";
+  for (const byte of bytes) code += SHORT_CODE_ALPHABET[byte % 32];
+  return code;
+}
+
+// Table setup runs once per warm instance (see schema-once.js); expired
+// transfer cleanup still runs on every call.
+const ensureTransferTables = schemaOnce("device-transfer:tables", async () => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS device_transfer_packages (
       id UUID PRIMARY KEY,
@@ -65,6 +86,10 @@ async function ensureSchema({ cleanup = true } = {}) {
     CREATE INDEX IF NOT EXISTS idx_device_transfer_user_status
     ON device_transfer_packages (user_id, status, expires_at)
   `);
+});
+
+async function ensureSchema({ cleanup = true } = {}) {
+  await ensureTransferTables();
   return cleanup ? cleanupExpiredTransfers() : 0;
 }
 
@@ -92,6 +117,7 @@ module.exports = {
   cleanupExpiredTransfers,
   db,
   ensureSchema,
+  generateShortCode,
   normalizeCode,
   parseBody,
   reply,

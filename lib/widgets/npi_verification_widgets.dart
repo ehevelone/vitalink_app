@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../services/npi_verification_service.dart';
@@ -50,7 +52,7 @@ Future<String?> showDoctorZipPrompt({
   final result = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Where is this doctor?'),
+      title: Text(AppStrings.of(context).whereIsThisDoctor),
       content: Form(
         key: formKey,
         child: Column(
@@ -59,10 +61,11 @@ Future<String?> showDoctorZipPrompt({
           children: [
             Text(
               refiningSearch
-                  ? 'Enter a specific ZIP code to narrow the results for $doctorName.'
+                  ? AppStrings.of(context).enterZipToNarrow(doctorName)
                   : homeZip.isEmpty
-                  ? 'Enter the ZIP code for $doctorName.'
-                  : 'We couldn\'t find $doctorName in your registered ZIP ($homeZip). Enter the ZIP code where the doctor is located.',
+                      ? AppStrings.of(context).enterZipFor(doctorName)
+                      : AppStrings.of(context)
+                          .couldNotFindInRegisteredZip(doctorName, homeZip),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -73,13 +76,13 @@ Future<String?> showDoctorZipPrompt({
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(5),
               ],
-              decoration: const InputDecoration(
-                labelText: 'Doctor ZIP code',
+              decoration: InputDecoration(
+                labelText: AppStrings.of(context).doctorZipCode,
                 hintText: '12345',
               ),
               validator: (value) => RegExp(r'^\d{5}$').hasMatch(value ?? '')
                   ? null
-                  : 'Enter a 5-digit ZIP code',
+                  : AppStrings.of(context).enterFiveDigitZip,
               onChanged: (value) => zipValue = value,
               onFieldSubmitted: (value) {
                 if (formKey.currentState?.validate() == true) {
@@ -93,7 +96,7 @@ Future<String?> showDoctorZipPrompt({
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Leave unresolved'),
+          child: Text(AppStrings.of(context).leaveUnresolved),
         ),
         FilledButton(
           onPressed: () {
@@ -101,7 +104,7 @@ Future<String?> showDoctorZipPrompt({
               Navigator.pop(dialogContext, zipValue);
             }
           },
-          child: const Text('Search ZIP'),
+          child: Text(AppStrings.of(context).searchZip),
         ),
       ],
     ),
@@ -116,7 +119,7 @@ Future<String?> showPharmacyZipPrompt({required BuildContext context}) async {
   return showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Pharmacy ZIP code'),
+      title: Text(AppStrings.of(context).pharmacyZipCode),
       content: Form(
         key: formKey,
         child: TextFormField(
@@ -127,13 +130,13 @@ Future<String?> showPharmacyZipPrompt({required BuildContext context}) async {
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(5),
           ],
-          decoration: const InputDecoration(
-            labelText: 'ZIP code',
+          decoration: InputDecoration(
+            labelText: AppStrings.of(context).zipCode,
             hintText: '12345',
           ),
           validator: (value) => RegExp(r'^\d{5}$').hasMatch(value ?? '')
               ? null
-              : 'Enter a five-digit ZIP code.',
+              : AppStrings.of(context).enterFiveDigitZipSentence,
           onChanged: (value) => zipValue = value,
           onFieldSubmitted: (value) {
             if (formKey.currentState?.validate() == true) {
@@ -145,7 +148,7 @@ Future<String?> showPharmacyZipPrompt({required BuildContext context}) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
+          child: Text(AppStrings.of(context).cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -153,7 +156,7 @@ Future<String?> showPharmacyZipPrompt({required BuildContext context}) async {
               Navigator.pop(dialogContext, zipValue);
             }
           },
-          child: const Text('Search'),
+          child: Text(AppStrings.of(context).search),
         ),
       ],
     ),
@@ -179,7 +182,7 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
-        title: const Text('What type of doctor is this?'),
+        title: Text(AppStrings.of(context).whatTypeOfDoctor),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,17 +192,22 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'This can narrow the NPI matches before you choose a provider.',
+            Text(
+              AppStrings.of(context).narrowNpiMatches,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: selected,
-              decoration: const InputDecoration(labelText: 'Doctor type'),
+              decoration:
+                  InputDecoration(labelText: AppStrings.of(context).doctorType),
               items: npiDoctorSpecialtyOptions
                   .map(
-                    (option) =>
-                        DropdownMenuItem(value: option, child: Text(option)),
+                    (option) => DropdownMenuItem(
+                      value: option,
+                      child: Text(
+                        AppStrings.of(context).doctorSpecialtyLabel(option),
+                      ),
+                    ),
                   )
                   .toList(),
               onChanged: (value) {
@@ -210,8 +218,8 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
               const SizedBox(height: 12),
               TextField(
                 controller: otherController,
-                decoration: const InputDecoration(
-                  labelText: 'Doctor type (optional)',
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).doctorTypeOptional,
                 ),
               ),
             ],
@@ -220,7 +228,7 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Leave unresolved'),
+            child: Text(AppStrings.of(context).leaveUnresolved),
           ),
           FilledButton(
             onPressed: () {
@@ -234,7 +242,7 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
                 ),
               );
             },
-            child: const Text('Narrow matches'),
+            child: Text(AppStrings.of(context).narrowMatches),
           ),
         ],
       ),
@@ -244,23 +252,28 @@ Future<NpiSpecialtySelection?> showNpiSpecialtyPicker({
   return result;
 }
 
-Widget npiStatusIcon(String status) {
+// Builder supplies a context so the hover labels follow the app language.
+Widget npiStatusIcon(String status) => Builder(
+      builder: (context) => _npiStatusIcon(context, status),
+    );
+
+Widget _npiStatusIcon(BuildContext context, String status) {
   if (status == 'va_verified') {
-    return const Tooltip(
-      message: 'VA provider verified',
-      child: Icon(Icons.military_tech, color: Colors.blue, size: 19),
+    return Tooltip(
+      message: AppStrings.of(context).vaProviderVerified,
+      child: const Icon(Icons.military_tech, color: Colors.blue, size: 19),
     );
   }
   if (status == 'verified') {
-    return const Tooltip(
-      message: 'NPI verified',
-      child: Icon(Icons.check_circle, color: Colors.green, size: 18),
+    return Tooltip(
+      message: AppStrings.of(context).npiVerified,
+      child: const Icon(Icons.check_circle, color: Colors.green, size: 18),
     );
   }
   return Tooltip(
     message: status == 'needs_review'
-        ? 'NPI match needs review'
-        : 'NPI not verified',
+        ? AppStrings.of(context).npiMatchNeedsReview
+        : AppStrings.of(context).npiNotVerified,
     child: Icon(
       status == 'needs_review' ? Icons.flag_outlined : Icons.warning_amber,
       color: status == 'needs_review' ? Colors.orange : Colors.amber.shade800,
@@ -270,18 +283,20 @@ Widget npiStatusIcon(String status) {
 }
 
 Widget primaryCareIndicator() {
-  return const Tooltip(
-    message: 'Primary care provider',
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.health_and_safety_outlined, size: 17),
-        SizedBox(width: 4),
-        Text(
-          'Primary Care',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        ),
-      ],
+  return Builder(
+    builder: (context) => Tooltip(
+      message: AppStrings.of(context).primaryCareProvider,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.health_and_safety_outlined, size: 17),
+          const SizedBox(width: 4),
+          Text(
+            AppStrings.of(context).primaryCare,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -307,9 +322,9 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
               Text(
                 candidates.isEmpty
                     ? allowAlternateZip
-                        ? 'No matching records here. Try the pharmacy ZIP, or leave it unresolved.'
-                        : 'No matching records found. Leave it unresolved if none match.'
-                    : 'Choose the matching record, or leave it unresolved.',
+                        ? AppStrings.of(context).noMatchingRecordsTryPharmacyZip
+                        : AppStrings.of(context).noMatchingRecords
+                    : AppStrings.of(context).chooseMatchingRecord,
               ),
               const SizedBox(height: 12),
               ...candidates.take(candidateLimit).map((candidate) {
@@ -361,7 +376,8 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                           children: [
                             Expanded(
                               child: Text(
-                                (candidate['displayName'] ?? 'Provider')
+                                (candidate['displayName'] ??
+                                        AppStrings.of(context).provider)
                                     .toString(),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
@@ -369,19 +385,19 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                               ),
                             ),
                             if (candidate['suggested'] == true)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
                                 child: Text(
-                                  'Previously confirmed',
-                                  style: TextStyle(fontSize: 12),
+                                  AppStrings.of(context).previouslyConfirmed,
+                                  style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                             if (isVaProvider)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
                                 child: Text(
-                                  'VA Provider',
-                                  style: TextStyle(
+                                  AppStrings.of(context).vaProvider,
+                                  style: const TextStyle(
                                     color: Colors.blue,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -398,8 +414,9 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
                           const SizedBox(height: 4),
                           Text(
                             distance < 0.1
-                                ? 'In your ZIP code'
-                                : 'About ${distance.toStringAsFixed(1)} miles away',
+                                ? AppStrings.of(context).inYourZipCode
+                                : AppStrings.of(context).aboutMilesAway(
+                                    distance.toStringAsFixed(1)),
                           ),
                         ],
                         if (address.isNotEmpty) ...[
@@ -431,11 +448,11 @@ Future<Map<String, dynamic>?> showNpiCandidatePicker({
               dialogContext,
               const <String, dynamic>{'_pickerAction': 'searchAnotherZip'},
             ),
-            child: const Text('Search another ZIP'),
+            child: Text(AppStrings.of(context).searchAnotherZip),
           ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Leave unresolved'),
+          child: Text(AppStrings.of(context).leaveUnresolved),
         ),
       ],
     ),

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -13,6 +14,12 @@ import 'services/api_service.dart';
 import 'services/secure_store.dart';
 import 'services/deep_link_service.dart';
 import 'services/device_security_service.dart';
+import 'services/device_id.dart';
+import 'services/fcm_token_service.dart';
+import 'l10n/app_strings.dart';
+import 'services/language_service.dart';
+import 'services/notification_routes.dart';
+import 'widgets/app_update_gate.dart';
 
 // SCREENS
 import 'screens/landing_screen.dart';
@@ -106,46 +113,72 @@ Future<void> _setupNotificationDisplay() async {
 }
 
 // 🔥 POPUP
+bool _notificationPopupOpen = false;
+
+// One handler for every screen (clients and agents). The client and agent
+// menus used to add their own listeners too, which could show the same
+// notification twice; this keeps the agent menu's dark style instead.
 void showGlobalNotificationPopup(RemoteMessage message) {
   final ctx = navigatorKey.currentContext;
-  if (ctx == null) return;
+  if (ctx == null || _notificationPopupOpen) return;
 
   final data = message.data;
+  final strings = AppStrings.of(ctx);
+  _notificationPopupOpen = true;
 
   showDialog(
     context: ctx,
     barrierDismissible: false,
     builder: (context) {
       return AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          data["title"] ?? message.notification?.title ?? "New Notification",
+          data["title"] ??
+              message.notification?.title ??
+              strings.newNotification,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           data["body"] ??
               message.notification?.body ??
-              "You have a new update.",
+              strings.newNotificationBody,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Dismiss"),
+            child: Text(
+              strings.dismiss,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.lightBlueAccent,
+              foregroundColor: Colors.black,
+            ),
             onPressed: () {
               Navigator.pop(context);
 
               _captureProfileShareInvite(message);
               final route = data["route"];
-              if (route != null) {
+              if (_isKnownNotificationRoute(route)) {
                 navigatorKey.currentState?.pushNamed(route, arguments: data);
               }
             },
-            child: const Text("Open"),
+            child: Text(
+              strings.openLabel,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       );
     },
-  );
+  ).whenComplete(() => _notificationPopupOpen = false);
 }
 
 @pragma('vm:entry-point')
@@ -169,11 +202,25 @@ void _captureProfileShareInvite(RemoteMessage message) {
   }
 }
 
+bool _isKnownNotificationRoute(dynamic route) =>
+    isKnownNotificationRoute(route);
+
+Future<bool> _revocationTargetsCurrentDevice(RemoteMessage message) async {
+  final targetUserId = message.data['userId']?.toString() ?? '';
+  final targetDeviceId = message.data['deviceId']?.toString() ?? '';
+  if (targetUserId.isEmpty || targetDeviceId.isEmpty) return false;
+
+  final store = SecureStore();
+  final currentUserId = await store.getString('userId') ?? '';
+  final currentDeviceId = await DeviceId.getOrCreate();
+  return targetUserId == currentUserId && targetDeviceId == currentDeviceId;
+}
+
 Future<void> _setupFCMGlobal() async {
   try {
     final messaging = FirebaseMessaging.instance;
 
-    final token = await messaging.getToken();
+    final token = await FcmTokenService.getToken();
     final store = SecureStore();
 
     if (token != null) {
@@ -191,10 +238,14 @@ Future<void> _setupFCMGlobal() async {
       final userId = await store.getString("userId");
 
       if (userId != null) {
-        await ApiService.registerDeviceToken(
-          userId: userId,
-          fcmToken: newToken,
-        );
+        try {
+          await ApiService.registerDeviceToken(
+            userId: userId,
+            fcmToken: newToken,
+          );
+        } catch (error) {
+          debugPrint('FCM TOKEN REFRESH REGISTRATION FAILED: $error');
+        }
       }
     });
   } catch (e) {
@@ -217,7 +268,7 @@ Future<void> main() async {
 
     await Firebase.initializeApp();
     await _setupNotificationDisplay();
-    await _setupFCMGlobal();
+    await LanguageService.load();
 
     // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
     _appLinks.uriLinkStream.listen((uri) {
@@ -242,12 +293,33 @@ Future<void> main() async {
       });
     }
 
+    // Agent-prepared registration (vitalink://activate?onboard=CODE). Goes
+    // through the user terms screen, which forwards the code to registration.
+    Future<void> handleAssistedOnboardingLink(Uri uri) async {
+      final onboardingCode =
+          (uri.queryParameters['onboard'] ?? uri.queryParameters['onboarding'])
+              ?.trim()
+              .toUpperCase();
+      if (onboardingCode == null || onboardingCode.isEmpty) return;
+
+      VitaLinkDeepLink.onboardingCode = onboardingCode;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigatorKey.currentState?.pushNamed(
+          '/terms_user',
+          arguments: {'onboard': onboardingCode},
+        );
+      });
+    }
+
     final initialShareUri = await _appLinks.getInitialLink();
     if (initialShareUri != null) {
       await handleProfileShareLink(initialShareUri);
+      await handleAssistedOnboardingLink(initialShareUri);
     }
 
     _appLinks.uriLinkStream.listen(handleProfileShareLink);
+    _appLinks.uriLinkStream.listen(handleAssistedOnboardingLink);
 
     RemoteMessage? initialMessage =
         await FirebaseMessaging.instance.getInitialMessage();
@@ -256,7 +328,7 @@ Future<void> main() async {
       _captureProfileShareInvite(initialMessage);
       final route = initialMessage.data["route"];
 
-      if (route != null) {
+      if (_isKnownNotificationRoute(route)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           navigatorKey.currentState?.pushNamed(
             route,
@@ -272,6 +344,7 @@ Future<void> main() async {
 
     FirebaseMessaging.onMessage.listen((message) async {
       if (message.data['type'] == 'device_revoked') {
+        if (!await _revocationTargetsCurrentDevice(message)) return;
         await DeviceSecurityService.disableCurrentDevice(
           reason: message.data['reason']?.toString(),
         );
@@ -290,12 +363,16 @@ Future<void> main() async {
 
       final route = message.data["route"];
 
-      if (route != null) {
+      if (_isKnownNotificationRoute(route)) {
         navigatorKey.currentState?.pushNamed(route, arguments: message.data);
       }
     });
 
     runApp(const VitaLinkApp());
+
+    // Token lookup and registration can be slow on poor connections; never
+    // hold the first screen for them.
+    unawaited(_setupFCMGlobal());
   }, (error, stack) {
     debugPrint('ZONED ERROR: $error');
   });
@@ -311,106 +388,124 @@ class VitaLinkApp extends StatefulWidget {
 class _VitaLinkAppState extends State<VitaLinkApp> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        useMaterial3: false,
-        primaryColor: Colors.blue,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          enabledBorder: OutlineInputBorder(),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue, width: 2),
+    // Rebuild the whole app when the Settings language picker changes.
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: LanguageService.localeNotifier,
+      builder: (context, locale, _) => MaterialApp(
+        theme: ThemeData(
+          useMaterial3: false,
+          primaryColor: Colors.blue,
+          inputDecorationTheme: const InputDecorationTheme(
+            border: OutlineInputBorder(),
+            enabledBorder: OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue, width: 2),
+            ),
           ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          dialogTheme: const DialogThemeData(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
         ),
-        dialogTheme: const DialogThemeData(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-          ),
-        ),
-      ),
-      navigatorKey: navigatorKey,
-      title: 'VitaLink',
-      debugShowCheckedModeBanner: false,
-      home: const LandingScreen(),
-      builder: (context, child) {
-        return SafeArea(
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-      onGenerateRoute: (settings) {
-        if (settings.name == '/insurance_cards') {
-          int index = 0;
-          final args = settings.arguments;
+        navigatorKey: navigatorKey,
+        title: 'VitaLink',
+        locale: locale,
+        supportedLocales: const [
+          Locale('en'),
+          Locale('es'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        debugShowCheckedModeBanner: false,
+        home: const LandingScreen(),
+        builder: (context, child) {
+          return AppUpdateGate(
+            navigatorKey: navigatorKey,
+            child: SafeArea(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
+        },
+        onGenerateRoute: (settings) {
+          if (settings.name == '/insurance_cards') {
+            int index = 0;
+            final args = settings.arguments;
 
-          if (args is int) index = args;
-          if (args is Map && args['index'] is int) {
-            index = args['index'];
+            if (args is int) index = args;
+            if (args is Map && args['index'] is int) {
+              index = args['index'];
+            }
+
+            return MaterialPageRoute(
+              builder: (_) => InsuranceCardsScreen(index: index),
+            );
           }
 
-          return MaterialPageRoute(
-            builder: (_) => InsuranceCardsScreen(index: index),
-          );
-        }
-
-        return null;
-      },
-      routes: {
-        '/landing': (context) => const LandingScreen(),
-        '/splash': (context) => const SplashScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/agent_login': (context) => const AgentLoginScreen(),
-        '/registration': (context) => const RegistrationScreen(),
-        '/account_setup': (context) => const AccountSetupScreen(),
-        '/agent_registration': (context) => const AgentRegistrationScreen(),
-        '/agent_setup': (context) => const AgentSetupScreen(),
-        '/terms_user': (context) => const TermsUserScreen(),
-        '/terms_agent': (context) => const TermsAgentScreen(),
-        '/account_access': (context) => const AccountAccessScreen(),
-        '/device_disabled': (context) => const DeviceDisabledScreen(),
-        '/prospect_contact_request': (context) =>
-            const ProspectContactRequestScreen(),
-        '/logo': (context) => const LogoScreen(),
-        '/menu': (context) => const MenuScreen(),
-        '/agent_menu': (context) => const AgentMenuScreen(),
-        '/agent_clients': (context) => const AgentClientsScreen(),
-        '/agent_notes': (context) => const AgentNotesScreen(),
-        '/my_agent_user': (context) => const MyAgentUser(),
-        '/my_agent_agent': (context) => const MyAgentAgent(),
-        '/emergency': (context) => const EmergencyScreen(),
-        '/emergency_view': (context) => const EmergencyView(),
-        '/my_profile_user': (context) => const ProfileUserScreen(),
-        '/my_profile_agent': (context) => const ProfileAgentScreen(),
-        '/edit_profile': (context) => const EditProfileScreen(),
-        '/profile_picker': (context) => const ProfilePickerScreen(),
-        '/profile_sharing': (context) => const ProfileSharingScreen(),
-        '/profile_accept': (context) => const ProfileAcceptInviteScreen(),
-        '/profile_updates': (context) => const ProfileUpdatesScreen(),
-        '/new_profile': (context) => const NewProfileScreen(),
-        '/referral_center': (context) => const ReferralCenterScreen(),
-        '/agent_referrals': (context) => const AgentReferralsScreen(),
-        '/settings': (context) => const SettingsScreen(),
-        '/meds': (context) => const MedsScreen(),
-        '/doctors': (context) => const DoctorsScreen(),
-        '/doctors_view': (context) => const DoctorsView(),
-        '/appointments': (context) => const AppointmentsScreen(),
-        '/insurance_policies': (context) => const InsurancePoliciesScreen(),
-        '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
-        '/scan_card': (context) => const ScanCard(),
-        '/authorization_form': (context) => const HipaaFormScreen(),
-        '/request_reset': (context) => const RequestResetScreen(),
-        '/reset_password': (context) => const ResetPasswordScreen(),
-        '/agent_request_reset': (context) => const AgentRequestResetScreen(),
-        '/agent_reset_password': (context) => const AgentResetPasswordScreen(),
-        '/update_app': (context) => const UpdateAppScreen(),
-      },
+          return null;
+        },
+        routes: {
+          '/landing': (context) => const LandingScreen(),
+          '/splash': (context) => const SplashScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/agent_login': (context) => const AgentLoginScreen(),
+          '/registration': (context) => const RegistrationScreen(),
+          '/account_setup': (context) => const AccountSetupScreen(),
+          '/agent_registration': (context) => const AgentRegistrationScreen(),
+          '/agent_setup': (context) => const AgentSetupScreen(),
+          '/terms_user': (context) => const TermsUserScreen(),
+          '/terms_agent': (context) => const TermsAgentScreen(),
+          '/account_access': (context) => const AccountAccessScreen(),
+          '/device_disabled': (context) => const DeviceDisabledScreen(),
+          '/prospect_contact_request': (context) =>
+              const ProspectContactRequestScreen(),
+          '/logo': (context) => const LogoScreen(),
+          '/menu': (context) => const MenuScreen(),
+          '/agent_menu': (context) => const AgentMenuScreen(),
+          '/agent_clients': (context) => const AgentClientsScreen(),
+          '/agent_notes': (context) => const AgentNotesScreen(),
+          '/my_agent_user': (context) => const MyAgentUser(),
+          '/my_agent_agent': (context) => const MyAgentAgent(),
+          '/emergency': (context) => const EmergencyScreen(),
+          '/emergency_view': (context) => const EmergencyView(),
+          '/my_profile_user': (context) => const ProfileUserScreen(),
+          '/my_profile_agent': (context) => const ProfileAgentScreen(),
+          '/edit_profile': (context) => const EditProfileScreen(),
+          '/profile_picker': (context) => const ProfilePickerScreen(),
+          '/profile_sharing': (context) => const ProfileSharingScreen(),
+          '/profile_accept': (context) => const ProfileAcceptInviteScreen(),
+          '/profile_updates': (context) => const ProfileUpdatesScreen(),
+          '/new_profile': (context) => const NewProfileScreen(),
+          '/referral_center': (context) => const ReferralCenterScreen(),
+          '/agent_referrals': (context) => const AgentReferralsScreen(),
+          '/settings': (context) => const SettingsScreen(),
+          '/meds': (context) => const MedsScreen(),
+          '/doctors': (context) => const DoctorsScreen(),
+          '/doctors_view': (context) => const DoctorsView(),
+          '/appointments': (context) => const AppointmentsScreen(),
+          '/insurance_policies': (context) => const InsurancePoliciesScreen(),
+          '/insurance_cards_menu': (context) => const IOSCardScanScreen(),
+          '/scan_card': (context) => const ScanCard(),
+          '/authorization_form': (context) => const HipaaFormScreen(),
+          '/request_reset': (context) => const RequestResetScreen(),
+          '/reset_password': (context) => const ResetPasswordScreen(),
+          '/agent_request_reset': (context) => const AgentRequestResetScreen(),
+          '/agent_reset_password': (context) =>
+              const AgentResetPasswordScreen(),
+          '/update_app': (context) => const UpdateAppScreen(),
+        },
+      ),
     );
   }
 }

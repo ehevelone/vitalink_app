@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/secure_store.dart';
+import '../services/fcm_token_service.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 
@@ -90,15 +92,14 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
         if (res["requires_payment"] == true) {
           setState(() {
             _showAccessOverlay = true;
-            _overlayMessage =
-                "Your agent portal access is not active. Contact VitaLink support before logging in.";
+            _overlayMessage = AppStrings.of(context).agentPortalNotActive;
           });
           return;
         }
 
         // ❌ Normal error
         setState(() {
-          _errorMessage = res["error"] ?? "Login failed";
+          _errorMessage = res["error"] ?? AppStrings.of(context).loginFailed;
         });
 
         return;
@@ -108,13 +109,14 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
 
       if (agent == null) {
         setState(() {
-          _errorMessage = "Invalid response";
+          _errorMessage = AppStrings.of(context).invalidResponse;
           _loading = false;
         });
         return;
       }
 
       final store = SecureStore();
+      await store.clearAuth();
 
       await AppState.clearAuth();
       await AppState.setLoggedIn(true);
@@ -142,7 +144,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       }
 
       try {
-        final fcm = await FirebaseMessaging.instance.getToken();
+        final fcm = await FcmTokenService.getToken();
         if (fcm != null) {
           final agentId = int.tryParse(agent["id"].toString());
           if (agentId != null && agentId > 0) {
@@ -163,7 +165,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = "Login error";
+        _errorMessage = AppStrings.of(context).loginError;
         _loading = false;
       });
     }
@@ -183,7 +185,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Agent Login")),
+      appBar: AppBar(title: Text(AppStrings.of(context).agentLogin)),
       body: Stack(
         children: [
           // 🔹 MAIN UI
@@ -196,9 +198,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                   TextFormField(
                     controller: _emailCtrl,
                     onChanged: (_) => _clearError(),
-                    decoration: const InputDecoration(labelText: "Agent Email"),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? "Enter your email" : null,
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).agentEmail),
+                    validator: (v) => v == null || v.isEmpty
+                        ? AppStrings.of(context).enterYourEmail
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -206,7 +210,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                     onChanged: (_) => _clearError(),
                     obscureText: !_showPassword,
                     decoration: InputDecoration(
-                      labelText: "Password",
+                      labelText: AppStrings.of(context).password,
                       suffixIcon: IconButton(
                         icon: Icon(
                           _showPassword
@@ -217,8 +221,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                             setState(() => _showPassword = !_showPassword),
                       ),
                     ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? "Enter password" : null,
+                    validator: (v) => v == null || v.isEmpty
+                        ? AppStrings.of(context).enterPassword
+                        : null,
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 10),
@@ -232,20 +237,20 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: _goToReset,
-                      child: const Text("Forgot Password?"),
+                      child: Text(AppStrings.of(context).forgotPassword),
                     ),
                   ),
                   CheckboxListTile(
                     value: _rememberMe,
                     onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                    title: const Text("Remember me"),
+                    title: Text(AppStrings.of(context).rememberMe),
                   ),
                   const SizedBox(height: 24),
                   _loading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton(
                           onPressed: _login,
-                          child: const Text("Login as Agent"),
+                          child: Text(AppStrings.of(context).loginAsAgent),
                         ),
                 ],
               ),
@@ -275,9 +280,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          "Access Not Active",
-                          style: TextStyle(
+                        Text(
+                          AppStrings.of(context).accessNotActive,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -299,7 +304,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
                             foregroundColor: Colors.black,
                           ),
                           onPressed: _closeOverlay,
-                          child: const Text("Close"),
+                          child: Text(AppStrings.of(context).close),
                         ),
                       ],
                     ),

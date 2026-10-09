@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/data_repository.dart';
@@ -41,16 +43,16 @@ class _DoctorsViewState extends State<DoctorsView> {
 
     final docs = _p!.doctors;
     final title = _p?.fullName.isNotEmpty == true
-        ? "Doctors – ${_p!.fullName}"
-        : "Doctors";
+        ? AppStrings.of(context).doctorsFor(_p!.fullName)
+        : AppStrings.of(context).doctors;
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: docs.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
-                "No doctors available.",
-                style: TextStyle(fontSize: 16, color: Colors.black54),
+                AppStrings.of(context).noDoctorsAvailable,
+                style: const TextStyle(fontSize: 16, color: Colors.black54),
               ),
             )
           : ListView.separated(
@@ -65,12 +67,16 @@ class _DoctorsViewState extends State<DoctorsView> {
                     bottom: BorderSide(color: Colors.black12),
                   ),
                   title: Text(
-                    d.name.isNotEmpty ? d.name : "Unnamed Doctor",
+                    d.name.isNotEmpty
+                        ? d.name
+                        : AppStrings.of(context).unnamedDoctor,
                   ),
                   subtitle: Text(
-                    [d.specialty, d.clinic, d.phone]
-                        .where((s) => s.isNotEmpty)
-                        .join(" • "),
+                    [
+                      AppStrings.of(context).doctorSpecialtyLabel(d.specialty),
+                      d.clinic,
+                      d.phone,
+                    ].where((s) => s.isNotEmpty).join(" • "),
                   ),
                 );
               },

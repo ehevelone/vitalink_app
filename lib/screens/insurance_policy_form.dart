@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../models.dart';
 import '../services/data_repository.dart';
 import '../services/secure_store.dart';
@@ -112,15 +114,15 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
     if (duplicate.isNotEmpty) {
       final idx = widget.allPolicies.indexOf(duplicate.first);
       widget.allPolicies[idx] = updated;
-      _showSnack("Merged into existing policy");
+      _showSnack(AppStrings.of(context).mergedIntoExistingPolicy);
       Navigator.pop(context, updated);
       return;
     }
 
     _showSnack(
       widget.policy.carrier.isEmpty && widget.policy.policy.isEmpty
-          ? "Created new policy"
-          : "Policy updated",
+          ? AppStrings.of(context).createdNewPolicy
+          : AppStrings.of(context).policyUpdated,
     );
 
     Navigator.pop(context, updated);
@@ -143,13 +145,13 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
       appBar: AppBar(
         title: Text(
           widget.policy.carrier.isEmpty
-              ? "New Insurance Policy$profileName"
-              : "Edit Insurance Policy$profileName",
+              ? "${AppStrings.of(context).newInsurancePolicy}$profileName"
+              : "${AppStrings.of(context).editInsurancePolicy}$profileName",
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
-            tooltip: "Save",
+            tooltip: AppStrings.of(context).save,
             onPressed: _save,
           ),
         ],
@@ -162,7 +164,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: carrier,
-                  decoration: const InputDecoration(labelText: "Carrier"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).carrier),
                 ),
                 const Divider(height: 1),
               ],
@@ -171,7 +174,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: policyNo,
-                  decoration: const InputDecoration(labelText: "Policy #"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).policyNumber),
                 ),
                 const Divider(height: 1),
               ],
@@ -180,7 +184,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: groupNo,
-                  decoration: const InputDecoration(labelText: "Group #"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).groupNumber),
                 ),
                 const Divider(height: 1),
               ],
@@ -189,7 +194,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: memberId,
-                  decoration: const InputDecoration(labelText: "Member ID"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).memberId),
                 ),
                 const Divider(height: 1),
               ],
@@ -200,7 +206,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: insuredName,
-                  decoration: const InputDecoration(labelText: "Insured Name"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).insuredName),
                 ),
                 const Divider(height: 1),
               ],
@@ -209,7 +216,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: beneficiary,
-                  decoration: const InputDecoration(labelText: "Beneficiary"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).beneficiary),
                 ),
                 const Divider(height: 1),
               ],
@@ -218,7 +226,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: phone,
-                  decoration: const InputDecoration(labelText: "Phone"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).phone),
                   keyboardType: TextInputType.phone,
                   inputFormatters: [PhoneNumberFormatter()],
                 ),
@@ -229,7 +238,8 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextField(
                   controller: policyType,
-                  decoration: const InputDecoration(labelText: "Policy Type"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).policyType),
                 ),
                 const Divider(height: 1),
               ],
@@ -240,12 +250,12 @@ class _InsurancePolicyFormState extends State<InsurancePolicyForm> {
               children: [
                 TextButton(
                   onPressed: _cancel,
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
                 const SizedBox(width: 12),
                 FilledButton(
                   onPressed: _save,
-                  child: const Text("Save"),
+                  child: Text(AppStrings.of(context).save),
                 ),
               ],
             ),

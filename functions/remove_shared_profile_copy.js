@@ -5,8 +5,14 @@ const {
   ensureSchema,
   parseBody,
   reply,
+  uniqueTargets,
   verifyUserSession,
 } = require("./services/profile-share-sync");
+const {
+  ensureLanguageColumns,
+  notificationText,
+  sendLocalizedMulticast,
+} = require("./services/notification-language");
 
 function initFirebase() {
   if (admin.apps.length) return true;
@@ -27,22 +33,23 @@ function initFirebase() {
 
 async function notifyOwner(ownerUserId, profileName) {
   if (!ownerUserId || !initFirebase()) return;
+  await ensureLanguageColumns();
   const devices = await db.query(
-    `SELECT device_token FROM user_devices
+    `SELECT device_token, app_language FROM user_devices
      WHERE user_id::TEXT=$1 AND device_status='active'
        AND device_token IS NOT NULL AND TRIM(device_token) <> ''`,
     [String(ownerUserId)]
   );
-  const tokens = [...new Set(devices.rows.map((row) => clean(row.device_token)).filter(Boolean))];
-  if (!tokens.length) return;
-  await admin.messaging().sendEachForMulticast({
+  const targets = uniqueTargets(devices.rows);
+  if (!targets.length) return;
+  await sendLocalizedMulticast(admin.messaging(), targets, (language, tokens) => ({
     tokens,
     notification: {
-      title: "Shared profile removed",
-      body: `The caregiver removed ${profileName || "the shared profile"} from their device.`,
+      title: notificationText("sharedRemovedTitle", language),
+      body: notificationText("sharedRemovedBody", language, { profile: profileName }),
     },
     data: { type: "profile_share_recipient_removed" },
-  });
+  }));
 }
 
 exports.handler = async (event) => {

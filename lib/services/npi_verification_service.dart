@@ -1,6 +1,8 @@
 import 'api_service.dart';
 import 'secure_store.dart';
 import '../models.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/screen_strings.dart';
 
 Map<String, dynamic> selectNpiIdentity({
   String? agentId,
@@ -143,7 +145,8 @@ class NpiVerificationService {
     if (response['success'] != true) {
       return NpiLookupResult(
         status: 'error',
-        error: response['error']?.toString() ?? 'Provider lookup failed',
+        error: response['error']?.toString() ??
+            AppStrings.current().providerLookupFailed,
       );
     }
     return NpiLookupResult.fromJson(response);

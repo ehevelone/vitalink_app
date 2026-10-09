@@ -1,5 +1,6 @@
 // functions/get_user_agent.js
 const db = require("./services/db");
+const { verifyUserSession } = require("./services/user-auth");
 
 function ok(obj) {
   return {
@@ -41,10 +42,13 @@ exports.handler = async (event) => {
       return fail("Method not allowed", 405);
     }
 
-    const { email } = JSON.parse(event.body || "{}");
+    const { email, userId, sessionToken } = JSON.parse(event.body || "{}");
 
     if (!email) {
       return fail("Missing user email");
+    }
+    if (!(await verifyUserSession(userId, sessionToken))) {
+      return fail("Unauthorized", 403);
     }
 
     // 1️⃣ Normalize email
@@ -52,8 +56,8 @@ exports.handler = async (event) => {
 
     // 2️⃣ Fetch user and agent_id
     const userResult = await db.query(
-      "SELECT id, agent_id FROM users WHERE email = $1 LIMIT 1",
-      [normalizedEmail]
+      "SELECT id, agent_id FROM users WHERE id = $1 AND LOWER(email) = LOWER($2) LIMIT 1",
+      [userId, normalizedEmail]
     );
 
     if (!userResult.rows.length) {

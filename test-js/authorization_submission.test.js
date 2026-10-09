@@ -48,21 +48,21 @@ function setup() {
   return { handler, mailed: () => mailed, crmPackage: () => crmPackage };
 }
 
-const hipaa = { name: 'Health_Information_Authorization.pdf', content: Buffer.from('hipaa PDF').toString('base64') };
-const soa = { name: 'Medicare_Scope_of_Appointment.pdf', content: Buffer.from('soa PDF').toString('base64') };
+const combined = { name: 'HIPAA_SOA_Authorization.pdf', content: Buffer.from('combined signed PDF').toString('base64') };
 
-test('new authorization submission requires both PDFs and SOA choices', async () => {
+test('new authorization submission requires the combined signed PDF', async () => {
   const { handler, mailed } = setup();
   const response = await handler({ body: JSON.stringify({
+    app_user_id: '17',
+    sessionToken: 'test-session',
     agent: { email: 'agent@example.com' },
-    attachments: [hipaa],
-    soa_product_types: ['Medicare Advantage (Part C)'],
+    attachments: [],
   }) });
   assert.equal(response.statusCode, 400);
   assert.equal(mailed(), undefined);
 });
 
-test('distinct signed PDFs and selected products reach email and CRM', async () => {
+test('one combined signed PDF reaches email and CRM as the official record', async () => {
   const { handler, mailed, crmPackage } = setup();
   const response = await handler({ body: JSON.stringify({
     agent: { email: 'agent@example.com' },
@@ -70,14 +70,9 @@ test('distinct signed PDFs and selected products reach email and CRM', async () 
     user_email: 'client@example.com',
     app_user_id: '17',
     sessionToken: 'test-session',
-    attachments: [hipaa, soa],
-    soa_product_types: ['Medicare Advantage (Part C)'],
+    attachments: [combined],
   }) });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(crmPackage().soaProductTypes, ['Medicare Advantage (Part C)']);
-  assert.equal(crmPackage().hipaaPdfBase64, hipaa.content);
-  assert.equal(crmPackage().soaPdfBase64, soa.content);
-  assert.notEqual(crmPackage().hipaaPdfBase64, crmPackage().soaPdfBase64);
-  assert.ok(mailed().attachments.some((a) => a.filename === hipaa.name));
-  assert.ok(mailed().attachments.some((a) => a.filename === soa.name));
+  assert.equal(crmPackage().hipaaSoaPdfBase64, combined.content);
+  assert.ok(mailed().attachments.some((a) => a.filename === combined.name));
 });

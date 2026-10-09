@@ -16,15 +16,13 @@ function setup({ agent = null, rsm = null, duplicate = false, selfRsm = null } =
     release() {},
     async query(sql, params = []) {
       calls.push({ sql, params });
-      if (sql.includes('FROM agents') && sql.includes('promo_code = $1')) return { rows: agent ? [agent] : [] };
+      if (sql.includes('FROM agents') && sql.includes('promo_code=$1')) return { rows: agent ? [agent] : [] };
       if (sql.includes('FROM rsms') && sql.includes('FOR UPDATE')) return { rows: rsm ? [rsm] : [] };
       if (sql.includes('FROM agents') && sql.includes('LOWER(email)')) return { rows: duplicate ? [{ id: 99 }] : [] };
       if (sql.includes('FROM rsms') && sql.includes('LOWER(email)')) return { rows: selfRsm ? [{ id: selfRsm }] : [] };
       if (sql.includes('INSERT INTO agents') || sql.includes('UPDATE agents')) {
-        const isInsert = sql.includes('INSERT INTO agents');
-        const status = params[isInsert ? 14 : 15];
-        return { rows: [{ id: 51, email: 'new@example.com', active: params[isInsert ? 11 : 13],
-          subscription_status: status, promo_code: isInsert ? params[16] : params[10], role: 'agent' }] };
+        return { rows: [{ id: agent?.id || 51, email: params[0], active: params[11],
+          subscription_status: params[14], promo_code: params[10], role: 'agent' }] };
       }
       return { rows: [] };
     },
@@ -38,10 +36,11 @@ function request(code = 'RSM-TEST', email = 'new@example.com') {
   return { httpMethod: 'POST', body: JSON.stringify({
     unlockCode: code, email, password: 'StrongPass!1', npn: '1234567890',
     name: 'New Agent', phone: '4025550100', agencyState: 'ne',
+    agreementVersion: '2026-09-30',
   }) };
 }
 
-const activeRsm = { id: '00000000-0000-0000-0000-000000000001', billing_active: true,
+const activeRsm = { id: '00000000-0000-0000-0000-000000000001', active: true, billing_active: true,
   billing_mode: 'agent_paid', pricing_tier: 'founders' };
 
 test.after(() => {
@@ -80,8 +79,8 @@ test('QR-created agent code cannot bypass individual billing', async () => {
   assert.equal(body.requiresAgentBilling, true);
   assert.equal(body.active, false);
   const update = calls.find(call => call.sql.includes('UPDATE agents'));
-  assert.equal(update.params[14], 'agent');
-  assert.equal(update.params[15], 'pending_payment');
+  assert.equal(update.params[13], 'agent');
+  assert.equal(update.params[14], 'pending_payment');
 });
 
 test('existing standalone agent code still works', async () => {
@@ -111,6 +110,17 @@ test('previously paid agent code does not require a second checkout', async () =
   assert.equal(body.active, true);
 });
 
+test('manual admin override remains active without an agent checkout', async () => {
+  setup({ agent: { id: 12, rsm_id: activeRsm.id, billing_owner: 'agent',
+    subscription_status: 'admin_override', stripe_subscription_id: null,
+    password_hash: null }, rsm: activeRsm });
+  const body = JSON.parse((await handler(request('AGT-TEST'))).body);
+  assert.equal(body.success, true);
+  assert.equal(body.requiresAgentBilling, false);
+  assert.equal(body.active, true);
+  assert.equal(body.subscriptionStatus, 'active');
+});
+
 test('duplicate email is rejected without inserting', async () => {
   const calls = setup({ rsm: activeRsm, duplicate: true });
   const response = await handler(request());
@@ -122,6 +132,13 @@ test('duplicate email is rejected without inserting', async () => {
 test('inactive RSM billing blocks invite', async () => {
   setup({ rsm: { ...activeRsm, billing_active: false } });
   const response = await handler(request());
+  assert.equal(response.statusCode, 402);
+});
+
+test('agent code linked to a missing office fails closed', async () => {
+  setup({ agent: { id: 12, rsm_id: activeRsm.id, billing_owner: 'agent',
+    subscription_status: 'pending_payment', password_hash: null } });
+  const response = await handler(request('AGT-TEST'));
   assert.equal(response.statusCode, 402);
 });
 

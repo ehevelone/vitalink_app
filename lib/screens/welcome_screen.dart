@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -25,22 +27,22 @@ class WelcomeScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Log In As"),
-        content: const Text("Please choose your account type."),
+        title: Text(AppStrings.of(context).logInAs),
+        content: Text(AppStrings.of(context).chooseAccountType),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/login'); // User login
             },
-            child: const Text("User Login"),
+            child: Text(AppStrings.of(context).userLogin),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/agent_login');
             },
-            child: const Text("Agent Login"),
+            child: Text(AppStrings.of(context).agentLogin),
           ),
         ],
       ),
@@ -62,19 +64,19 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Create Account",
-                  style: TextStyle(
+                Text(
+                  AppStrings.of(context).createAccount,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "Choose the account type that matches how you use VitaLink.",
+                Text(
+                  AppStrings.of(context).chooseAccountType,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
                   ),
@@ -83,8 +85,8 @@ class WelcomeScreen extends StatelessWidget {
                 _registerOption(
                   context,
                   icon: Icons.family_restroom,
-                  title: "Create Client Account",
-                  subtitle: "For VitaLink users and families",
+                  title: AppStrings.of(context).createClientAccount,
+                  subtitle: AppStrings.of(context).forUsersAndFamilies,
                   color: Colors.green,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -95,8 +97,8 @@ class WelcomeScreen extends StatelessWidget {
                 _registerOption(
                   context,
                   icon: Icons.business_center,
-                  title: "Create Agent Account",
-                  subtitle: "For licensed agents with a registration code",
+                  title: AppStrings.of(context).activateAgentPortal,
+                  subtitle: AppStrings.of(context).agentActivationSubtitle,
                   color: vitalinkBlue,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -228,21 +230,20 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Client Account Activation",
+                Text(
+                  AppStrings.of(context).clientAccountActivation,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  "VitaLink client accounts require an access code before registration. This code may come from your insurance agent or be delivered by email after it is issued.\n\n"
-                  "Do you already have a VitaLink activation code?",
+                Text(
+                  AppStrings.of(context).activationCodeIntro(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
                     height: 1.4,
@@ -250,7 +251,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "I Have a Code",
+                  label: AppStrings.of(context).iHaveCode,
                   primary: true,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -259,7 +260,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
               ],
             ),
@@ -284,20 +285,20 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Agent Portal Activation",
+                Text(
+                  AppStrings.of(context).agentPortalActivation,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  "Enter an already-issued agent registration code to continue.",
+                Text(
+                  AppStrings.of(context).agentActivationBody,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
                     height: 1.4,
@@ -305,7 +306,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 _dialogActionButton(
-                  label: "Continue With Registration Code",
+                  label: AppStrings.of(context).continueWithRegistrationCode,
                   primary: true,
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -314,7 +315,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
               ],
             ),
@@ -332,9 +333,9 @@ class WelcomeScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "Welcome to VitaLink",
-              style: TextStyle(
+            Text(
+              AppStrings.of(context).welcomeToVitalink,
+              style: const TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
               ),
@@ -349,9 +350,9 @@ class WelcomeScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 55),
               ),
               onPressed: () => _showLoginOptions(context),
-              child: const Text(
-                "Log In to Your Account",
-                style: TextStyle(fontSize: 18),
+              child: Text(
+                AppStrings.of(context).loginToYourAccount,
+                style: const TextStyle(fontSize: 18),
               ),
             ),
 
@@ -364,9 +365,9 @@ class WelcomeScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 55),
               ),
               onPressed: () => _showRegisterOptions(context),
-              child: const Text(
-                "Register for an Account",
-                style: TextStyle(fontSize: 18),
+              child: Text(
+                AppStrings.of(context).registerForAccount,
+                style: const TextStyle(fontSize: 18),
               ),
             ),
           ],

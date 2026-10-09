@@ -1,4 +1,5 @@
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 const { verifyAgentSession } = require("./agent-auth");
 const { verifyUserSession } = require("./user-auth");
 const { normalizeText } = require("./npi-registry");
@@ -151,6 +152,9 @@ async function cacheConfirmedCandidate({ entityType, searchedName, candidate, ac
     ],
   );
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureNpiCacheTable = schemaOnce("npi-verification:ensureNpiCacheTable", ensureNpiCacheTable);
 
 module.exports = {
   authenticate,

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import '../l10n/app_strings.dart';
 
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/app_state.dart';
 import '../services/device_id.dart';
+import '../services/fcm_token_service.dart';
 import '../services/device_security_service.dart';
 import '../services/device_transfer_service.dart';
+import '../services/transfer_code.dart';
+import '../widgets/transfer_code_dialog.dart';
 import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -27,66 +30,59 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _errorMessage;
 
-  Future<void> _restoreTransferAfterLogin() async {
-    final controller = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Load Your VitaLink Profiles'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Transfer code'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Not Now'),
+  /// Loads the transfer the server already verified at login. The package
+  /// stays downloadable by this phone for 6 hours, so a failed attempt can be
+  /// retried here or later from Settings without a new code.
+  Future<void> _restoreTransferAfterLogin(String code) async {
+    while (mounted) {
+      try {
+        await DeviceTransferService().redeemTransfer(code);
+      } on TransferCleanupException {
+        // Profiles were imported; only the server cleanup failed.
+      } catch (e) {
+        if (!mounted) return;
+        final retry = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Text(AppStrings.of(context).transferNotLoadedYet),
+            content: Text(
+              '${e.toString().replaceFirst('Exception: ', '')}\n\n'
+              '${AppStrings.of(context).transferRetryHint}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(AppStrings.of(context).later),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(AppStrings.of(context).tryAgain),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Load Profiles'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (code == null || code.isEmpty) return;
-    try {
-      await DeviceTransferService().redeemTransfer(code);
+        );
+        if (retry == true) continue;
+        return;
+      }
+
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Transfer Complete'),
-          content: const Text(
-            'Your VitaLink profiles and locally stored information are now on this device.',
+          title: Text(AppStrings.of(context).transferCompleteTitle),
+          content: Text(
+            AppStrings.of(context).transferCompleteBody,
           ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Continue'),
+              child: Text(AppStrings.of(context).continueLabel),
             ),
           ],
         ),
       );
-    } catch (e) {
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Transfer Not Loaded'),
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      return;
     }
   }
 
@@ -131,20 +127,19 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "New App Installation Detected",
-                style: TextStyle(
+              Text(
+                AppStrings.of(context).newInstallationDetected,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "VitaLink found another installation for this account.\n\n"
-                "If this is the same phone after an update or reinstall, confirm it below. If you are moving to a different phone, use Transfer Profile to New Device first. Account recovery does not restore information stored only on another device.",
+              Text(
+                AppStrings.of(context).newInstallationBody,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -153,8 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: () => Navigator.pop(ctx, "current_installation"),
-                child: const Text("This Is My Current Phone",
-                    style: TextStyle(color: Colors.black)),
+                child: Text(AppStrings.of(context).thisIsMyCurrentPhone,
+                    style: const TextStyle(color: Colors.black)),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -163,8 +158,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: () => Navigator.pop(ctx, "replaced"),
-                child: const Text("I Created a Transfer Code",
-                    style: TextStyle(color: Colors.white)),
+                child: Text(AppStrings.of(context).iCreatedTransferCode,
+                    style: const TextStyle(color: Colors.white)),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -173,13 +168,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: () => Navigator.pop(ctx, "lost_stolen"),
-                child: const Text("It Was Lost or Stolen",
-                    style: TextStyle(color: Colors.white)),
+                child: Text(AppStrings.of(context).itWasLostOrStolen,
+                    style: const TextStyle(color: Colors.white)),
               ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("Cancel"),
+                child: Text(AppStrings.of(context).cancel),
               ),
             ],
           ),
@@ -194,7 +189,16 @@ class _LoginScreenState extends State<LoginScreen> {
     bool recoverInstallation = false,
     bool validateForm = true,
     String replacementReason = "replaced",
+    String? transferCode,
   }) async {
+    final loginStopwatch = Stopwatch()..start();
+    void logStage(String stage) {
+      debugPrint(
+        "$stage elapsedMs=${loginStopwatch.elapsedMilliseconds} "
+        "replace=$replace recovery=$recoverInstallation",
+      );
+    }
+
     if (!auto && validateForm) {
       final formState = _formKey.currentState;
       if (formState == null || !formState.validate()) return;
@@ -204,166 +208,215 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
       _errorMessage = null;
     });
+    logStage("LOGIN_START");
 
-    final email = _emailCtrl.text.trim().toLowerCase();
-    final password = _passwordCtrl.text.trim();
-    final deviceId = await DeviceId.getOrCreate();
-    String? fcmToken;
     try {
-      fcmToken = await FirebaseMessaging.instance.getToken();
-    } catch (_) {}
-
-    final platform =
-        !mounted || Theme.of(context).platform == TargetPlatform.iOS
-            ? "ios"
-            : "android";
-
-    final res = await ApiService.loginUser(
-      email: email,
-      password: password,
-      platform: platform,
-      deviceId: deviceId,
-      fcmToken: fcmToken,
-      recoverInstallation: recoverInstallation,
-      replace: replace,
-      replacementReason: replacementReason,
-    );
-
-    if (!mounted) return;
-
-    if (res["success"] == true) {
-      final user = res["user"];
-      final store = SecureStore();
-      await DeviceSecurityService.clearLocalRevocationForReplacement();
-
-      await AppState.setLoggedIn(true);
-      await AppState.setRole("user");
-      await AppState.setEmail(user["email"]);
-
-      // ✅ FIX — STORE AS STRING
-      await store.setString("userId", user["id"].toString());
-
-      await store.setString("userEmail", user["email"]);
-
-      final sessionToken = user["session_token"]?.toString() ?? "";
-      if (sessionToken.isNotEmpty) {
-        await store.setString("userSessionToken", sessionToken);
-      } else {
-        await store.remove("userSessionToken");
-      }
-
-      if (_rememberMe) {
-        await store.setBool("rememberMeUser", true);
-        await store.setString("savedUserEmail", email);
-        await store.setString("savedUserPassword", password);
-      } else {
-        await store.setBool("rememberMeUser", false);
-        await store.remove("savedUserEmail");
-        await store.remove("savedUserPassword");
-      }
-
+      final email = _emailCtrl.text.trim().toLowerCase();
+      final password = _passwordCtrl.text.trim();
+      final deviceId = await DeviceId.getOrCreate();
+      String? fcmToken;
       try {
-        final fcm = await FirebaseMessaging.instance.getToken();
-        if (fcm != null) {
-          final userId = await store.getString("userId");
-          if (userId != null) {
-            await ApiService.registerDeviceToken(
-              userId: userId,
-              fcmToken: fcm,
+        fcmToken = await FcmTokenService.getToken();
+      } catch (_) {}
+
+      final platform =
+          !mounted || Theme.of(context).platform == TargetPlatform.iOS
+              ? "ios"
+              : "android";
+
+      if (replace || recoverInstallation) {
+        logStage("DEVICE_SWITCH_REQUEST_START");
+      }
+      final res = await ApiService.loginUser(
+        email: email,
+        password: password,
+        platform: platform,
+        deviceId: deviceId,
+        fcmToken: fcmToken,
+        recoverInstallation: recoverInstallation,
+        replace: replace,
+        replacementReason: replacementReason,
+        transferCode: transferCode == null
+            ? null
+            : TransferCode.parse(transferCode).serverCode,
+      );
+      logStage("LOGIN_RESPONSE");
+
+      if (!mounted) return;
+
+      if (res["success"] == true) {
+        final user = res["user"];
+        final store = SecureStore();
+        final nextUserId = user["id"].toString();
+        await store.clearAuth();
+        await store.setString('profileOwnerUserId', nextUserId);
+        await DeviceSecurityService.clearLocalRevocationForReplacement();
+
+        logStage("SESSION_SAVE_START");
+        await AppState.setLoggedIn(true);
+        await AppState.setRole("user");
+        await AppState.setEmail(user["email"]);
+
+        // ✅ FIX — STORE AS STRING
+        await store.setString("userId", nextUserId);
+
+        await store.setString("userEmail", user["email"]);
+
+        final sessionToken = user["session_token"]?.toString() ?? "";
+        if (sessionToken.isNotEmpty) {
+          await store.setString("userSessionToken", sessionToken);
+        } else {
+          await store.remove("userSessionToken");
+        }
+
+        if (_rememberMe) {
+          await store.setBool("rememberMeUser", true);
+          await store.setString("savedUserEmail", email);
+          await store.setString("savedUserPassword", password);
+        } else {
+          await store.setBool("rememberMeUser", false);
+          await store.remove("savedUserEmail");
+          await store.remove("savedUserPassword");
+        }
+        logStage("SESSION_SAVE_COMPLETE");
+
+        try {
+          logStage("DEVICE_TOKEN_REGISTER_START");
+          final fcm = await FcmTokenService.getToken();
+          if (fcm != null) {
+            final userId = await store.getString("userId");
+            if (userId != null) {
+              await ApiService.registerDeviceToken(
+                userId: userId,
+                fcmToken: fcm,
+              );
+            }
+          }
+          logStage("DEVICE_TOKEN_REGISTER_COMPLETE");
+        } catch (error) {
+          debugPrint(
+            "DEVICE_TOKEN_REGISTER_FAILED errorType=${error.runtimeType}",
+          );
+        }
+
+        if (!mounted) return;
+
+        if (replace && replacementReason == 'replaced') {
+          if (transferCode != null) {
+            await _restoreTransferAfterLogin(transferCode);
+          }
+          if (!mounted) return;
+        }
+        logStage("NAVIGATION_START");
+        Navigator.pushReplacementNamed(context, "/logo");
+      } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
+        logStage("DEVICE_CONFLICT_DETECTED");
+        final choice = await _showReplacePopup();
+        if (choice != null) logStage("DEVICE_SWITCH_CONFIRMED");
+        if (choice == "lost_stolen") {
+          if (!mounted) return;
+          final lostOrStolen = await showDialog<String>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(AppStrings.of(context).disableOldDeviceTitle),
+              content: Text(
+                AppStrings.of(context).disableOldDeviceBody,
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(AppStrings.of(context).cancel)),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, "lost"),
+                    child: Text(AppStrings.of(context).lost)),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, "stolen"),
+                    child: Text(AppStrings.of(context).stolen)),
+              ],
+            ),
+          );
+          if (lostOrStolen != null) {
+            await _login(
+              replace: true,
+              validateForm: false,
+              replacementReason: lostOrStolen,
+            );
+          }
+        } else if (choice == "current_installation") {
+          await _login(
+            recoverInstallation: true,
+            validateForm: false,
+          );
+        } else if (choice == "replaced") {
+          if (!mounted) return;
+          // Collect and check the code before the old phone is switched off.
+          final code = await showTransferCodeDialog(context);
+          if (code != null) {
+            await _login(
+              replace: true,
+              validateForm: false,
+              replacementReason: "replaced",
+              transferCode: code,
             );
           }
         }
-      } catch (_) {}
-
-      if (!mounted) return;
-
-      if (replace && replacementReason == 'replaced') {
-        await _restoreTransferAfterLogin();
-        if (!mounted) return;
-      }
-      Navigator.pushReplacementNamed(context, "/logo");
-    } else if (res["error"] == "DEVICE_ACTIVE" && replace == false) {
-      final choice = await _showReplacePopup();
-      if (choice == "lost_stolen") {
-        if (!mounted) return;
-        final lostOrStolen = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text("Disable the old device?"),
-            content: const Text(
-              "The old device will be disabled the next time it connects. Information stored outside VitaLink, including screenshots or exported files, cannot be recalled.",
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel")),
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx, "lost"),
-                  child: const Text("Lost")),
-              ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, "stolen"),
-                  child: const Text("Stolen")),
-            ],
-          ),
+      } else if (res["error"] == "DEVICE_REVOKED") {
+        await DeviceSecurityService.disableCurrentDevice(
+          reason: res["reason"]?.toString(),
         );
-        if (lostOrStolen != null) {
-          await _login(
-            replace: true,
-            validateForm: false,
-            replacementReason: lostOrStolen,
-          );
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/device_disabled', (_) => false);
+      } else if (res["error"] == "TRANSFER_CODE_INVALID") {
+        setState(() {
+          _errorMessage = res["message"]?.toString() ??
+              AppStrings.of(context).transferCodeDoesNotMatch;
+        });
+      } else if (res["error"] == "TRANSFER_REQUIRED") {
+        setState(() {
+          _errorMessage = AppStrings.of(context).transferRequired;
+        });
+      } else if (res["error"] == "INSTALLATION_RECOVERY_NOT_VERIFIED") {
+        setState(() {
+          _errorMessage =
+              AppStrings.of(context).installationRecoveryNotVerified;
+        });
+      } else {
+        final store = SecureStore();
+
+        if (auto) {
+          await store.remove("savedUserPassword");
+          await store.setBool("rememberMeUser", false);
         }
-      } else if (choice == "current_installation") {
-        await _login(
-          recoverInstallation: true,
-          validateForm: false,
-        );
-      } else if (choice == "replaced") {
-        await _login(
-          replace: true,
-          validateForm: false,
-          replacementReason: "replaced",
-        );
+
+        if (!mounted) return;
+        String msg = AppStrings.of(context).loginFailed;
+
+        if (res["httpStatus"] == 401) {
+          msg = AppStrings.of(context).incorrectPassword;
+        } else if (res["httpStatus"] == 404) {
+          msg = AppStrings.of(context).accountNotFound;
+        } else if (res["error"] != null) {
+          msg = res["error"];
+        }
+
+        setState(() {
+          _errorMessage = msg;
+        });
       }
-    } else if (res["error"] == "DEVICE_REVOKED") {
-      await DeviceSecurityService.disableCurrentDevice(
-        reason: res["reason"]?.toString(),
-      );
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(
-          context, '/device_disabled', (_) => false);
-    } else if (res["error"] == "TRANSFER_REQUIRED") {
-      setState(() {
-        _errorMessage =
-            "Create a transfer code on the old device before replacing it.";
-      });
-    } else {
-      final store = SecureStore();
-
-      if (auto) {
-        await store.remove("savedUserPassword");
-        await store.setBool("rememberMeUser", false);
+    } catch (error) {
+      debugPrint('LOGIN_LOCAL_FAILURE type=${error.runtimeType}');
+      if (mounted) {
+        setState(() {
+          _errorMessage = AppStrings.of(context).loginCouldNotFinish;
+        });
       }
-
-      String msg = "Login failed";
-
-      if (res["status"] == 401) {
-        msg = "Incorrect password";
-      } else if (res["status"] == 404) {
-        msg = "Account not found";
-      } else if (res["error"] != null) {
-        msg = res["error"];
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
       }
-
-      setState(() {
-        _errorMessage = msg;
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
     }
   }
 
@@ -402,7 +455,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("User Login")),
+      appBar: AppBar(title: Text(AppStrings.of(context).userLogin)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -412,8 +465,11 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _emailCtrl,
                 onChanged: (_) => _clearError(),
-                decoration: const InputDecoration(labelText: "Email"),
-                validator: (v) => v == null || v.isEmpty ? "Enter email" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).email),
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).enterEmail
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -421,7 +477,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onChanged: (_) => _clearError(),
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: "Password",
+                  labelText: AppStrings.of(context).password,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showPassword ? Icons.visibility_off : Icons.visibility,
@@ -430,8 +486,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         setState(() => _showPassword = !_showPassword),
                   ),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter password" : null,
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).enterPassword
+                    : null,
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 10),
@@ -447,19 +504,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _goToReset,
-                  child: const Text("Forgot Password?"),
+                  child: Text(AppStrings.of(context).forgotPassword),
                 ),
               ),
               const SizedBox(height: 8),
               CheckboxListTile(
                 value: _rememberMe,
                 onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                title: const Text("Remember me"),
+                title: Text(AppStrings.of(context).rememberMe),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => _login(),
-                child: const Text("Login"),
+                child: Text(AppStrings.of(context).login),
               ),
             ],
           ),

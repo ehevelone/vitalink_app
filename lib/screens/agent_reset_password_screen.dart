@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
 import '../services/secure_store.dart';
 
@@ -32,13 +34,13 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
   }
 
   String? _validatePassword(String? pw) {
-    if (pw == null || pw.isEmpty) return "Enter a password";
-    if (pw.length < 10) return "Must be at least 10 characters";
+    if (pw == null || pw.isEmpty) return AppStrings.of(context).enterAPassword;
+    if (pw.length < 10) return AppStrings.of(context).passwordAtLeast10;
     if (!RegExp(r'[A-Z]').hasMatch(pw)) {
-      return "Must contain at least one uppercase letter";
+      return AppStrings.of(context).passwordNeedsUppercase;
     }
     if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(pw)) {
-      return "Must contain at least one special character";
+      return AppStrings.of(context).passwordNeedsSpecial;
     }
     return null;
   }
@@ -68,8 +70,8 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text("Success"),
-          content: const Text("Agent password has been reset successfully."),
+          title: Text(AppStrings.of(context).success),
+          content: Text(AppStrings.of(context).agentPasswordReset),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -86,7 +88,8 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data['error'] ?? "Reset failed")),
+        SnackBar(
+            content: Text(data['error'] ?? AppStrings.of(context).resetFailed)),
       );
     }
   }
@@ -104,7 +107,7 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Agent Reset Password"),
+        title: Text(AppStrings.of(context).agentResetPassword),
         backgroundColor: Colors.blue.shade700,
       ),
       body: Padding(
@@ -113,29 +116,30 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
           key: _formKey,
           child: ListView(
             children: [
-              const Text(
-                "VitaLink Agent Portal",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Text(
+                AppStrings.of(context).agentPortalTitle,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Agent Email",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).agentEmail,
                   border: InputBorder.none,
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "Enter your email address" : null,
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).enterEmailAddress
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _codeCtrl,
-                decoration: const InputDecoration(
-                  labelText: "6-digit Reset Code",
+                decoration: InputDecoration(
+                  labelText: AppStrings.of(context).sixDigitResetCode,
                   border: InputBorder.none,
                 ),
                 validator: (v) => v == null || v.length != 6
-                    ? "Enter valid 6-digit code"
+                    ? AppStrings.of(context).enterValidSixDigitCode
                     : null,
               ),
               const SizedBox(height: 12),
@@ -143,7 +147,7 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
                 controller: _newPassCtrl,
                 obscureText: !_showPass,
                 decoration: InputDecoration(
-                  labelText: "New Password",
+                  labelText: AppStrings.of(context).newPassword,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -159,7 +163,7 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
                 controller: _confirmCtrl,
                 obscureText: !_showConfirm,
                 decoration: InputDecoration(
-                  labelText: "Confirm Password",
+                  labelText: AppStrings.of(context).confirmPassword,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -169,15 +173,16 @@ class _AgentResetPasswordScreenState extends State<AgentResetPasswordScreen> {
                         setState(() => _showConfirm = !_showConfirm),
                   ),
                 ),
-                validator: (v) =>
-                    v != _newPassCtrl.text ? "Passwords do not match" : null,
+                validator: (v) => v != _newPassCtrl.text
+                    ? AppStrings.of(context).passwordsDoNotMatch
+                    : null,
               ),
               const SizedBox(height: 24),
               _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton.icon(
                       icon: const Icon(Icons.lock_reset),
-                      label: const Text("Reset Password"),
+                      label: Text(AppStrings.of(context).resetPassword),
                       onPressed: _submitNewPassword,
                     ),
             ],

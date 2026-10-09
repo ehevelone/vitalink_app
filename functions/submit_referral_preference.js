@@ -7,7 +7,18 @@ const {
   sendReferralPush,
 } = require("./services/referral-center");
 
+const { notificationText } = require("./services/notification-language");
+
 const VALID_PREFERENCES = new Set(["Text Message", "Phone Call", "Email"]);
+const PREFERENCES_ES = {
+  "Text Message": "mensaje de texto",
+  "Phone Call": "llamada",
+  Email: "correo electrónico",
+};
+
+function preferenceLabel(preference, language) {
+  return language === "es" ? PREFERENCES_ES[preference] || preference : preference;
+}
 
 exports.handler = async (event) => {
   try {
@@ -164,8 +175,11 @@ exports.handler = async (event) => {
     const agentPush = await sendReferralPush({
       recipient: { type: "agent", id: referral.agent_id },
       referral,
-      title: "New VitaLink Referral",
-      body: `${referral.referral_name} preferred contact: ${preference}.`,
+      title: (language) => notificationText("newReferralTitle", language),
+      body: (language) => notificationText("newReferralBody", language, {
+        name: referral.referral_name,
+        preference: preferenceLabel(preference, language),
+      }),
     });
 
     console.log("submit_referral_preference push_complete", {

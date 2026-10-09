@@ -30,23 +30,47 @@ class DeviceSecurityService {
   static Future<void> disableCurrentDevice({String? reason}) async {
     final deviceId = await DeviceId.getOrCreate();
     final normalizedReason = reason?.trim().toLowerCase() ?? 'unknown';
-    final eraseData = normalizedReason == 'lost' || normalizedReason == 'stolen';
+    final eraseData =
+        normalizedReason == 'lost' || normalizedReason == 'stolen';
+    final repository = DataRepository();
+    final prefs = await SharedPreferences.getInstance();
+
+    // This can run more than once (push, startup check, then a login attempt
+    // that returns DEVICE_REVOKED). After the first run auth is cleared and the
+    // current suffix is 'unassigned', so keep the account recorded first.
+    final currentSuffix = await repository.currentStorageSuffix();
+    final recordedSuffix = prefs.getString('revokedProfileStorageSuffix');
+    final storageSuffix = currentSuffix != 'unassigned'
+        ? currentSuffix
+        : (recordedSuffix != null && recordedSuffix.isNotEmpty
+            ? recordedSuffix
+            : currentSuffix);
+    if (storageSuffix != 'unassigned') {
+      await prefs.setString('revokedProfileStorageSuffix', storageSuffix);
+    }
+
     if (eraseData) {
-      await DataRepository().clearLocalProfiles();
+      await repository.clearLocalProfiles(storageSuffix: storageSuffix);
     }
     await SecureStore().clearAuth();
     await AppState.clearAuth();
 
-    final prefs = await SharedPreferences.getInstance();
+    final alreadyErased = prefs.getBool('revokedDeviceDataErased') ?? false;
     await prefs.setBool('deviceRevoked', true);
     await prefs.setString('revokedDeviceId', deviceId);
     await prefs.setString('deviceRevocationReason', normalizedReason);
-    await prefs.setBool('revokedDeviceDataErased', eraseData);
+    await prefs.setBool('revokedDeviceDataErased', eraseData || alreadyErased);
+
+    // The server keeps this id revoked. A fresh id lets the next login reach
+    // the normal "New App Installation Detected" choices instead of being
+    // sent straight back to this screen.
+    await DeviceId.reset();
   }
 
   static Future<void> erasePreservedLocalData() async {
-    await DataRepository().clearLocalProfiles();
     final prefs = await SharedPreferences.getInstance();
+    final storageSuffix = prefs.getString('revokedProfileStorageSuffix');
+    await DataRepository().clearLocalProfiles(storageSuffix: storageSuffix);
     await prefs.setBool('revokedDeviceDataErased', true);
   }
 
@@ -69,5 +93,6 @@ class DeviceSecurityService {
     await prefs.remove('revokedDeviceId');
     await prefs.remove('deviceRevocationReason');
     await prefs.remove('revokedDeviceDataErased');
+    await prefs.remove('revokedProfileStorageSuffix');
   }
 }

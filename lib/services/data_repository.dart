@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../models.dart';
 import 'persistent_file_store.dart';
+import 'profile_server_sync_service.dart';
 import 'profile_update_sync_service.dart';
 import 'secure_store.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/screen_strings.dart';
 
 class DataRepository {
   final SecureStore _store;
@@ -16,12 +19,96 @@ class DataRepository {
   static const String _profilesKey = 'profiles_json';
   static const String _activeIndexKey = 'active_profile_index';
 
+  Future<String> _accountSuffix() async {
+    final userId = (await _store.getString('userId') ?? '').trim();
+    final userSession =
+        (await _store.getString('userSessionToken') ?? '').trim();
+    if (userId.isNotEmpty && userSession.isNotEmpty) {
+      return 'user_${userId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}';
+    }
+
+    final agentId = (await _store.getString('agentId') ?? '').trim();
+    final agentSession =
+        (await _store.getString('agentSessionToken') ?? '').trim();
+    if (agentId.isNotEmpty && agentSession.isNotEmpty) {
+      return 'agent_${agentId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}';
+    }
+
+    return 'unassigned';
+  }
+
+  Future<String> _accountProfilesKey() async =>
+      '${_profilesKey}_${await _accountSuffix()}';
+
+  Future<String> _accountActiveIndexKey() async =>
+      '${_activeIndexKey}_${await _accountSuffix()}';
+
+  Future<String> currentStorageSuffix() => _accountSuffix();
+
   // ==========================================================
   // INTERNAL LOAD
   // ==========================================================
   Future<List<Profile>> _loadProfilesInternal() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_profilesKey);
+    final accountSuffix = await _accountSuffix();
+    final profilesKey = '${_profilesKey}_$accountSuffix';
+    var raw = await _store.getString(profilesKey);
+
+    // Compatibility for the short-lived account key used by build 313a4a6.
+    // It was never released, but retaining this read protects test devices.
+    if ((raw == null || raw.isEmpty) && accountSuffix.startsWith('user_')) {
+      final rawUserId = accountSuffix.substring('user_'.length);
+      final interimProfilesKey = '${_profilesKey}_$rawUserId';
+      final interimIndexKey = '${_activeIndexKey}_$rawUserId';
+      final interimRaw = await _store.getString(interimProfilesKey);
+      if (interimRaw != null && interimRaw.isNotEmpty) {
+        raw = interimRaw;
+        await _store.setString(profilesKey, interimRaw);
+        final interimIndex = await _store.getString(interimIndexKey);
+        if (interimIndex != null && interimIndex.isNotEmpty) {
+          await _store.setString(
+            '${_activeIndexKey}_$accountSuffix',
+            interimIndex,
+          );
+        }
+        await _store.remove(interimProfilesKey);
+        await _store.remove(interimIndexKey);
+      }
+    }
+
+    // Device-wide legacy data may contain client medical profiles. Never move
+    // it into an agent account merely because the agent logs in first.
+    if ((raw == null || raw.isEmpty) && accountSuffix.startsWith('user_')) {
+      final legacySecure = await _store.getString(_profilesKey);
+      final legacyPrefs = prefs.getString(_profilesKey);
+      final legacyRaw =
+          (legacySecure?.isNotEmpty ?? false) ? legacySecure : legacyPrefs;
+      if (legacyRaw != null && legacyRaw.isNotEmpty) {
+        final currentUserId = (await _store.getString('userId') ?? '').trim();
+        final recordedOwner =
+            (await _store.getString('profileOwnerUserId') ?? '').trim();
+        final migrationOwner = recordedOwner.isNotEmpty
+            ? 'user_${recordedOwner.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}'
+            : accountSuffix;
+        final migrationProfilesKey = '${_profilesKey}_$migrationOwner';
+        final migrationIndexKey = '${_activeIndexKey}_$migrationOwner';
+        await _store.setString(migrationProfilesKey, legacyRaw);
+
+        final legacyIndex = await _store.getString(_activeIndexKey) ??
+            prefs.getInt(_activeIndexKey)?.toString();
+        if (legacyIndex != null && legacyIndex.isNotEmpty) {
+          await _store.setString(migrationIndexKey, legacyIndex);
+        }
+        await _store.remove(_profilesKey);
+        await _store.remove(_activeIndexKey);
+        await prefs.remove(_profilesKey);
+        await prefs.remove(_activeIndexKey);
+
+        if (recordedOwner.isEmpty || recordedOwner == currentUserId) {
+          raw = legacyRaw;
+        }
+      }
+    }
 
     if (raw == null || raw.isEmpty) return [];
 
@@ -43,6 +130,20 @@ class DataRepository {
           }
         }
 
+        var migratedIds = false;
+        for (final profile in profiles) {
+          if (profile.id.isEmpty) {
+            profile.id = const Uuid().v4();
+            migratedIds = true;
+          } else if (profile.id.length < 30) {
+            profile.id = const Uuid().v5(Uuid.NAMESPACE_URL, profile.id);
+            migratedIds = true;
+          }
+        }
+        if (migratedIds) {
+          await _saveProfilesInternal(profiles);
+        }
+
         return profiles;
       }
     } catch (_) {
@@ -58,14 +159,20 @@ class DataRepository {
   Future<void> _saveProfilesInternal(
     List<Profile> profiles, {
     int? activeIndex,
+    bool syncToServer = true,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-
     final list = profiles.map((p) => p.toJson()).toList();
-    await prefs.setString(_profilesKey, jsonEncode(list));
+    await _store.setString(await _accountProfilesKey(), jsonEncode(list));
 
     if (activeIndex != null) {
-      await prefs.setInt(_activeIndexKey, activeIndex);
+      await _store.setString(
+        await _accountActiveIndexKey(),
+        activeIndex.toString(),
+      );
+    }
+
+    if (syncToServer) {
+      unawaited(ProfileServerSyncService.sync(profiles));
     }
   }
 
@@ -73,11 +180,12 @@ class DataRepository {
   // ACTIVE INDEX
   // ==========================================================
   Future<int> _getActiveIndex(List<Profile> profiles) async {
-    final prefs = await SharedPreferences.getInstance();
-
     if (profiles.isEmpty) return 0;
 
-    int idx = prefs.getInt(_activeIndexKey) ?? 0;
+    int idx = int.tryParse(
+          await _store.getString(await _accountActiveIndexKey()) ?? '',
+        ) ??
+        0;
 
     if (idx < 0 || idx >= profiles.length) idx = 0;
     return idx;
@@ -112,28 +220,6 @@ class DataRepository {
     final idx = await _getActiveIndex(list);
     final p = list[idx];
 
-    // ==========================================================
-    // 🔥 CRITICAL FIX — VALIDATE ID
-    // ==========================================================
-    if (p.id.isEmpty || p.id.length < 30) {
-      debugPrint("INVALID PROFILE ID DETECTED - RESETTING");
-
-      final newProfile = Profile(); // generates proper UUID
-      await saveProfile(newProfile, publishUpdate: false);
-
-      await _syncName(newProfile);
-      return newProfile;
-    }
-
-    // ==========================================================
-    // EXISTING LOGIC (UNCHANGED)
-    // ==========================================================
-    final name = p.fullName.trim();
-
-    if (name.isNotEmpty) {
-      await saveProfile(p, publishUpdate: false); // forces clean rewrite
-    }
-
     // Keep the local account display name aligned with the active profile.
     await _syncName(p);
 
@@ -162,7 +248,7 @@ class DataRepository {
     final rawProfiles = payload['profiles'];
 
     if (rawProfiles is! List || rawProfiles.isEmpty) {
-      throw Exception('No VitaLink profiles were found in this transfer.');
+      throw Exception(AppStrings.current().noProfilesInTransfer);
     }
 
     final profiles = <Profile>[];
@@ -174,16 +260,36 @@ class DataRepository {
     }
 
     if (profiles.isEmpty) {
-      throw Exception('No VitaLink profiles were found in this transfer.');
+      throw Exception(AppStrings.current().noProfilesInTransfer);
     }
 
     final rawIndex = payload['activeProfileIndex'];
-    final activeIndex =
-        rawIndex is int ? rawIndex.clamp(0, profiles.length - 1).toInt() : 0;
+    final importedActive = profiles[
+        rawIndex is int ? rawIndex.clamp(0, profiles.length - 1).toInt() : 0];
 
-    await _saveProfilesInternal(profiles, activeIndex: activeIndex);
-    await _syncName(profiles[activeIndex]);
+    // Merge rather than overwrite: keep anything already entered on this
+    // phone, let transferred copies replace same-id profiles, and drop the
+    // empty placeholder profile the app creates on first launch.
+    final importedIds = profiles.map((p) => p.id).toSet();
+    final existing = await _loadProfilesInternal();
+    final kept = existing
+        .where((p) => !importedIds.contains(p.id) && !_isEmptyPlaceholder(p))
+        .toList();
+    final merged = [...kept, ...profiles];
+    final activeIndex = merged.indexWhere((p) => p.id == importedActive.id);
+
+    await _saveProfilesInternal(merged, activeIndex: activeIndex);
+    await _syncName(importedActive);
   }
+
+  bool _isEmptyPlaceholder(Profile p) =>
+      p.fullName.trim().isEmpty &&
+      p.meds.isEmpty &&
+      p.doctors.isEmpty &&
+      p.appointments.isEmpty &&
+      p.insurances.isEmpty &&
+      p.orphanCards.isEmpty &&
+      jsonEncode(p.emergency.toJson()) == jsonEncode(EmergencyInfo().toJson());
 
   Future<void> saveProfile(
     Profile profile, {
@@ -331,7 +437,11 @@ class DataRepository {
     if (profiles.isEmpty) return;
     if (index < 0 || index >= profiles.length) return;
 
-    await _saveProfilesInternal(profiles, activeIndex: index);
+    await _saveProfilesInternal(
+      profiles,
+      activeIndex: index,
+      syncToServer: false,
+    );
 
     // 🔥 sync newly active profile name
     final p = profiles[index];
@@ -395,10 +505,27 @@ class DataRepository {
     for (final path in paths) {
       await PersistentFileStore.deleteIfLocal(path);
     }
+    await _store.remove('qr_url:${profile.id}');
   }
 
-  Future<void> clearLocalProfiles() async {
-    final profiles = await _loadProfilesInternal();
+  Future<void> clearLocalProfiles({String? storageSuffix}) async {
+    final suffix = storageSuffix ?? await _accountSuffix();
+    final profilesKey = '${_profilesKey}_$suffix';
+    final activeIndexKey = '${_activeIndexKey}_$suffix';
+    final raw = await _store.getString(profilesKey);
+    final profiles = <Profile>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final item in decoded.whereType<Map>()) {
+            profiles.add(Profile.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      } catch (_) {
+        // Continue removing the account keys even if one record is malformed.
+      }
+    }
     final paths = <String>{};
 
     void collect(dynamic value) {
@@ -429,10 +556,15 @@ class DataRepository {
     for (final path in paths) {
       await PersistentFileStore.deleteIfLocal(path);
     }
+    for (final profile in profiles) {
+      await _store.remove('qr_url:${profile.id}');
+    }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_profilesKey);
-    await prefs.remove(_activeIndexKey);
+    await prefs.remove(profilesKey);
+    await prefs.remove(activeIndexKey);
+    await _store.remove(profilesKey);
+    await _store.remove(activeIndexKey);
     await _store.remove('userName');
     await _store.remove('qr_url');
   }

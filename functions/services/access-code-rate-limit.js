@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const db = require("./db");
+const { schemaOnce } = require("./schema-once");
 
 const MAX_FAILURES = 5;
 const WINDOW_MINUTES = 15;
@@ -200,6 +201,9 @@ async function cleanupExpiredAccessCodeAttempts() {
   `);
   return (result.rowCount || 0) + (aggregate.rowCount || 0);
 }
+
+// Schema setup runs once per warm instance (see schema-once.js).
+ensureAccessCodeRateLimitSchema = schemaOnce("access-code-rate-limit:ensureAccessCodeRateLimitSchema", ensureAccessCodeRateLimitSchema);
 
 module.exports = {
   checkAccessCodeLimit,

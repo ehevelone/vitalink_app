@@ -7,6 +7,7 @@ class Medication {
   String name;
   String dose;
   String frequency;
+  String quantity;
   String prescriber;
   String? pharmacyFulfillmentType;
   String? pharmacyNpi;
@@ -15,12 +16,19 @@ class Medication {
   DateTime? pharmacyVerifiedAt;
   String? pharmacyVerifiedBy;
   String source;
+  // Sorts the entry into Prescriptions or Supplements & OTC on the meds
+  // screen: "prescription", "supplement", "otc" or "unknown".
+  String itemType;
+  String servingSize;
+  List<String> activeIngredients;
+  List<String> otherIngredients;
   DateTime updatedAt;
 
   Medication({
     this.name = '',
     this.dose = '',
     this.frequency = '',
+    this.quantity = '',
     this.prescriber = '',
     this.pharmacyFulfillmentType,
     this.pharmacyNpi,
@@ -29,14 +37,40 @@ class Medication {
     this.pharmacyVerifiedAt,
     this.pharmacyVerifiedBy,
     this.source = 'Manual',
+    this.itemType = 'prescription',
+    this.servingSize = '',
+    List<String>? activeIngredients,
+    List<String>? otherIngredients,
     DateTime? updatedAt,
   })  : pharmacyNpiCandidates = pharmacyNpiCandidates ?? [],
+        activeIngredients = activeIngredients ?? [],
+        otherIngredients = otherIngredients ?? [],
         updatedAt = updatedAt ?? DateTime.now();
+
+  bool get isSupplementOrOtc => itemType == 'supplement' || itemType == 'otc';
+
+  static List<String> _stringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value
+          .split(RegExp(r'[\n;]'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return [];
+  }
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'dose': dose,
         'frequency': frequency,
+        'quantity': quantity,
         'prescriber': prescriber,
         'pharmacyFulfillmentType': pharmacyFulfillmentType,
         'pharmacyNpi': pharmacyNpi,
@@ -45,6 +79,10 @@ class Medication {
         'pharmacyVerifiedAt': pharmacyVerifiedAt?.toIso8601String(),
         'pharmacyVerifiedBy': pharmacyVerifiedBy,
         'source': source,
+        'itemType': itemType,
+        'servingSize': servingSize,
+        'activeIngredients': activeIngredients,
+        'otherIngredients': otherIngredients,
         'updatedAt': updatedAt.toIso8601String(),
       };
 
@@ -52,6 +90,7 @@ class Medication {
         name: json['name'] ?? '',
         dose: json['dose'] ?? '',
         frequency: json['frequency'] ?? '',
+        quantity: json['quantity'] ?? '',
         prescriber: json['prescriber'] ?? '',
         pharmacyFulfillmentType: json['pharmacyFulfillmentType'],
         pharmacyNpi: json['pharmacyNpi'],
@@ -61,10 +100,15 @@ class Medication {
             .whereType<Map>()
             .map((candidate) => Map<String, dynamic>.from(candidate))
             .toList(),
-        pharmacyVerifiedAt:
-            DateTime.tryParse(json['pharmacyVerifiedAt'] ?? ''),
+        pharmacyVerifiedAt: DateTime.tryParse(json['pharmacyVerifiedAt'] ?? ''),
         pharmacyVerifiedBy: json['pharmacyVerifiedBy'],
         source: json['source'] ?? 'Manual',
+        itemType: json['itemType'] ?? json['type'] ?? 'prescription',
+        servingSize: json['servingSize'] ?? json['serving_size'] ?? '',
+        activeIngredients: _stringList(
+            json['activeIngredients'] ?? json['active_ingredients']),
+        otherIngredients:
+            _stringList(json['otherIngredients'] ?? json['other_ingredients']),
         updatedAt: DateTime.tryParse(json['updatedAt'] ?? '') ?? DateTime.now(),
       );
 }
@@ -366,6 +410,8 @@ class EmergencyInfo {
   String implants;
   String procedures;
   bool organDonor;
+  bool dnrPolstOnFile;
+  String dnrPolstLocation;
 
   EmergencyInfo({
     this.contact = '',
@@ -377,6 +423,8 @@ class EmergencyInfo {
     this.implants = '',
     this.procedures = '',
     this.organDonor = false,
+    this.dnrPolstOnFile = false,
+    this.dnrPolstLocation = '',
   }) : contacts = contacts ?? [];
 
   List<EmergencyContact> get effectiveContacts {
@@ -397,6 +445,8 @@ class EmergencyInfo {
     String? implants,
     String? procedures,
     bool? organDonor,
+    bool? dnrPolstOnFile,
+    String? dnrPolstLocation,
   }) {
     return EmergencyInfo(
       contact: contact ?? this.contact,
@@ -408,6 +458,8 @@ class EmergencyInfo {
       implants: implants ?? this.implants,
       procedures: procedures ?? this.procedures,
       organDonor: organDonor ?? this.organDonor,
+      dnrPolstOnFile: dnrPolstOnFile ?? this.dnrPolstOnFile,
+      dnrPolstLocation: dnrPolstLocation ?? this.dnrPolstLocation,
     );
   }
 
@@ -421,6 +473,8 @@ class EmergencyInfo {
         'implants': implants,
         'procedures': procedures,
         'organDonor': organDonor,
+        'dnrPolstOnFile': dnrPolstOnFile,
+        'dnrPolstLocation': dnrPolstLocation,
       };
 
   factory EmergencyInfo.fromJson(Map<String, dynamic> json) {
@@ -449,6 +503,11 @@ class EmergencyInfo {
       implants: json['implants'] ?? '',
       procedures: json['procedures'] ?? '',
       organDonor: json['organDonor'] ?? false,
+      dnrPolstOnFile:
+          json['dnrPolstOnFile'] == true || json['dnr_polst_on_file'] == true,
+      dnrPolstLocation:
+          (json['dnrPolstLocation'] ?? json['dnr_polst_location'] ?? '')
+              .toString(),
     );
   }
 }
@@ -635,7 +694,6 @@ class Profile {
         'orphanCards': orphanCards.map((c) => c.toJson()).toList(),
         'emergency': emergency.toJson(),
         'username': username,
-        'password': password,
         'useBiometrics': useBiometrics,
         'acceptedTerms': acceptedTerms,
         'registered': registered,
@@ -648,7 +706,7 @@ class Profile {
         'agentEmail': agentEmail,
         'agentPhone': agentPhone,
         'agentNpn': agentNpn,
-        'qr_Token': qrToken,
+        'qr_token': qrToken,
         'sharedRelationshipId': sharedRelationshipId,
         'sharedAccessStatus': sharedAccessStatus,
       };
@@ -688,7 +746,6 @@ class Profile {
             ? EmergencyInfo.fromJson(json['emergency'])
             : EmergencyInfo(),
         username: json['username'],
-        password: json['password'],
         useBiometrics: json['useBiometrics'] ?? false,
         acceptedTerms: json['acceptedTerms'] ?? false,
         registered: json['registered'] ?? false,
@@ -701,7 +758,7 @@ class Profile {
         agentEmail: json['agentEmail'],
         agentPhone: json['agentPhone'],
         agentNpn: json['agentNpn'],
-        qrToken: json['qr_token'],
+        qrToken: json['qr_token'] ?? json['qr_Token'],
         sharedRelationshipId: json['sharedRelationshipId'],
         sharedAccessStatus: json['sharedAccessStatus'] ?? 'owned',
       );

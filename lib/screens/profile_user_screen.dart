@@ -1,8 +1,11 @@
 // lib/screens/profile_user_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import '../services/secure_store.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
+import '../services/app_state.dart';
 import '../utils/phone_formatter.dart';
 
 class ProfileUserScreen extends StatefulWidget {
@@ -41,6 +44,15 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   Future<void> _loadLocalProfile() async {
     final store = SecureStore();
+    final userId = await store.getString('userId');
+    if (userId == null || userId.isEmpty) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.of(context).sessionErrorLogInAgain)),
+      );
+      return;
+    }
 
     final email = await store.getString('userEmail') ?? "";
     final name = await store.getString('profileName') ?? "";
@@ -83,18 +95,18 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove Veteran status?'),
-        content: const Text(
-          'This will also remove the VA health care selection and VA emergency notice from this profile.',
+        title: Text(AppStrings.of(context).removeVeteranStatus),
+        content: Text(
+          AppStrings.of(context).removeVeteranStatusBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep Veteran Status'),
+            child: Text(AppStrings.of(context).keepVeteranStatus),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -113,7 +125,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
     if (_currentEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Session error. Please log in again.")),
+        SnackBar(content: Text(AppStrings.of(context).sessionErrorLogInAgain)),
       );
       return;
     }
@@ -121,6 +133,15 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     setState(() => _loading = true);
 
     final store = SecureStore();
+    final userId = await store.getString('userId');
+    if (userId == null || userId.isEmpty) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.of(context).sessionErrorLogInAgain)),
+      );
+      return;
+    }
 
     final newName = _nameCtrl.text.trim();
     final newEmail = _emailCtrl.text.trim();
@@ -136,6 +157,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
     try {
       final res = await ApiService.updateUserProfile(
+        userId: userId,
         currentEmail: _currentEmail,
         email: newEmail,
         name: newName,
@@ -146,7 +168,9 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       if (res['success'] != true) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(res['error'] ?? "Failed to update profile ❌")),
+          SnackBar(
+              content: Text(res['error'] ??
+                  AppStrings.of(context).failedToUpdateProfile)),
         );
         return;
       }
@@ -154,6 +178,10 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       await store.setString('profileName', newName);
       await store.setString('profilePhone', newPhone);
       await store.setString('userEmail', newEmail);
+      await AppState.setEmail(newEmail);
+      if (await store.getBool('rememberMeUser') == true) {
+        await store.setString('savedUserEmail', newEmail);
+      }
 
       await store.setString('profileAddress', newAddress);
       await store.setString('profileCity', newCity);
@@ -185,7 +213,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile updated ✅")),
+        SnackBar(content: Text(AppStrings.of(context).profileUpdatedCheck)),
       );
 
       Navigator.pop(context);
@@ -214,7 +242,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("My Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).myProfile)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -222,23 +250,25 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
             key: _formKey,
             child: Column(
               children: [
-                const Text(
-                  "User Profile",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Text(
+                  AppStrings.of(context).userProfile,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
                 TextFormField(
                   controller: _nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Full Name (First & Last)",
+                  decoration: InputDecoration(
+                    labelText: AppStrings.of(context).fullNameFirstLast,
                   ),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _emailCtrl,
-                  decoration: const InputDecoration(labelText: "Email"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).email),
                 ),
                 const SizedBox(height: 12),
 
@@ -246,7 +276,8 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [PhoneNumberFormatter()],
-                  decoration: const InputDecoration(labelText: "Phone"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).phone),
                 ),
                 const SizedBox(height: 12),
 
@@ -254,9 +285,9 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 TextFormField(
                   controller: _dobCtrl,
                   readOnly: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "DOB",
-                    hintText: "mm/dd/yyyy",
+                    hintText: AppStrings.of(context).dateHint,
                   ),
                   onTap: () async {
                     final picked = await showDatePicker(
@@ -281,32 +312,36 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(labelText: "Address Line 1"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).addressLine1),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _cityCtrl,
-                  decoration: const InputDecoration(labelText: "City"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).city),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _stateCtrl,
-                  decoration: const InputDecoration(labelText: "State"),
+                  decoration:
+                      InputDecoration(labelText: AppStrings.of(context).state),
                 ),
                 const SizedBox(height: 12),
 
                 TextFormField(
                   controller: _zipCtrl,
-                  decoration: const InputDecoration(labelText: "Zip Code"),
+                  decoration: InputDecoration(
+                      labelText: AppStrings.of(context).zipCode),
                 ),
 
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _isVeteran,
                   onChanged: _changeVeteranStatus,
-                  title: const Text('Are you a Veteran?'),
+                  title: Text(AppStrings.of(context).areYouVeteran),
                 ),
                 if (_isVeteran)
                   SwitchListTile(
@@ -314,7 +349,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                     value: _usesVaHealthcare,
                     onChanged: (value) =>
                         setState(() => _usesVaHealthcare = value),
-                    title: const Text('Do you use VA health care?'),
+                    title: Text(AppStrings.of(context).useVaHealthCare),
                   ),
 
                 const SizedBox(height: 24),
@@ -323,7 +358,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                     ? const CircularProgressIndicator()
                     : ElevatedButton.icon(
                         icon: const Icon(Icons.save),
-                        label: const Text("Save Changes"),
+                        label: Text(AppStrings.of(context).saveChanges),
                         onPressed: _saveProfile,
                       ),
               ],

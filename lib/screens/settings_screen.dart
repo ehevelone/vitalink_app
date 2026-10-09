@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -8,6 +7,8 @@ import '../services/api_service.dart';
 import '../services/device_transfer_service.dart';
 import '../services/language_service.dart';
 import '../services/secure_store.dart';
+import '../services/fcm_token_service.dart';
+import '../widgets/transfer_code_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -64,7 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final userId = await store.getString("userId");
       if (userId == null || userId.isEmpty) return;
 
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await FcmTokenService.getToken();
       if (token == null || token.isEmpty) return;
 
       await ApiService.registerDeviceToken(
@@ -128,8 +129,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 code,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
+                  fontFamily: 'monospace',
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
                 ),
               ),
               const SizedBox(height: 12),
@@ -166,37 +169,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _redeemTransfer() async {
     final strings = AppStrings.of(context);
-    final controller = TextEditingController();
 
-    final code = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(strings.haveTransferCode),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(labelText: strings.enterTransferCode),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(strings.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(strings.restoreTransfer),
-          ),
-        ],
-      ),
+    final code = await showTransferCodeDialog(
+      context,
+      title: strings.haveTransferCode,
+      confirmLabel: strings.restoreTransfer,
     );
-
-    controller.dispose();
 
     if (code == null || code.isEmpty || !mounted) return;
 
     setState(() => _transferWorking = true);
 
     try {
-      await _transferService.redeemTransfer(code);
+      try {
+        await _transferService.redeemTransfer(code);
+      } on TransferCleanupException {
+        // Profiles were imported; only the server cleanup failed.
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(strings.transferComplete)),

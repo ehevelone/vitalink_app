@@ -38,7 +38,7 @@ exports.handler = async (event) => {
       return reply(403, { success: false, error: "Unauthorized" });
     }
     if (!existing.rows.length) {
-      return reply(200, { success: true, active: false, status: "unknown" });
+      return reply(200, { success: true, active: true, status: "unregistered" });
     }
     await db.query(
       `UPDATE user_devices SET last_seen_at=NOW(), updated_at=NOW()

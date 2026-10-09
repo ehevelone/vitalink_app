@@ -1,6 +1,7 @@
 const db = require("./services/db");
 const { verifyUserSession } = require("./services/user-auth");
 const { ensureDeviceSecuritySchema } = require("./services/device-security");
+const { requestLanguage } = require("./services/notification-language");
 
 const headers = {
   "Content-Type": "application/json",
@@ -27,7 +28,7 @@ exports.handler = async (event) => {
       return reply(403, { success: false, error: "Unauthorized" });
     }
 
-    const user = await db.query("SELECT id, agent_id FROM users WHERE id=$1 LIMIT 1", [userId]);
+    const user = await db.query("SELECT id FROM users WHERE id=$1 LIMIT 1", [userId]);
     if (!user.rows.length) return reply(404, { success: false, error: "User not found" });
 
     const current = await db.query(
@@ -64,14 +65,15 @@ exports.handler = async (event) => {
     const result = await db.query(
       `INSERT INTO user_devices
         (user_id, agent_id, device_id, device_token, platform, push_status,
-         device_status, last_seen_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,'registered','active',NOW(),NOW(),NOW())
+         device_status, last_seen_at, created_at, updated_at, app_language)
+       VALUES ($1,$2,$3,$4,$5,'registered','active',NOW(),NOW(),NOW(),$6)
        ON CONFLICT (user_id, device_id) WHERE user_id IS NOT NULL AND device_id IS NOT NULL
-       DO UPDATE SET agent_id=EXCLUDED.agent_id, device_token=EXCLUDED.device_token,
+       DO UPDATE SET agent_id=NULL, device_token=EXCLUDED.device_token,
          platform=EXCLUDED.platform, push_status='registered', last_push_error=NULL,
+         app_language=COALESCE(EXCLUDED.app_language, user_devices.app_language),
          last_seen_at=NOW(), updated_at=NOW()
        RETURNING id, user_id, device_id, platform, device_status, updated_at`,
-      [userId, user.rows[0].agent_id || null, deviceId, fcmToken, body.platform || "unknown"]
+      [userId, null, deviceId, fcmToken, body.platform || "unknown", requestLanguage(event, body)]
     );
 
     return reply(200, { success: true, device: result.rows[0] });

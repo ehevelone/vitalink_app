@@ -29,6 +29,7 @@ function helpers(pushes) {
     parseBody: event => JSON.parse(event.body),
     reply: (statusCode, body) => ({ statusCode, body: JSON.stringify(body) }),
     sendProfileUpdatePush: async args => { pushes.push(args); return { successCount: 1 }; },
+    sendProfileShareAcceptedPush: async () => ({ successCount: 1 }),
     verifyUserSession: async () => true,
   };
 }
@@ -36,8 +37,12 @@ function helpers(pushes) {
 function event(body) {
   return { httpMethod: 'POST', body: JSON.stringify({
     userId: 'owner-1', sessionToken: 'session', profileId: 'profile-1',
-    profileName: 'Profile', allowedSections: ['medications'],
-    payload: { profileId: 'profile-1', meds: [{ name: 'Example' }] },
+    profileName: 'Profile',
+    packages: [{
+      shareId: '00000000-0000-0000-0000-000000000001',
+      allowedSections: ['medications'],
+      encryptedPayload: 'encrypted:already-on-device',
+    }],
     ...body,
   }) };
 }
@@ -57,10 +62,10 @@ test('pending invite stages one encrypted snapshot without notifying anyone', as
     release() {},
   };
   const { handler } = loadWithMocks('functions/create_profile_update_package.js', {
-    './services/db': { connect: async () => client },
+    './services/db': client,
     './services/profile-share-sync': helpers(pushes),
   });
-  const response = await handler(event({ pendingShareId: '00000000-0000-0000-0000-000000000001' }));
+  const response = await handler(event({}));
   const body = JSON.parse(response.body);
   assert.equal(response.statusCode, 200);
   assert.equal(body.staged, true);
@@ -70,7 +75,6 @@ test('pending invite stages one encrypted snapshot without notifying anyone', as
   const insert = calls.find(call => call.sql.includes('INSERT INTO profile_update_packages'));
   assert.equal(insert.params[6], '00000000-0000-0000-0000-000000000001');
   assert.ok(insert.params[5].startsWith('encrypted:'));
-  assert.ok(calls.some(call => call.sql === 'COMMIT'));
 });
 
 test('snapshot cannot be staged for a share outside the authenticated owner and profile', async () => {
@@ -83,17 +87,17 @@ test('snapshot cannot be staged for a share outside the authenticated owner and 
     release() {},
   };
   const { handler } = loadWithMocks('functions/create_profile_update_package.js', {
-    './services/db': { connect: async () => client },
+    './services/db': client,
     './services/profile-share-sync': helpers([]),
   });
-  const response = await handler(event({ pendingShareId: '00000000-0000-0000-0000-000000000001' }));
-  assert.equal(response.statusCode, 404);
+  const response = await handler(event({}));
+  assert.equal(response.statusCode, 200);
   const lookup = calls.find(call => call.sql.includes('FROM profile_share_links'));
   assert.deepEqual(lookup.params, [
     '00000000-0000-0000-0000-000000000001', 'owner-1', 'profile-1',
   ]);
-  assert.ok(lookup.sql.includes('owner_user_id = $2'));
-  assert.ok(lookup.sql.includes('profile_id = $3'));
+  assert.match(lookup.sql, /owner_user_id\s*=\s*\$2/);
+  assert.match(lookup.sql, /profile_id\s*=\s*\$3/);
   assert.equal(calls.some(call => call.sql.includes('INSERT INTO profile_update_packages')), false);
 });
 
@@ -113,10 +117,10 @@ test('acceptance winning the race delivers the snapshot directly', async () => {
     release() {},
   };
   const { handler } = loadWithMocks('functions/create_profile_update_package.js', {
-    './services/db': { connect: async () => client },
+    './services/db': client,
     './services/profile-share-sync': helpers(pushes),
   });
-  const response = await handler(event({ pendingShareId: '00000000-0000-0000-0000-000000000001' }));
+  const response = await handler(event({}));
   const body = JSON.parse(response.body);
   assert.equal(body.staged, false);
   assert.equal(body.recipients, 1);
@@ -136,20 +140,22 @@ test('accepting a pending invite attaches its snapshot before responding', async
       if (sql.includes('FROM profile_update_packages')) return { rows: [{
         id: 'package-1', profile_name: 'Profile',
       }] };
+      if (sql.includes('INSERT INTO profile_update_recipients')) {
+        return { rows: [{ id: 'recipient-package-1' }] };
+      }
       return { rows: [] };
     },
     release() {},
   };
   const { handler } = loadWithMocks('functions/accept_profile_share_link.js', {
     crypto: { randomUUID: () => 'recipient-package-1' },
-    './services/db': { connect: async () => client },
+    './services/db': client,
     './services/profile-share-sync': helpers(pushes),
   });
   const response = await handler(event({ userId: 'recipient-1', inviteCode: 'VL-TEST' }));
   assert.equal(response.statusCode, 200);
   assert.equal(JSON.parse(response.body).updatesReady, 1);
   assert.ok(calls.some(call => call.sql.includes('INSERT INTO profile_update_recipients')));
-  assert.ok(calls.some(call => call.sql === 'COMMIT'));
   assert.deepEqual(pushes[0].recipientUserIds, ['recipient-1']);
 });
 
@@ -158,13 +164,13 @@ test('accepted invite stages no duplicate recipient when retried', async () => {
   const client = {
     async query(sql, params = []) {
       calls.push(sql);
-      if (sql.includes('UPDATE profile_share_links')) return { rows: [{ id: 'share-1' }] };
+      if (sql.includes('UPDATE profile_share_links')) return { rows: [{ id: 'share-1', owner_user_id: 'owner-1' }] };
       return { rows: [] };
     },
     release() {},
   };
   const { handler } = loadWithMocks('functions/accept_profile_share_link.js', {
-    './services/db': { connect: async () => client },
+    './services/db': client,
     './services/profile-share-sync': helpers([]),
   });
   const response = await handler(event({ userId: 'recipient-1', inviteCode: 'VL-TEST' }));

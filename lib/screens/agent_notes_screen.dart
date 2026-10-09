@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -57,7 +59,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
 
       if (agentId == null) {
         setState(() {
-          _error = "Missing agent session";
+          _error = AppStrings.of(context).missingAgentSession;
           _loading = false;
         });
         return;
@@ -67,7 +69,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
 
       if (res["success"] != true) {
         setState(() {
-          _error = res["error"] ?? "Failed to load clients";
+          _error = res["error"] ?? AppStrings.of(context).failedToLoadClients;
           _loading = false;
         });
         return;
@@ -90,7 +92,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = "Failed to load notes and tasks";
+        _error = AppStrings.of(context).failedToLoadNotes;
         _loading = false;
       });
     }
@@ -123,12 +125,13 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
           _items = [];
           _listLoading = false;
         });
-        _showMessage(res["error"] ?? "Failed to load saved items");
+        _showMessage(
+            res["error"] ?? AppStrings.of(context).failedToLoadSavedItems);
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _listLoading = false);
-      _showMessage("Failed to load saved items");
+      _showMessage(AppStrings.of(context).failedToLoadSavedItems);
     }
   }
 
@@ -138,12 +141,12 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     final text = _textController.text.trim();
 
     if (agentId == null || clientId == null) {
-      _showMessage("Choose a client first");
+      _showMessage(AppStrings.of(context).chooseClientFirst);
       return;
     }
 
     if (text.isEmpty) {
-      _showMessage("Add note or task text first");
+      _showMessage(AppStrings.of(context).addNoteTextFirst);
       return;
     }
 
@@ -162,13 +165,16 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
       if (res["success"] == true) {
         _textController.clear();
         await _loadItems();
-        _showMessage(_type == _AgentItemType.note ? "Note saved" : "Task saved");
+        if (!mounted) return;
+        _showMessage(_type == _AgentItemType.note
+            ? AppStrings.of(context).noteSaved
+            : AppStrings.of(context).taskSaved);
       } else {
-        _showMessage(res["error"] ?? "Failed to save");
+        _showMessage(res["error"] ?? AppStrings.of(context).failedToSave);
       }
     } catch (_) {
       if (!mounted) return;
-      _showMessage("Failed to save");
+      _showMessage(AppStrings.of(context).failedToSave);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -180,25 +186,25 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     final isTask = item["item_type"] == "task";
 
     if (agentId == null || itemId == null) {
-      _showMessage("Could not delete this item");
+      _showMessage(AppStrings.of(context).couldNotDeleteItem);
       return;
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Delete ${isTask ? "task" : "note"}?"),
-        content: const Text(
-          "This will remove it from the app and CRM.",
+        title: Text(AppStrings.of(context).deleteNoteOrTaskQ(isTask)),
+        content: Text(
+          AppStrings.of(context).removeFromAppAndCrm,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete"),
+            child: Text(AppStrings.of(context).delete),
           ),
         ],
       ),
@@ -218,13 +224,16 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
 
       if (res["success"] == true) {
         await _loadItems();
-        _showMessage(isTask ? "Task deleted" : "Note deleted");
+        if (!mounted) return;
+        _showMessage(isTask
+            ? AppStrings.of(context).taskDeleted
+            : AppStrings.of(context).noteDeleted);
       } else {
-        _showMessage(res["error"] ?? "Failed to delete");
+        _showMessage(res["error"] ?? AppStrings.of(context).failedToDelete);
       }
     } catch (_) {
       if (!mounted) return;
-      _showMessage("Failed to delete");
+      _showMessage(AppStrings.of(context).failedToDelete);
     }
   }
 
@@ -236,8 +245,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     }
 
     final permission = await Permission.microphone.request();
+    if (!mounted) return;
     if (!permission.isGranted) {
-      _showMessage("Microphone permission is needed for dictation");
+      _showMessage(AppStrings.of(context).micPermissionNeeded);
       return;
     }
 
@@ -252,8 +262,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
       },
     );
 
+    if (!mounted) return;
     if (!available) {
-      _showMessage("Voice dictation is not available on this device");
+      _showMessage(AppStrings.of(context).dictationNotAvailable);
       return;
     }
 
@@ -268,9 +279,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
         final words = result.recognizedWords.trim();
         if (words.isEmpty) return;
 
-        _textController.text = _dictationBaseText.isEmpty
-            ? words
-            : "$_dictationBaseText $words";
+        _textController.text =
+            _dictationBaseText.isEmpty ? words : "$_dictationBaseText $words";
         _textController.selection = TextSelection.fromPosition(
           TextPosition(offset: _textController.text.length),
         );
@@ -295,7 +305,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     final first = (item["first_name"] ?? "").toString().trim();
     final last = (item["last_name"] ?? "").toString().trim();
     final name = "$first $last".trim();
-    return name.isNotEmpty ? name : (item["email"] ?? "Client").toString();
+    return name.isNotEmpty
+        ? name
+        : (item["email"] ?? AppStrings.of(context).clientLabel).toString();
   }
 
   String _dateLabel(dynamic value) {
@@ -325,9 +337,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
-        title: const Text(
-          "Notes / Tasks",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          AppStrings.of(context).notesTasks,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -376,7 +388,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
             DropdownButtonFormField<int>(
               initialValue: _selectedClientId,
               decoration: InputDecoration(
-                labelText: "Client",
+                labelText: AppStrings.of(context).clientLabel,
                 filled: true,
                 fillColor: Colors.grey.shade100,
               ),
@@ -398,16 +410,16 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
             ),
             const SizedBox(height: 14),
             SegmentedButton<_AgentItemType>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: _AgentItemType.note,
-                  icon: Icon(Icons.notes),
-                  label: Text("Note"),
+                  icon: const Icon(Icons.notes),
+                  label: Text(AppStrings.of(context).noteLabel),
                 ),
                 ButtonSegment(
                   value: _AgentItemType.task,
-                  icon: Icon(Icons.task_alt),
-                  label: Text("Task"),
+                  icon: const Icon(Icons.task_alt),
+                  label: Text(AppStrings.of(context).taskLabel),
                 ),
               ],
               selected: {_type},
@@ -421,8 +433,8 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
               maxLines: 5,
               decoration: InputDecoration(
                 hintText: _type == _AgentItemType.note
-                    ? "Enter note..."
-                    : "Enter task...",
+                    ? AppStrings.of(context).enterNote
+                    : AppStrings.of(context).enterTask,
                 filled: true,
                 fillColor: Colors.grey.shade100,
                 border: OutlineInputBorder(
@@ -451,13 +463,16 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save),
-                    label: Text(_saving ? "Saving..." : "Save"),
+                    label: Text(_saving
+                        ? AppStrings.of(context).saving
+                        : AppStrings.of(context).save),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Container(
                   decoration: BoxDecoration(
-                    color: _listening ? Colors.red.shade700 : Colors.red.shade100,
+                    color:
+                        _listening ? Colors.red.shade700 : Colors.red.shade100,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: IconButton(
@@ -482,7 +497,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
         child: Padding(
           padding: const EdgeInsets.only(top: 80),
           child: Text(
-            "No clients found",
+            AppStrings.of(context).noClientsFound,
             style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
           ),
         ),
@@ -501,7 +516,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
         child: Padding(
           padding: const EdgeInsets.only(top: 80),
           child: Text(
-            "No saved notes or tasks",
+            AppStrings.of(context).noSavedNotes,
             style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
           ),
         ),
@@ -533,7 +548,9 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
                       Row(
                         children: [
                           Text(
-                            isTask ? "Task" : "Note",
+                            isTask
+                                ? AppStrings.of(context).taskLabel
+                                : AppStrings.of(context).noteLabel,
                             style: TextStyle(
                               color: color,
                               fontWeight: FontWeight.bold,
@@ -566,7 +583,7 @@ class _AgentNotesScreenState extends State<AgentNotesScreen> {
                   ),
                 ),
                 IconButton(
-                  tooltip: "Delete",
+                  tooltip: AppStrings.of(context).delete,
                   onPressed: () => _deleteItem(item),
                   icon: Icon(
                     Icons.delete_outline,

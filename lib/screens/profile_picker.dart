@@ -1,5 +1,7 @@
 // lib/screens/profile_picker_screen.dart
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -53,16 +55,16 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Delete Profile"),
-        content: Text("Permanently remove \"$name\" from household profiles?"),
+        title: Text(AppStrings.of(context).deleteProfile),
+        content: Text(AppStrings.of(context).permanentlyRemoveProfile(name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete"),
+            child: Text(AppStrings.of(context).delete),
           ),
         ],
       ),
@@ -87,7 +89,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Switch Profile")),
+      appBar: AppBar(title: Text(AppStrings.of(context).switchProfile)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -96,15 +98,15 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.add_link, color: Colors.blue),
-                    title: const Text(
-                      "Add Profile from Invite",
-                      style: TextStyle(
+                    title: Text(
+                      AppStrings.of(context).addProfileFromInvite,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    subtitle: const Text(
-                      "Use a profile share code from a family member or caregiver.",
+                    subtitle: Text(
+                      AppStrings.of(context).useProfileShareCode,
                     ),
                     onTap: () => Navigator.pushNamed(
                       context,
@@ -136,21 +138,23 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                         size: 32,
                       ),
                       title: Text(
-                        p.fullName.isNotEmpty ? p.fullName : "Unnamed Profile",
+                        p.fullName.isNotEmpty
+                            ? p.fullName
+                            : AppStrings.of(context).unnamedProfile,
                         style: TextStyle(
                           fontSize: 18,
                           color: sharingEnded ? Colors.grey.shade600 : null,
                         ),
                       ),
                       subtitle: sharingEnded
-                          ? const Text(
-                              'Sharing ended. You can keep this disabled copy or delete it.',
-                              style: TextStyle(color: Colors.redAccent),
+                          ? Text(
+                              AppStrings.of(context).sharingEndedCopy,
+                              style: const TextStyle(color: Colors.redAccent),
                             )
                           : isActive
-                              ? const Text(
-                                  "Currently Active",
-                                  style: TextStyle(
+                              ? Text(
+                                  AppStrings.of(context).currentlyActive,
+                                  style: const TextStyle(
                                     color: Colors.green,
                                     fontWeight: FontWeight.w600,
                                   ),

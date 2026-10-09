@@ -1,49 +1,66 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 
 // 🔥 ADDED FOR PROFILE SYNC
 import '../services/secure_store.dart';
 import '../services/data_repository.dart';
 import '../services/device_id.dart';
+import '../services/profile_server_sync_service.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/server_messages.dart';
+import '../l10n/screen_strings.dart';
 
 class ApiService {
   static const String _baseUrl =
       "https://vitalink-app.netlify.app/.netlify/functions";
 
   // -------------------------------------------------------------
-  // 🔥 UUID FIX (KEEP FOR OTHER USES)
-  // -------------------------------------------------------------
-  static String _ensureUuid(String? id) {
-    if (id == null || id.isEmpty) return const Uuid().v4();
-
-    final uuidRegex = RegExp(r'^[0-9a-fA-F-]{36}$');
-
-    if (uuidRegex.hasMatch(id)) return id;
-
-    return const Uuid().v5(Uuid.NAMESPACE_URL, id);
-  }
-
-  // -------------------------------------------------------------
 // 🔧 Internal POST helper (SAFE)
 // -------------------------------------------------------------
+  static const Duration _defaultTimeout = Duration(seconds: 20);
+  // AI parsing and transfer chunks (~1.5 MB) legitimately take longer.
+  static const Duration _longTimeout = Duration(seconds: 90);
+
+  // Server text arrives in English; show it in the app language.
+  static Map<String, dynamic> _localizeMessages(Map<String, dynamic> body) {
+    final language = AppStrings.current().languageCode;
+    if (language == 'en') return body;
+    final out = Map<String, dynamic>.from(body);
+    for (final key in const ['error', 'message']) {
+      final value = out[key];
+      if (value is String) out[key] = localizeServerMessage(value, language);
+    }
+    return out;
+  }
+
   static Future<Map<String, dynamic>> _postJson(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    Duration timeout = _defaultTimeout,
+  }) async {
+    final stopwatch = Stopwatch()..start();
     try {
       final url = Uri.parse("$_baseUrl/$path");
-      debugPrint("API POST: $path");
+      debugPrint("HTTP_REQUEST_START endpoint=$path");
 
-      final res = await http.post(
-        url,
-        headers: const {"Content-Type": "application/json"},
-        body: jsonEncode(body),
+      final res = await http
+          .post(
+            url,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept-Language": AppStrings.current().languageCode,
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+
+      debugPrint(
+        "HTTP_RESPONSE endpoint=$path status=${res.statusCode} "
+        "elapsedMs=${stopwatch.elapsedMilliseconds}",
       );
-
-      debugPrint("API STATUS ($path): ${res.statusCode}");
 
       // 🔥 CRITICAL FIX:
       // Always return backend JSON — even on 403
@@ -52,17 +69,42 @@ class ApiService {
           final decoded = jsonDecode(res.body);
 
           if (decoded is Map<String, dynamic>) {
-            return decoded;
+            return {
+              ..._localizeMessages(decoded),
+              "httpStatus": res.statusCode,
+            };
           }
         } catch (e) {
-          debugPrint("⚠️ JSON decode failed: $e");
+          debugPrint(
+            "HTTP_RESPONSE_INVALID_JSON endpoint=$path "
+            "elapsedMs=${stopwatch.elapsedMilliseconds}",
+          );
         }
       }
 
       // fallback only if response is unusable
-      return {"success": false, "error": "Server returned ${res.statusCode}"};
+      return {
+        "success": false,
+        "httpStatus": res.statusCode,
+        "error": AppStrings.current().serverReturned(res.statusCode),
+      };
+    } on TimeoutException catch (e, st) {
+      debugPrint(
+        "HTTP_REQUEST_TIMEOUT endpoint=$path "
+        "elapsedMs=${stopwatch.elapsedMilliseconds}",
+      );
+      debugPrintStack(stackTrace: st);
+      return {
+        "success": false,
+        "error": AppStrings.current().requestTimedOut,
+        "timeout": true
+      };
     } catch (e, st) {
-      debugPrint("❌ API ERROR ($path): $e\n$st");
+      debugPrint(
+        "HTTP_REQUEST_ERROR endpoint=$path "
+        "elapsedMs=${stopwatch.elapsedMilliseconds} errorType=${e.runtimeType}",
+      );
+      debugPrintStack(stackTrace: st);
       return {"success": false, "error": e.toString()};
     }
   }
@@ -77,24 +119,32 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _postJsonWithUserSession(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    Duration timeout = _defaultTimeout,
+  }) async {
     final token = await _userSessionToken();
-    return _postJson(path, {
-      ...body,
-      if (token != null && token.isNotEmpty) "sessionToken": token,
-    });
+    return _postJson(
+        path,
+        {
+          ...body,
+          if (token != null && token.isNotEmpty) "sessionToken": token,
+        },
+        timeout: timeout);
   }
 
   static Future<Map<String, dynamic>> _postJsonWithAgentSession(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    Duration timeout = _defaultTimeout,
+  }) async {
     final token = await _agentSessionToken();
-    return _postJson(path, {
-      ...body,
-      if (token != null && token.isNotEmpty) "agentSessionToken": token,
-    });
+    return _postJson(
+        path,
+        {
+          ...body,
+          if (token != null && token.isNotEmpty) "agentSessionToken": token,
+        },
+        timeout: timeout);
   }
 
   static Future<Map<String, dynamic>> lookupNpi({
@@ -187,8 +237,12 @@ class ApiService {
   // -------------------------------------------------------------
   // 🔎 Get User's Assigned Agent
   // -------------------------------------------------------------
-  static Future<Map<String, dynamic>> getUserAgent(String email) {
-    return _postJson("get_user_agent", {"email": email});
+  static Future<Map<String, dynamic>> getUserAgent(String email) async {
+    final userId = await SecureStore().getString("userId");
+    return _postJsonWithUserSession("get_user_agent", {
+      "email": email,
+      if (userId != null && userId.isNotEmpty) "userId": userId,
+    });
   }
 
   // -------------------------------------------------------------
@@ -209,10 +263,13 @@ class ApiService {
     final store = SecureStore();
     final userId = await store.getString("userId");
 
-    return _postJsonWithUserSession("parse_insurance", {
-      "imageBase64": base64,
-      if (userId != null && userId.isNotEmpty) "userId": userId,
-    });
+    return _postJsonWithUserSession(
+        "parse_insurance",
+        {
+          "imageBase64": base64,
+          if (userId != null && userId.isNotEmpty) "userId": userId,
+        },
+        timeout: _longTimeout);
   }
 
   static Future<Map<String, dynamic>> parseInsuranceImages(
@@ -228,10 +285,13 @@ class ApiService {
     final store = SecureStore();
     final userId = await store.getString("userId");
 
-    return _postJsonWithUserSession("parse_insurance", {
-      "images": encodedImages,
-      if (userId != null && userId.isNotEmpty) "userId": userId,
-    });
+    return _postJsonWithUserSession(
+        "parse_insurance",
+        {
+          "images": encodedImages,
+          if (userId != null && userId.isNotEmpty) "userId": userId,
+        },
+        timeout: _longTimeout);
   }
 
   static Future<Map<String, dynamic>> parseAgentBusinessCard({
@@ -240,12 +300,15 @@ class ApiService {
     String? cardImageBase64,
   }) async {
     final bytes = await image.readAsBytes();
-    return _postJsonWithAgentSession("parse_agent_business_card", {
-      "agentEmail": agentEmail,
-      "imageBase64": base64Encode(bytes),
-      if (cardImageBase64 != null && cardImageBase64.isNotEmpty)
-        "cardImageBase64": cardImageBase64,
-    });
+    return _postJsonWithAgentSession(
+        "parse_agent_business_card",
+        {
+          "agentEmail": agentEmail,
+          "imageBase64": base64Encode(bytes),
+          if (cardImageBase64 != null && cardImageBase64.isNotEmpty)
+            "cardImageBase64": cardImageBase64,
+        },
+        timeout: _longTimeout);
   }
 
   static Future<Map<String, dynamic>> getMedicarePlanBenefits({
@@ -257,13 +320,16 @@ class ApiService {
     final store = SecureStore();
     final userId = await store.getString("userId");
 
-    return _postJsonWithUserSession("get_medicare_plan_benefits", {
-      "medicarePlanId": medicarePlanId,
-      "policy": policy,
-      "carrier": carrier,
-      "cardText": cardText,
-      if (userId != null && userId.isNotEmpty) "userId": userId,
-    });
+    return _postJsonWithUserSession(
+        "get_medicare_plan_benefits",
+        {
+          "medicarePlanId": medicarePlanId,
+          "policy": policy,
+          "carrier": carrier,
+          "cardText": cardText,
+          if (userId != null && userId.isNotEmpty) "userId": userId,
+        },
+        timeout: _longTimeout);
   }
 
   // -------------------------------------------------------------
@@ -334,6 +400,7 @@ class ApiService {
     bool recoverInstallation = false,
     bool replace = false,
     String replacementReason = "replaced",
+    String? transferCode,
   }) async {
     final res = await _postJson("check_user", {
       "email": email,
@@ -344,14 +411,20 @@ class ApiService {
       "recover_installation": recoverInstallation,
       "replace": replace,
       "replacement_reason": replacementReason,
+      if (transferCode != null && transferCode.isNotEmpty)
+        "transfer_code": transferCode,
     });
 
     if (res["success"] != true) {
-      return {"success": false, "error": res["error"] ?? "Invalid credentials"};
+      return {
+        ...res,
+        "success": false,
+        "error": res["error"] ?? AppStrings.current().invalidCredentials,
+      };
     }
 
     if (res["user"] == null) {
-      return {"success": false, "error": "User data missing"};
+      return {"success": false, "error": AppStrings.current().userDataMissing};
     }
 
     return {"success": true, "user": res["user"]};
@@ -428,6 +501,25 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // 🔎 Assisted onboarding (details an agent entered for the client)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> getAssistedOnboarding(String code) {
+    return _postJson("get_assisted_onboarding", {
+      "code": code,
+    });
+  }
+
+  static Future<Map<String, dynamic>> claimAssistedOnboarding({
+    required String code,
+    required String userId,
+  }) {
+    return _postJsonWithUserSession("claim_assisted_onboarding", {
+      "code": code,
+      "userId": userId,
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔹 Promo lookup
   // -------------------------------------------------------------
   // -------------------------------------------------------------
@@ -489,12 +581,21 @@ class ApiService {
     required String fcmToken,
     String? platform,
   }) {
+    final parsedUserId = int.tryParse(userId);
+    if (parsedUserId == null) {
+      return Future.value({
+        "success": false,
+        "error": AppStrings.current().invalidUserSession,
+      });
+    }
     return DeviceId.getOrCreate()
         .then((deviceId) => _postJsonWithUserSession("register_device_v2", {
-              "user_id": int.parse(userId), // 🔥 THIS FIXES IT
+              "user_id": parsedUserId,
               "deviceToken": fcmToken,
               "deviceId": deviceId,
               "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+              // Push notifications are sent in this language.
+              "language": AppStrings.current().languageCode,
             }));
   }
 
@@ -502,11 +603,13 @@ class ApiService {
     required String userId,
     required String deviceId,
     required int chunkCount,
+    String? codeFormat,
   }) {
     return _postJsonWithUserSession("create_device_transfer", {
       "userId": userId,
       "deviceId": deviceId,
       "chunkCount": chunkCount,
+      if (codeFormat != null) "codeFormat": codeFormat,
     });
   }
 
@@ -517,13 +620,16 @@ class ApiService {
     required int chunkIndex,
     required String chunkData,
   }) {
-    return _postJsonWithUserSession("upload_device_transfer_chunk", {
-      "userId": userId,
-      "deviceId": deviceId,
-      "transferId": transferId,
-      "chunkIndex": chunkIndex,
-      "chunkData": chunkData,
-    });
+    return _postJsonWithUserSession(
+        "upload_device_transfer_chunk",
+        {
+          "userId": userId,
+          "deviceId": deviceId,
+          "transferId": transferId,
+          "chunkIndex": chunkIndex,
+          "chunkData": chunkData,
+        },
+        timeout: _longTimeout);
   }
 
   static Future<Map<String, dynamic>> checkDeviceTransfer({
@@ -566,12 +672,15 @@ class ApiService {
     required String transferId,
     required int chunkIndex,
   }) {
-    return _postJsonWithUserSession("get_device_transfer_chunk", {
-      "userId": userId,
-      "deviceId": deviceId,
-      "transferId": transferId,
-      "chunkIndex": chunkIndex,
-    });
+    return _postJsonWithUserSession(
+        "get_device_transfer_chunk",
+        {
+          "userId": userId,
+          "deviceId": deviceId,
+          "transferId": transferId,
+          "chunkIndex": chunkIndex,
+        },
+        timeout: _longTimeout);
   }
 
   static Future<Map<String, dynamic>> registerAgentDeviceToken({
@@ -583,6 +692,8 @@ class ApiService {
       "agentId": agentId,
       "deviceToken": fcmToken,
       "platform": platform ?? (Platform.isIOS ? "ios" : "android"),
+      // Push notifications are sent in this language.
+      "language": AppStrings.current().languageCode,
     });
   }
 
@@ -676,6 +787,7 @@ class ApiService {
   // 👤 Update user profile
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> updateUserProfile({
+    required String userId,
     required String currentEmail,
     required String email,
     String? name,
@@ -683,6 +795,7 @@ class ApiService {
     String? password,
   }) {
     final body = {
+      "userId": userId,
       "currentEmail": currentEmail,
       "email": email,
       "name": name,
@@ -690,7 +803,7 @@ class ApiService {
       "password": password,
     }..removeWhere((k, v) => v == null || v.trim().isEmpty);
 
-    return _postJson("update_user_profile", body);
+    return _postJsonWithUserSession("update_user_profile", body);
   }
 
   // -------------------------------------------------------------
@@ -698,9 +811,11 @@ class ApiService {
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> markReviewed({
     required String email,
-  }) {
-    return _postJson("mark_reviewed", {
+  }) async {
+    final userId = await SecureStore().getString("userId");
+    return _postJsonWithUserSession("mark_reviewed", {
       "email": email.trim(),
+      if (userId != null && userId.isNotEmpty) "userId": userId,
     });
   }
 
@@ -715,7 +830,7 @@ class ApiService {
     if (res["success"] != true || res["agent"] == null) {
       return {
         "success": false,
-        "error": res["error"] ?? "Invalid agent code",
+        "error": res["error"] ?? AppStrings.current().invalidAgentCode,
       };
     }
 
@@ -972,18 +1087,7 @@ class ApiService {
         return {"success": false};
       }
 
-      final fixedProfiles = profiles.map((p) {
-        final json = p.toJson();
-        json["id"] = _ensureUuid(p.id);
-        return json;
-      }).toList();
-
-      final body = {
-        "id": userId, // ✅ FIXED
-        "profiles": fixedProfiles,
-      };
-
-      return await _postJsonWithUserSession("save_user_profiles", body);
+      return await ProfileServerSyncService.sync(profiles);
     } catch (e, st) {
       debugPrint("❌ Profile Sync Error: $e\n$st");
       return {"success": false, "error": e.toString()};

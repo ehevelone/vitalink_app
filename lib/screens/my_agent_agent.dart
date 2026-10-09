@@ -1,4 +1,6 @@
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -108,7 +110,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     await Clipboard.setData(ClipboardData(text: _deepLink!));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Invite link copied")),
+      SnackBar(content: Text(AppStrings.of(context).inviteLinkCopied)),
     );
   }
 
@@ -137,7 +139,9 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
           borderRadius: BorderRadius.circular(16),
         ),
         title: Text(
-          success ? "Notification Results" : "Error",
+          success
+              ? AppStrings.of(context).notificationResults
+              : AppStrings.of(context).error,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -149,7 +153,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
           children: [
             if (!success)
               Text(
-                res["error"] ?? "Unknown error",
+                res["error"] ?? AppStrings.of(context).unknownError,
                 style: const TextStyle(color: Colors.redAccent),
               )
             else ...[
@@ -157,20 +161,20 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                 Text(message, style: const TextStyle(color: Colors.white70)),
               if (campaign.isNotEmpty)
                 Text(
-                  "Campaign: $campaign",
+                  AppStrings.of(context).campaignValue('$campaign'),
                   style: const TextStyle(color: Colors.white70),
                 ),
               const SizedBox(height: 10),
               Text(
-                "Devices targeted: $total",
+                AppStrings.of(context).devicesTargeted(total),
                 style: const TextStyle(color: Colors.white),
               ),
               Text(
-                "Users notified: $notified",
+                AppStrings.of(context).usersNotified(notified),
                 style: const TextStyle(color: Colors.white),
               ),
               Text(
-                "Failures: $failures",
+                AppStrings.of(context).failuresCount(failures),
                 style: const TextStyle(color: Colors.white),
               ),
             ],
@@ -194,33 +198,33 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
 
   Future<void> _sendProspectMessage() async {
     if (_agentEmail == null || _agentEmail!.isEmpty) return;
-    const templates = <String, Map<String, String>>{
+    final templates = <String, Map<String, String>>{
       'medicare_aep': {
-        'title': 'Medicare: AEP reminder',
-        'preview': 'AEP begins October 15. Would you like to schedule a Medicare coverage review?',
+        'title': AppStrings.of(context).tplMedicareAepTitle,
+        'preview': AppStrings.of(context).tplMedicareAepPreview,
       },
       'medicare_window': {
-        'title': 'Medicare: Enrollment window',
-        'preview': 'Your Medicare enrollment window is approaching. Would you like me to reach out?',
+        'title': AppStrings.of(context).tplMedicareWindowTitle,
+        'preview': AppStrings.of(context).tplMedicareWindowPreview,
       },
       'medicare_options': {
-        'title': 'Medicare: Talk about options',
-        'preview': 'Would you like to talk about your Medicare options?',
+        'title': AppStrings.of(context).tplMedicareOptionsTitle,
+        'preview': AppStrings.of(context).tplMedicareOptionsPreview,
       },
       'life_awareness': {
-        'title': 'Life: Awareness Month',
-        'preview': "It's Life Insurance Awareness Month. Would you like to talk?",
+        'title': AppStrings.of(context).tplLifeAwarenessTitle,
+        'preview': AppStrings.of(context).tplLifeAwarenessPreview,
       },
       'life_family': {
-        'title': 'Life: You or your family',
-        'preview': 'Would you like to discuss life insurance options for you or your family?',
+        'title': AppStrings.of(context).tplLifeFamilyTitle,
+        'preview': AppStrings.of(context).tplLifeFamilyPreview,
       },
     };
 
     final templateId = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Send a prospect message'),
+        title: Text(AppStrings.of(context).sendProspectMessage),
         content: SizedBox(
           width: 520,
           child: ListView(
@@ -241,7 +245,7 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.of(context).cancel),
           ),
         ],
       ),
@@ -258,16 +262,20 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(result['success'] == true ? 'Message results' : 'Unable to send'),
+        title: Text(result['success'] == true
+            ? AppStrings.of(context).messageResults
+            : AppStrings.of(context).unableToSend),
         content: Text(
           result['success'] == true
-              ? '${result['successCount'] ?? 0} prospect device(s) notified.'
-              : result['error']?.toString() ?? 'The message could not be sent.',
+              ? AppStrings.of(context)
+                  .prospectDevicesNotified(result['successCount'] ?? 0)
+              : result['error']?.toString() ??
+                  AppStrings.of(context).messageCouldNotSend,
         ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Done'),
+            child: Text(AppStrings.of(context).done),
           ),
         ],
       ),
@@ -354,22 +362,25 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
         ),
         const SizedBox(height: 12),
         if (_agencyName?.isNotEmpty == true)
-          Text("Agency: $_agencyName", textAlign: TextAlign.center),
+          Text(AppStrings.of(context).agencyValue('$_agencyName'),
+              textAlign: TextAlign.center),
         if (_agencyAddress?.isNotEmpty == true)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              "Address: $_agencyAddress",
+              AppStrings.of(context).addressValue('$_agencyAddress'),
               textAlign: TextAlign.center,
             ),
           ),
         const SizedBox(height: 16),
         if (_agentPhone?.isNotEmpty == true)
-          Text("Phone: $_agentPhone", textAlign: TextAlign.center),
+          Text(AppStrings.of(context).phoneValue('$_agentPhone'),
+              textAlign: TextAlign.center),
         if (_agentEmail?.isNotEmpty == true)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text("Email: $_agentEmail", textAlign: TextAlign.center),
+            child: Text(AppStrings.of(context).emailValue('$_agentEmail'),
+                textAlign: TextAlign.center),
           ),
       ],
     );
@@ -390,7 +401,9 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
         title: Text(
-          "My Agent - $displayName",
+          AppStrings.of(context).myAgentTitle(displayName == 'Agent'
+              ? AppStrings.of(context).agentWord
+              : displayName),
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -472,9 +485,9 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                                     ),
                                   ),
                                   icon: const Icon(Icons.copy),
-                                  label: const Text(
-                                    "Copy Invite Link",
-                                    style: TextStyle(
+                                  label: Text(
+                                    AppStrings.of(context).copyInviteLink,
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -488,25 +501,26 @@ class _MyAgentAgentState extends State<MyAgentAgent> {
                     const SizedBox(height: 28),
                     _actionButton(
                       icon: Icons.document_scanner,
-                      label: "Scan Business Card",
+                      label: AppStrings.of(context).scanBusinessCard,
                       onPressed: _scanBusinessCard,
                     ),
                     const SizedBox(height: 18),
                     _actionButton(
                       icon: Icons.assignment,
-                      label: "Send My Information",
+                      label: AppStrings.of(context).sendMyInformation,
                       onPressed: _goToAuthorizationForm,
                     ),
                     const SizedBox(height: 18),
                     _actionButton(
                       icon: Icons.notifications_active,
-                      label: "Send Client Medicare Notification",
+                      label:
+                          AppStrings.of(context).sendClientMedicareNotification,
                       onPressed: _sendNotification,
                     ),
                     const SizedBox(height: 18),
                     _actionButton(
                       icon: Icons.campaign_outlined,
-                      label: "Send Prospect Message",
+                      label: AppStrings.of(context).sendProspectMessageButton,
                       onPressed: _sendProspectMessage,
                     ),
                   ],

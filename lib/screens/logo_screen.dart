@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/device_security_service.dart';
 import '../services/app_state.dart';
 import '../services/secure_store.dart';
+import '../services/fcm_token_service.dart';
 
 class LogoScreen extends StatefulWidget {
   const LogoScreen({super.key});
@@ -63,7 +66,8 @@ class _LogoScreenState extends State<LogoScreen> {
       if (agent["active"] == false) {
         if (!mounted) return false;
 
-        final agency = agent["agency_name"] ?? "your agency";
+        final agency =
+            agent["agency_name"] ?? AppStrings.of(context).yourAgency;
         final phone = agent["agency_phone"] ?? "";
 
         await showDialog(
@@ -74,19 +78,18 @@ class _LogoScreenState extends State<LogoScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: const Text(
-              "Important Account Update",
-              style: TextStyle(
+            title: Text(
+              AppStrings.of(context).importantAccountUpdate,
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
             content: Text(
               phone.isNotEmpty
-                  ? "Your insurance agent is no longer active.\n\n"
-                      "Please contact $agency at $phone for assistance."
-                  : "Your insurance agent is no longer active.\n\n"
-                      "Please contact $agency for assistance.",
+                  ? AppStrings.of(context)
+                      .agentInactiveBody('$agency', '$phone')
+                  : AppStrings.of(context).agentInactiveBodyNoPhone('$agency'),
               style: const TextStyle(color: Colors.white70),
             ),
             actions: [
@@ -101,7 +104,7 @@ class _LogoScreenState extends State<LogoScreen> {
                     backgroundColor: Colors.green.shade600,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text("Call Agency"),
+                  child: Text(AppStrings.of(context).callAgency),
                 ),
               FilledButton(
                 onPressed: () => Navigator.pop(context),
@@ -123,7 +126,9 @@ class _LogoScreenState extends State<LogoScreen> {
   Future<void> _initQR() async {
     try {
       final store = SecureStore();
-      final existing = await store.getString('qr_url');
+      final activeProfile = await _repo.loadProfile();
+      final cacheKey = 'qr_url:${activeProfile.id}';
+      final existing = await store.getString(cacheKey);
 
       if (existing != null && existing.isNotEmpty) return;
 
@@ -136,12 +141,17 @@ class _LogoScreenState extends State<LogoScreen> {
       final profiles = res["profiles"];
       if (profiles == null || profiles.isEmpty) return;
 
-      final token = profiles[0]["qr_token"];
+      final matchingProfile = profiles
+          .cast<dynamic>()
+          .where((profile) =>
+              profile is Map && profile['id']?.toString() == activeProfile.id)
+          .firstOrNull;
+      final token = matchingProfile?["qr_token"];
       if (token == null || token.toString().isEmpty) return;
 
       final qrUrl = "https://myvitalink.app/emergency.html?token=$token";
 
-      await store.setString('qr_url', qrUrl);
+      await store.setString(cacheKey, qrUrl);
 
       debugPrint("QR saved");
     } catch (e) {
@@ -161,7 +171,7 @@ class _LogoScreenState extends State<LogoScreen> {
         sound: true,
       );
 
-      final token = await messaging.getToken();
+      final token = await FcmTokenService.getToken();
       if (token == null) return;
 
       final userId = await SecureStore().getString("userId");
@@ -299,7 +309,7 @@ class _LogoScreenState extends State<LogoScreen> {
                   const CircularProgressIndicator(color: Colors.white70)
                 else if (hasName) ...[
                   Text(
-                    "Welcome, $name",
+                    AppStrings.of(context).welcomeName('$name'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -307,12 +317,12 @@ class _LogoScreenState extends State<LogoScreen> {
                   ),
                   const SizedBox(height: 10),
                 ],
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 28),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: Text(
-                    "Emergency profiles are encrypted and securely stored for QR access in emergencies.",
+                    AppStrings.of(context).emergencyProfilesEncrypted,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white60,
                       fontSize: 13,
                       height: 1.4,
@@ -340,16 +350,16 @@ class _LogoScreenState extends State<LogoScreen> {
                         ),
                       ],
                     ),
-                    child: const Column(
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.warning_amber_rounded,
                           color: Colors.white,
                           size: 42,
                         ),
-                        SizedBox(height: 12),
-                        Text(
+                        const SizedBox(height: 12),
+                        const Text(
                           "EMERGENCY",
                           style: TextStyle(
                             color: Colors.white,
@@ -358,10 +368,10 @@ class _LogoScreenState extends State<LogoScreen> {
                             letterSpacing: 1.2,
                           ),
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Text(
-                          "TAP FOR INFO",
-                          style: TextStyle(
+                          AppStrings.of(context).tapForInfo,
+                          style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

@@ -3,6 +3,12 @@ const db = require("./services/db");
 const { verifyUserSession } = require("./services/user-auth");
 const { ensureReferralSchema, reply, sendReferralPush } = require("./services/referral-center");
 const { CONTACT_REQUEST_VERSION, TEMPLATES, ensureProspectMarketingSchema } = require("./services/prospect-marketing");
+const {
+  channelLabel,
+  notificationText,
+  requestLanguage,
+  topicLabel,
+} = require("./services/notification-language");
 
 const VALID_CHANNELS = new Set(["call", "text", "email"]);
 
@@ -45,7 +51,11 @@ exports.handler = async (event) => {
     const existing = await db.query("SELECT id FROM prospect_contact_requests WHERE delivery_id=$1 LIMIT 1", [deliveryId]);
     if (existing.rows.length) return reply(200, { success: true, alreadySubmitted: true });
 
-    const requestText = `${delivery.agent_name} may contact me about ${template.topic} using: ${channels.join(", ")}.`;
+    // Stored in the language the user saw on the request screen.
+    const language = requestLanguage(event, body) || "en";
+    const requestText = language === "es"
+      ? `${delivery.agent_name} puede contactarme sobre ${topicLabel(template.topic, "es")} por: ${channels.map((channel) => channelLabel(channel, "es")).join(", ")}.`
+      : `${delivery.agent_name} may contact me about ${template.topic} using: ${channels.join(", ")}.`;
     const requestId = crypto.randomUUID();
     const referralId = crypto.randomUUID();
     await db.query("BEGIN");
@@ -84,8 +94,11 @@ exports.handler = async (event) => {
     await sendReferralPush({
       recipient: { type: "agent", id: delivery.agent_id },
       referral: { id: referralId },
-      title: "Prospect Contact Request",
-      body: `A prospect requested ${channels.join(", ")} contact about ${template.topic}.`,
+      title: (language) => notificationText("prospectRequestTitle", language),
+      body: (language) => notificationText("prospectRequestBody", language, {
+        channels: channels.map((channel) => channelLabel(channel, language)).join(", "),
+        topic: topicLabel(template.topic, language),
+      }),
     });
     return reply(200, { success: true });
   } catch (error) {

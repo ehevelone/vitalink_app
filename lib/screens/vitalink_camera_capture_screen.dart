@@ -1,4 +1,6 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +12,8 @@ class VitalinkCameraCaptureScreen extends StatefulWidget {
   final String title;
   final String reviewTitle;
   final String instructions;
-  final String addAnotherLabel;
+  // Defaults to the translated "Add Another Side".
+  final String? addAnotherLabel;
   final int maxPhotos;
 
   const VitalinkCameraCaptureScreen({
@@ -18,7 +21,7 @@ class VitalinkCameraCaptureScreen extends StatefulWidget {
     required this.title,
     required this.reviewTitle,
     required this.instructions,
-    this.addAnotherLabel = 'Add Another Side',
+    this.addAnotherLabel,
     this.maxPhotos = 4,
   });
 
@@ -58,7 +61,7 @@ class _VitalinkCameraCaptureScreenState
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
         setState(() {
-          _error = 'No camera was found on this device.';
+          _error = AppStrings.of(context).noCameraFound;
           _loading = false;
         });
         return;
@@ -86,7 +89,7 @@ class _VitalinkCameraCaptureScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Camera could not be opened. Please check camera permission.';
+        _error = AppStrings.of(context).cameraCouldNotOpen;
         _loading = false;
       });
     }
@@ -114,7 +117,7 @@ class _VitalinkCameraCaptureScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Photo failed: $e')),
+        SnackBar(content: Text(AppStrings.of(context).photoFailed(e))),
       );
     } finally {
       if (mounted) setState(() => _takingPicture = false);
@@ -128,7 +131,8 @@ class _VitalinkCameraCaptureScreenState
       final image = image_lib.decodeImage(bytes);
       if (image == null) return path;
 
-      final longestSide = image.width > image.height ? image.width : image.height;
+      final longestSide =
+          image.width > image.height ? image.width : image.height;
       if (longestSide <= _maxSavedImageSide) return path;
 
       final resized = image_lib.copyResize(
@@ -250,14 +254,14 @@ class _VitalinkCameraCaptureScreenState
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'If the image is blurry, dark, or cut off, retake it.',
+                Text(
+                  AppStrings.of(context).retakeIfBlurry,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70),
+                  style: const TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 14),
                 _actionButton(
-                  label: 'Use Photo',
+                  label: AppStrings.of(context).usePhoto,
                   primary: true,
                   icon: Icons.check,
                   onPressed: () => _usePhoto(addAnother: false),
@@ -265,7 +269,8 @@ class _VitalinkCameraCaptureScreenState
                 if (canAddMore) ...[
                   const SizedBox(height: 10),
                   _actionButton(
-                    label: widget.addAnotherLabel,
+                    label: widget.addAnotherLabel ??
+                        AppStrings.of(context).addAnotherSide,
                     icon: Icons.add_a_photo,
                     onPressed: () => _usePhoto(addAnother: true),
                   ),
@@ -275,7 +280,7 @@ class _VitalinkCameraCaptureScreenState
                   children: [
                     Expanded(
                       child: _actionButton(
-                        label: 'Retake',
+                        label: AppStrings.of(context).retake,
                         icon: Icons.refresh,
                         onPressed: () => setState(() => _previewPath = null),
                       ),
@@ -283,7 +288,7 @@ class _VitalinkCameraCaptureScreenState
                     const SizedBox(width: 10),
                     Expanded(
                       child: _actionButton(
-                        label: 'Cancel',
+                        label: AppStrings.of(context).cancel,
                         icon: Icons.close,
                         onPressed: _finishWithoutCurrent,
                       ),
@@ -347,7 +352,7 @@ class _VitalinkCameraCaptureScreenState
                 if (_acceptedPaths.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '${_acceptedPaths.length} photo(s) added',
+                    AppStrings.of(context).photosAdded(_acceptedPaths.length),
                     style: const TextStyle(
                       color: _vitalinkBlue,
                       fontWeight: FontWeight.bold,
@@ -356,14 +361,18 @@ class _VitalinkCameraCaptureScreenState
                 ],
                 const SizedBox(height: 14),
                 _actionButton(
-                  label: _takingPicture ? 'Taking Photo...' : 'Take Photo',
+                  label: _takingPicture
+                      ? AppStrings.of(context).takingPhoto
+                      : AppStrings.of(context).takePhoto,
                   primary: true,
                   icon: Icons.camera_alt,
                   onPressed: _takingPicture ? null : _takePicture,
                 ),
                 const SizedBox(height: 10),
                 _actionButton(
-                  label: _acceptedPaths.isEmpty ? 'Cancel' : 'Done',
+                  label: _acceptedPaths.isEmpty
+                      ? AppStrings.of(context).cancel
+                      : AppStrings.of(context).done,
                   icon: _acceptedPaths.isEmpty ? Icons.close : Icons.check,
                   onPressed: _finishWithoutCurrent,
                 ),

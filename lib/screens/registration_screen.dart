@@ -1,8 +1,11 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models.dart';
 import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
@@ -41,6 +44,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _activationCodeCtrl = TextEditingController();
+  final _manualOnboardingCodeCtrl = TextEditingController();
 
   bool _loading = false;
   bool _showPassword = false;
@@ -53,6 +57,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String _relationshipType = 'client';
   String? _accessCodeType;
 
+  // Assisted onboarding: details an agent entered for this client on the
+  // CRM, agent access page or agent report (link: activate?onboard=CODE).
+  bool _onboardingLoaded = false;
+  String? _onboardingCode;
+  Map<String, dynamic>? _onboardingPayload;
+  String? _onboardingMessage;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -62,9 +73,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     final args = ModalRoute.of(context)?.settings.arguments;
     String? code;
+    String? onboardingCode;
 
     if (args is Map && args['code'] != null) {
       code = args['code'].toString().trim().toUpperCase();
+    }
+
+    if (args is Map && args['onboard'] != null) {
+      onboardingCode = args['onboard'].toString().trim().toUpperCase();
+    }
+    onboardingCode ??= VitaLinkDeepLink.onboardingCode?.trim().toUpperCase();
+
+    if (onboardingCode != null && onboardingCode.isNotEmpty) {
+      _onboardingCode = onboardingCode;
+      if (VitaLinkDeepLink.onboardingCode == onboardingCode) {
+        VitaLinkDeepLink.clearOnboardingCode();
+      }
+      // Runs after this frame so setState and AppStrings are safe to use.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _lookupAssistedOnboarding());
+      return;
     }
 
     if (args is Map && args['fromAgentAccount'] == true) {
@@ -111,6 +139,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _activationCodeCtrl.dispose();
+    _manualOnboardingCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -153,6 +182,159 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  Future<void> _lookupAssistedOnboarding() async {
+    if (_onboardingLoaded || !mounted) return;
+
+    final code = _onboardingCode?.trim().toUpperCase() ?? "";
+    if (code.isEmpty) return;
+
+    final strings = AppStrings.of(context);
+    setState(() {
+      _loading = true;
+      _onboardingMessage = null;
+    });
+
+    try {
+      final res = await ApiService.getAssistedOnboarding(code);
+
+      if (!mounted) return;
+
+      if (res['success'] != true) {
+        setState(() {
+          _onboardingMessage =
+              (res['error'] ?? strings.assistedOnboardingExpired).toString();
+        });
+        return;
+      }
+
+      final payload = Map<String, dynamic>.from(res['payload'] as Map? ?? {});
+      final profile =
+          Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+
+      setState(() {
+        _onboardingPayload = payload;
+        _onboardingLoaded = true;
+        _onboardingMessage = strings.assistedOnboardingLoaded;
+
+        _activationCodeCtrl.text = (payload['activationCode'] ?? '').toString();
+        _nameCtrl.text = (profile['fullName'] ?? '').toString();
+        _emailCtrl.text = (profile['email'] ?? '').toString();
+        _phoneCtrl.text = (profile['userPhone'] ?? '').toString();
+        _addressCtrl.text = (profile['address'] ?? '').toString();
+        _cityCtrl.text = (profile['city'] ?? '').toString();
+        _stateCtrl.text = (profile['state'] ?? '').toString();
+        _zipCtrl.text = (profile['zip'] ?? '').toString();
+        _activationLoaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _onboardingMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadManualOnboardingCode() async {
+    final code = _manualOnboardingCodeCtrl.text.trim().toUpperCase();
+
+    if (code.isEmpty) {
+      setState(() {
+        _onboardingMessage = AppStrings.of(context).enterOnboardingCode;
+      });
+      return;
+    }
+
+    setState(() {
+      _onboardingCode = code;
+      _onboardingLoaded = false;
+      _onboardingPayload = null;
+      _onboardingMessage = null;
+    });
+
+    await _lookupAssistedOnboarding();
+  }
+
+  EmergencyInfo? _emergencyFromOnboarding() {
+    final payload = _onboardingPayload;
+    if (payload == null) return null;
+
+    final emergency =
+        Map<String, dynamic>.from(payload['emergency'] as Map? ?? {});
+    if (emergency.isEmpty) return null;
+
+    final contacts = (emergency['contacts'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((item) =>
+            EmergencyContact.fromJson(Map<String, dynamic>.from(item)))
+        .where((contact) => contact.hasDetails)
+        .toList();
+
+    return EmergencyInfo(
+      contact: contacts.isNotEmpty ? contacts.first.name : '',
+      phone: contacts.isNotEmpty ? contacts.first.phone : '',
+      contacts: contacts,
+      allergies: (emergency['allergies'] ?? '').toString(),
+      conditions: (emergency['conditions'] ?? '').toString(),
+      bloodType: (emergency['bloodType'] ?? '').toString(),
+      implants: (emergency['implants'] ?? '').toString(),
+      procedures: (emergency['procedures'] ?? '').toString(),
+      organDonor: emergency['organDonor'] == true,
+      dnrPolstOnFile: emergency['dnrPolstOnFile'] == true,
+      dnrPolstLocation: (emergency['dnrPolstLocation'] ?? '').toString(),
+    );
+  }
+
+  String? _onboardingProfileValue(String key) {
+    final payload = _onboardingPayload;
+    if (payload == null) return null;
+
+    final profile = Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+    final value = profile[key]?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  List<String> _onboardingReviewLines(AppStrings strings) {
+    final payload = _onboardingPayload;
+    if (payload == null) return [];
+
+    final profile = Map<String, dynamic>.from(payload['profile'] as Map? ?? {});
+    final emergency =
+        Map<String, dynamic>.from(payload['emergency'] as Map? ?? {});
+    final contacts = (emergency['contacts'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final lines = <String>[];
+    void add(String label, Object? value) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty) lines.add('$label: $text');
+    }
+
+    add(strings.dateOfBirth, profile['dob']);
+    for (var i = 0; i < contacts.length; i += 1) {
+      final contact = contacts[i];
+      final details = [
+        contact['name']?.toString().trim() ?? '',
+        contact['phone']?.toString().trim() ?? '',
+      ].where((item) => item.isNotEmpty).join(' - ');
+      add(strings.emergencyContactNumber(i + 1), details);
+    }
+    add(strings.bloodType, emergency['bloodType']);
+    add(strings.allergies, emergency['allergies']);
+    add(strings.conditions, emergency['conditions']);
+    add(strings.implantedDevices, emergency['implants']);
+    add(strings.majorProcedures, emergency['procedures']);
+    if (emergency['organDonor'] == true) {
+      lines.add('${strings.organDonor}: ${strings.yes}');
+    }
+    if (emergency['dnrPolstOnFile'] == true) {
+      lines.add('${strings.dnrPolstOnFile}: ${strings.yes}');
+      add(strings.signedFormLocation, emergency['dnrPolstLocation']);
+    }
+    return lines;
+  }
+
   Future<void> _pasteCode() async {
     final data = await Clipboard.getData('text/plain');
     if (data?.text == null) return;
@@ -185,7 +367,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   String? _validateEmail(String? value) {
     final email = _normalizeEmail(value ?? "");
-    if (email.isEmpty) return "Email required";
+    if (email.isEmpty) return AppStrings.of(context).emailRequired;
 
     final emailPattern = RegExp(
       r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$",
@@ -194,7 +376,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email.contains("..") ||
         email.startsWith(".") ||
         email.endsWith(".")) {
-      return "Enter a valid email";
+      return AppStrings.of(context).enterValidEmail;
     }
 
     final tld = email.split(".").last;
@@ -208,7 +390,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       "gom",
     };
     if (commonTypos.contains(tld)) {
-      return "Check the email ending. Did you mean .com?";
+      return AppStrings.of(context).checkEmailEnding;
     }
 
     return null;
@@ -219,6 +401,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() => _loading = true);
 
+    // Read wording before any await so it is safe to use after them.
+    final strings = AppStrings.of(context);
     try {
       final repo = DataRepository();
 
@@ -228,7 +412,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       final agentRes = await ApiService.validateAccessCode(code);
 
       if (agentRes['success'] != true) {
-        throw Exception("Invalid or inactive activation code");
+        throw Exception(strings.invalidActivationCode);
       }
       _accessCodeType = agentRes['type']?.toString();
 
@@ -251,16 +435,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (registerRes['success'] != true) {
-        throw Exception(registerRes['error'] ?? "Registration failed");
+        throw Exception(registerRes['error'] ??
+            AppStrings.current().registrationFailedShort);
       }
 
       final user = registerRes['user'];
       if (user == null) {
-        throw Exception("Registration returned no user");
+        throw Exception(AppStrings.current().registrationReturnedNoUser);
       }
 
       final store = SecureStore();
       await store.setString("userId", user["id"].toString());
+      await store.setString("profileOwnerUserId", user["id"].toString());
       await store.setString("userEmail", user["email"].toString());
       if (_agentAccountPrefilled) {
         await store.setBool("agentUserAccountCreated", true);
@@ -279,6 +465,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.emergency =
           profile.emergency.copyWith(phone: _phoneCtrl.text.trim());
       profile.userPhone = _phoneCtrl.text.trim();
+      profile.dob = _onboardingProfileValue('dob') ?? profile.dob;
 
       // ✅ SAVE ADDRESS DATA
       profile.address = _addressCtrl.text.trim();
@@ -286,10 +473,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.state = _stateCtrl.text.trim();
       profile.zip = _zipCtrl.text.trim();
 
+      final onboardingEmergency = _emergencyFromOnboarding();
+      if (onboardingEmergency != null) {
+        profile.emergency = onboardingEmergency;
+      }
+
       profile.registered = true;
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
+
+      // Marks the agent's onboarding package as used. The account already
+      // exists at this point, so a failure here must not block the client.
+      if (_onboardingCode != null && _onboardingCode!.isNotEmpty) {
+        try {
+          await ApiService.claimAssistedOnboarding(
+            code: _onboardingCode!,
+            userId: user["id"].toString(),
+          );
+        } catch (_) {}
+      }
 
       await AppState.setLoggedIn(true);
       await AppState.setRole('user');
@@ -307,7 +510,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registration failed: $e")),
+        SnackBar(
+            content: Text(AppStrings.of(context).registrationFailed('$e'))),
       );
     } finally {
       if (mounted) {
@@ -316,10 +520,116 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  Widget _assistedOnboardingPrompt(AppStrings strings) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            strings.assistedOnboardingPromptTitle,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            strings.assistedOnboardingPromptBody,
+            style: const TextStyle(color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _manualOnboardingCodeCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: strings.onboardingCode,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _loading ? null : _loadManualOnboardingCode,
+                child: Text(strings.loadMyInfo),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _assistedOnboardingStatus(AppStrings strings) {
+    final reviewLines = _onboardingReviewLines(strings);
+    return [
+      if (_onboardingMessage != null) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F2FE),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            _onboardingMessage!,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+      if (reviewLines.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                strings.reviewAgentEnteredDetails,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...reviewLines.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    line,
+                    style: const TextStyle(color: Color(0xFF334155)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("User Registration")),
+      appBar: AppBar(title: Text(AppStrings.of(context).userRegistration)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -334,15 +644,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     border: Border.all(color: const Color(0xFF78C7E7)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.person_add_alt_1, color: Color(0xFF1479B8)),
-                      SizedBox(width: 12),
+                      const Icon(Icons.person_add_alt_1, color: Color(0xFF1479B8)),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          "We filled this in from your agent account. Add your personal address, then complete registration.",
-                          style: TextStyle(fontSize: 15, height: 1.35),
+                          AppStrings.of(context).prefilledFromAgentAccount,
+                          style: const TextStyle(fontSize: 15, height: 1.35),
                         ),
                       ),
                     ],
@@ -350,9 +660,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 const SizedBox(height: 20),
               ],
-              const Text(
-                "ENTER YOUR ACTIVATION CODE",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              if (!_agentAccountPrefilled) ...[
+                _assistedOnboardingPrompt(AppStrings.of(context)),
+                const SizedBox(height: 20),
+              ],
+              Text(
+                AppStrings.of(context).enterActivationCode,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
 
@@ -360,7 +675,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _activationCodeCtrl,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  labelText: "Activation Code",
+                  labelText: AppStrings.of(context).activationCode,
                   border: InputBorder.none,
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.paste),
@@ -368,29 +683,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 validator: (v) => v == null || v.trim().isEmpty
-                    ? "Activation code required"
+                    ? AppStrings.of(context).activationCodeRequired
                     : null,
               ),
+
+              ..._assistedOnboardingStatus(AppStrings.of(context)),
 
               const SizedBox(height: 20),
 
               if (_accessCodeType != 'personal') ...[
-                const Text(
-                  'YOUR CONNECTION',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Text(
+                  AppStrings.of(context).yourConnectionCaps,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: 'client',
-                      icon: Icon(Icons.verified_user_outlined),
-                      label: Text('Current client'),
+                      icon: const Icon(Icons.verified_user_outlined),
+                      label: Text(AppStrings.of(context).currentClient),
                     ),
                     ButtonSegment(
                       value: 'prospect',
-                      icon: Icon(Icons.person_search_outlined),
-                      label: Text('Not a client yet'),
+                      icon: const Icon(Icons.person_search_outlined),
+                      label: Text(AppStrings.of(context).notClientYet),
                     ),
                   ],
                   selected: {_relationshipType},
@@ -398,25 +715,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       setState(() => _relationshipType = selection.first),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'This helps VitaLink apply the correct communication permissions. The client/user will confirm this after registration.',
-                  style: TextStyle(color: Colors.black54, height: 1.35),
+                Text(
+                  AppStrings.of(context).connectionHelpsPermissions,
+                  style: const TextStyle(color: Colors.black54, height: 1.35),
                 ),
                 const SizedBox(height: 20),
               ],
 
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Name required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).fullName),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? AppStrings.of(context).nameRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: "Email"),
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).email),
                 keyboardType: TextInputType.emailAddress,
                 validator: _validateEmail,
               ),
@@ -425,7 +745,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               TextFormField(
                 controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: "Phone"),
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).phone),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [PhoneNumberFormatter()],
               ),
@@ -435,37 +756,45 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               // ✅ ADDRESS BLOCK
               TextFormField(
                 controller: _addressCtrl,
-                decoration: const InputDecoration(labelText: "Address Line 1"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Address required" : null,
+                decoration: InputDecoration(
+                    labelText: AppStrings.of(context).addressLine1),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? AppStrings.of(context).addressRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _cityCtrl,
-                decoration: const InputDecoration(labelText: "City"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "City required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).city),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? AppStrings.of(context).cityRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _stateCtrl,
-                decoration: const InputDecoration(labelText: "State"),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "State required" : null,
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).state),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? AppStrings.of(context).stateRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
 
               TextFormField(
                 controller: _zipCtrl,
-                decoration: const InputDecoration(labelText: "Zip Code"),
+                decoration:
+                    InputDecoration(labelText: AppStrings.of(context).zipCode),
                 keyboardType: TextInputType.number,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? "Zip required" : null,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? AppStrings.of(context).zipRequired
+                    : null,
               ),
 
               const SizedBox(height: 12),
@@ -474,7 +803,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: "Password",
+                  labelText: AppStrings.of(context).password,
                   suffixIcon: IconButton(
                     icon: Icon(_showPassword
                         ? Icons.visibility
@@ -486,7 +815,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
                 ),
-                validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                validator: (v) => v == null || v.isEmpty
+                    ? AppStrings.of(context).requiredField
+                    : null,
               ),
 
               const SizedBox(height: 8),
@@ -498,7 +829,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _confirmCtrl,
                 obscureText: !_showConfirmPassword,
                 decoration: InputDecoration(
-                  labelText: "Confirm Password",
+                  labelText: AppStrings.of(context).confirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(_showConfirmPassword
                         ? Icons.visibility
@@ -510,15 +841,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
                 ),
-                validator: (v) =>
-                    v != _passwordCtrl.text ? "Passwords don’t match" : null,
+                validator: (v) => v != _passwordCtrl.text
+                    ? AppStrings.of(context).passwordsDontMatch
+                    : null,
               ),
             ],
           ),
         ),
       ),
       bottomNavigationBar: SafeBottomButton(
-        label: "Complete Registration",
+        label: AppStrings.of(context).completeRegistration,
         icon: Icons.check,
         loading: _loading,
         onPressed: _register,

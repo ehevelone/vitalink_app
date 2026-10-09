@@ -1,9 +1,11 @@
 import 'dart:io';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:pdf/widgets.dart' as pw;              // ✅ ADDED
-import 'package:path_provider/path_provider.dart';    // ✅ ADDED
+import 'package:pdf/widgets.dart' as pw; // ✅ ADDED
+import 'package:path_provider/path_provider.dart'; // ✅ ADDED
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -81,8 +83,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         : '${match.group(1)}-${match.group(2)}-${int.parse(segment)}';
   }
 
-  bool get _hasMedicarePlanId =>
-      _detectMedicarePlanId(widget.card).isNotEmpty;
+  bool get _hasMedicarePlanId => _detectMedicarePlanId(widget.card).isNotEmpty;
 
   bool get _looksLikeMedicareCard {
     final text = [
@@ -142,9 +143,10 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   }
 
   void _showBenefitsError(Map<String, dynamic> data) {
-    final message = data['error']?.toString() ??
-        'Unable to load co-pays for this card.';
-    final planId = data['plan_id']?.toString() ?? _detectMedicarePlanId(widget.card);
+    final message =
+        data['error']?.toString() ?? AppStrings.of(context).unableToLoadCopays;
+    final planId =
+        data['plan_id']?.toString() ?? _detectMedicarePlanId(widget.card);
     final planYear = data['plan_year']?.toString() ?? '';
 
     showDialog<void>(
@@ -154,9 +156,9 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
         ),
-        title: const Text(
-          'Co-pays Not Found',
-          style: TextStyle(
+        title: Text(
+          AppStrings.of(context).copaysNotFound,
+          style: const TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.bold,
           ),
@@ -200,9 +202,9 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          title: const Text(
-            'Medicare Co-pays',
-            style: TextStyle(
+          title: Text(
+            AppStrings.of(context).medicareCopays,
+            style: const TextStyle(
               color: Color(0xFF0F172A),
               fontWeight: FontWeight.bold,
             ),
@@ -216,7 +218,8 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    (plan['plan_name'] ?? 'Medicare Plan').toString(),
+                    (plan['plan_name'] ?? AppStrings.of(context).medicarePlan)
+                        .toString(),
                     style: const TextStyle(
                       color: Color(0xFF0F172A),
                       fontWeight: FontWeight.bold,
@@ -235,14 +238,16 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                     ),
                   const SizedBox(height: 12),
                   if ((moop['in_network'] ?? '').toString().isNotEmpty)
-                    _benefitRow('MOOP In-Network', moop['in_network']),
+                    _benefitRow(AppStrings.of(context).moopInNetwork,
+                        moop['in_network']),
                   if ((moop['combined'] ?? '').toString().isNotEmpty)
-                    _benefitRow('MOOP Combined', moop['combined']),
+                    _benefitRow(
+                        AppStrings.of(context).moopCombined, moop['combined']),
                   const Divider(height: 24),
                   if (copays.isEmpty)
-                    const Text(
-                      'CMS found this plan, but no key co-pay rows were mapped yet.',
-                      style: TextStyle(color: Color(0xFF334155)),
+                    Text(
+                      AppStrings.of(context).cmsNoCopayRows,
+                      style: const TextStyle(color: Color(0xFF334155)),
                     ),
                   for (final copay in copays)
                     _benefitRow(
@@ -264,7 +269,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
+              child: Text(AppStrings.of(context).done),
             ),
           ],
         );
@@ -309,7 +314,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
 
     if (frontPath.isEmpty && (backPath == null || backPath.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No card images available")),
+        SnackBar(content: Text(AppStrings.of(context).noCardImagesAvailable)),
       );
       return;
     }
@@ -320,17 +325,15 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         ? pw.MemoryImage(File(frontPath).readAsBytesSync())
         : null;
 
-    final backImage = (backPath != null &&
-            backPath.isNotEmpty &&
-            File(backPath).existsSync())
-        ? pw.MemoryImage(File(backPath).readAsBytesSync())
-        : null;
+    final backImage =
+        (backPath != null && backPath.isNotEmpty && File(backPath).existsSync())
+            ? pw.MemoryImage(File(backPath).readAsBytesSync())
+            : null;
 
     if (frontImage != null) {
       pdf.addPage(
         pw.Page(
-          build: (pw.Context context) =>
-              pw.Center(child: pw.Image(frontImage)),
+          build: (pw.Context context) => pw.Center(child: pw.Image(frontImage)),
         ),
       );
     }
@@ -338,8 +341,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
     if (backImage != null) {
       pdf.addPage(
         pw.Page(
-          build: (pw.Context context) =>
-              pw.Center(child: pw.Image(backImage)),
+          build: (pw.Context context) => pw.Center(child: pw.Image(backImage)),
         ),
       );
     }
@@ -349,14 +351,15 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
         "${dir.path}/insurance_card_${DateTime.now().millisecondsSinceEpoch}.pdf");
 
     await file.writeAsBytes(await pdf.save());
+    if (!mounted) return;
 
-    final subject =
-        "Insurance Card – ${card.carrier.isNotEmpty ? card.carrier : "Member"}";
+    final subject = AppStrings.of(context).insuranceCardSubject(
+        card.carrier.isNotEmpty ? card.carrier : AppStrings.of(context).member);
 
     await Share.shareXFiles(
       [XFile(file.path)],
       subject: subject,
-      text: "Please find my insurance card attached for your records.",
+      text: AppStrings.of(context).insuranceCardShareText,
     );
   }
 
@@ -415,20 +418,17 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
   Widget build(BuildContext context) {
     final card = widget.card;
 
-    final imagePath = _showFront
-        ? card.frontImagePath
-        : (card.backImagePath ?? '');
+    final imagePath =
+        _showFront ? card.frontImagePath : (card.backImagePath ?? '');
 
-    final file = (imagePath.isNotEmpty)
-        ? File(imagePath)
-        : null;
+    final file = (imagePath.isNotEmpty) ? File(imagePath) : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           card.carrier.isNotEmpty
               ? card.carrier
-              : "Insurance Card",
+              : AppStrings.of(context).insuranceCard,
         ),
         actions: [
           if (widget.onDelete != null)
@@ -453,8 +453,7 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                         minScale: 1.0,
                         maxScale: 5.0,
                         onInteractionUpdate: (details) {
-                          setState(
-                              () => _currentScale = details.scale);
+                          setState(() => _currentScale = details.scale);
                         },
                         child: Image.file(
                           file,
@@ -466,7 +465,6 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                   : const Icon(Icons.broken_image, size: 120),
             ),
           ),
-
           SafeArea(
             top: false,
             child: Padding(
@@ -499,8 +497,8 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                             : const Icon(Icons.medical_information_outlined),
                         label: Text(
                           _hasMedicarePlanId
-                              ? "Co-pays"
-                              : "Co-pays unavailable",
+                              ? AppStrings.of(context).copays
+                              : AppStrings.of(context).copaysUnavailable,
                         ),
                       ),
                     ),
@@ -513,20 +511,18 @@ class _InsuranceCardDetailState extends State<InsuranceCardDetail> {
                       icon: const Icon(Icons.camera_alt_outlined),
                       label: Text(
                         (card.backImagePath ?? '').isEmpty
-                            ? "Add Back of Card"
-                            : "Replace Back of Card",
+                            ? AppStrings.of(context).addBackOfCard
+                            : AppStrings.of(context).replaceBackOfCard,
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _sendInsuranceEmail,
                       icon: const Icon(Icons.email_outlined),
-                      label: const Text("Share This Card"),
+                      label: Text(AppStrings.of(context).shareThisCard),
                     ),
                   ),
                 ],

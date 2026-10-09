@@ -143,6 +143,11 @@ exports.handler = async (event) => {
         conditions: emergency.conditions || data.conditions || "",
         implants: emergency.implants || data.implants || "",
         procedures: emergency.procedures || data.procedures || "",
+        dnrPolstOnFile:
+          emergency.dnrPolstOnFile === true ||
+          emergency.dnr_polst_on_file === true,
+        dnrPolstLocation:
+          emergency.dnrPolstLocation || emergency.dnr_polst_location || "",
 
         meds,
         providers: data.providers || data.doctors || [],

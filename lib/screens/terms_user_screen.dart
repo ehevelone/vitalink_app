@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
@@ -73,18 +75,18 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
     final uninstall = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Decline Terms"),
-        content: const Text(
-          "If you do not accept the terms, you cannot use VitaLink.",
+        title: Text(AppStrings.of(context).declineTerms),
+        content: Text(
+          AppStrings.of(context).declineTermsBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("No"),
+            child: Text(AppStrings.of(context).no),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Exit App"),
+            child: Text(AppStrings.of(context).exitApp),
           ),
         ],
       ),
@@ -94,7 +96,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
       SystemNavigator.pop();
     } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must accept the terms to continue.")),
+        SnackBar(content: Text(AppStrings.of(context).mustAcceptTerms)),
       );
     }
   }
@@ -111,7 +113,7 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("User Terms of Service"),
+        title: Text(AppStrings.of(context).userTermsOfService),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -139,11 +141,12 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        userAgreementText,
-                        style: TextStyle(
+                        userAgreementTextFor(
+                            AppStrings.of(context).languageCode),
+                        style: const TextStyle(
                           fontSize: 16,
                           color: Colors.black,
                           height: 1.4,
@@ -157,11 +160,11 @@ class _TermsUserScreenState extends State<TermsUserScreen> {
                     children: [
                       OutlinedButton(
                         onPressed: () => _handleDecline(context),
-                        child: const Text("Decline"),
+                        child: Text(AppStrings.of(context).decline),
                       ),
                       ElevatedButton(
                         onPressed: _handleAccept,
-                        child: const Text("Accept"),
+                        child: Text(AppStrings.of(context).accept),
                       ),
                     ],
                   ),

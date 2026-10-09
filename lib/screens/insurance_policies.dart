@@ -1,4 +1,6 @@
 import 'dart:convert';
+import '../l10n/screen_strings.dart';
+import '../l10n/app_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -148,12 +150,11 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
       final imagePaths = await Navigator.push<List<String>>(
         context,
         MaterialPageRoute(
-          builder: (_) => const VitalinkCameraCaptureScreen(
-            title: 'Scan Insurance Policy',
-            reviewTitle: 'Can you read the policy page?',
-            instructions:
-                'Hold the phone steady and fill the screen with the policy page.',
-            addAnotherLabel: 'Add Another Page',
+          builder: (_) => VitalinkCameraCaptureScreen(
+            title: AppStrings.of(context).scanInsurancePolicy,
+            reviewTitle: AppStrings.of(context).canYouReadPolicyPage,
+            instructions: AppStrings.of(context).fillScreenWithPolicyPage,
+            addAnotherLabel: AppStrings.of(context).addAnotherPage,
             maxPhotos: 6,
           ),
         ),
@@ -178,18 +179,21 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           userId.isEmpty ||
           sessionToken == null ||
           sessionToken.isEmpty) {
-        throw Exception("Please log in again before scanning.");
+        if (!mounted) return;
+        throw Exception(AppStrings.of(context).logInAgainBeforeScanning);
       }
 
-      final resp = await http.post(
-        Uri.parse(url),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "images": base64Images,
-          "userId": userId,
-          "sessionToken": sessionToken,
-        }),
-      );
+      final resp = await http
+          .post(
+            Uri.parse(url),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "images": base64Images,
+              "userId": userId,
+              "sessionToken": sessionToken,
+            }),
+          )
+          .timeout(const Duration(seconds: 90));
 
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body);
@@ -229,21 +233,21 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           final choice = await showDialog<String>(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text("Duplicate Detected"),
-              content: Text(
-                  "Policy '${newPolicy.carrier} – ${newPolicy.policy}' already exists."),
+              title: Text(AppStrings.of(context).duplicateDetected),
+              content: Text(AppStrings.of(context)
+                  .policyAlreadyExists(newPolicy.carrier, newPolicy.policy)),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, "cancel"),
-                  child: const Text("Cancel"),
+                  child: Text(AppStrings.of(context).cancel),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, "add"),
-                  child: const Text("Add New"),
+                  child: Text(AppStrings.of(context).addNew),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, "update"),
-                  child: const Text("Update Existing"),
+                  child: Text(AppStrings.of(context).updateExisting),
                 ),
               ],
             ),
@@ -281,7 +285,7 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Policy scan failed: $e")),
+        SnackBar(content: Text(AppStrings.of(context).policyScanFailed(e))),
       );
     }
   }
@@ -312,16 +316,16 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Remove policy?"),
+        title: Text(AppStrings.of(context).removePolicy),
         content: Text(_p!.insurances[i].carrier),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: Text(AppStrings.of(context).cancel),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Remove"),
+            child: Text(AppStrings.of(context).remove),
           ),
         ],
       ),
@@ -344,7 +348,7 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
     final insurances = _p!.insurances;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Insurance Policies")),
+      appBar: AppBar(title: Text(AppStrings.of(context).insurancePolicies)),
       body: Column(
         children: [
           Padding(
@@ -361,9 +365,9 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
                 ),
               ),
               icon: const Icon(Icons.camera_alt),
-              label: const Text(
-                "Scan Insurance Policy",
-                style: TextStyle(
+              label: Text(
+                AppStrings.of(context).scanInsurancePolicy,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -372,8 +376,8 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
           ),
           Expanded(
             child: insurances.isEmpty
-                ? const Center(
-                    child: Text("No insurance policies yet. Tap + to add."),
+                ? Center(
+                    child: Text(AppStrings.of(context).noInsurancePoliciesYet),
                   )
                 : ListView.builder(
                     itemCount: insurances.length,
@@ -383,10 +387,14 @@ class _InsurancePoliciesScreenState extends State<InsurancePoliciesScreen> {
                         title: Text(
                           ins.carrier.isNotEmpty
                               ? ins.carrier
-                              : "Unnamed Policy",
+                              : AppStrings.of(context).unnamedPolicy,
                         ),
                         subtitle: Text(
-                          "Policy #: ${ins.policy.isNotEmpty ? ins.policy : 'N/A'}",
+                          AppStrings.of(context).policyNumberValue(
+                            ins.policy.isNotEmpty
+                                ? ins.policy
+                                : AppStrings.of(context).notAvailable,
+                          ),
                         ),
                         onTap: () {
                           Navigator.push(
