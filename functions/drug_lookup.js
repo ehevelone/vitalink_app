@@ -317,8 +317,16 @@ function createRxNavClient(fetchImpl = global.fetch) {
     }
 
     if (!clean(name) || !clean(dose)) return { status: "no_match" };
-    const payload = await get("/drugs.json", { name: clean(name) });
-    let matches = productsMatchingName(name, flattenProducts(payload))
+    let payload = await get("/drugs.json", { name: clean(name) });
+    let products = flattenProducts(payload);
+    if (!products.length && dosageModifiers(name).size) {
+      const baseName = requestedIngredients(name).join(" / ");
+      if (baseName && normalized(baseName) !== normalized(name)) {
+        payload = await get("/drugs.json", { name: baseName });
+        products = flattenProducts(payload);
+      }
+    }
+    let matches = productsMatchingName(name, products)
       .filter((candidate) =>
         doseMatchesProduct(dose, candidate) && formMatchesProduct(form, candidate),
       );

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitalink/models.dart';
@@ -346,10 +349,70 @@ void main() {
     expect(find.text('Methocarbamol 500 mg tablet'), findsOneWidget);
   });
 
-  test('search step gives the label photo 40 percent of screen height', () {
+  test('search photo becomes a compact strip while the keyboard is open', () {
     expect(medicationLabelPhotoHeight(800, search: true), 320);
+    expect(medicationLabelPhotoHeight(450, search: true), 180);
+    expect(
+      medicationLabelPhotoHeight(
+        450,
+        search: true,
+        keyboardOpen: true,
+      ),
+      80,
+    );
     expect(medicationLabelPhotoHeight(800, search: false), 150);
   });
+
+  for (final size in [const Size(410, 890), const Size(360, 640)]) {
+    testWidgets(
+      'search fits with keyboard and large text at ${size.width.toInt()}x${size.height.toInt()}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetViewInsets);
+
+        final image = File(
+          '${Directory.systemTemp.path}\\vitalink-label-${size.width.toInt()}.png',
+        );
+        image.writeAsBytesSync(base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ));
+        addTearDown(() {
+          if (image.existsSync()) image.deleteSync();
+        });
+
+        await tester.pumpWidget(MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+            ),
+            child: child!,
+          ),
+          home: MedicationDrugReviewScreen(
+            medication: Medication(
+              name: 'Guanfacine ER',
+              dose: '2 mg',
+            ),
+            lookup: FakeDrugLookup(),
+            imagePaths: [image.path],
+            current: 1,
+            total: 1,
+          ),
+        ));
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 380);
+        await tester.pumpAndSettle();
+
+        final layoutException = tester.takeException();
+        expect(layoutException, isNull);
+        expect(find.byKey(const Key('drug-search-field')), findsOneWidget);
+        expect(find.byKey(const Key('drug-search-scroll')), findsOneWidget);
+        expect(find.byKey(const Key('keyboard-skip-medicine')), findsOneWidget);
+      },
+    );
+  }
 
   test('identity edits clear stale drug codes and unchanged edits keep them', () {
     final confirmed = Medication(
@@ -402,4 +465,3 @@ void main() {
     expect(pharmacyTextChanged('Same Pharmacy', ' same pharmacy '), isFalse);
   });
 }
-

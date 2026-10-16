@@ -9,8 +9,12 @@ import '../models.dart';
 import '../services/drug_lookup_service.dart';
 
 @visibleForTesting
-double medicationLabelPhotoHeight(double screenHeight, {required bool search}) =>
-    search ? screenHeight * .4 : 150;
+double medicationLabelPhotoHeight(
+  double availableHeight, {
+  required bool search,
+  bool keyboardOpen = false,
+}) =>
+    keyboardOpen ? 80 : (search ? availableHeight * .4 : 150);
 
 class MedicationDrugReviewScreen extends StatefulWidget {
   const MedicationDrugReviewScreen({
@@ -261,13 +265,14 @@ class _MedicationDrugReviewScreenState
     );
   }
 
-  Widget _photos() {
+  Widget _photos(double availableHeight, {required bool keyboardOpen}) {
     if (widget.imagePaths.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       key: const Key('label-photo-panel'),
       height: medicationLabelPhotoHeight(
-        MediaQuery.sizeOf(context).height,
+        availableHeight,
         search: _step == _ReviewStep.search,
+        keyboardOpen: keyboardOpen,
       ),
       child: PageView.builder(
         itemCount: widget.imagePaths.length,
@@ -286,6 +291,10 @@ class _MedicationDrugReviewScreenState
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final showBottomSkip = _step == _ReviewStep.confirm ||
+        _step == _ReviewStep.strengths ||
+        (_step == _ReviewStep.search && !keyboardOpen);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -298,24 +307,37 @@ class _MedicationDrugReviewScreenState
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _photos(),
-                if (widget.imagePaths.isNotEmpty) const SizedBox(height: 20),
-                Expanded(child: _body(strings)),
-                const SizedBox(height: 12),
-                if (_step == _ReviewStep.confirm ||
-                    _step == _ReviewStep.search ||
-                    _step == _ReviewStep.strengths)
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context, _unmatched()),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(54),
+            child: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_step != _ReviewStep.search) ...[
+                    _photos(
+                      constraints.maxHeight,
+                      keyboardOpen: keyboardOpen,
                     ),
-                    child: Text(strings.skipForNow),
+                    if (widget.imagePaths.isNotEmpty)
+                      const SizedBox(height: 20),
+                  ],
+                  Expanded(
+                    child: _body(
+                      strings,
+                      keyboardOpen: keyboardOpen,
+                      availableHeight: constraints.maxHeight,
+                    ),
                   ),
-              ],
+                  if (showBottomSkip) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context, _unmatched()),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(54),
+                      ),
+                      child: Text(strings.skipForNow),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -323,7 +345,11 @@ class _MedicationDrugReviewScreenState
     );
   }
 
-  Widget _body(AppStrings strings) {
+  Widget _body(
+    AppStrings strings, {
+    required bool keyboardOpen,
+    required double availableHeight,
+  }) {
     if (_step == _ReviewStep.checking) {
       return Center(
         child: Column(
@@ -440,9 +466,11 @@ class _MedicationDrugReviewScreenState
         ],
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      key: const Key('drug-search-scroll'),
       children: [
+        _photos(availableHeight, keyboardOpen: keyboardOpen),
+        if (widget.imagePaths.isNotEmpty) const SizedBox(height: 20),
         Text(strings.medicineNameUnclear,
             style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 18),
@@ -463,23 +491,43 @@ class _MedicationDrugReviewScreenState
           ),
         ),
         const SizedBox(height: 12),
-        Expanded(
-          child: _networkError
-              ? _networkErrorBody(strings)
-              : _names.isEmpty && _searchController.text.length >= 2 && !_loading
-              ? Center(child: Text(strings.noMedicineMatches))
-              : ListView.separated(
-                  itemCount: _names.length,
-                  separatorBuilder: (_, __) => const Divider(),
-                  itemBuilder: (_, index) => ListTile(
-                    minTileHeight: 58,
-                    title: Text(_normalCase(_names[index]),
-                        style: const TextStyle(fontSize: 19)),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _chooseName(_names[index]),
-                  ),
-                ),
-        ),
+        if (_networkError)
+          _networkErrorBody(strings)
+        else if (_names.isEmpty &&
+            _searchController.text.length >= 2 &&
+            !_loading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              strings.noMedicineMatches,
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          for (var index = 0; index < _names.length; index++) ...[
+            if (index > 0) const Divider(),
+            ListTile(
+              minTileHeight: 58,
+              title: Text(
+                _normalCase(_names[index]),
+                style: const TextStyle(fontSize: 19),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _chooseName(_names[index]),
+            ),
+          ],
+        if (keyboardOpen) ...[
+          const SizedBox(height: 16),
+          OutlinedButton(
+            key: const Key('keyboard-skip-medicine'),
+            onPressed: () => Navigator.pop(context, _unmatched()),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(54),
+            ),
+            child: Text(strings.skipForNow),
+          ),
+        ],
+        const SizedBox(height: 8),
       ],
     );
   }

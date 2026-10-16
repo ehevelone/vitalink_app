@@ -1,0 +1,19 @@
+{
+  "drugGroup": {
+    "name": "guanfacine",
+    "conceptGroup": [
+      {
+        "tty": "SCD",
+        "conceptProperties": [
+          {
+            "rxcui": "862010",
+            "name": "24 HR guanfacine 2 MG Extended Release Oral Tablet",
+            "synonym": "guanfacine 2 MG 24 HR Extended Release Oral Tablet",
+            "tty": "SCD",
+            "suppress": "N"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -204,6 +204,35 @@ test("metformin ER sees prefixed products but remains ambiguous", async () => {
   assert.equal(options[0].displayName, "metformin hydrochloride 500 MG Oral Tablet");
 });
 
+test("release suffix retries RxNav with the base drug name", async () => {
+  const noDrugs = { drugGroup: { name: null, conceptGroup: [] } };
+  const requestedNames = [];
+  const client = createRxNavClient(fakeFetch({
+    drugsByName: {
+      "guanfacine ER": noDrugs,
+      guanfacine: fixture("guanfacine-er"),
+    },
+    onRequest: (url) => {
+      if (url.pathname.endsWith("/drugs.json")) {
+        requestedNames.push(url.searchParams.get("name"));
+      }
+    },
+  }));
+
+  const result = await client.verify({
+    name: "guanfacine ER",
+    dose: "2 mg",
+    form: "tablet",
+  });
+
+  assert.equal(result.status, "sure");
+  assert.equal(
+    result.match.displayName,
+    "24 HR guanfacine 2 MG Extended Release Oral Tablet",
+  );
+  assert.deepEqual(requestedNames, ["guanfacine ER", "guanfacine"]);
+});
+
 test("a default delayed-release capsule remains sure when every candidate is delayed-release", async () => {
   const result = await createRxNavClient(fakeFetch({
     drugs: fixture("dosage-form-modifiers"),
