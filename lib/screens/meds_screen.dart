@@ -12,6 +12,9 @@ import '../services/secure_store.dart';
 import '../services/npi_verification_service.dart';
 import '../services/api_service.dart';
 import '../services/drug_lookup_service.dart';
+import '../services/label_photo.dart';
+import '../widgets/label_sides_review_screen.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import '../widgets/npi_verification_widgets.dart';
 import '../widgets/medication_drug_review_screen.dart';
 import '../widgets/working_overlay.dart';
@@ -1373,22 +1376,74 @@ class _MedsScreenState extends State<MedsScreen> {
     );
   }
 
+  /// Uses the phone's document scanner (the same one as insurance cards): it
+  /// highlights the label, snaps when steady, and handles focus. Phones that
+  /// cannot run it fall back to VitaLink's own camera screen.
+  ///
+  /// The scanner takes one side at a time (fast basic mode, no image clean-up)
+  /// and VitaLink's own screen offers big "Add Another Side" / "Done" buttons
+  /// instead of the scanner's small add-page button.
+  Future<List<String>?> _captureLabelPhotos() async {
+    const maxSides = 4;
+    final paths = <String>[];
+    while (paths.length < maxSides) {
+      List<String>? shot;
+      try {
+        // A short pause helps iOS present the scanner cleanly.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        shot = await CunningDocumentScanner.getPictures(
+          noOfPages: 1,
+          androidScannerMode: AndroidScannerMode.base,
+        );
+      } catch (error) {
+        debugPrint('Document scanner unavailable, using camera: $error');
+        if (!mounted) return null;
+        if (paths.isNotEmpty) break;
+        final cameraPaths = await Navigator.push<List<String>>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VitalinkCameraCaptureScreen(
+              title: AppStrings.of(context).scanLabelOrList,
+              reviewTitle: AppStrings.of(context).canYouReadEveryItem,
+              instructions: AppStrings.of(context).scanLabelInstructions,
+              addAnotherLabel: AppStrings.of(context).addAnotherPage,
+            ),
+          ),
+        );
+        if (cameraPaths == null || cameraPaths.isEmpty) return cameraPaths;
+        return [for (final path in cameraPaths) await compressLabelPhoto(path)];
+      }
+      if (!mounted) return null;
+      if (shot != null && shot.isNotEmpty) {
+        paths.add(await compressLabelPhoto(shot.first));
+      }
+      // Cancelled before any side was scanned: nothing to read.
+      if (paths.isEmpty) return null;
+      if (!mounted) return null;
+
+      final action = await Navigator.push<LabelSidesAction>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LabelSidesReviewScreen(
+            imagePaths: List<String>.from(paths),
+            maxSides: maxSides,
+          ),
+        ),
+      );
+      if (action == LabelSidesAction.addSide) continue;
+      if (action == LabelSidesAction.done) return paths;
+      return null;
+    }
+    return paths;
+  }
+
   Future<void> _scanLabel() async {
     if (_scanning || _captureInProgress) return;
     setState(() => _captureInProgress = true);
 
     try {
-      final imagePaths = await Navigator.push<List<String>>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => VitalinkCameraCaptureScreen(
-            title: AppStrings.of(context).scanLabelOrList,
-            reviewTitle: AppStrings.of(context).canYouReadEveryItem,
-            instructions: AppStrings.of(context).scanLabelInstructions,
-            addAnotherLabel: AppStrings.of(context).addAnotherPage,
-          ),
-        ),
-      );
+      final imagePaths = await _captureLabelPhotos();
+      if (!mounted) return;
 
       final List<String> base64Images = [];
       for (final path in imagePaths ?? <String>[]) {

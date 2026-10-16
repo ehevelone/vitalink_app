@@ -470,6 +470,9 @@ extension ScreenStrings on AppStrings {
   String get searchAnotherZip =>
       _isEs ? 'Buscar otro código postal' : 'Search another ZIP';
   String get addAnotherSide => _isEs ? 'Agregar otro lado' : 'Add Another Side';
+  String sidesScanned(int count) => _isEs
+      ? (count == 1 ? '1 lado escaneado' : '$count lados escaneados')
+      : (count == 1 ? '1 side scanned' : '$count sides scanned');
   String get noCameraFound => _isEs
       ? 'No se encontró ninguna cámara en este dispositivo.'
       : 'No camera was found on this device.';

@@ -314,3 +314,17 @@ test("common vitamin D name falls back to ergocalciferol with the label unit hin
   assert.equal(options.length, 1);
   assert.match(options[0].displayName, /50,000 units/);
 });
+
+test("strengths for a label name with ER list the base drug's extended-release options", async () => {
+  const client = createRxNavClient(fakeFetch({
+    drugsByName: {
+      "GUANFACINE ER": { drugGroup: { name: "GUANFACINE ER" } },
+      guanfacine: fixture("guanfacine-er"),
+    },
+  }));
+  const options = await client.strengths("GUANFACINE ER");
+  assert.deepEqual(
+    options.map((option) => option.displayName),
+    ["24 HR guanfacine 2 MG Extended Release Oral Tablet"],
+  );
+});

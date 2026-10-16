@@ -421,6 +421,26 @@ function createRxNavClient(fetchImpl = global.fetch) {
         { stripPackagePrefixes: true },
       ));
     }
+    // "Guanfacine ER" is not an RxNorm name: look up "guanfacine", then keep
+    // only the extended-release products the label asked for.
+    const wantedModifiers = dosageModifiers(query);
+    if (!products.length && wantedModifiers.size) {
+      const baseName = requestedIngredients(query).join(" / ");
+      if (baseName && normalized(baseName) !== normalized(query)) {
+        lookupName = baseName;
+        payload = await get("/drugs.json", { name: lookupName });
+        const baseProducts = uniqueProducts(productsMatchingName(
+          lookupName,
+          flattenProducts(payload),
+          { stripPackagePrefixes: true },
+        ));
+        const withModifiers = baseProducts.filter((product) => {
+          const actual = dosageModifiers(product.name);
+          return [...wantedModifiers].every((modifier) => actual.has(modifier));
+        });
+        products = withModifiers.length ? withModifiers : baseProducts;
+      }
+    }
     return products
       .map((product) => {
         const option = productParts(product);
