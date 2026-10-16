@@ -372,7 +372,6 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetViewInsets);
-
         final image = File(
           '${Directory.systemTemp.path}\\vitalink-label-${size.width.toInt()}.png',
         );
@@ -402,6 +401,8 @@ void main() {
           ),
         ));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('drug-search-field')));
+        await tester.pump();
         tester.view.viewInsets = const FakeViewPadding(bottom: 380);
         await tester.pumpAndSettle();
 
@@ -409,6 +410,11 @@ void main() {
         expect(layoutException, isNull);
         expect(find.byKey(const Key('drug-search-field')), findsOneWidget);
         expect(find.byKey(const Key('drug-search-scroll')), findsOneWidget);
+        await tester.drag(
+          find.byKey(const Key('drug-search-scroll')),
+          const Offset(0, -600),
+        );
+        await tester.pumpAndSettle();
         expect(find.byKey(const Key('keyboard-skip-medicine')), findsOneWidget);
       },
     );
@@ -463,5 +469,21 @@ void main() {
     expect(medication.pharmacyVerifiedAt, isNull);
     expect(medication.pharmacyVerifiedBy, isNull);
     expect(pharmacyTextChanged('Same Pharmacy', ' same pharmacy '), isFalse);
+  });
+
+  test('scanned doctor names preserve last-first order when already present', () {
+    expect(scannedDoctorDisplayName('MEISINGER, DAVID'), 'MEISINGER, DAVID');
+    expect(scannedDoctorDisplayName('DAVID MEISINGER'), 'MEISINGER, DAVID');
+  });
+
+  test('confirmed scans save directly while unmatched scans open the editor', () {
+    expect(
+      scannedMedicationNeedsEditor(Medication(matchStatus: 'confirmed')),
+      isFalse,
+    );
+    expect(
+      scannedMedicationNeedsEditor(Medication(matchStatus: 'unmatched')),
+      isTrue,
+    );
   });
 }

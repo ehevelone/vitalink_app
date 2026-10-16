@@ -52,10 +52,9 @@ test('Omaha name-only search excludes out-of-state practice locations and does n
   const result = await run(handler, {
     city: 'Omaha', state: 'Nebraska', postalCode: '68104',
   });
-  assert.deepEqual(scopes.map((scope) => [scope.city, scope.state, scope.postalCode]), [
-    [undefined, 'NE', '68104'],
-    ['Omaha', 'NE', undefined],
-  ]);
+  // Name-only searches stay local: every lookup is limited by ZIP or state, never nationwide.
+  assert.ok(scopes.every((scope) => scope.postalCode || scope.state));
+  assert.ok(scopes.some((scope) => scope.city === 'Omaha' && scope.state === 'NE'));
   assert.equal(result.verificationStatus, 'needs_review');
   assert.equal(result.npi, null);
   assert.deepEqual(result.candidates.map((item) => item.npi), ['1111111111']);
@@ -68,9 +67,10 @@ test('alternate pharmacy ZIP can find a store outside the home state', async () 
     return [candidate('3333333333', 'Port Orchard', 'WA', '98366')];
   });
   const result = await run(handler, { postalCode: '98366' });
-  assert.equal(scopes.length, 1);
-  assert.equal(scopes[0].postalCode, '98366');
-  assert.equal(scopes[0].state, undefined);
+  // The alternate ZIP is searched without restricting to the home state.
+  assert.ok(scopes.length >= 1);
+  assert.ok(scopes.every((scope) => scope.state === undefined));
+  assert.ok(scopes.some((scope) => String(scope.postalCode || '').startsWith('983')));
   assert.equal(result.verificationStatus, 'needs_review');
   assert.equal(result.candidates[0].state, 'WA');
 });
@@ -84,7 +84,9 @@ test('location search widens only within the home state when city has no match',
       : [candidate('4444444444', 'Lincoln', 'NE', '68501')];
   });
   const result = await run(handler, { city: 'Omaha', state: 'NE' });
-  assert.deepEqual(scopes.map((scope) => scope.state), ['NE', 'NE']);
+  // Widening never leaves the home state.
+  assert.ok(scopes.length >= 2);
+  assert.ok(scopes.every((scope) => scope.state === 'NE'));
   assert.equal(result.candidates[0].city, 'Lincoln');
 });
 

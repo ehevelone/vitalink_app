@@ -42,7 +42,11 @@ enum _RetryAction { search, strengths }
 
 class _MedicationDrugReviewScreenState
     extends State<MedicationDrugReviewScreen> {
+  static const _navy = Color(0xFF0F172A);
+  static const _header = Color(0xFF0E5A88);
+  static const _vitalinkBlue = Color(0xFF78C7E7);
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   Timer? _debounce;
   _ReviewStep _step = _ReviewStep.checking;
   DrugProduct? _match;
@@ -57,12 +61,20 @@ class _MedicationDrugReviewScreenState
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.addListener(_onSearchFocusChanged);
     _verify();
+  }
+
+  void _onSearchFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchFocusNode
+      ..removeListener(_onSearchFocusChanged)
+      ..dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -291,17 +303,20 @@ class _MedicationDrugReviewScreenState
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final showBottomSkip = _step == _ReviewStep.confirm ||
-        _step == _ReviewStep.strengths ||
-        (_step == _ReviewStep.search && !keyboardOpen);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0 ||
+        (_step == _ReviewStep.search && _searchFocusNode.hasFocus);
+    final showBottomSkip =
+        _step == _ReviewStep.confirm || _step == _ReviewStep.strengths;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
+        backgroundColor: _navy,
         appBar: AppBar(
+          backgroundColor: _header,
+          foregroundColor: Colors.white,
           title: Text(strings.medicineProgress(widget.current, widget.total)),
         ),
         body: SafeArea(
@@ -331,6 +346,8 @@ class _MedicationDrugReviewScreenState
                     OutlinedButton(
                       onPressed: () => Navigator.pop(context, _unmatched()),
                       style: OutlinedButton.styleFrom(
+                        foregroundColor: _vitalinkBlue,
+                        side: const BorderSide(color: _vitalinkBlue),
                         minimumSize: const Size.fromHeight(54),
                       ),
                       child: Text(strings.skipForNow),
@@ -358,7 +375,10 @@ class _MedicationDrugReviewScreenState
             const CircularProgressIndicator(),
             const SizedBox(height: 20),
             Text(strings.checkingMedicine,
-                style: Theme.of(context).textTheme.titleLarge),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(color: Colors.white)),
           ],
         ),
       );
@@ -368,17 +388,23 @@ class _MedicationDrugReviewScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, size: 52),
+            const Icon(Icons.cloud_off_outlined,
+                size: 52, color: _vitalinkBlue),
             const SizedBox(height: 20),
             Text(
               strings.medicineCheckUnavailable,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 28),
             FilledButton(
               onPressed: () => Navigator.pop(context, _unmatched()),
               style: FilledButton.styleFrom(
+                backgroundColor: _vitalinkBlue,
+                foregroundColor: _navy,
                 minimumSize: const Size.fromHeight(54),
               ),
               child: Text(strings.continueLabel),
@@ -394,7 +420,10 @@ class _MedicationDrugReviewScreenState
         children: [
           Text(strings.isThisYourMedicine,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(color: Colors.white)),
           const SizedBox(height: 20),
           Text(
             _match!.friendlyName,
@@ -402,12 +431,16 @@ class _MedicationDrugReviewScreenState
             style: Theme.of(context)
                 .textTheme
                 .headlineMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+                ?.copyWith(color: _vitalinkBlue, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 36),
           FilledButton(
             onPressed: () => Navigator.pop(context, _confirmed(_match!)),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+            style: FilledButton.styleFrom(
+              backgroundColor: _vitalinkBlue,
+              foregroundColor: _navy,
+              minimumSize: const Size.fromHeight(56),
+            ),
             child: Text(strings.medicineYes),
           ),
           const SizedBox(height: 12),
@@ -418,7 +451,11 @@ class _MedicationDrugReviewScreenState
               _searchCameFromConfirm = true;
               _step = _ReviewStep.search;
             }),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _vitalinkBlue,
+              side: const BorderSide(color: _vitalinkBlue),
+              minimumSize: const Size.fromHeight(56),
+            ),
             child: Text(strings.medicineNo),
           ),
         ],
@@ -429,7 +466,10 @@ class _MedicationDrugReviewScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(strings.chooseStrength,
-              style: Theme.of(context).textTheme.headlineSmall),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(color: Colors.white)),
           const SizedBox(height: 16),
           Expanded(
             child: _networkError
@@ -441,7 +481,10 @@ class _MedicationDrugReviewScreenState
                         child: Text(
                           strings.noStrengthsFound,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(color: Colors.white),
                         ),
                       )
                 : ListView.separated(
@@ -450,8 +493,10 @@ class _MedicationDrugReviewScreenState
                     itemBuilder: (_, index) => ListTile(
                       minTileHeight: 58,
                       title: Text(_products[index].friendlyName,
-                          style: const TextStyle(fontSize: 18)),
-                      trailing: const Icon(Icons.chevron_right),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 18)),
+                      trailing: const Icon(Icons.chevron_right,
+                          color: _vitalinkBlue),
                       onTap: () => _chooseProduct(_products[index]),
                     ),
                   ),
@@ -459,6 +504,8 @@ class _MedicationDrugReviewScreenState
           FilledButton.tonal(
             onPressed: _searchAgain,
             style: FilledButton.styleFrom(
+              backgroundColor: _vitalinkBlue,
+              foregroundColor: _navy,
               minimumSize: const Size.fromHeight(52),
             ),
             child: Text(strings.searchAgain),
@@ -472,16 +519,27 @@ class _MedicationDrugReviewScreenState
         _photos(availableHeight, keyboardOpen: keyboardOpen),
         if (widget.imagePaths.isNotEmpty) const SizedBox(height: 20),
         Text(strings.medicineNameUnclear,
-            style: Theme.of(context).textTheme.titleLarge),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(color: Colors.white)),
         const SizedBox(height: 18),
         TextField(
           key: const Key('drug-search-field'),
           controller: _searchController,
+          focusNode: _searchFocusNode,
           autofocus: true,
           onChanged: _onSearchChanged,
-          style: const TextStyle(fontSize: 20),
+          style: const TextStyle(color: Colors.white, fontSize: 20),
           decoration: InputDecoration(
             labelText: strings.searchMedicineName,
+            labelStyle: const TextStyle(color: Colors.white70),
+            enabledBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.white38),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: _vitalinkBlue, width: 2),
+            ),
             suffixIcon: _loading
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -501,6 +559,7 @@ class _MedicationDrugReviewScreenState
             child: Text(
               strings.noMedicineMatches,
               textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70),
             ),
           )
         else
@@ -510,23 +569,24 @@ class _MedicationDrugReviewScreenState
               minTileHeight: 58,
               title: Text(
                 _normalCase(_names[index]),
-                style: const TextStyle(fontSize: 19),
+                style: const TextStyle(color: Colors.white, fontSize: 19),
               ),
-              trailing: const Icon(Icons.chevron_right),
+              trailing:
+                  const Icon(Icons.chevron_right, color: _vitalinkBlue),
               onTap: () => _chooseName(_names[index]),
             ),
           ],
-        if (keyboardOpen) ...[
-          const SizedBox(height: 16),
-          OutlinedButton(
-            key: const Key('keyboard-skip-medicine'),
-            onPressed: () => Navigator.pop(context, _unmatched()),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(54),
-            ),
-            child: Text(strings.skipForNow),
+        const SizedBox(height: 16),
+        OutlinedButton(
+          key: const Key('keyboard-skip-medicine'),
+          onPressed: () => Navigator.pop(context, _unmatched()),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _vitalinkBlue,
+            side: const BorderSide(color: _vitalinkBlue),
+            minimumSize: const Size.fromHeight(54),
           ),
-        ],
+          child: Text(strings.skipForNow),
+        ),
         const SizedBox(height: 8),
       ],
     );
@@ -539,11 +599,18 @@ class _MedicationDrugReviewScreenState
             Text(
               strings.medicineListUnavailable,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _retry,
+              style: FilledButton.styleFrom(
+                backgroundColor: _vitalinkBlue,
+                foregroundColor: _navy,
+              ),
               child: Text(strings.tryAgain),
             ),
           ],

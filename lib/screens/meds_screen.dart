@@ -42,6 +42,24 @@ bool pharmacyTextChanged(String before, String after) =>
     before.trim().toLowerCase() != after.trim().toLowerCase();
 
 @visibleForTesting
+String scannedDoctorDisplayName(String name) {
+  final trimmed = name.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (trimmed.contains(',')) {
+    final parts = trimmed.split(',').map((part) => part.trim()).toList();
+    if (parts.length == 2 && parts.every((part) => part.isNotEmpty)) {
+      return '${parts[0]}, ${parts[1]}';
+    }
+  }
+  final parts = trimmed.split(' ')..removeWhere((part) => part.isEmpty);
+  if (parts.length < 2) return trimmed;
+  return '${parts.last}, ${parts.sublist(0, parts.length - 1).join(" ")}';
+}
+
+@visibleForTesting
+bool scannedMedicationNeedsEditor(Medication medication) =>
+    medication.matchStatus != 'confirmed';
+
+@visibleForTesting
 void resetPharmacyVerification(Medication medication) {
   medication.pharmacyNpi = null;
   medication.pharmacyVerificationStatus = 'unverified';
@@ -134,15 +152,7 @@ class _MedsScreenState extends State<MedsScreen> {
   }
 
   String _toLastFirstFormat(String name) {
-    final cleaned =
-        name.replaceAll(",", " ").replaceAll(RegExp(r'\s+'), " ").trim();
-
-    final parts = cleaned.split(" ")..removeWhere((p) => p.isEmpty);
-    if (parts.length < 2) return cleaned;
-
-    final last = parts.last;
-    final firstMiddle = parts.sublist(0, parts.length - 1).join(" ");
-    return "$last, $firstMiddle";
+    return scannedDoctorDisplayName(name);
   }
 
   bool _doctorExistsByNormalizedName(String docName) {
@@ -291,14 +301,17 @@ class _MedsScreenState extends State<MedsScreen> {
   String _buildPharmacyDisplay(Map<String, dynamic> data) {
     final pharm = (data['pharmacy'] ?? "").toString().trim();
     final pharmPhone = (data['pharmacy_phone'] ?? "").toString().trim();
-
-    if (pharm.isEmpty && pharmPhone.isEmpty) return "";
-
-    if (pharm.isNotEmpty && pharmPhone.isNotEmpty) {
-      return "$pharm\n$pharmPhone";
-    }
-
-    return pharm.isNotEmpty ? pharm : pharmPhone;
+    final address = (data['pharmacy_address'] ?? '').toString().trim();
+    final city = (data['pharmacy_city'] ?? '').toString().trim();
+    final state = (data['pharmacy_state'] ?? '').toString().trim();
+    final zip = (data['pharmacy_zip'] ?? '').toString().trim();
+    final location = [
+      city,
+      [state, zip].where((part) => part.isNotEmpty).join(' '),
+    ].where((part) => part.isNotEmpty).join(', ');
+    return [pharm, address, location, pharmPhone]
+        .where((part) => part.isNotEmpty)
+        .join('\n');
   }
 
   String _pharmacyName(String value) {
@@ -382,7 +395,6 @@ class _MedsScreenState extends State<MedsScreen> {
     var result = await _npiService.lookup(
       entityType: 'pharmacy',
       name: name,
-      city: _p!.city,
       state: _p!.state,
       postalCode: _p!.zip,
       phone: _pharmacyPhone(medication.prescriber),
@@ -420,7 +432,9 @@ class _MedsScreenState extends State<MedsScreen> {
         result = await _npiService.lookup(
           entityType: 'pharmacy',
           name: name,
+          state: _p!.state,
           postalCode: zip,
+          phone: _pharmacyPhone(medication.prescriber),
         );
         if (result.hasError) {
           await _showVerificationError('pharmacy', result.error);
@@ -1644,27 +1658,37 @@ class _MedsScreenState extends State<MedsScreen> {
             }
           }
         } else {
-          await _addOrEdit(
-            prefill: {
-              "name": scannedName,
-              "dose": scannedDose,
-              "frequency": scannedFreq,
-              "quantity": (data['quantity'] ?? '').toString().trim(),
-              "prescriber": pharmacyDisplay,
-              "item_type": itemType,
-              "serving_size": servingSize,
-              "active_ingredients": activeIngredients,
-              "other_ingredients": otherIngredients,
-              "rxcui": scannedMedication.rxcui,
-              "ndc": scannedMedication.ndc,
-              "ndc_source": scannedMedication.ndcSource,
-              "drug_form": scannedMedication.drugForm,
-              "drug_type": scannedMedication.drugType,
-              "days_supply": scannedMedication.daysSupply?.toString() ?? '',
-              "refills": scannedMedication.refills,
-              "match_status": scannedMedication.matchStatus,
-            },
-          );
+          if (!scannedMedicationNeedsEditor(scannedMedication)) {
+            late final int addedIndex;
+            setState(() {
+              _p!.meds.add(scannedMedication);
+              addedIndex = _p!.meds.length - 1;
+            });
+            await _save();
+            await _verifyPharmacy(addedIndex);
+          } else {
+            await _addOrEdit(
+              prefill: {
+                "name": scannedName,
+                "dose": scannedDose,
+                "frequency": scannedFreq,
+                "quantity": (data['quantity'] ?? '').toString().trim(),
+                "prescriber": pharmacyDisplay,
+                "item_type": itemType,
+                "serving_size": servingSize,
+                "active_ingredients": activeIngredients,
+                "other_ingredients": otherIngredients,
+                "rxcui": scannedMedication.rxcui,
+                "ndc": scannedMedication.ndc,
+                "ndc_source": scannedMedication.ndcSource,
+                "drug_form": scannedMedication.drugForm,
+                "drug_type": scannedMedication.drugType,
+                "days_supply": scannedMedication.daysSupply?.toString() ?? '',
+                "refills": scannedMedication.refills,
+                "match_status": scannedMedication.matchStatus,
+              },
+            );
+          }
         }
       }
 

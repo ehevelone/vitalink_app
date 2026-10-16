@@ -96,6 +96,36 @@ function isVaPharmacyName(value) {
 
 async function searchPharmacy({ name, city, state, postalCode, phone }) {
   const zip = String(postalCode || "").match(/^\d{5}/)?.[0] || "";
+  const nameVariants = [name];
+  const normalizedName = normalizeText(name);
+  if (normalizedName.includes("walmart")) nameVariants.push("Wal-Mart*");
+  if (normalizedName.includes("walgreens")) nameVariants.push("Walgreen*");
+  if (normalizedName.includes("cvs")) nameVariants.push("CVS*");
+
+  if (zip && !isVaPharmacyName(name)) {
+    const prefixes = nearbyZipPrefixes(zip, 15);
+    const nearbySets = await Promise.all(prefixes.flatMap((prefix) =>
+      nameVariants.map((searchName) => searchNpi({
+        entityType: "pharmacy",
+        name: searchName,
+        postalCode: `${prefix}*`,
+        excludedTaxonomyCodes: ["3336M0002X"],
+      })),
+    ));
+    const withinRadius = candidatesWithinRadius(
+      uniqueCandidates(nearbySets.flat()),
+      zip,
+      15,
+    );
+    const matchingPhone = candidatesMatchingPhone(withinRadius, phone);
+    if (matchingPhone.length) {
+      return { candidates: matchingPhone, phoneMatched: true };
+    }
+    if (withinRadius.length) {
+      return { candidates: withinRadius, phoneMatched: false };
+    }
+  }
+
   const scopes = [];
   if (zip) scopes.push(state ? { postalCode: zip, state } : { postalCode: zip });
   if (city && state) scopes.push({ city, state });
@@ -106,17 +136,20 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
   let nearby = [];
   for (const scope of scopes) {
     const vaPharmacy = isVaPharmacyName(name);
-    const results = uniqueCandidates(await searchNpi({
-      entityType: "pharmacy",
-      name: vaPharmacy ? "" : name,
-      ...scope,
-      ...(vaPharmacy
-        ? {
-            taxonomyDescription: "Department of Veterans Affairs (VA) Pharmacy",
-            taxonomyCodes: ["332100000X"],
-          }
-        : { excludedTaxonomyCodes: ["3336M0002X"] }),
-    }))
+    const searches = vaPharmacy ? [""] : nameVariants;
+    const results = uniqueCandidates((await Promise.all(searches.map(
+      (searchName) => searchNpi({
+        entityType: "pharmacy",
+        name: searchName,
+        ...scope,
+        ...(vaPharmacy
+          ? {
+              taxonomyDescription: "Department of Veterans Affairs (VA) Pharmacy",
+              taxonomyCodes: ["332100000X"],
+            }
+          : { excludedTaxonomyCodes: ["3336M0002X"] }),
+      }),
+    ))).flat())
       .filter((candidate) => matchesLocation(candidate, scope));
     const matchingPhone = candidatesMatchingPhone(results, phone);
     if (matchingPhone.length) return { candidates: matchingPhone, phoneMatched: true };
@@ -152,7 +185,13 @@ async function searchRegistryScope({ entityType, name, city, state, postalCode, 
 }
 
 async function searchRegistry(options) {
-  const exact = await searchRegistryScope(options);
+  let exact = await searchRegistryScope(options);
+  if (!exact.length && String(options.name || "").includes(",")) {
+    const [left, right] = String(options.name).split(",").map((part) => part.trim());
+    if (left && right) {
+      exact = await searchRegistryScope({ ...options, name: `${right}, ${left}` });
+    }
+  }
   const originZip = normalizeZip(options.postalCode);
   if (!originZip) return exact;
 
@@ -307,3 +346,5 @@ exports.handler = async (event) => {
     return reply(502, { success: false, error: "Provider registry lookup is temporarily unavailable" });
   }
 };
+
+exports._test = { searchPharmacy, searchRegistry };
