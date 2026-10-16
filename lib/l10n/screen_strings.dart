@@ -332,6 +332,9 @@ extension ScreenStrings on AppStrings {
       _isEs ? 'Nombre del medicamento' : 'Medicine name';
   String get chooseStrength =>
       _isEs ? 'Elija la concentración' : 'Choose the strength';
+  String weFoundMedicine(String name) => _isEs
+      ? 'Encontramos $name. ¿Cuál dice su frasco?'
+      : 'We found $name. Which one is on your bottle?';
   String get skipForNow => _isEs ? 'Omitir por ahora' : 'Skip for now';
   String get checkingMedicine =>
       _isEs ? 'Verificando el medicamento...' : 'Checking medicine...';

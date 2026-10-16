@@ -144,6 +144,11 @@ function strengthValues(value) {
 function doseMatchesProduct(dose, product) {
   const requested = strengthValues(dose);
   if (!requested.length) return false;
+  // "250 mg" on a label is per tablet/capsule; it must not match a liquid
+  // concentration such as "250 MG/ML" unless the label itself says per mL.
+  if (!/\/\s*ML\b/i.test(clean(dose)) && /\/\s*ML\b/i.test(clean(product?.name))) {
+    return false;
+  }
   const actual = strengthValues(product?.name);
   return requested.every((value) => actual.some((candidate) =>
     Math.abs(candidate - value) < 0.000001,

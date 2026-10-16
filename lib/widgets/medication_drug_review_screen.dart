@@ -16,6 +16,30 @@ double medicationLabelPhotoHeight(
 }) =>
     keyboardOpen ? 80 : (search ? availableHeight * .4 : 150);
 
+/// Puts products whose strength matches the scanned dose (e.g. "250MG")
+/// first, keeping the original order otherwise.
+@visibleForTesting
+List<DrugProduct> scannedStrengthFirst(
+  List<DrugProduct> products,
+  String scannedDose,
+) {
+  final amount =
+      RegExp(r'(\d+(?:\.\d+)?)').firstMatch(scannedDose)?.group(1);
+  if (amount == null) return products;
+  final number = double.tryParse(amount);
+  bool matches(DrugProduct product) {
+    final value = RegExp(r'(\d+(?:\.\d+)?)')
+        .firstMatch(product.strength)
+        ?.group(1);
+    return value != null && double.tryParse(value) == number;
+  }
+
+  return [
+    ...products.where(matches),
+    ...products.where((product) => !matches(product)),
+  ];
+}
+
 class MedicationDrugReviewScreen extends StatefulWidget {
   const MedicationDrugReviewScreen({
     super.key,
@@ -57,6 +81,9 @@ class _MedicationDrugReviewScreenState
   bool _networkError = false;
   _RetryAction? _retryAction;
   String _selectedName = '';
+  // Set when the scanned name is a real drug but the exact product was
+  // unclear, so the client picks from that drug's options instead of typing.
+  String? _foundName;
 
   @override
   void initState() {
@@ -87,6 +114,20 @@ class _MedicationDrugReviewScreenState
       ndc: widget.medication.ndc,
     );
     if (!mounted) return;
+    if (!result.isSure && !result.isUnavailable) {
+      final options = await _scannedNameOptions();
+      if (!mounted) return;
+      if (options.isNotEmpty) {
+        setState(() {
+          _foundName = widget.medication.name.trim();
+          _selectedName = _foundName!;
+          _products = options;
+          _searchCameFromConfirm = false;
+          _step = _ReviewStep.strengths;
+        });
+        return;
+      }
+    }
     setState(() {
       if (result.isSure) {
         _match = result.match;
@@ -98,6 +139,16 @@ class _MedicationDrugReviewScreenState
         _step = _ReviewStep.search;
       }
     });
+  }
+
+  /// The scanned drug's real products, with the scanned strength listed first.
+  /// Empty when the scanned name is not a real drug or the lookup fails.
+  Future<List<DrugProduct>> _scannedNameOptions() async {
+    final name = widget.medication.name.trim();
+    if (name.length < 2) return const [];
+    final result = await widget.lookup.strengths(name);
+    if (!result.available || result.products.isEmpty) return const [];
+    return scannedStrengthFirst(result.products, widget.medication.dose);
   }
 
   void _onSearchChanged(String value) {
@@ -134,6 +185,7 @@ class _MedicationDrugReviewScreenState
   }
 
   Future<void> _chooseName(String name) async {
+    _foundName = null;
     _selectedName = name;
     await _loadStrengths(name);
   }
@@ -198,6 +250,7 @@ class _MedicationDrugReviewScreenState
   Future<void> _handleBack() async {
     if (_step == _ReviewStep.strengths) {
       setState(() {
+        _foundName = null;
         _networkError = false;
         _step = _ReviewStep.search;
       });
@@ -232,6 +285,7 @@ class _MedicationDrugReviewScreenState
 
   void _searchAgain() {
     setState(() {
+      _foundName = null;
       _networkError = false;
       _products = const [];
       _step = _ReviewStep.search;
@@ -465,7 +519,10 @@ class _MedicationDrugReviewScreenState
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(strings.chooseStrength,
+          Text(
+              _foundName == null
+                  ? strings.chooseStrength
+                  : strings.weFoundMedicine(_foundName!),
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall

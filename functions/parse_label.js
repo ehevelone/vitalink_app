@@ -295,6 +295,10 @@ Rules:
 10a. For each medication row, form, ndc, days_supply, refills,
     pharmacy_name, and pharmacy_phone must contain only text clearly visible
     for that row. Return an empty string when it is missing or unclear.
+10c. form is the dosage form (tablet, capsule, solution, inhaler, cream, etc.).
+    When it is not printed on its own, take it from the printed directions,
+    for example "TAKE ONE TABLET BY MOUTH" means tablet and "TAKE 1 CAPSULE"
+    means capsule. Leave it empty only when neither shows a form.
 10b. pharmacy_address, pharmacy_city, pharmacy_state, and pharmacy_zip are the
     pharmacy location printed on the label. Never use or infer the patient's
     address. Return an empty string for every part that is not clearly visible.

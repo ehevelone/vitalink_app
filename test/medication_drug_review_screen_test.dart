@@ -26,12 +26,17 @@ class FakeDrugLookup implements DrugLookupApi {
         const DrugOptionsResult.available([_methocarbamol]),
     this.selectResult =
         const DrugVerificationResult.sure(_methocarbamol),
+    this.scannedNameIsReal = false,
   });
 
   DrugVerificationResult verification;
   DrugSearchResult searchResult;
   DrugOptionsResult strengthResult;
   DrugVerificationResult selectResult;
+  // When false, the scanned name behaves like a misread (e.g.
+  // "Cyclobenzapramol"): it has no products until the client searches.
+  bool scannedNameIsReal;
+  bool _searched = false;
 
   @override
   Future<DrugVerificationResult> verify({
@@ -43,10 +48,16 @@ class FakeDrugLookup implements DrugLookupApi {
       verification;
 
   @override
-  Future<DrugSearchResult> search(String text) async => searchResult;
+  Future<DrugSearchResult> search(String text) async {
+    _searched = true;
+    return searchResult;
+  }
 
   @override
-  Future<DrugOptionsResult> strengths(String drug) async => strengthResult;
+  Future<DrugOptionsResult> strengths(String drug) async =>
+      _searched || scannedNameIsReal
+          ? strengthResult
+          : const DrugOptionsResult.available([]);
 
   @override
   Future<DrugVerificationResult> select(String rxcui) async => selectResult;
@@ -189,6 +200,31 @@ void main() {
     await _open(tester, FakeDrugLookup());
     final field = tester.widget<TextField>(find.byKey(const Key('drug-search-field')));
     expect(field.controller!.text, isEmpty);
+  });
+
+  testWidgets('real scanned name with an unclear product offers its options',
+      (tester) async {
+    await _open(tester, FakeDrugLookup(scannedNameIsReal: true));
+    expect(
+      find.text('We found Methocarbamol. Which one is on your bottle?'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('drug-search-field')), findsNothing);
+    expect(find.text('Methocarbamol 500 mg tablet'), findsOneWidget);
+  });
+
+  test('scanned strength is listed first', () {
+    const other = DrugProduct(
+      rxcui: '1',
+      rxNormName: 'methocarbamol 750 MG Oral Tablet',
+      strength: '750 MG',
+      form: 'Oral Tablet',
+      drugType: 'generic',
+      ndc: '',
+      ndcSource: '',
+    );
+    final ordered = scannedStrengthFirst([other, _methocarbamol], '500MG');
+    expect(ordered.first.rxcui, _methocarbamol.rxcui);
   });
 
   testWidgets('search then strength then select saves confirmed',
