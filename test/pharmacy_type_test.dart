@@ -37,6 +37,20 @@ void main() {
     expect(knownPharmacyType(outOfState), 'retail');
   });
 
+  test('the bottle ZIP and state are read when printed', () {
+    expect(
+      bottlePharmacyLocation('VA\nOMAHA 636 NE 68105-1850'),
+      (state: 'NE', zip: '68105'),
+    );
+    expect(
+      bottlePharmacyLocation('Walmart Pharmacy\n1606 S 72nd St\nOmaha, NE 68124'),
+      (state: 'NE', zip: '68124'),
+    );
+    // A street number is not a ZIP; no address means use the home ZIP.
+    expect(bottlePharmacyLocation('Walmart Pharmacy\n12850 L St'), isNull);
+    expect(bottlePharmacyLocation('Walgreens\n402-555-1111'), isNull);
+  });
+
   test('unknown names without an address still ask the client', () {
     expect(knownPharmacyType('Smithfield Rx\n402-555-1111'), isNull);
     expect(knownPharmacyType(''), isNull);

@@ -110,8 +110,12 @@ const LOCAL_PHARMACY_TAXONOMY_CODES = [
   "3336S0011X",
 ];
 
-async function searchPharmacy({ name, city, state, postalCode, phone }) {
+async function searchPharmacy({ name, city, state, postalCode, phone, exactZip = false }) {
   const zip = String(postalCode || "").match(/^\d{5}/)?.[0] || "";
+  // exactZip: the ZIP came from the pharmacy's own address on the bottle, so
+  // search only that ZIP. Otherwise it is the client's home ZIP and gets a
+  // 15-mile radius.
+  const onlyThisZip = exactZip && Boolean(zip);
   const nameVariants = [name];
   const normalizedName = normalizeText(name);
   // Walmart pharmacies are registered as "WALMART INC."; "WAL-MART STORES"
@@ -120,7 +124,7 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
   if (normalizedName.includes("walgreens")) nameVariants.push("Walgreen*");
   if (normalizedName.includes("cvs")) nameVariants.push("CVS*");
 
-  if (zip && !isVaPharmacyName(name)) {
+  if (zip && !onlyThisZip && !isVaPharmacyName(name)) {
     const prefixes = nearbyZipPrefixes(zip, 15);
     const nearbySets = await Promise.all(prefixes.flatMap((prefix) =>
       nameVariants.map((searchName) => searchNpi({
@@ -147,10 +151,12 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
 
   const scopes = [];
   if (zip) scopes.push(state ? { postalCode: zip, state } : { postalCode: zip });
-  if (city && state) scopes.push({ city, state });
-  if (state) scopes.push({ state });
-  if (city && !state) scopes.push({ city });
-  if (phone) scopes.push({});
+  if (!onlyThisZip) {
+    if (city && state) scopes.push({ city, state });
+    if (state) scopes.push({ state });
+    if (city && !state) scopes.push({ city });
+    if (phone) scopes.push({});
+  }
 
   let nearby = [];
   for (const scope of scopes) {
@@ -255,6 +261,7 @@ exports.handler = async (event) => {
     const state = normalizeState(body.state);
     const postalCode = String(body.postalCode || "").trim();
     const mailOrder = entityType === "pharmacy" && body.mailOrder === true;
+    const exactZip = entityType === "pharmacy" && body.exactZip === true;
     const vaPharmacy = entityType === "pharmacy" && isVaPharmacyName(name);
     const includeVa = entityType === "provider" && body.includeVa === true;
     if (!["provider", "pharmacy"].includes(entityType) || name.length < 2) {
@@ -300,7 +307,7 @@ exports.handler = async (event) => {
 
     const pharmacyResult = entityType === "pharmacy"
       ? vaPharmacy
-        ? await searchPharmacy({ name, city, state, postalCode, phone })
+        ? await searchPharmacy({ name, city, state, postalCode, phone, exactZip })
         : mailOrder
         ? {
             candidates: uniqueCandidates(await searchNpi({
@@ -311,7 +318,7 @@ exports.handler = async (event) => {
             })),
             phoneMatched: false,
           }
-        : await searchPharmacy({ name, city, state, postalCode, phone })
+        : await searchPharmacy({ name, city, state, postalCode, phone, exactZip })
       : null;
     let registryCandidates;
     if (pharmacyResult) {

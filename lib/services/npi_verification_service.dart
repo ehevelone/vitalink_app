@@ -124,6 +124,7 @@ class NpiVerificationService {
     String? phone,
     bool? mailOrder,
     bool includeVa = false,
+    bool exactZip = false,
   }) async {
     if (name.trim().isEmpty) {
       return const NpiLookupResult(status: 'unverified');
@@ -140,6 +141,7 @@ class NpiVerificationService {
       phone: phone,
       mailOrder: mailOrder,
       includeVa: includeVa,
+      exactZip: exactZip,
     );
 
     if (response['success'] != true) {

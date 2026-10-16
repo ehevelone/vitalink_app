@@ -344,3 +344,17 @@ test('provider specialty search also returns other exact surname-variant matches
     '1689454357', '1619882255',
   ]);
 });
+
+test('a ZIP from the bottle is searched alone, with no radius or state widening', async () => {
+  const scopes = [];
+  const handler = lookupWith(async (scope) => {
+    scopes.push(scope);
+    return [candidate('7777777777', 'Omaha', 'NE', '68105')];
+  });
+  const result = await run(handler, {
+    state: 'NE', postalCode: '68105', exactZip: true,
+  });
+  assert.ok(scopes.length >= 1);
+  assert.ok(scopes.every((scope) => scope.postalCode === '68105'));
+  assert.equal(result.candidates[0].npi, '7777777777');
+});

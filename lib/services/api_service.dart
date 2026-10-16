@@ -158,6 +158,7 @@ class ApiService {
     String? phone,
     bool? mailOrder,
     bool includeVa = false,
+    bool exactZip = false,
   }) async {
     final body = {
       ...identity,
@@ -171,6 +172,7 @@ class ApiService {
         'specialty': specialty.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       if (mailOrder != null) 'mailOrder': mailOrder,
+      if (exactZip) 'exactZip': true,
       if (includeVa) 'includeVa': true,
     };
     return identity['agentId'] != null

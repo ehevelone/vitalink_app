@@ -147,6 +147,25 @@ String? _stateCode(String? value) {
   return _stateCodes[text.toLowerCase()];
 }
 
+/// The pharmacy's state and ZIP printed on the bottle, e.g. "Omaha, NE 68105"
+/// or "OMAHA 636 NE 68105-1850". Null when the bottle shows no address.
+@visibleForTesting
+({String state, String zip})? bottlePharmacyLocation(String pharmacyText) {
+  final lines = pharmacyText
+      .split(RegExp(r'[\r\n]+'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .skip(1);
+  for (final line in lines) {
+    final match =
+        RegExp(r'\b([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?\b').firstMatch(line);
+    if (match != null) {
+      return (state: match.group(1)!.toUpperCase(), zip: match.group(2)!);
+    }
+  }
+  return null;
+}
+
 /// Returns 'mail_order' or 'retail' when the pharmacy text makes the type
 /// clear, or null when the client should be asked.
 @visibleForTesting
@@ -514,13 +533,17 @@ class _MedsScreenState extends State<MedsScreen> {
     medication.pharmacyFulfillmentType = pharmacyType;
     await _save();
 
+    // The pharmacy's own ZIP from the bottle beats the client's home ZIP.
+    final bottle = bottlePharmacyLocation(medication.prescriber);
     var result = await _npiService.lookup(
       entityType: 'pharmacy',
       name: name,
-      state: _p!.state,
-      postalCode: _p!.zip,
+      state: bottle?.state ?? _p!.state,
+      postalCode: bottle?.zip ?? _p!.zip,
       phone: _pharmacyPhone(medication.prescriber),
       mailOrder: pharmacyType == 'mail_order',
+      // The bottle's ZIP is searched alone; the home ZIP gets a radius.
+      exactZip: bottle != null,
     );
     if (result.hasError) {
       await _showVerificationError('pharmacy', result.error);
