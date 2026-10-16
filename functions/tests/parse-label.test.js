@@ -188,3 +188,10 @@ test("the reader never answers unknown; it decides from the label instead", () =
   );
   assert.equal(decide({}), "prescription");
 });
+
+test("photos are labeled with their real image type", () => {
+  const { imageMimeType } = require("../parse_label");
+  assert.equal(imageMimeType("/9j/4AAQSkZJRgABAQ"), "image/jpeg");
+  assert.equal(imageMimeType("iVBORw0KGgoAAAANSUhEUg"), "image/png");
+  assert.equal(imageMimeType(""), "image/jpeg");
+});

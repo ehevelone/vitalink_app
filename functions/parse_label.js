@@ -20,6 +20,16 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+// Label the photo with its real format; the app sends JPEGs.
+function imageMimeType(base64) {
+  const start = String(base64 || "").slice(0, 12);
+  if (start.startsWith("/9j/")) return "image/jpeg";
+  if (start.startsWith("iVBORw0KGgo")) return "image/png";
+  if (start.startsWith("UklGR")) return "image/webp";
+  if (start.startsWith("R0lGOD")) return "image/gif";
+  return "image/jpeg";
+}
+
 // Prefer the separate first/last fields so the app never has to guess the
 // order; fall back to the single printed name.
 function prescriberDisplayName(parsed) {
@@ -197,7 +207,7 @@ exports.handler = async (event) => {
       imageInputs = body.images.map(base64 => ({
         type: "image_url",
         image_url: {
-          url: `data:image/png;base64,${base64}`,
+          url: `data:${imageMimeType(base64)};base64,${base64}`,
           // Small curved label print needs the full-resolution image.
           detail: "high",
         },
@@ -206,7 +216,7 @@ exports.handler = async (event) => {
       imageInputs = [{
         type: "image_url",
         image_url: {
-          url: `data:image/png;base64,${body.imageBase64}`,
+          url: `data:${imageMimeType(body.imageBase64)};base64,${body.imageBase64}`,
           detail: "high",
         },
       }];
@@ -399,3 +409,5 @@ Rules:
 };
 
 exports.normalizeMedicationList = normalizeMedicationList;
+
+exports.imageMimeType = imageMimeType;

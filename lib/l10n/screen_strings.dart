@@ -253,6 +253,11 @@ extension ScreenStrings on AppStrings {
       ? 'Inicie sesión de nuevo antes de escanear.'
       : 'Please log in again before scanning.';
   String get listTooLong => _isEs ? 'Lista demasiado larga' : 'List Too Long';
+  String get photosTooLarge =>
+      _isEs ? 'Fotos demasiado grandes' : 'Photos Too Large';
+  String get photosTooLargeBody => _isEs
+      ? 'Estas fotos son demasiado grandes para enviarlas juntas. Escanee de nuevo con menos lados o ingrese el medicamento manualmente.'
+      : 'These photos are too large to send together. Please scan again with fewer sides, or enter the medication manually.';
   String get couldNotReadLabel =>
       _isEs ? 'No se pudo leer la etiqueta' : 'Could Not Read Label';
   String get listTooLongBody => _isEs

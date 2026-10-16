@@ -1445,6 +1445,22 @@ class _MedsScreenState extends State<MedsScreen> {
       final imagePaths = await _captureLabelPhotos();
       if (!mounted) return;
 
+      // Never send an upload the label scanner would reject for size.
+      if (imagePaths != null &&
+          imagePaths.isNotEmpty &&
+          !await labelPhotosFit(imagePaths)) {
+        if (!mounted) return;
+        final choice = await _showScanIssueDialog(
+          title: AppStrings.of(context).photosTooLarge,
+          message: AppStrings.of(context).photosTooLargeBody,
+          allowManualEntry: true,
+        );
+        if (choice == "manual" && mounted) {
+          await _addOrEdit();
+        }
+        return;
+      }
+
       final List<String> base64Images = [];
       for (final path in imagePaths ?? <String>[]) {
         final bytes = await File(path).readAsBytes();
