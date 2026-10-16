@@ -455,9 +455,34 @@ class DataRepository {
     return _getActiveIndex(profiles);
   }
 
+  // The account holder's own profile (the one created at registration). Other
+  // profiles on the account are family members without their own login.
+  Future<String> _accountProfileIdKey() async =>
+      'account_profile_id_${await _accountSuffix()}';
+
+  Future<void> markAccountProfile(String profileId) async {
+    if (profileId.trim().isEmpty) return;
+    await _store.setString(await _accountProfileIdKey(), profileId);
+  }
+
+  Future<bool> isAccountProfile(Profile profile) async {
+    final profiles = await _loadProfilesInternal();
+    if (profiles.isEmpty) return true;
+    final saved = (await _store.getString(await _accountProfileIdKey()) ?? '')
+        .trim();
+    if (saved.isNotEmpty && profiles.any((p) => p.id == saved)) {
+      return saved == profile.id;
+    }
+    // Accounts created before this was recorded: registration always creates
+    // the first profile, so the first profile is the account holder's.
+    return profiles.first.id == profile.id;
+  }
+
   Future<void> deleteProfileAt(int index) async {
     final profiles = await _loadProfilesInternal();
     if (index < 0 || index >= profiles.length) return;
+    // The account holder's own profile is never deleted from here.
+    if (await isAccountProfile(profiles[index])) return;
 
     await _deleteProfileFiles(profiles[index]);
     profiles.removeAt(index);

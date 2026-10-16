@@ -752,6 +752,9 @@ extension ScreenStrings on AppStrings {
   String get saveHouseholdProfile =>
       _isEs ? 'Guardar perfil familiar' : 'Save Household Profile';
   String get deleteProfile => _isEs ? 'Eliminar perfil' : 'Delete Profile';
+  String get cannotDeleteAccountHolderProfile => _isEs
+      ? 'Este es el perfil del titular de la cuenta y no se puede eliminar.'
+      : 'This is the account holder\'s profile and can\'t be deleted.';
   String get addProfileFromInvite =>
       _isEs ? 'Agregar perfil desde una invitación' : 'Add Profile from Invite';
   String get useProfileShareCode => _isEs

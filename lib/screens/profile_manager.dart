@@ -43,6 +43,17 @@ class _ProfileManagerScreenState extends State<ProfileManagerScreen> {
   }
 
   Future<void> _delete(int index) async {
+    if (await _repo.isAccountProfile(_profiles[index])) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(AppStrings.of(context).cannotDeleteAccountHolderProfile),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     if (index == _activeIndex) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

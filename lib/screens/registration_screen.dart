@@ -482,6 +482,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       profile.updatedAt = DateTime.now();
 
       await repo.saveProfile(profile);
+      await repo.markAccountProfile(profile.id);
 
       // Marks the agent's onboarding package as used. The account already
       // exists at this point, so a failure here must not block the client.

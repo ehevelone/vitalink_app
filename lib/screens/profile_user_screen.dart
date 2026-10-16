@@ -33,6 +33,10 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   bool _loading = false;
   String _currentEmail = "";
+  // True when the open profile is the account holder's own. Family profiles
+  // have no login, so they never change the account's email, password, name,
+  // or phone.
+  bool _isAccountProfile = true;
   bool _isVeteran = false;
   bool _usesVaHealthcare = false;
 
@@ -61,9 +65,12 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     // separately stored values only when the profile field is empty.
     final repo = DataRepository();
     final profile = await repo.loadProfile();
+    final isAccountProfile = await repo.isAccountProfile(profile);
+    // The older separately stored values belong to the account holder only,
+    // so a family member's blank field never shows the holder's details.
     Future<String> pick(String? fromProfile, String storeKey) async {
       final value = (fromProfile ?? '').trim();
-      if (value.isNotEmpty) return value;
+      if (value.isNotEmpty || !isAccountProfile) return value;
       return (await store.getString(storeKey) ?? '').trim();
     }
 
@@ -78,6 +85,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     if (!mounted) return;
 
     setState(() {
+      _isAccountProfile = isAccountProfile;
       _currentEmail = email;
       _emailCtrl.text = email;
       _nameCtrl.text = name;
@@ -130,7 +138,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_currentEmail.isEmpty) {
+    if (_isAccountProfile && _currentEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppStrings.of(context).sessionErrorLogInAgain)),
       );
@@ -163,37 +171,41 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     final newPassword = _passwordCtrl.text.trim();
 
     try {
-      final res = await ApiService.updateUserProfile(
-        userId: userId,
-        currentEmail: _currentEmail,
-        email: newEmail,
-        name: newName,
-        phone: newPhone,
-        password: newPassword.isNotEmpty ? newPassword : null,
-      );
-
-      if (res['success'] != true) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(res['error'] ??
-                  AppStrings.of(context).failedToUpdateProfile)),
+      // Only the account holder's profile updates the login account. A family
+      // member's profile is saved to that profile alone.
+      if (_isAccountProfile) {
+        final res = await ApiService.updateUserProfile(
+          userId: userId,
+          currentEmail: _currentEmail,
+          email: newEmail,
+          name: newName,
+          phone: newPhone,
+          password: newPassword.isNotEmpty ? newPassword : null,
         );
-        return;
-      }
 
-      await store.setString('profileName', newName);
-      await store.setString('profilePhone', newPhone);
-      await store.setString('userEmail', newEmail);
-      await AppState.setEmail(newEmail);
-      if (await store.getBool('rememberMeUser') == true) {
-        await store.setString('savedUserEmail', newEmail);
-      }
+        if (res['success'] != true) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(res['error'] ??
+                    AppStrings.of(context).failedToUpdateProfile)),
+          );
+          return;
+        }
 
-      await store.setString('profileAddress', newAddress);
-      await store.setString('profileCity', newCity);
-      await store.setString('profileState', newState);
-      await store.setString('profileZip', newZip);
+        await store.setString('profileName', newName);
+        await store.setString('profilePhone', newPhone);
+        await store.setString('userEmail', newEmail);
+        await AppState.setEmail(newEmail);
+        if (await store.getBool('rememberMeUser') == true) {
+          await store.setString('savedUserEmail', newEmail);
+        }
+
+        await store.setString('profileAddress', newAddress);
+        await store.setString('profileCity', newCity);
+        await store.setString('profileState', newState);
+        await store.setString('profileZip', newZip);
+      }
 
       final repo = DataRepository();
       final profile = await repo.loadProfile();
@@ -211,11 +223,12 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
       await repo.saveProfile(profile);
 
-      if (newPassword.isNotEmpty) {
-        await store.setString('userPassword', newPassword);
+      if (_isAccountProfile) {
+        if (newPassword.isNotEmpty) {
+          await store.setString('userPassword', newPassword);
+        }
+        _currentEmail = newEmail;
       }
-
-      _currentEmail = newEmail;
 
       if (!mounted) return;
 
@@ -272,12 +285,15 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                TextFormField(
-                  controller: _emailCtrl,
-                  decoration:
-                      InputDecoration(labelText: AppStrings.of(context).email),
-                ),
-                const SizedBox(height: 12),
+                // Family profiles have no login, so no account email here.
+                if (_isAccountProfile) ...[
+                  TextFormField(
+                    controller: _emailCtrl,
+                    decoration: InputDecoration(
+                        labelText: AppStrings.of(context).email),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 TextFormField(
                   controller: _phoneCtrl,

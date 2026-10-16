@@ -50,6 +50,17 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   }
 
   Future<void> _delete(int index) async {
+    if (await _repo.isAccountProfile(_profiles[index])) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(AppStrings.of(context).cannotDeleteAccountHolderProfile),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     final name = _profiles[index].fullName;
 
     final ok = await showDialog<bool>(
