@@ -273,6 +273,10 @@ Return exactly this JSON structure:
 Rules:
 
 1. Combine information across all images of the same label or list.
+   When there is more than one photo of a prescription bottle, they are
+   different sides of the SAME bottle. Read every photo: the strength, form,
+   quantity, NDC, or pharmacy details may appear only on a later photo, and
+   they belong to that one medication. Never return a row for each photo.
 1a. label_format must be exactly one of: "single_bottle", "medication_list",
     "pill_pack", "supplement_label", or "otc_label".
 2. A single prescription bottle contains exactly ONE medication. Combine the
@@ -340,7 +344,10 @@ Rules:
             {
               type: "text",
               text:
-                "Extract every medication row plus any visible NDC, form, days supply, refills, prescribing doctor, pharmacy name, pharmacy phone number, and pharmacy address. The image may show a prescription bottle, a multi-medication pill-pack manifest, or a supplement / over-the-counter label. Classify item_type."
+                "Extract every medication row plus any visible NDC, form, days supply, refills, prescribing doctor, pharmacy name, pharmacy phone number, and pharmacy address. The image may show a prescription bottle, a multi-medication pill-pack manifest, or a supplement / over-the-counter label. Classify item_type." +
+                (imageInputs.length > 1
+                  ? ` There are ${imageInputs.length} photos. For a bottle they are different sides of the same bottle: combine them into one medication and take the strength from whichever photo shows it.`
+                  : ""),
             },
             ...imageInputs,
           ],
@@ -368,6 +375,14 @@ Rules:
       });
     }
     const parsed = normalizeMedicationList(raw);
+    // Diagnostics only: counts and yes/no, never names or label text.
+    console.log("parse_label result", JSON.stringify({
+      photos: imageInputs.length,
+      labelFormat: parsed.label_format,
+      rows: parsed.medications.length,
+      strengthFound: Boolean(parsed.dose),
+      formFound: Boolean(parsed.medications[0]?.form),
+    }));
 
     return reply(200, {
       version: "v8-drug-pharmacy-fields",
