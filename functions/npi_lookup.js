@@ -94,11 +94,29 @@ function isVaPharmacyName(value) {
   ) && /\b(pharmacy|pharm)\b/.test(name);
 }
 
+// Store-name searches such as "Wal-Mart*" also return vision centers and other
+// non-pharmacy locations, so local searches keep only pharmacy taxonomies.
+// Mail order (3336M0002X) is left out here and searched separately.
+const LOCAL_PHARMACY_TAXONOMY_CODES = [
+  "333600000X",
+  "3336C0002X",
+  "3336C0003X",
+  "3336C0004X",
+  "3336H0001X",
+  "3336I0012X",
+  "3336L0003X",
+  "3336M0003X",
+  "3336N0007X",
+  "3336S0011X",
+];
+
 async function searchPharmacy({ name, city, state, postalCode, phone }) {
   const zip = String(postalCode || "").match(/^\d{5}/)?.[0] || "";
   const nameVariants = [name];
   const normalizedName = normalizeText(name);
-  if (normalizedName.includes("walmart")) nameVariants.push("Wal-Mart*");
+  // Walmart pharmacies are registered as "WALMART INC."; "WAL-MART STORES"
+  // entries are usually vision centers, which the taxonomy filter drops.
+  if (normalizedName.includes("walmart")) nameVariants.push("Walmart*", "Wal-Mart*");
   if (normalizedName.includes("walgreens")) nameVariants.push("Walgreen*");
   if (normalizedName.includes("cvs")) nameVariants.push("CVS*");
 
@@ -109,6 +127,7 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
         entityType: "pharmacy",
         name: searchName,
         postalCode: `${prefix}*`,
+        taxonomyCodes: LOCAL_PHARMACY_TAXONOMY_CODES,
         excludedTaxonomyCodes: ["3336M0002X"],
       })),
     ));
@@ -147,7 +166,10 @@ async function searchPharmacy({ name, city, state, postalCode, phone }) {
               taxonomyDescription: "Department of Veterans Affairs (VA) Pharmacy",
               taxonomyCodes: ["332100000X"],
             }
-          : { excludedTaxonomyCodes: ["3336M0002X"] }),
+          : {
+              taxonomyCodes: LOCAL_PHARMACY_TAXONOMY_CODES,
+              excludedTaxonomyCodes: ["3336M0002X"],
+            }),
       }),
     ))).flat())
       .filter((candidate) => matchesLocation(candidate, scope));
