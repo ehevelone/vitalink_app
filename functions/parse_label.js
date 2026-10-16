@@ -20,6 +20,15 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+// Prefer the separate first/last fields so the app never has to guess the
+// order; fall back to the single printed name.
+function prescriberDisplayName(parsed) {
+  const first = clean(parsed?.prescribing_doctor_first);
+  const last = clean(parsed?.prescribing_doctor_last);
+  if (first && last) return `${last}, ${first}`;
+  return clean(parsed?.prescribing_doctor);
+}
+
 function mergeSingleBottleRows(medications) {
   if (medications.length <= 1) return medications;
 
@@ -109,7 +118,7 @@ function normalizeMedicationList(parsed) {
     dose: first.dose,
     frequency: first.frequency,
     quantity: first.quantity,
-    prescribing_doctor: clean(parsed?.prescribing_doctor),
+    prescribing_doctor: prescriberDisplayName(parsed),
     pharmacy: clean(parsed?.pharmacy),
     pharmacy_phone: clean(parsed?.pharmacy_phone),
     pharmacy_address: clean(parsed?.pharmacy_address),
@@ -189,6 +198,8 @@ exports.handler = async (event) => {
         type: "image_url",
         image_url: {
           url: `data:image/png;base64,${base64}`,
+          // Small curved label print needs the full-resolution image.
+          detail: "high",
         },
       }));
     } else if (body.imageBase64) {
@@ -196,6 +207,7 @@ exports.handler = async (event) => {
         type: "image_url",
         image_url: {
           url: `data:image/png;base64,${body.imageBase64}`,
+          detail: "high",
         },
       }];
     } else if (body.imageUrl) {
@@ -244,6 +256,8 @@ Return exactly this JSON structure:
   "dose": "",
   "frequency": "",
   "prescribing_doctor": "",
+  "prescribing_doctor_first": "",
+  "prescribing_doctor_last": "",
   "pharmacy": "",
   "pharmacy_phone": "",
   "pharmacy_address": "",
@@ -285,6 +299,11 @@ Rules:
     pharmacy location printed on the label. Never use or infer the patient's
     address. Return an empty string for every part that is not clearly visible.
 11. Remove credentials like MD, DO, NP from doctor name.
+11a. Also return the prescriber's first name in prescribing_doctor_first and
+    last name in prescribing_doctor_last. Pharmacy labels usually print the
+    prescriber as "LAST, FIRST"; use the comma to tell which part is which.
+    Copy the letters exactly as printed. If any letter is unclear or you cannot
+    tell which part is the first name, leave both of these fields empty.
 12. item_type must be exactly one of: "prescription", "supplement", "otc".
     Never leave it empty and never answer "unknown"; the app does not ask the
     user, so always choose the best match from the evidence below.
@@ -324,6 +343,8 @@ Rules:
         },
       ],
       response_format: { type: "json_object" },
+      // Same label, same answer: no creative variation between scans.
+      temperature: 0,
       max_tokens: 1800,
     });
 

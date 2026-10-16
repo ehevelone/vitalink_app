@@ -35,6 +35,7 @@ class _VitalinkCameraCaptureScreenState
   static const Color _vitalinkBlue = Color(0xFF79CAE3);
   static const int _maxSavedImageSide = 2048;
   static const int _jpegQuality = 88;
+  static const int _maxSavedImageBytes = 700 * 1024;
 
   CameraController? _controller;
   List<CameraDescription> _cameras = [];
@@ -74,7 +75,9 @@ class _VitalinkCameraCaptureScreenState
 
       final controller = CameraController(
         backCamera,
-        ResolutionPreset.medium,
+        // 1080p keeps small curved label print readable; phones that cannot
+        // capture it fall back to their closest supported resolution.
+        ResolutionPreset.veryHigh,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -133,14 +136,21 @@ class _VitalinkCameraCaptureScreenState
 
       final longestSide =
           image.width > image.height ? image.width : image.height;
-      if (longestSide <= _maxSavedImageSide) return path;
+      // Re-encode large files too, so four 1080p photos stay well under the
+      // label scanner's upload limit.
+      if (longestSide <= _maxSavedImageSide &&
+          bytes.length <= _maxSavedImageBytes) {
+        return path;
+      }
 
-      final resized = image_lib.copyResize(
-        image,
-        width: image.width >= image.height ? _maxSavedImageSide : null,
-        height: image.height > image.width ? _maxSavedImageSide : null,
-        interpolation: image_lib.Interpolation.average,
-      );
+      final resized = longestSide <= _maxSavedImageSide
+          ? image
+          : image_lib.copyResize(
+              image,
+              width: image.width >= image.height ? _maxSavedImageSide : null,
+              height: image.height > image.width ? _maxSavedImageSide : null,
+              interpolation: image_lib.Interpolation.average,
+            );
 
       final optimized = image_lib.encodeJpg(resized, quality: _jpegQuality);
       await source.writeAsBytes(optimized, flush: true);
