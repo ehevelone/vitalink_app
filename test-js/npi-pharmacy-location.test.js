@@ -358,3 +358,33 @@ test('a ZIP from the bottle is searched alone, with no radius or state widening'
   assert.ok(scopes.every((scope) => scope.postalCode === '68105'));
   assert.equal(result.candidates[0].npi, '7777777777');
 });
+
+test('bottle ZIP plus phone auto-detects a store registered under a different name', async () => {
+  const handler = lookupWith(async (scope) => (!scope.name && scope.postalCode === '60656')
+    ? [
+        candidate('8888888888', 'Chicago', 'IL', '60656', '7737753777'),
+        candidate('9999999999', 'Chicago', 'IL', '60656', '7735550000'),
+      ]
+    : []);
+  const result = await run(handler, {
+    name: 'Jewel-Osco Pharmacy #3123', state: 'IL', postalCode: '60656',
+    phone: '773-775-3777', exactZip: true,
+  });
+  assert.equal(result.verificationStatus, 'verified');
+  assert.equal(result.npi, '8888888888');
+});
+
+test('label name noise is loosened only after the exact name finds nothing', async () => {
+  const names = [];
+  const handler = lookupWith(async (scope) => {
+    names.push(scope.name);
+    return scope.name === 'meijer*'
+      ? [candidate('1212121212', 'Grand Rapids', 'MI', '49503')]
+      : [];
+  });
+  const result = await run(handler, {
+    name: 'MEIJER PHARMACY #237', state: 'MI', postalCode: '49503', exactZip: true,
+  });
+  assert.ok(names.indexOf('MEIJER PHARMACY #237') < names.indexOf('meijer*'));
+  assert.equal(result.candidates[0].npi, '1212121212');
+});

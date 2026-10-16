@@ -110,12 +110,44 @@ const LOCAL_PHARMACY_TAXONOMY_CODES = [
   "3336S0011X",
 ];
 
+// Words that pharmacy labels add but NPPES registrations often lack, e.g.
+// "MEIJER PHARMACY #237" is registered as "MEIJER STORES LIMITED PARTNERSHIP".
+const STORE_NAME_NOISE = /\b(pharmacy|pharmacies|pharm|rx|drug|drugs|drugstore|store|stores|inc|llc|co|corp|corporation|company|the|of)\b/g;
+
+// Looser "starts with" spellings of the label name, tried only when the exact
+// name finds nothing: "Winn-Dixie*", "Winn Dixie*", "WinnDixie*", "Fry's*".
+function looseStoreNameVariants(name) {
+  const withoutNumbers = String(name || "").replace(/#\s*\d+/g, " ");
+  const words = normalizeText(withoutNumbers)
+    .replace(/\b\d+\b/g, " ")
+    .replace(STORE_NAME_NOISE, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length || words.join("").length < 3) return [];
+  const apostropheWords = String(withoutNumbers)
+    .toLowerCase()
+    .replace(/[^a-z0-9' ]+/g, " ")
+    .replace(STORE_NAME_NOISE, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return [
+    `${words.join(" ")}*`,
+    `${words.join("-")}*`,
+    `${words.join("")}*`,
+    `${apostropheWords.join(" ")}*`,
+  ].filter((value, index, values) =>
+    value.replace(/[^a-z0-9]/g, "").length >= 3 && values.indexOf(value) === index);
+}
+
 async function searchPharmacy({ name, city, state, postalCode, phone, exactZip = false }) {
   const zip = String(postalCode || "").match(/^\d{5}/)?.[0] || "";
   // exactZip: the ZIP came from the pharmacy's own address on the bottle, so
   // search only that ZIP. Otherwise it is the client's home ZIP and gets a
   // 15-mile radius.
   const onlyThisZip = exactZip && Boolean(zip);
+  const vaPharmacy = isVaPharmacyName(name);
   const nameVariants = [name];
   const normalizedName = normalizeText(name);
   // Walmart pharmacies are registered as "WALMART INC."; "WAL-MART STORES"
@@ -123,8 +155,66 @@ async function searchPharmacy({ name, city, state, postalCode, phone, exactZip =
   if (normalizedName.includes("walmart")) nameVariants.push("Walmart*", "Wal-Mart*");
   if (normalizedName.includes("walgreens")) nameVariants.push("Walgreen*");
   if (normalizedName.includes("cvs")) nameVariants.push("CVS*");
+  // NPPES matches punctuation literally, so "HyVee" never finds "HY-VEE".
+  const compactName = normalizedName.replace(/[^a-z0-9]/g, "");
+  if (compactName.includes("hyvee")) nameVariants.push("Hy-Vee*", "Hy Vee*");
+  // Sam's Club pharmacies are registered as "SAMS WEST INC".
+  if (compactName.includes("samsclub") || compactName.startsWith("sams")) {
+    nameVariants.push("Sams*", "Sam's*");
+  }
 
-  if (zip && !onlyThisZip && !isVaPharmacyName(name)) {
+  // 1. Auto-detect: with the bottle's ZIP and phone, find the pharmacy in that
+  // ZIP whose registered phone matches, whatever name it is registered under.
+  // Only the matching store is ever returned.
+  if (onlyThisZip && !vaPharmacy && normalizePhone(phone).length === 10) {
+    const inZip = uniqueCandidates(await searchNpi({
+      entityType: "pharmacy",
+      name: "",
+      postalCode: zip,
+      taxonomyDescription: "Pharmacy",
+      taxonomyCodes: LOCAL_PHARMACY_TAXONOMY_CODES,
+      excludedTaxonomyCodes: ["3336M0002X"],
+    }));
+    const matchingPhone = candidatesMatchingPhone(inZip, phone);
+    if (matchingPhone.length) return { candidates: matchingPhone, phoneMatched: true };
+  }
+
+  // 2. The label name (plus known chain spellings).
+  const first = await searchPharmacyByName({
+    name, nameVariants, city, state, zip, phone, onlyThisZip, vaPharmacy,
+  });
+  if (first.candidates.length || vaPharmacy) return first;
+
+  // 3. Loosen the name: drop "Pharmacy", store numbers, and punctuation.
+  const looseVariants = looseStoreNameVariants(name)
+    .filter((variant) => !nameVariants.includes(variant));
+  if (looseVariants.length) {
+    const loose = await searchPharmacyByName({
+      name, nameVariants: looseVariants, city, state, zip, phone, onlyThisZip, vaPharmacy,
+    });
+    if (loose.candidates.length) return loose;
+  }
+
+  // 4. Nothing in the bottle's ZIP: look nearby so the client can choose.
+  if (onlyThisZip) {
+    return searchPharmacyByName({
+      name,
+      nameVariants: [...nameVariants, ...looseVariants],
+      city,
+      state,
+      zip,
+      phone,
+      onlyThisZip: false,
+      vaPharmacy,
+    });
+  }
+  return first;
+}
+
+async function searchPharmacyByName({
+  name, nameVariants, city, state, zip, phone, onlyThisZip, vaPharmacy,
+}) {
+  if (zip && !onlyThisZip && !vaPharmacy) {
     const prefixes = nearbyZipPrefixes(zip, 15);
     const nearbySets = await Promise.all(prefixes.flatMap((prefix) =>
       nameVariants.map((searchName) => searchNpi({
@@ -160,7 +250,6 @@ async function searchPharmacy({ name, city, state, postalCode, phone, exactZip =
 
   let nearby = [];
   for (const scope of scopes) {
-    const vaPharmacy = isVaPharmacyName(name);
     const searches = vaPharmacy ? [""] : nameVariants;
     const results = uniqueCandidates((await Promise.all(searches.map(
       (searchName) => searchNpi({
