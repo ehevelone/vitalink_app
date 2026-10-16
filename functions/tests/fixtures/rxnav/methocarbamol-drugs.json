@@ -1,0 +1,38 @@
+{
+  "drugGroup": {
+    "name": null,
+    "conceptGroup": [
+      {
+        "tty": "SBD",
+        "conceptProperties": [
+          {
+            "rxcui": "1010654",
+            "name": "methocarbamol 750 MG Oral Tablet [Robaxin]",
+            "synonym": "Robaxin 750 MG Oral Tablet",
+            "tty": "SBD",
+            "suppress": "N"
+          }
+        ]
+      },
+      {
+        "tty": "SCD",
+        "conceptProperties": [
+          {
+            "rxcui": "197943",
+            "name": "methocarbamol 500 MG Oral Tablet",
+            "synonym": "",
+            "tty": "SCD",
+            "suppress": "N"
+          },
+          {
+            "rxcui": "197944",
+            "name": "methocarbamol 750 MG Oral Tablet",
+            "synonym": "",
+            "tty": "SCD",
+            "suppress": "N"
+          }
+        ]
+      }
+    ]
+  }
+}

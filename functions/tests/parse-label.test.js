@@ -17,12 +17,48 @@ test("medication manifests preserve every row, including repeated medications", 
   assert.deepEqual(result.medications[1], {
     name: "Levetiracetam",
     dose: "250 mg",
+    form: "",
+    ndc: "",
     frequency: "",
     quantity: "26",
+    days_supply: "",
+    refills: "",
+    pharmacy_name: "",
+    pharmacy_phone: "",
   });
   assert.equal(result.medications[2].quantity, "30");
   assert.equal(result.name, "Aspirin Low Dose");
   assert.equal(result.pharmacy, "Schuyler Drugstore");
+});
+
+test("drug and pharmacy location fields are preserved without invention", () => {
+  const result = normalizeMedicationList({
+    medications: [{
+      name: "Methocarbamol",
+      dose: "500 mg",
+      form: "tablet",
+      ndc: "00000-0000-00",
+      days_supply: "30",
+      refills: "2",
+      pharmacy_name: "Example Pharmacy",
+      pharmacy_phone: "402-555-0100",
+    }],
+    pharmacy: "Example Pharmacy",
+    pharmacy_phone: "402-555-0100",
+    pharmacy_address: "123 Main St",
+    pharmacy_city: "Schuyler",
+    pharmacy_state: "NE",
+    pharmacy_zip: "68661",
+  });
+
+  assert.equal(result.medications[0].form, "tablet");
+  assert.equal(result.medications[0].ndc, "00000-0000-00");
+  assert.equal(result.medications[0].days_supply, "30");
+  assert.equal(result.medications[0].refills, "2");
+  assert.equal(result.pharmacy_address, "123 Main St");
+  assert.equal(result.pharmacy_city, "Schuyler");
+  assert.equal(result.pharmacy_state, "NE");
+  assert.equal(result.pharmacy_zip, "68661");
 });
 
 test("single-bottle legacy output remains compatible", () => {

@@ -1,0 +1,17 @@
+{
+  "ndcStatus": {
+    "ndc11": "00000000002",
+    "status": "OBSOLETE",
+    "rxcui": "111111",
+    "conceptName": "obsolete methocarbamol product",
+    "conceptStatus": "Remapped",
+    "ndcHistory": [
+      {
+        "originalRxcui": "111111",
+        "activeRxcui": "197943",
+        "startDate": "201001",
+        "endDate": "202001"
+      }
+    ]
+  }
+}

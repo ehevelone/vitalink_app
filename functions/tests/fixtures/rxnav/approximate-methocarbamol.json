@@ -1,0 +1,23 @@
+{
+  "approximateGroup": {
+    "inputTerm": null,
+    "candidate": [
+      {
+        "rxcui": "197943",
+        "rxaui": "123",
+        "score": "100",
+        "rank": "1",
+        "name": "methocarbamol 500 MG Oral Tablet",
+        "source": "RXNORM"
+      },
+      {
+        "rxcui": "197943",
+        "rxaui": "456",
+        "score": "99",
+        "rank": "2",
+        "name": "methocarbamol 500 MG Oral Tablet",
+        "source": "MMSL"
+      }
+    ]
+  }
+}

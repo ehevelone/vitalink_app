@@ -85,6 +85,9 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final AppLinks _appLinks = AppLinks();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+String? _lastHandledUri;
+DateTime? _lastHandledUriAt;
+final Set<String> _streamHandledUris = <String>{};
 
 const AndroidNotificationChannel vitalinkNotificationChannel =
     AndroidNotificationChannel(
@@ -94,9 +97,22 @@ const AndroidNotificationChannel vitalinkNotificationChannel =
   importance: Importance.high,
 );
 
-Future<void> _setupNotificationDisplay() async {
+@visibleForTesting
+InitializationSettings notificationInitializationSettings() {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidSettings);
+  const darwinSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  return const InitializationSettings(
+    android: androidSettings,
+    iOS: darwinSettings,
+  );
+}
+
+Future<void> _setupNotificationDisplay() async {
+  final initSettings = notificationInitializationSettings();
 
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
@@ -106,10 +122,75 @@ Future<void> _setupNotificationDisplay() async {
       ?.createNotificationChannel(vitalinkNotificationChannel);
 
   await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-    alert: true,
+    alert: false,
     badge: true,
     sound: true,
   );
+}
+
+@visibleForTesting
+void navigateWhenReady(String route, {Object? arguments}) {
+  final navigator = navigatorKey.currentState;
+  if (navigator != null) {
+    navigator.pushNamed(route, arguments: arguments);
+    return;
+  }
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    navigatorKey.currentState?.pushNamed(route, arguments: arguments);
+  });
+  WidgetsBinding.instance.scheduleFrame();
+}
+
+@visibleForTesting
+void resetIncomingUriDeduplication() {
+  _lastHandledUri = null;
+  _lastHandledUriAt = null;
+  _streamHandledUris.clear();
+}
+
+@visibleForTesting
+bool handleIncomingUri(
+  Uri uri, {
+  DateTime? handledAt,
+  bool isInitialLinkFallback = false,
+  void Function(String route, {Object? arguments})? navigate,
+}) {
+  final now = handledAt ?? DateTime.now();
+  final uriKey = uri.toString();
+  if (isInitialLinkFallback && _streamHandledUris.contains(uriKey)) {
+    return false;
+  }
+  if (_lastHandledUri == uriKey &&
+      _lastHandledUriAt != null &&
+      now.difference(_lastHandledUriAt!).abs() < const Duration(seconds: 3)) {
+    return false;
+  }
+  if (!isInitialLinkFallback) {
+    _streamHandledUris.add(uriKey);
+  }
+  _lastHandledUri = uriKey;
+  _lastHandledUriAt = now;
+
+  final navigateTo = navigate ?? navigateWhenReady;
+  final rawCode = uri.queryParameters['code']?.trim();
+  final onboardingCode =
+      (uri.queryParameters['onboard'] ?? uri.queryParameters['onboarding'])
+          ?.trim()
+          .toUpperCase();
+
+  if (uri.host == 'share' && rawCode != null && rawCode.isNotEmpty) {
+    VitaLinkDeepLink.shareCode = rawCode;
+    navigateTo('/profile_accept');
+  } else if (rawCode != null && rawCode.isNotEmpty) {
+    VitaLinkDeepLink.code = rawCode.toUpperCase();
+  }
+
+  if (onboardingCode != null && onboardingCode.isNotEmpty) {
+    VitaLinkDeepLink.onboardingCode = onboardingCode;
+    navigateTo('/terms_user', arguments: {'onboard': onboardingCode});
+  }
+  return true;
 }
 
 // 🔥 POPUP
@@ -260,115 +341,106 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await runZonedGuarded(() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    try {
+      await LanguageService.load().timeout(const Duration(seconds: 1));
+    } catch (_) {}
 
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    try {
+      _appLinks.uriLinkStream.listen(handleIncomingUri);
+    } catch (error) {
+      debugPrint('DEEP LINK LISTENER INITIALIZATION FAILED: $error');
+    }
 
-    await Firebase.initializeApp();
-    await _setupNotificationDisplay();
-    await LanguageService.load();
+    // Paint the app before optional platform services initialize. A plugin
+    // failure must never leave a fresh install on the native white screen.
+    runApp(const VitaLinkApp());
 
-    // 🔥 DEEP LINK HANDLER (FIXED LOCATION)
-    _appLinks.uriLinkStream.listen((uri) {
-      final code = uri.queryParameters['code']?.toUpperCase();
+    try {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } catch (error) {
+      debugPrint('SYSTEM UI INITIALIZATION FAILED: $error');
+    }
 
-      if (uri.host != 'share' && code != null && code.isNotEmpty) {
-        VitaLinkDeepLink.code = code;
+    var firebaseReady = false;
+    try {
+      await Firebase.initializeApp();
+      firebaseReady = true;
+    } catch (error) {
+      debugPrint('FIREBASE INITIALIZATION FAILED: $error');
+    }
+
+    if (firebaseReady) {
+      try {
+        await _setupNotificationDisplay();
+      } catch (error) {
+        debugPrint('NOTIFICATION DISPLAY INITIALIZATION FAILED: $error');
       }
-    });
-
-    // 🔥 HANDLE TAP WHEN APP IS CLOSED
-    Future<void> handleProfileShareLink(Uri uri) async {
-      if (uri.host != 'share') return;
-
-      final shareCode = uri.queryParameters['code'];
-      if (shareCode == null || shareCode.isEmpty) return;
-
-      VitaLinkDeepLink.shareCode = shareCode;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed('/profile_accept');
-      });
     }
 
-    // Agent-prepared registration (vitalink://activate?onboard=CODE). Goes
-    // through the user terms screen, which forwards the code to registration.
-    Future<void> handleAssistedOnboardingLink(Uri uri) async {
-      final onboardingCode =
-          (uri.queryParameters['onboard'] ?? uri.queryParameters['onboarding'])
-              ?.trim()
-              .toUpperCase();
-      if (onboardingCode == null || onboardingCode.isEmpty) return;
-
-      VitaLinkDeepLink.onboardingCode = onboardingCode;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        navigatorKey.currentState?.pushNamed(
-          '/terms_user',
-          arguments: {'onboard': onboardingCode},
-        );
-      });
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        handleIncomingUri(initialUri, isInitialLinkFallback: true);
+      }
+    } catch (error) {
+      debugPrint('INITIAL LINK LOOKUP FAILED: $error');
     }
 
-    final initialShareUri = await _appLinks.getInitialLink();
-    if (initialShareUri != null) {
-      await handleProfileShareLink(initialShareUri);
-      await handleAssistedOnboardingLink(initialShareUri);
+    if (!firebaseReady) return;
+
+    RemoteMessage? initialMessage;
+    try {
+      initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    } catch (error) {
+      debugPrint('INITIAL NOTIFICATION LOOKUP FAILED: $error');
     }
-
-    _appLinks.uriLinkStream.listen(handleProfileShareLink);
-    _appLinks.uriLinkStream.listen(handleAssistedOnboardingLink);
-
-    RemoteMessage? initialMessage =
-        await FirebaseMessaging.instance.getInitialMessage();
 
     if (initialMessage != null) {
-      _captureProfileShareInvite(initialMessage);
-      final route = initialMessage.data["route"];
-
-      if (_isKnownNotificationRoute(route)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.pushNamed(
-            route,
-            arguments: initialMessage.data,
-          );
-        });
-      }
-    }
-
-    FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler,
-    );
-
-    FirebaseMessaging.onMessage.listen((message) async {
-      if (message.data['type'] == 'device_revoked') {
-        if (!await _revocationTargetsCurrentDevice(message)) return;
-        await DeviceSecurityService.disableCurrentDevice(
-          reason: message.data['reason']?.toString(),
-        );
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
-          '/device_disabled',
-          (route) => false,
-        );
-        return;
-      }
-      showGlobalNotificationPopup(message);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      _handleNotificationNavigation(message);
+      final message = initialMessage;
       _captureProfileShareInvite(message);
-
       final route = message.data["route"];
 
       if (_isKnownNotificationRoute(route)) {
-        navigatorKey.currentState?.pushNamed(route, arguments: message.data);
+        navigateWhenReady(route, arguments: message.data);
       }
-    });
+    }
 
-    runApp(const VitaLinkApp());
+    try {
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+
+      FirebaseMessaging.onMessage.listen((message) async {
+        if (message.data['type'] == 'device_revoked') {
+          if (!await _revocationTargetsCurrentDevice(message)) return;
+          await DeviceSecurityService.disableCurrentDevice(
+            reason: message.data['reason']?.toString(),
+          );
+          navigatorKey.currentState?.pushNamedAndRemoveUntil(
+            '/device_disabled',
+            (route) => false,
+          );
+          return;
+        }
+        showGlobalNotificationPopup(message);
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        _handleNotificationNavigation(message);
+        _captureProfileShareInvite(message);
+
+        final route = message.data["route"];
+
+        if (_isKnownNotificationRoute(route)) {
+          navigateWhenReady(route, arguments: message.data);
+        }
+      });
+    } catch (error) {
+      debugPrint('FIREBASE MESSAGE LISTENER INITIALIZATION FAILED: $error');
+    }
 
     // Token lookup and registration can be slow on poor connections; never
     // hold the first screen for them.

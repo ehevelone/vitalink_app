@@ -1,0 +1,26 @@
+{
+  "drugGroup": {
+    "name": null,
+    "conceptGroup": [
+      {
+        "tty": "SBD",
+        "conceptProperties": [
+          { "rxcui": "200031", "name": "carvedilol 6.25 MG Oral Tablet [Coreg]", "synonym": "Coreg 6.25 MG Oral Tablet", "tty": "SBD", "suppress": "N" },
+          { "rxcui": "311354", "name": "lisinopril 10 MG Oral Tablet [Zestril]", "synonym": "Zestril 10 MG Oral Tablet", "tty": "SBD", "suppress": "N" },
+          { "rxcui": "284592", "name": "levothyroxine 0.1 MG / liothyronine 0.025 MG Oral Tablet [Thyrolar]", "synonym": "Thyrolar", "tty": "SBD", "suppress": "N" },
+          { "rxcui": "2760701", "name": "metformin 500 MG / sitagliptin 50 MG Oral Tablet [Zituvimet]", "synonym": "Zituvimet", "tty": "SBD", "suppress": "N" }
+        ]
+      },
+      {
+        "tty": "SCD",
+        "conceptProperties": [
+          { "rxcui": "200032", "name": "carvedilol 25 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "966220", "name": "levothyroxine 0.025 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "861007", "name": "metformin hydrochloride 500 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "860975", "name": "metformin hydrochloride 500 MG Extended Release Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "314076", "name": "lisinopril 10 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" }
+        ]
+      }
+    ]
+  }
+}

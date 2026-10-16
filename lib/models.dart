@@ -9,6 +9,14 @@ class Medication {
   String frequency;
   String quantity;
   String prescriber;
+  String rxcui;
+  String ndc;
+  String ndcSource;
+  String drugForm;
+  String drugType;
+  int? daysSupply;
+  String refills;
+  String matchStatus;
   String? pharmacyFulfillmentType;
   String? pharmacyNpi;
   String pharmacyVerificationStatus;
@@ -30,6 +38,14 @@ class Medication {
     this.frequency = '',
     this.quantity = '',
     this.prescriber = '',
+    this.rxcui = '',
+    this.ndc = '',
+    this.ndcSource = '',
+    this.drugForm = '',
+    this.drugType = '',
+    this.daysSupply,
+    this.refills = '',
+    this.matchStatus = '',
     this.pharmacyFulfillmentType,
     this.pharmacyNpi,
     this.pharmacyVerificationStatus = 'unverified',
@@ -48,6 +64,65 @@ class Medication {
         updatedAt = updatedAt ?? DateTime.now();
 
   bool get isSupplementOrOtc => itemType == 'supplement' || itemType == 'otc';
+
+  Medication copyWith({
+    String? name,
+    String? dose,
+    String? frequency,
+    String? quantity,
+    String? prescriber,
+    String? rxcui,
+    String? ndc,
+    String? ndcSource,
+    String? drugForm,
+    String? drugType,
+    int? daysSupply,
+    bool clearDaysSupply = false,
+    String? refills,
+    String? matchStatus,
+    String? pharmacyFulfillmentType,
+    String? pharmacyNpi,
+    String? pharmacyVerificationStatus,
+    List<Map<String, dynamic>>? pharmacyNpiCandidates,
+    DateTime? pharmacyVerifiedAt,
+    String? pharmacyVerifiedBy,
+    String? source,
+    String? itemType,
+    String? servingSize,
+    List<String>? activeIngredients,
+    List<String>? otherIngredients,
+    DateTime? updatedAt,
+  }) =>
+      Medication(
+        name: name ?? this.name,
+        dose: dose ?? this.dose,
+        frequency: frequency ?? this.frequency,
+        quantity: quantity ?? this.quantity,
+        prescriber: prescriber ?? this.prescriber,
+        rxcui: rxcui ?? this.rxcui,
+        ndc: ndc ?? this.ndc,
+        ndcSource: ndcSource ?? this.ndcSource,
+        drugForm: drugForm ?? this.drugForm,
+        drugType: drugType ?? this.drugType,
+        daysSupply: clearDaysSupply ? null : daysSupply ?? this.daysSupply,
+        refills: refills ?? this.refills,
+        matchStatus: matchStatus ?? this.matchStatus,
+        pharmacyFulfillmentType:
+            pharmacyFulfillmentType ?? this.pharmacyFulfillmentType,
+        pharmacyNpi: pharmacyNpi ?? this.pharmacyNpi,
+        pharmacyVerificationStatus:
+            pharmacyVerificationStatus ?? this.pharmacyVerificationStatus,
+        pharmacyNpiCandidates:
+            pharmacyNpiCandidates ?? List.of(this.pharmacyNpiCandidates),
+        pharmacyVerifiedAt: pharmacyVerifiedAt ?? this.pharmacyVerifiedAt,
+        pharmacyVerifiedBy: pharmacyVerifiedBy ?? this.pharmacyVerifiedBy,
+        source: source ?? this.source,
+        itemType: itemType ?? this.itemType,
+        servingSize: servingSize ?? this.servingSize,
+        activeIngredients: activeIngredients ?? List.of(this.activeIngredients),
+        otherIngredients: otherIngredients ?? List.of(this.otherIngredients),
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 
   static List<String> _stringList(dynamic value) {
     if (value is List) {
@@ -72,6 +147,14 @@ class Medication {
         'frequency': frequency,
         'quantity': quantity,
         'prescriber': prescriber,
+        'rxcui': rxcui,
+        'ndc': ndc,
+        'ndcSource': ndcSource,
+        'drugForm': drugForm,
+        'drugType': drugType,
+        'daysSupply': daysSupply,
+        'refills': refills,
+        'matchStatus': matchStatus,
         'pharmacyFulfillmentType': pharmacyFulfillmentType,
         'pharmacyNpi': pharmacyNpi,
         'pharmacyVerificationStatus': pharmacyVerificationStatus,
@@ -92,6 +175,16 @@ class Medication {
         frequency: json['frequency'] ?? '',
         quantity: json['quantity'] ?? '',
         prescriber: json['prescriber'] ?? '',
+        rxcui: json['rxcui']?.toString() ?? '',
+        ndc: json['ndc']?.toString() ?? '',
+        ndcSource: json['ndcSource']?.toString() ?? '',
+        drugForm: json['drugForm']?.toString() ?? '',
+        drugType: json['drugType']?.toString() ?? '',
+        daysSupply: json['daysSupply'] is int
+            ? json['daysSupply'] as int
+            : int.tryParse(json['daysSupply']?.toString() ?? ''),
+        refills: json['refills']?.toString() ?? '',
+        matchStatus: json['matchStatus']?.toString() ?? '',
         pharmacyFulfillmentType: json['pharmacyFulfillmentType'],
         pharmacyNpi: json['pharmacyNpi'],
         pharmacyVerificationStatus:

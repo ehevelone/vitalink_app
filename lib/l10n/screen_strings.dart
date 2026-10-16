@@ -318,6 +318,42 @@ extension ScreenStrings on AppStrings {
       : 'Confirm every medication against the printed list. VitaLink will not guess missing directions.';
   String medicationNumber(int number) =>
       _isEs ? 'Medicamento $number' : 'Medication $number';
+  String medicineProgress(int current, int total) => _isEs
+      ? 'Medicamento $current de $total'
+      : 'Medicine $current of $total';
+  String get isThisYourMedicine =>
+      _isEs ? '¿Este es su medicamento?' : 'Is this your medicine?';
+  String get medicineYes => _isEs ? 'Sí' : 'Yes';
+  String get medicineNo => _isEs ? 'No' : 'No';
+  String get medicineNameUnclear => _isEs
+      ? 'No pudimos leer claramente el nombre del medicamento. Escriba el nombre que aparece en el frasco.'
+      : 'We couldn\'t read the medicine name clearly. Please type the name from your bottle.';
+  String get searchMedicineName =>
+      _isEs ? 'Nombre del medicamento' : 'Medicine name';
+  String get chooseStrength =>
+      _isEs ? 'Elija la concentración' : 'Choose the strength';
+  String get skipForNow => _isEs ? 'Omitir por ahora' : 'Skip for now';
+  String get checkingMedicine =>
+      _isEs ? 'Verificando el medicamento...' : 'Checking medicine...';
+  String get medicineCheckUnavailable => _isEs
+      ? 'No pudimos verificar este medicamento en este momento. Lo guardamos tal como se leyó; puede confirmarlo más tarde.'
+      : 'We couldn\'t check this medicine right now. We saved it as read; you can confirm it later.';
+  String get continueLabel => _isEs ? 'Continuar' : 'Continue';
+  String get noMedicineMatches => _isEs
+      ? 'No se encontraron coincidencias. Revise el nombre e inténtelo de nuevo.'
+      : 'No matches found. Check the name and try again.';
+  String get stopCheckingMedicine => _isEs
+      ? '¿Dejar de verificar este medicamento?'
+      : 'Stop checking this medicine?';
+  String get keepChecking => _isEs ? 'Seguir verificando' : 'Keep checking';
+  String get skipIt => _isEs ? 'Omitirlo' : 'Skip it';
+  String get searchAgain => _isEs ? 'Buscar de nuevo' : 'Search again';
+  String get noStrengthsFound => _isEs
+      ? 'No se encontraron concentraciones para este medicamento. Pruebe con otro nombre.'
+      : 'No strengths found for this medicine. Try another name.';
+  String get medicineListUnavailable => _isEs
+      ? 'No pudimos conectarnos con la lista de medicamentos.'
+      : 'We couldn\'t reach the medicine list.';
   String medicationListSaved(int added, int updated) => _isEs
       ? 'Lista de medicamentos guardada: $added agregados, $updated actualizados.'
       : 'Medication list saved: $added added, $updated updated.';

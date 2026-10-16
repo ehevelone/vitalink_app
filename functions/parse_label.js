@@ -32,16 +32,28 @@ function normalizeMedicationList(parsed) {
     .map((item) => ({
       name: clean(item?.name),
       dose: clean(item?.dose),
+      form: clean(item?.form),
+      ndc: clean(item?.ndc),
       frequency: clean(item?.frequency),
       quantity: clean(item?.quantity),
+      days_supply: clean(item?.days_supply),
+      refills: clean(item?.refills),
+      pharmacy_name: clean(item?.pharmacy_name),
+      pharmacy_phone: clean(item?.pharmacy_phone),
     }))
     .filter((item) => item.name);
 
   const first = medications[0] || {
     name: "",
     dose: "",
+    form: "",
+    ndc: "",
     frequency: "",
     quantity: "",
+    days_supply: "",
+    refills: "",
+    pharmacy_name: "",
+    pharmacy_phone: "",
   };
 
   const list = (value) =>
@@ -69,6 +81,10 @@ function normalizeMedicationList(parsed) {
     prescribing_doctor: clean(parsed?.prescribing_doctor),
     pharmacy: clean(parsed?.pharmacy),
     pharmacy_phone: clean(parsed?.pharmacy_phone),
+    pharmacy_address: clean(parsed?.pharmacy_address),
+    pharmacy_city: clean(parsed?.pharmacy_city),
+    pharmacy_state: clean(parsed?.pharmacy_state),
+    pharmacy_zip: clean(parsed?.pharmacy_zip),
     // Supplement and OTC labels (restored from the Aug 18 scanner; lost in
     // the Aug 25 overwrite). The app files these under Supplements & OTC.
     item_type: itemType,
@@ -182,8 +198,14 @@ Return exactly this JSON structure:
     {
       "name": "",
       "dose": "",
+      "form": "",
+      "ndc": "",
       "frequency": "",
-      "quantity": ""
+      "quantity": "",
+      "days_supply": "",
+      "refills": "",
+      "pharmacy_name": "",
+      "pharmacy_phone": ""
     }
   ],
   "name": "",
@@ -192,6 +214,10 @@ Return exactly this JSON structure:
   "prescribing_doctor": "",
   "pharmacy": "",
   "pharmacy_phone": "",
+  "pharmacy_address": "",
+  "pharmacy_city": "",
+  "pharmacy_state": "",
+  "pharmacy_zip": "",
   "item_type": "prescription",
   "serving_size": "",
   "active_ingredients": [],
@@ -212,6 +238,12 @@ Rules:
    medication row, or be empty when no medication is found.
 9. Pharmacy examples include VA, Walmart, CVS, Walgreens, Hy-Vee, and independent drugstores.
 10. pharmacy_phone must be a visible phone number.
+10a. For each medication row, form, ndc, days_supply, refills,
+    pharmacy_name, and pharmacy_phone must contain only text clearly visible
+    for that row. Return an empty string when it is missing or unclear.
+10b. pharmacy_address, pharmacy_city, pharmacy_state, and pharmacy_zip are the
+    pharmacy location printed on the label. Never use or infer the patient's
+    address. Return an empty string for every part that is not clearly visible.
 11. Remove credentials like MD, DO, NP from doctor name.
 12. item_type must be exactly one of: "prescription", "supplement", "otc".
     Never leave it empty and never answer "unknown"; the app does not ask the
@@ -245,7 +277,7 @@ Rules:
             {
               type: "text",
               text:
-                "Extract every medication row plus any visible prescribing doctor, pharmacy name, and pharmacy phone number. The image may show a prescription bottle, a multi-medication pill-pack manifest, or a supplement / over-the-counter label. Classify item_type."
+                "Extract every medication row plus any visible NDC, form, days supply, refills, prescribing doctor, pharmacy name, pharmacy phone number, and pharmacy address. The image may show a prescription bottle, a multi-medication pill-pack manifest, or a supplement / over-the-counter label. Classify item_type."
             },
             ...imageInputs,
           ],
@@ -273,7 +305,7 @@ Rules:
     const parsed = normalizeMedicationList(raw);
 
     return reply(200, {
-      version: "v7-medication-list-supplements",
+      version: "v8-drug-pharmacy-fields",
       data: parsed,
     });
   } catch (err) {

@@ -11,9 +11,44 @@ import '../services/data_repository.dart';
 import '../services/secure_store.dart';
 import '../services/npi_verification_service.dart';
 import '../services/api_service.dart';
+import '../services/drug_lookup_service.dart';
 import '../widgets/npi_verification_widgets.dart';
+import '../widgets/medication_drug_review_screen.dart';
 import '../widgets/working_overlay.dart';
 import 'vitalink_camera_capture_screen.dart';
+
+@visibleForTesting
+Medication medicationAfterIdentityEdit(
+  Medication medication,
+  String name,
+  String dose,
+) {
+  final changed = medication.matchStatus == 'confirmed' &&
+      (medication.name != name || medication.dose != dose);
+  return medication.copyWith(
+    name: name,
+    dose: dose,
+    rxcui: changed ? '' : medication.rxcui,
+    ndc: changed ? '' : medication.ndc,
+    ndcSource: changed ? '' : medication.ndcSource,
+    drugForm: changed ? '' : medication.drugForm,
+    drugType: changed ? '' : medication.drugType,
+    matchStatus: changed ? 'unmatched' : medication.matchStatus,
+  );
+}
+
+@visibleForTesting
+bool pharmacyTextChanged(String before, String after) =>
+    before.trim().toLowerCase() != after.trim().toLowerCase();
+
+@visibleForTesting
+void resetPharmacyVerification(Medication medication) {
+  medication.pharmacyNpi = null;
+  medication.pharmacyVerificationStatus = 'unverified';
+  medication.pharmacyNpiCandidates = [];
+  medication.pharmacyVerifiedAt = null;
+  medication.pharmacyVerifiedBy = null;
+}
 
 class MedsScreen extends StatefulWidget {
   const MedsScreen({super.key});
@@ -25,6 +60,7 @@ class MedsScreen extends StatefulWidget {
 class _MedsScreenState extends State<MedsScreen> {
   late final DataRepository _repo;
   late final NpiVerificationService _npiService;
+  late final DrugLookupApi _drugLookup;
   Profile? _p;
   bool _loading = true;
   bool _captureInProgress = false;
@@ -36,6 +72,7 @@ class _MedsScreenState extends State<MedsScreen> {
     super.initState();
     _repo = DataRepository(SecureStore());
     _npiService = NpiVerificationService();
+    _drugLookup = DrugLookupService();
     _load();
   }
 
@@ -192,6 +229,32 @@ class _MedsScreenState extends State<MedsScreen> {
   }
 
   String _joinLines(List<String> values) => values.join('\n');
+
+  int? _wholeNumber(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (!RegExp(r'^\d+$').hasMatch(text)) return null;
+    return int.tryParse(text);
+  }
+
+  Future<Medication?> _reviewPrescriptionDrug(
+    Medication medication,
+    List<String> imagePaths,
+    int current,
+    int total,
+  ) {
+    return Navigator.push<Medication>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MedicationDrugReviewScreen(
+          medication: medication,
+          lookup: _drugLookup,
+          imagePaths: imagePaths,
+          current: current,
+          total: total,
+        ),
+      ),
+    );
+  }
 
   String _supplementPreview(Medication m) {
     final parts = <String>[
@@ -739,12 +802,45 @@ class _MedsScreenState extends State<MedsScreen> {
         pharmacyType = null;
       }
 
-      final m = Medication(
+      final confirmedName =
+          existing?.name ?? prefill?['name']?.toString().trim() ?? '';
+      final confirmedDose =
+          existing?.dose ?? prefill?['dose']?.toString().trim() ?? '';
+      final previousMatchStatus = prefill?['match_status']?.toString() ??
+          existing?.matchStatus ??
+          '';
+      final identitySource = existing ??
+          Medication(
+            name: confirmedName,
+            dose: confirmedDose,
+            rxcui: prefill?['rxcui']?.toString() ?? '',
+            ndc: prefill?['ndc']?.toString() ?? '',
+            ndcSource: prefill?['ndc_source']?.toString() ?? '',
+            drugForm: prefill?['drug_form']?.toString() ?? '',
+            drugType: prefill?['drug_type']?.toString() ?? '',
+            matchStatus: previousMatchStatus,
+          );
+      final identitySafe = medicationAfterIdentityEdit(
+        identitySource,
+        nameCtrl.text.trim(),
+        doseCtrl.text.trim(),
+      );
+
+      final m = (existing ?? Medication()).copyWith(
         name: nameCtrl.text.trim(),
         dose: doseCtrl.text.trim(),
         frequency: freqCtrl.text.trim(),
         quantity: quantityCtrl.text.trim(),
         prescriber: pharmacyCtrl.text.trim(),
+        rxcui: identitySafe.rxcui,
+        ndc: identitySafe.ndc,
+        ndcSource: identitySafe.ndcSource,
+        drugForm: identitySafe.drugForm,
+        drugType: identitySafe.drugType,
+        daysSupply: _wholeNumber(prefill?['days_supply']) ??
+            existing?.daysSupply,
+        refills: prefill?['refills']?.toString() ?? existing?.refills ?? '',
+        matchStatus: identitySafe.matchStatus,
         pharmacyFulfillmentType: pharmacyType,
         source: existing?.source ?? (prefill != null ? 'Scanned' : 'Manual'),
         itemType: itemType,
@@ -1018,6 +1114,7 @@ class _MedsScreenState extends State<MedsScreen> {
                   final name = row['name']!.text.trim();
                   if (name.isEmpty) continue;
                   result.add({
+                    ...medications[index],
                     'name': name,
                     'dose': row['dose']!.text.trim(),
                     'frequency': row['frequency']!.text.trim(),
@@ -1048,6 +1145,13 @@ class _MedsScreenState extends State<MedsScreen> {
                 'dose': (item['dose'] ?? '').toString().trim(),
                 'frequency': (item['frequency'] ?? '').toString().trim(),
                 'quantity': (item['quantity'] ?? '').toString().trim(),
+                'form': (item['form'] ?? '').toString().trim(),
+                'ndc': (item['ndc'] ?? '').toString().trim(),
+                'days_supply': (item['days_supply'] ?? '').toString().trim(),
+                'refills': (item['refills'] ?? '').toString().trim(),
+                'item_type': _normalizeItemType(
+                  item['item_type'] ?? item['itemType'],
+                ),
               })
           .where((item) => item['name']!.isNotEmpty)
           .toList();
@@ -1194,9 +1298,9 @@ class _MedsScreenState extends State<MedsScreen> {
       final data = _normalizeParsed(parsed['data'] ?? parsed);
       final medicationList = _parsedMedicationList(data);
 
-      final scannedName =
+      var scannedName =
           _stripBrandMarks((data['name'] ?? "").toString().trim());
-      final scannedDose =
+      var scannedDose =
           _stripBrandMarks((data['dose'] ?? "").toString().trim());
       final scannedFreq = (data['frequency'] ?? "").toString().trim();
       final pharmacyDisplay = _buildPharmacyDisplay(data);
@@ -1231,16 +1335,49 @@ class _MedsScreenState extends State<MedsScreen> {
         final reviewed = await _reviewScannedMedicationList(resolved);
         if (!mounted || reviewed == null) return;
 
+        final reviewedMedications = <Medication>[];
+        for (var index = 0; index < reviewed.length; index++) {
+          final item = reviewed[index];
+          final scanned = Medication(
+            name: item['name']!,
+            dose: item['dose']!,
+            frequency: item['frequency']!,
+            quantity: item['quantity']!,
+            prescriber: pharmacyDisplay,
+            ndc: item['ndc'] ?? '',
+            ndcSource: (item['ndc'] ?? '').isEmpty ? '' : 'label',
+            drugForm: item['form'] ?? '',
+            daysSupply: _wholeNumber(item['days_supply']),
+            refills: item['refills'] ?? '',
+            source: 'Scanned medication list',
+            itemType: item['item_type'] ?? 'prescription',
+            updatedAt: DateTime.now(),
+          );
+          if (scanned.isSupplementOrOtc) {
+            reviewedMedications.add(scanned);
+            continue;
+          }
+          final confirmed = await _reviewPrescriptionDrug(
+            scanned,
+            imagePaths ?? const <String>[],
+            index + 1,
+            reviewed.length,
+          );
+          if (!mounted) return;
+          reviewedMedications.add(
+            confirmed ?? scanned.copyWith(matchStatus: 'unmatched'),
+          );
+        }
+
         var addedCount = 0;
         var updatedCount = 0;
+        final pharmacyVerificationIndexes = <int>[];
         final availableExistingIndexes = <int>{
           for (var index = 0; index < _p!.meds.length; index++) index,
         };
-        for (final item in reviewed) {
-          final name = item['name']!;
-          final dose = item['dose']!;
-          final frequency = item['frequency']!;
-          final quantity = item['quantity']!;
+        for (final scanned in reviewedMedications) {
+          final name = scanned.name;
+          final dose = scanned.dose;
           int? existingIndex;
           for (final index in availableExistingIndexes) {
             final medication = _p!.meds[index];
@@ -1255,32 +1392,43 @@ class _MedsScreenState extends State<MedsScreen> {
           if (existingIndex != null) {
             availableExistingIndexes.remove(existingIndex);
             final existing = _p!.meds[existingIndex];
+            final pharmacyChanged = pharmacyDisplay.isNotEmpty &&
+                pharmacyTextChanged(existing.prescriber, pharmacyDisplay);
             existing.name = name;
             existing.dose = dose;
-            existing.frequency = frequency;
-            existing.quantity = quantity;
+            existing.frequency = scanned.frequency;
+            existing.quantity = scanned.quantity;
             if (pharmacyDisplay.isNotEmpty) {
               existing.prescriber = pharmacyDisplay;
             }
+            if (pharmacyChanged) {
+              resetPharmacyVerification(existing);
+              pharmacyVerificationIndexes.add(existingIndex);
+            }
+            existing.rxcui = scanned.rxcui;
+            existing.ndc = scanned.ndc;
+            existing.ndcSource = scanned.ndcSource;
+            existing.drugForm = scanned.drugForm;
+            existing.drugType = scanned.drugType;
+            existing.daysSupply = scanned.daysSupply;
+            existing.refills = scanned.refills;
+            existing.matchStatus = scanned.matchStatus;
             existing.source = 'Scanned medication list';
             existing.updatedAt = DateTime.now();
             updatedCount++;
           } else {
-            _p!.meds.add(
-              Medication(
-                name: name,
-                dose: dose,
-                frequency: frequency,
-                quantity: quantity,
-                prescriber: pharmacyDisplay,
-                source: 'Scanned medication list',
-                updatedAt: DateTime.now(),
-              ),
-            );
+            _p!.meds.add(scanned);
+            if (!scanned.isSupplementOrOtc && scanned.prescriber.isNotEmpty) {
+              pharmacyVerificationIndexes.add(_p!.meds.length - 1);
+            }
             addedCount++;
           }
         }
         await _save();
+        for (final index in pharmacyVerificationIndexes) {
+          if (!mounted) return;
+          await _verifyPharmacy(index);
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1299,6 +1447,39 @@ class _MedsScreenState extends State<MedsScreen> {
               : (servingSize.isNotEmpty || activeIngredients.isNotEmpty)
                   ? 'supplement'
                   : 'prescription';
+        }
+
+        var scannedMedication = Medication(
+          name: scannedName,
+          dose: scannedDose,
+          frequency: scannedFreq,
+          quantity: (data['quantity'] ?? '').toString().trim(),
+          prescriber: pharmacyDisplay,
+          ndc: (data['ndc'] ?? '').toString().trim(),
+          ndcSource:
+              (data['ndc'] ?? '').toString().trim().isEmpty ? '' : 'label',
+          drugForm: (data['form'] ?? '').toString().trim(),
+          daysSupply: _wholeNumber(data['days_supply']),
+          refills: (data['refills'] ?? '').toString().trim(),
+          source: 'Scanned',
+          itemType: itemType,
+          servingSize: servingSize,
+          activeIngredients: activeIngredients,
+          otherIngredients: otherIngredients,
+          updatedAt: DateTime.now(),
+        );
+        if (itemType == 'prescription') {
+          final reviewedDrug = await _reviewPrescriptionDrug(
+            scannedMedication,
+            imagePaths ?? const <String>[],
+            1,
+            1,
+          );
+          if (!mounted) return;
+          scannedMedication = reviewedDrug ??
+              scannedMedication.copyWith(matchStatus: 'unmatched');
+          scannedName = scannedMedication.name;
+          scannedDose = scannedMedication.dose;
         }
 
         final normalizedScannedName = _normalizeMed(scannedName);
@@ -1417,19 +1598,35 @@ class _MedsScreenState extends State<MedsScreen> {
           );
 
           if (choice == "replace") {
+            final pharmacyChanged = pharmacyTextChanged(
+              existing.prescriber,
+              scannedMedication.prescriber,
+            );
             setState(() {
-              _p!.meds[existingIndex] = Medication(
-                name: scannedName,
-                dose: scannedDose,
-                frequency: scannedFreq,
-                prescriber: pharmacyDisplay,
-                source: "Scanned",
+              _p!.meds[existingIndex] = existing.copyWith(
+                name: scannedMedication.name,
+                dose: scannedMedication.dose,
+                frequency: scannedMedication.frequency,
+                quantity: scannedMedication.quantity,
+                prescriber: scannedMedication.prescriber,
+                rxcui: scannedMedication.rxcui,
+                ndc: scannedMedication.ndc,
+                ndcSource: scannedMedication.ndcSource,
+                drugForm: scannedMedication.drugForm,
+                drugType: scannedMedication.drugType,
+                daysSupply: scannedMedication.daysSupply,
+                refills: scannedMedication.refills,
+                matchStatus: scannedMedication.matchStatus,
+                source: 'Scanned',
                 itemType: itemType,
                 servingSize: servingSize,
                 activeIngredients: activeIngredients,
                 otherIngredients: otherIngredients,
                 updatedAt: DateTime.now(),
               );
+              if (pharmacyChanged) {
+                resetPharmacyVerification(_p!.meds[existingIndex]);
+              }
             });
             await _save();
             if (itemType == 'prescription') {
@@ -1438,20 +1635,7 @@ class _MedsScreenState extends State<MedsScreen> {
           } else if (choice == "add") {
             late final int addedIndex;
             setState(() {
-              _p!.meds.add(
-                Medication(
-                  name: scannedName,
-                  dose: scannedDose,
-                  frequency: scannedFreq,
-                  prescriber: pharmacyDisplay,
-                  source: "Scanned",
-                  itemType: itemType,
-                  servingSize: servingSize,
-                  activeIngredients: activeIngredients,
-                  otherIngredients: otherIngredients,
-                  updatedAt: DateTime.now(),
-                ),
-              );
+              _p!.meds.add(scannedMedication);
               addedIndex = _p!.meds.length - 1;
             });
             await _save();
@@ -1471,6 +1655,14 @@ class _MedsScreenState extends State<MedsScreen> {
               "serving_size": servingSize,
               "active_ingredients": activeIngredients,
               "other_ingredients": otherIngredients,
+              "rxcui": scannedMedication.rxcui,
+              "ndc": scannedMedication.ndc,
+              "ndc_source": scannedMedication.ndcSource,
+              "drug_form": scannedMedication.drugForm,
+              "drug_type": scannedMedication.drugType,
+              "days_supply": scannedMedication.daysSupply?.toString() ?? '',
+              "refills": scannedMedication.refills,
+              "match_status": scannedMedication.matchStatus,
             },
           );
         }

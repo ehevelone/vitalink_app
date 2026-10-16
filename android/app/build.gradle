@@ -60,6 +60,7 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = false
+            excludes += ["**/libdatastore_shared_counter.so"]
         }
     }
 }

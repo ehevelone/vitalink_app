@@ -236,7 +236,7 @@ class _LandingScreenState extends State<LandingScreen> {
     Navigator.pushReplacementNamed(
       context,
       '/terms_user',
-      arguments: {"code": activationCode},
+      arguments: {"code": activationCode ?? VitaLinkDeepLink.code},
     );
   }
 
@@ -283,6 +283,7 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showClientActivationDialog() {
+    activationCode ??= VitaLinkDeepLink.code;
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -337,6 +338,7 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   void _showAgentActivationDialog() {
+    activationCode ??= VitaLinkDeepLink.code;
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -378,7 +380,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     Navigator.pushNamed(
                       context,
                       '/terms_agent',
-                      arguments: {"code": activationCode},
+                      arguments: {
+                        "code": activationCode ?? VitaLinkDeepLink.code,
+                      },
                     );
                   },
                 ),

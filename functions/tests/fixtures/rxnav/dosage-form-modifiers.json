@@ -1,0 +1,21 @@
+{
+  "drugGroup": {
+    "name": null,
+    "conceptGroup": [
+      {
+        "tty": "SCD",
+        "conceptProperties": [
+          { "rxcui": "197361", "name": "amlodipine 5 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "757676", "name": "amlodipine 5 MG Disintegrating Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "861007", "name": "metformin hydrochloride 500 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "860975", "name": "24 HR metformin hydrochloride 500 MG Extended Release Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "1807915", "name": "Modified 24 HR metformin hydrochloride 500 MG Extended Release Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "1807917", "name": "Osmotic 24 HR metformin hydrochloride 500 MG Extended Release Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "200329", "name": "omeprazole 40 MG Delayed Release Oral Capsule", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "198052", "name": "ondansetron 4 MG Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" },
+          { "rxcui": "104894", "name": "ondansetron 4 MG Disintegrating Oral Tablet", "synonym": "", "tty": "SCD", "suppress": "N" }
+        ]
+      }
+    ]
+  }
+}
