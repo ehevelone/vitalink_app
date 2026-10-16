@@ -68,6 +68,122 @@ void resetPharmacyVerification(Medication medication) {
   medication.pharmacyVerifiedBy = null;
 }
 
+// Mail-order names are checked first so "CVS Caremark" is not mistaken for a
+// local CVS store.
+const _mailOrderPharmacyNames = [
+  'amazon pharmacy',
+  'pillpack',
+  'healthwarehouse',
+  'honeybee health',
+  'blink health',
+  'express scripts',
+  'caremark',
+  'centerwell',
+  'humana pharmacy',
+  'optumrx',
+  'optum rx',
+  'optum home delivery',
+  'cost plus drug',
+  'costplus drug',
+  'accredo',
+  'alliancerx',
+  'walgreens mail',
+];
+
+const _localPharmacyChains = [
+  'walmart',
+  'wal-mart',
+  'walgreens',
+  'cvs',
+  'hy-vee',
+  'hyvee',
+  "sam's club",
+  'sams club',
+  'costco',
+  'kroger',
+  'target',
+  'rite aid',
+  'bakers',
+  "baker's",
+  'fareway',
+  'safeway',
+  'albertsons',
+  'publix',
+  'meijer',
+  'h-e-b',
+  'heb pharmacy',
+  'king soopers',
+  "fry's",
+  'smith\'s',
+  'giant eagle',
+  'shoprite',
+  'winn-dixie',
+  'harris teeter',
+  'food lion',
+];
+
+const _stateCodes = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+  'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+  'district of columbia': 'DC', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN',
+  'iowa': 'IA', 'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA',
+  'maine': 'ME', 'maryland': 'MD', 'massachusetts': 'MA', 'michigan': 'MI',
+  'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO', 'montana': 'MT',
+  'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+  'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA',
+  'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+  'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+  'wisconsin': 'WI', 'wyoming': 'WY', 'puerto rico': 'PR',
+};
+
+String? _stateCode(String? value) {
+  final text = (value ?? '').trim();
+  if (text.isEmpty) return null;
+  if (text.length == 2) return text.toUpperCase();
+  return _stateCodes[text.toLowerCase()];
+}
+
+/// Returns 'mail_order' or 'retail' when the pharmacy text makes the type
+/// clear, or null when the client should be asked.
+@visibleForTesting
+String? knownPharmacyType(String pharmacyText, {String? clientState}) {
+  final lines = pharmacyText
+      .split(RegExp(r'[\r\n]+'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+  if (lines.isEmpty) return null;
+  final name = lines.first.toLowerCase();
+  if (_mailOrderPharmacyNames.any(name.contains)) return 'mail_order';
+  // A bottle shipped from another state may be mail order even when it only
+  // says "Walgreens", so ask instead of assuming a local store.
+  final bottleState = lines
+      .skip(1)
+      .map((line) => RegExp(r'\b([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\b')
+          .firstMatch(line)
+          ?.group(1))
+      .firstWhere((code) => code != null, orElse: () => null);
+  final homeState = _stateCode(clientState);
+  if (bottleState != null &&
+      homeState != null &&
+      bottleState.toUpperCase() != homeState) {
+    return null;
+  }
+  if (_localPharmacyChains.any((chain) =>
+      RegExp('(^|[^a-z])${RegExp.escape(chain)}([^a-z]|\$)').hasMatch(name))) {
+    return 'retail';
+  }
+  // A street address printed on the bottle means a walk-in store.
+  final hasStreetAddress = lines
+      .skip(1)
+      .any((line) => RegExp(r'^\d+\s+[A-Za-z]').hasMatch(line));
+  return hasStreetAddress ? 'retail' : null;
+}
+
 class MedsScreen extends StatefulWidget {
   const MedsScreen({super.key});
 
@@ -384,6 +500,12 @@ class _MedsScreenState extends State<MedsScreen> {
           break;
         }
       }
+    }
+    if (pharmacyType != 'retail' && pharmacyType != 'mail_order') {
+      pharmacyType = knownPharmacyType(
+        medication.prescriber,
+        clientState: _p!.state,
+      );
     }
     if (pharmacyType != 'retail' && pharmacyType != 'mail_order') {
       pharmacyType = await _askPharmacyType(name);
