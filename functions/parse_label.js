@@ -20,6 +20,31 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function mergeSingleBottleRows(medications) {
+  if (medications.length <= 1) return medications;
+
+  const [medication, ...fragments] = medications;
+  const firstValue = (field) =>
+    medication[field] || fragments.map((item) => item[field]).find(Boolean) || "";
+  const directions = [medication.frequency, ...fragments.map((item) => item.frequency)]
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(" ");
+
+  return [{
+    ...medication,
+    dose: firstValue("dose"),
+    form: firstValue("form"),
+    ndc: firstValue("ndc"),
+    frequency: directions,
+    quantity: firstValue("quantity"),
+    days_supply: firstValue("days_supply"),
+    refills: firstValue("refills"),
+    pharmacy_name: firstValue("pharmacy_name"),
+    pharmacy_phone: firstValue("pharmacy_phone"),
+  }];
+}
+
 function normalizeMedicationList(parsed) {
   const rawItems = Array.isArray(parsed?.medications)
     ? parsed.medications
@@ -27,7 +52,7 @@ function normalizeMedicationList(parsed) {
       ? [parsed]
       : [];
 
-  const medications = rawItems
+  let medications = rawItems
     .slice(0, 50)
     .map((item) => ({
       name: clean(item?.name),
@@ -42,6 +67,11 @@ function normalizeMedicationList(parsed) {
       pharmacy_phone: clean(item?.pharmacy_phone),
     }))
     .filter((item) => item.name);
+
+  const labelFormat = clean(parsed?.label_format).toLowerCase();
+  if (labelFormat === "single_bottle") {
+    medications = mergeSingleBottleRows(medications);
+  }
 
   const first = medications[0] || {
     name: "",
@@ -74,6 +104,7 @@ function normalizeMedicationList(parsed) {
 
   return {
     medications,
+    label_format: labelFormat,
     name: first.name,
     dose: first.dose,
     frequency: first.frequency,
@@ -194,6 +225,7 @@ You MUST return valid JSON only.
 Return exactly this JSON structure:
 
 {
+  "label_format": "single_bottle",
   "medications": [
     {
       "name": "",
@@ -227,7 +259,15 @@ Return exactly this JSON structure:
 Rules:
 
 1. Combine information across all images of the same label or list.
-2. Extract EVERY visible medication row in top-to-bottom order.
+1a. label_format must be exactly one of: "single_bottle", "medication_list",
+    "pill_pack", "supplement_label", or "otc_label".
+2. A single prescription bottle contains exactly ONE medication. Combine the
+   drug name, strength, form, directions, quantity, and refill information into
+   that one row even when the curved label separates them visually.
+2a. A patient's name, prescriber's name, pharmacy name/address, Rx number, and
+    warning text are NEVER medication rows. Do not place them in medications.
+2b. For medication_list and pill_pack, extract EVERY visible medication row in
+    top-to-bottom order.
 3. Preserve repeated rows. Do not merge or deduplicate medications, even when
    the name and strength match, because separate pill-pack rows may be intentional.
 4. Do NOT guess, infer, or expand dosing instructions.

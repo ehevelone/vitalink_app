@@ -73,6 +73,47 @@ test("single-bottle legacy output remains compatible", () => {
   assert.equal(result.frequency, "Take one daily");
 });
 
+test("single bottle cannot turn the patient name into a second medication", () => {
+  const result = normalizeMedicationList({
+    label_format: "single_bottle",
+    medications: [
+      {
+        name: "GUANFACINE ER",
+        dose: "",
+        frequency: "EVENING",
+        quantity: "90",
+      },
+      {
+        name: "BRAXTON M",
+        dose: "4MG",
+        frequency: "BY MOUTH AT THE SAME TIME EACH DAY",
+      },
+    ],
+  });
+
+  assert.equal(result.medications.length, 1);
+  assert.equal(result.medications[0].name, "GUANFACINE ER");
+  assert.equal(result.medications[0].dose, "4MG");
+  assert.equal(result.medications[0].quantity, "90");
+  assert.equal(
+    result.medications[0].frequency,
+    "EVENING BY MOUTH AT THE SAME TIME EACH DAY",
+  );
+  assert.equal(result.label_format, "single_bottle");
+});
+
+test("pill-pack format continues to preserve every medication row", () => {
+  const result = normalizeMedicationList({
+    label_format: "pill_pack",
+    medications: [
+      { name: "Aspirin", dose: "81 mg" },
+      { name: "Levetiracetam", dose: "250 mg" },
+    ],
+  });
+
+  assert.equal(result.medications.length, 2);
+});
+
 // A cut-off AI answer must produce a clear "list too long" error, not a 500.
 async function parseWithAiResponse(choice) {
   const userAuth = require("../services/user-auth");
