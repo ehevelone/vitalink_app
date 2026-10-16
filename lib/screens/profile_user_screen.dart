@@ -55,17 +55,24 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     }
 
     final email = await store.getString('userEmail') ?? "";
-    final name = await store.getString('profileName') ?? "";
-    final phone = await store.getString('profilePhone') ?? "";
 
-    final address = await store.getString('profileAddress') ?? "";
-    final city = await store.getString('profileCity') ?? "";
-    final state = await store.getString('profileState') ?? "";
-    final zip = await store.getString('profileZip') ?? "";
-
-    // ✅ LOAD DOB FROM PROFILE MODEL (ONLY ONCE)
+    // Registration (including agent-prepared registration) saves these on the
+    // profile itself, so read the profile first and fall back to the older
+    // separately stored values only when the profile field is empty.
     final repo = DataRepository();
     final profile = await repo.loadProfile();
+    Future<String> pick(String? fromProfile, String storeKey) async {
+      final value = (fromProfile ?? '').trim();
+      if (value.isNotEmpty) return value;
+      return (await store.getString(storeKey) ?? '').trim();
+    }
+
+    final name = await pick(profile.fullName, 'profileName');
+    final phone = await pick(profile.userPhone, 'profilePhone');
+    final address = await pick(profile.address, 'profileAddress');
+    final city = await pick(profile.city, 'profileCity');
+    final state = await pick(profile.state, 'profileState');
+    final zip = await pick(profile.zip, 'profileZip');
     final dob = profile.dob ?? "";
 
     if (!mounted) return;
