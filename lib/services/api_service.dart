@@ -809,6 +809,44 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
+  // Fix my name or email: password check, then emailed code(s)
+  // -------------------------------------------------------------
+  static Future<Map<String, dynamic>> startAccountCorrection({
+    required String userId,
+    required String currentEmail,
+    required String password,
+    String? newName,
+    String? newEmail,
+  }) {
+    return _postJsonWithUserSession("account_correction", {
+      "action": "start",
+      "userId": userId,
+      "currentEmail": currentEmail,
+      "password": password,
+      if (newName != null && newName.trim().isNotEmpty)
+        "newName": newName.trim(),
+      if (newEmail != null && newEmail.trim().isNotEmpty)
+        "newEmail": newEmail.trim(),
+    });
+  }
+
+  static Future<Map<String, dynamic>> confirmAccountCorrection({
+    required String userId,
+    required String correctionId,
+    required String code,
+    String? newEmailCode,
+  }) {
+    return _postJsonWithUserSession("account_correction", {
+      "action": "confirm",
+      "userId": userId,
+      "correctionId": correctionId,
+      "code": code.trim(),
+      if (newEmailCode != null && newEmailCode.trim().isNotEmpty)
+        "newEmailCode": newEmailCode.trim(),
+    });
+  }
+
+  // -------------------------------------------------------------
   // 🔎 Mark agent as reviewed
   // -------------------------------------------------------------
   static Future<Map<String, dynamic>> markReviewed({

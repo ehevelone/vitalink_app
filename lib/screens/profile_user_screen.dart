@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/data_repository.dart';
 import '../services/app_state.dart';
 import '../utils/phone_formatter.dart';
+import 'account_correction_screen.dart';
 
 class ProfileUserScreen extends StatefulWidget {
   const ProfileUserScreen({super.key});
@@ -33,6 +34,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
   bool _loading = false;
   String _currentEmail = "";
+  String _currentAccountName = "";
   // True when the open profile is the account holder's own. Family profiles
   // have no login, so they never change the account's email, password, name,
   // or phone.
@@ -87,6 +89,7 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     setState(() {
       _isAccountProfile = isAccountProfile;
       _currentEmail = email;
+      _currentAccountName = isAccountProfile ? name : "";
       _emailCtrl.text = email;
       _nameCtrl.text = name;
       _phoneCtrl.text = phone;
@@ -135,6 +138,19 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
     }
   }
 
+  Future<void> _openAccountCorrection() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AccountCorrectionScreen(
+          currentName: _currentAccountName,
+          currentEmail: _currentEmail,
+        ),
+      ),
+    );
+    if (changed == true && mounted) await _loadLocalProfile();
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -158,8 +174,10 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
       return;
     }
 
-    final newName = _nameCtrl.text.trim();
-    final newEmail = _emailCtrl.text.trim();
+    final newName = _isAccountProfile
+        ? _currentAccountName
+        : _nameCtrl.text.trim();
+    final newEmail = _currentEmail;
     final newPhone = _phoneCtrl.text.trim();
     final newDob = _dobCtrl.text.trim(); // ✅ ADDED
 
@@ -279,8 +297,11 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
 
                 TextFormField(
                   controller: _nameCtrl,
+                  readOnly: _isAccountProfile,
                   decoration: InputDecoration(
                     labelText: AppStrings.of(context).fullNameFirstLast,
+                    suffixIcon:
+                        _isAccountProfile ? const Icon(Icons.lock) : null,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -289,10 +310,22 @@ class _ProfileUserScreenState extends State<ProfileUserScreen> {
                 if (_isAccountProfile) ...[
                   TextFormField(
                     controller: _emailCtrl,
+                    readOnly: true,
                     decoration: InputDecoration(
-                        labelText: AppStrings.of(context).email),
+                      labelText: AppStrings.of(context).email,
+                      suffixIcon: const Icon(Icons.lock),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('fix-name-or-email'),
+                      onPressed: _openAccountCorrection,
+                      icon: const Icon(Icons.edit),
+                      label: Text(AppStrings.of(context).fixNameOrEmail),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                 ],
 
                 TextFormField(

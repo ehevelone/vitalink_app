@@ -1,7 +1,9 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitalink/models.dart';
+import 'package:vitalink/screens/profile_user_screen.dart';
 import 'package:vitalink/services/data_repository.dart';
 import 'package:vitalink/services/secure_store.dart';
 
@@ -66,5 +68,40 @@ void main() {
     profiles = await repo.loadAllProfiles();
     expect(profiles.length, 1);
     expect(profiles.single.id, holder.id);
+  });
+
+  testWidgets('account name and email are locked; family name stays editable',
+      (tester) async {
+    await _signInUser('404');
+    final store = SecureStore();
+    await store.setString('userEmail', 'john@example.com');
+    final repo = DataRepository();
+    final holder = await repo.loadProfile();
+    holder.fullName = 'John Holder';
+    await repo.saveProfile(holder);
+    await repo.markAccountProfile(holder.id);
+    await repo.addProfile(Profile(fullName: 'Jane Family'));
+
+    Future<void> openProfile() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        const MaterialApp(home: ProfileUserScreen()),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    EditableText fieldWithText(String text) => tester
+        .widgetList<EditableText>(find.byType(EditableText))
+        .singleWhere((field) => field.controller.text == text);
+
+    await repo.setActiveProfileIndex(0);
+    await openProfile();
+    expect(fieldWithText('John Holder').readOnly, isTrue);
+    expect(fieldWithText('john@example.com').readOnly, isTrue);
+
+    await repo.setActiveProfileIndex(1);
+    await openProfile();
+    expect(fieldWithText('Jane Family').readOnly, isFalse);
+    expect(find.text('john@example.com'), findsNothing);
   });
 }

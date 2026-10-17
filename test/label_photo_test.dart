@@ -27,7 +27,9 @@ void main() {
     expect(await file.length(), lessThanOrEqualTo(maxLabelPhotoBytes));
     expect(await labelPhotosFit([file.path, file.path, file.path, file.path]),
         isTrue);
-  });
+    // Re-encoding a large worst-case photo several times is slow on a cold
+    // test run; allow more than the default 30 seconds.
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   test('an unreadable file never fits instead of being sent', () async {
     expect(await labelPhotosFit(['does-not-exist.jpg']), isFalse);

@@ -755,6 +755,54 @@ extension ScreenStrings on AppStrings {
   String get cannotDeleteAccountHolderProfile => _isEs
       ? 'Este es el perfil del titular de la cuenta y no se puede eliminar.'
       : 'This is the account holder\'s profile and can\'t be deleted.';
+
+  // Fix my name or email
+  String get fixNameOrEmail =>
+      _isEs ? 'Corregir mi nombre o correo' : 'Fix my name or email';
+  String get fixNameOrEmailIntro => _isEs
+      ? 'Por su seguridad, escriba su correo y contraseña actuales. Le enviaremos un código por correo para confirmar el cambio.'
+      : 'For your security, enter your current email and password. We will email you a code to confirm the change.';
+  String get correctName => _isEs ? 'Nombre correcto' : 'Correct name';
+  String get correctEmail => _isEs ? 'Correo correcto' : 'Correct email';
+  String get currentEmailLabel => _isEs ? 'Correo actual' : 'Current email';
+  String get currentPasswordLabel =>
+      _isEs ? 'Contraseña actual' : 'Current password';
+  String get sendCode => _isEs ? 'Enviar código' : 'Send code';
+  String codeSentTo(String email) => _isEs
+      ? 'Escriba el código de 6 dígitos que enviamos a $email'
+      : 'Enter the 6-digit code we sent to $email';
+  String newEmailCodeSentTo(String email) => _isEs
+      ? 'Escriba también el código que enviamos a su nuevo correo $email'
+      : 'Also enter the code we sent to your new email $email';
+  String get verificationCode =>
+      _isEs ? 'Código de verificación' : 'Verification code';
+  String get newEmailCode =>
+      _isEs ? 'Código del nuevo correo' : 'Code from new email';
+  String get confirmChange => _isEs ? 'Confirmar cambio' : 'Confirm change';
+  String get accountCorrected => _isEs
+      ? 'Su nombre y correo se actualizaron.'
+      : 'Your name and email are updated.';
+  String get correctionCredentialsMismatch => _isEs
+      ? 'El correo o la contraseña no coinciden con esta cuenta.'
+      : 'The email or password does not match this account.';
+  String get correctionTooManyAttempts => _isEs
+      ? 'Demasiados intentos. Inténtelo de nuevo en un rato.'
+      : 'Too many attempts. Please try again in a little while.';
+  String get correctionCodeIncorrect => _isEs
+      ? 'Ese código no es correcto. Revise su correo e inténtelo de nuevo.'
+      : 'That code is not correct. Please check your email and try again.';
+  String get correctionCodeExpired => _isEs
+      ? 'Este código venció. Por favor empiece de nuevo.'
+      : 'This code has expired. Please start again.';
+  String get correctionEmailInUse => _isEs
+      ? 'Ese correo no se puede usar para esta cuenta.'
+      : 'That email can\'t be used for this account.';
+  String get correctionNothingToChange => _isEs
+      ? 'Primero cambie su nombre o su correo.'
+      : 'Change your name or email first.';
+  String get correctionFailed => _isEs
+      ? 'Algo salió mal. Inténtelo de nuevo.'
+      : 'Something went wrong. Please try again.';
   String get addProfileFromInvite =>
       _isEs ? 'Agregar perfil desde una invitación' : 'Add Profile from Invite';
   String get useProfileShareCode => _isEs

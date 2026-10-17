@@ -478,6 +478,26 @@ class DataRepository {
     return profiles.first.id == profile.id;
   }
 
+  /// Sets the account holder's profile name after a verified correction,
+  /// whichever profile is open right now.
+  Future<void> updateAccountHolderName(String fullName) async {
+    final profiles = await _loadProfilesInternal();
+    if (profiles.isEmpty || fullName.trim().isEmpty) return;
+    var holderIndex = 0;
+    for (var i = 0; i < profiles.length; i++) {
+      if (await isAccountProfile(profiles[i])) {
+        holderIndex = i;
+        break;
+      }
+    }
+    final activeIndex = await _getActiveIndex(profiles);
+    final updated = List<Profile>.from(profiles);
+    updated[holderIndex].fullName = fullName.trim();
+    updated[holderIndex].updatedAt = DateTime.now();
+    await _saveProfilesInternal(updated, activeIndex: activeIndex);
+    if (holderIndex == activeIndex) await _syncName(updated[holderIndex]);
+  }
+
   Future<void> deleteProfileAt(int index) async {
     final profiles = await _loadProfilesInternal();
     if (index < 0 || index >= profiles.length) return;

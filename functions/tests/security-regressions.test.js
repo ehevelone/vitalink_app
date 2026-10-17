@@ -71,12 +71,12 @@ test("update_user_profile rejects an email that does not belong to the session u
   });
 });
 
-test("update_user_profile updates by user id and refuses a duplicate email", async () => {
+test("update_user_profile changes only the phone; name, email, and password are locked", async () => {
   await withHandler("../update_user_profile", {
     session: true,
     query: (sql) => {
       if (sql.includes("AND LOWER(email) = LOWER($2)")) return { rows: [{ id: 7 }] };
-      if (sql.includes("AND id <> $2")) return { rows: [{ id: 99 }] };
+      if (/UPDATE\s+users/i.test(sql)) return { rows: [{ id: 7, phone: "4025550100" }] };
       return { rows: [] };
     },
   }, async (handler, calls) => {
@@ -84,32 +84,34 @@ test("update_user_profile updates by user id and refuses a duplicate email", asy
       currentEmail: "owner@example.com",
       userId: "7",
       sessionToken: "s",
-      email: "Taken@Example.com",
+      email: "attacker@example.com",
+      name: "Someone Else",
+      password: "attacker-chosen",
+      phone: "4025550100",
     }));
-    assert.equal(res.statusCode, 409);
-    assert.ok(!calls.some((c) => /UPDATE\s+users/i.test(c.sql)));
+    assert.equal(res.statusCode, 200);
+    const update = calls.find((c) => /UPDATE\s+users/i.test(c.sql));
+    assert.match(update.sql, /SET phone = \$1/);
+    const setClause = update.sql.split("RETURNING")[0];
+    assert.doesNotMatch(setClause, /email|first_name|last_name|password_hash/);
+    assert.deepEqual(update.params, ["4025550100", "7"]);
   });
 
   await withHandler("../update_user_profile", {
     session: true,
     query: (sql) => {
       if (sql.includes("AND LOWER(email) = LOWER($2)")) return { rows: [{ id: 7 }] };
-      if (sql.includes("AND id <> $2")) return { rows: [] };
-      if (/UPDATE\s+users/i.test(sql)) return { rows: [{ id: 7, email: "new@example.com" }] };
-      return { rows: [] };
+      return { rows: [{ id: 7, email: "owner@example.com" }] };
     },
   }, async (handler, calls) => {
     const res = await handler(post({
       currentEmail: "owner@example.com",
       userId: "7",
       sessionToken: "s",
-      email: "New@Example.com",
+      email: "attacker@example.com",
     }));
     assert.equal(res.statusCode, 200);
-    const update = calls.find((c) => /UPDATE\s+users/i.test(c.sql));
-    assert.match(update.sql, /WHERE id = \$\d+/);
-    assert.ok(update.params.includes("new@example.com"), "email is stored lowercased");
-    assert.equal(update.params[update.params.length - 1], "7");
+    assert.ok(!calls.some((c) => /UPDATE\s+users/i.test(c.sql)), "email alone never updates the account");
   });
 });
 
