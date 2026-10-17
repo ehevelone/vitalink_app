@@ -2,15 +2,12 @@ import 'dart:convert';
 import '../l10n/screen_strings.dart';
 import '../l10n/app_strings.dart';
 import 'dart:typed_data';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/app_state.dart';
-import '../services/secure_store.dart';
-import '../services/device_id.dart';
 
 class MyAgentUser extends StatefulWidget {
   const MyAgentUser({super.key});
@@ -32,14 +29,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
   String? _agencyPhone;
   String? _calendlyUrl;
   String? _businessCardImageBase64;
-  bool? _agentMessagesEnabled;
-  String? _relationshipStatus;
-  final Map<String, bool> _prospectMessages = {
-    'medicare': false,
-    'life': false,
-  };
-  final Map<String, String> _prospectConsentText = {};
-  bool _updatingMessages = false;
   bool _loading = true;
 
   @override
@@ -73,35 +62,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
         _agencyPhone = agent["agency_phone"];
         _calendlyUrl = agent["calendly_url"];
         _businessCardImageBase64 = agent["business_card_image_base64"];
-      }
-
-      final userId = await SecureStore().getString('userId');
-      if (userId != null && userId.isNotEmpty) {
-        final access = await ApiService.getAccountAccess(userId);
-        final details = Map<String, dynamic>.from(
-          access['access'] as Map? ?? {},
-        );
-        _relationshipStatus = details['relationshipStatus']?.toString();
-        if (details['relationshipStatus'] == 'confirmed_client') {
-          _agentMessagesEnabled = details['canMessage'] == true;
-        } else if (details['relationshipStatus'] == 'confirmed_prospect') {
-          final consents = Map<String, dynamic>.from(
-            details['prospectConsents'] as Map? ?? {},
-          );
-          for (final category in _prospectMessages.keys) {
-            _prospectMessages[category] =
-                (consents[category] as Map?)?['status'] == 'granted';
-          }
-          final options = Map<String, dynamic>.from(
-            details['prospectOptions'] as Map? ?? {},
-          );
-          for (final category in _prospectMessages.keys) {
-            final option = options[category];
-            if (option is Map && option['text'] != null) {
-              _prospectConsentText[category] = option['text'].toString();
-            }
-          }
-        }
       }
     } catch (e) {
       debugPrint("Agent load error: $e");
@@ -170,130 +130,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _disconnectAgent() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppStrings.of(context).disconnectFromAgentQ),
-        content: Text(
-          AppStrings.of(context).disconnectAgentBody(),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(AppStrings.of(context).keepMyCurrentAgent)),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(AppStrings.of(context).disconnectAndLock)),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final store = SecureStore();
-    final userId = await store.getString('userId');
-    if (userId == null) {
-      if (mounted) setState(() => _updatingMessages = false);
-      return;
-    }
-    final result = await ApiService.updateAccountAccess(
-      userId: userId,
-      action: 'disconnect',
-      values: {
-        'deviceId': await DeviceId.getOrCreate(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-      },
-    );
-    if (!mounted) return;
-    if (result['success'] == true) {
-      Navigator.pushNamedAndRemoveUntil(
-          context, '/account_access', (_) => false);
-    } else {
-      _showActionError(result['error']?.toString() ??
-          AppStrings.of(context).unableToDisconnectAgent);
-    }
-  }
-
-  Future<void> _setAgentMessages(bool enabled) async {
-    setState(() => _updatingMessages = true);
-    final store = SecureStore();
-    final userId = await store.getString('userId');
-    if (userId == null) return;
-    final result = await ApiService.updateAccountAccess(
-      userId: userId,
-      action: 'messaging_consent',
-      values: {
-        'messagingConsent': enabled,
-        'userAttestation': true,
-        'deviceId': await DeviceId.getOrCreate(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-      },
-    );
-    if (!mounted) return;
-    setState(() {
-      _updatingMessages = false;
-      if (result['success'] == true) _agentMessagesEnabled = enabled;
-    });
-    if (result['success'] != true) {
-      _showActionError(
-        result['error']?.toString() ??
-            AppStrings.of(context).unableToUpdateConsent,
-      );
-    }
-  }
-
-  Future<void> _setProspectMessages(String category, bool enabled) async {
-    if (enabled) {
-      final accepted = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(category == 'medicare'
-              ? AppStrings.of(context).medicareMessages
-              : AppStrings.of(context).lifeInsuranceMessages),
-          content: Text(
-            _prospectConsentText[category] ??
-                AppStrings.of(context).agreeMarketingFromConnected,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(AppStrings.of(context).cancel),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(AppStrings.of(context).iAgree),
-            ),
-          ],
-        ),
-      );
-      if (accepted != true || !mounted) return;
-    }
-    setState(() => _updatingMessages = true);
-    final userId = await SecureStore().getString('userId');
-    if (userId == null) return;
-    final result = await ApiService.updateAccountAccess(
-      userId: userId,
-      action: 'prospect_marketing_consent',
-      values: {
-        'category': category,
-        'granted': enabled,
-        'userAttestation': true,
-        'deviceId': await DeviceId.getOrCreate(),
-        'platform': Platform.isIOS ? 'ios' : 'android',
-      },
-    );
-    if (!mounted) return;
-    setState(() {
-      _updatingMessages = false;
-      if (result['success'] == true) _prospectMessages[category] = enabled;
-    });
-    if (result['success'] != true) {
-      _showActionError(
-        result['error']?.toString() ??
-            AppStrings.of(context).unableToUpdateConsent,
-      );
-    }
   }
 
   Widget _agentCardDisplay() {
@@ -549,61 +385,6 @@ class _MyAgentUserState extends State<MyAgentUser> {
                   icon: Icons.refresh,
                   label: AppStrings.of(context).reloadInfo,
                   onPressed: _loadAgent,
-                ),
-                if (_agentMessagesEnabled != null) ...[
-                  const SizedBox(height: 14),
-                  Card(
-                    child: SwitchListTile(
-                      value: _agentMessagesEnabled!,
-                      onChanged: _updatingMessages ? null : _setAgentMessages,
-                      secondary: const Icon(Icons.notifications_outlined),
-                      title: Text(AppStrings.of(context).messagesFromMyAgent),
-                      subtitle: Text(
-                        AppStrings.of(context).coverageRemindersBody,
-                      ),
-                    ),
-                  ),
-                ],
-                if (_relationshipStatus == 'confirmed_prospect') ...[
-                  const SizedBox(height: 14),
-                  Card(
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          value: _prospectMessages['medicare']!,
-                          onChanged: _updatingMessages
-                              ? null
-                              : (value) =>
-                                  _setProspectMessages('medicare', value),
-                          secondary:
-                              const Icon(Icons.health_and_safety_outlined),
-                          title: Text(AppStrings.of(context).medicareMessages),
-                          subtitle: Text(
-                            AppStrings.of(context).optionalMarketingFromAgent,
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        SwitchListTile(
-                          value: _prospectMessages['life']!,
-                          onChanged: _updatingMessages
-                              ? null
-                              : (value) => _setProspectMessages('life', value),
-                          secondary: const Icon(Icons.favorite_outline),
-                          title: Text(
-                              AppStrings.of(context).lifeInsuranceMessages),
-                          subtitle: Text(
-                            AppStrings.of(context).optionalMarketingFromAgent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed: _disconnectAgent,
-                  icon: const Icon(Icons.link_off),
-                  label: Text(AppStrings.of(context).changeOrDisconnectAgent),
                 ),
                 const SizedBox(height: 20),
                 _actionButton(

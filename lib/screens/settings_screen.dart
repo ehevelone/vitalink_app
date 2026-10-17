@@ -9,6 +9,7 @@ import '../services/language_service.dart';
 import '../services/secure_store.dart';
 import '../services/fcm_token_service.dart';
 import '../widgets/transfer_code_dialog.dart';
+import '../widgets/agent_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -289,6 +290,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     '${strings.version} $_version  |  ${strings.build} $_buildNumber',
                   ),
                 ),
+                const SizedBox(height: 28),
+                const AgentPreferences(),
               ],
             ),
     );

@@ -7,6 +7,17 @@ import 'app_strings.dart';
 extension ScreenStrings on AppStrings {
   bool get _isEs => languageCode == 'es';
 
+  String get turnOffAgentMessagesQ => _isEs
+      ? '¿Desactivar los mensajes de mi agente?'
+      : 'Turn off messages from my agent?';
+  String get turnOffAgentMessagesBody => _isEs
+      ? 'Dejarás de recibir recordatorios de cobertura y mensajes sobre períodos de inscripción de tu agente. Puedes volver a activarlos en Configuración en cualquier momento.'
+      : 'You will stop receiving coverage reminders and enrollment-period messages from your agent. You can turn them back on in Settings at any time.';
+  String get keepMessagesOn =>
+      _isEs ? 'Mantener los mensajes activados' : 'Keep messages on';
+  String get turnOffMessages =>
+      _isEs ? 'Desactivar mensajes' : 'Turn off messages';
+
   // ---- hand-written (wording depends on grammar, not a simple swap) ----
 
   /// itemType is prescription / supplement / otc / unknown.

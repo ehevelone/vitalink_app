@@ -132,43 +132,42 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.of(context).profileUpdates),
-        backgroundColor: const Color(0xFF0E5A88),
       ),
       body: Container(
-        color: Colors.black,
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _loadUpdates,
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(24),
                   children: [
                     Text(
                       AppStrings.of(context).connectedProfileUpdates,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
+                        color: Colors.black87,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       AppStrings.of(context).updatesTemporarilyStored,
-                      style: const TextStyle(color: Colors.white70, fontSize: 15),
+                      style: const TextStyle(color: Colors.black54, fontSize: 15),
                     ),
                     const SizedBox(height: 18),
                     if (_error != null)
                       _InfoCard(
                         child: Text(
                           _error!,
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.black87),
                         ),
                       )
                     else if (_packages.isEmpty)
                       _InfoCard(
                         child: Text(
                           AppStrings.of(context).noProfileUpdatesWaiting,
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.black87),
                         ),
                       )
                     else
@@ -185,7 +184,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                                     ? profileName!
                                     : AppStrings.of(context).sharedProfileTitle,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -194,7 +193,7 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                               Text(
                                 _sectionsLabel(item),
                                 style: const TextStyle(
-                                  color: Colors.white70,
+                                  color: Colors.black54,
                                   fontSize: 14,
                                 ),
                               ),
@@ -203,8 +202,6 @@ class _ProfileUpdatesScreenState extends State<ProfileUpdatesScreen> {
                                 width: double.infinity,
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF78C7E7),
-                                    foregroundColor: Colors.black,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 14,
                                     ),
@@ -241,10 +238,9 @@ class _InfoCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: const Color(0xFF78C7E7).withValues(alpha: .35)),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.black38),
       ),
       child: child,
     );

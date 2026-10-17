@@ -410,25 +410,24 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.of(context).profileSharing),
-        backgroundColor: const Color(0xFF0E5A88),
       ),
       body: Container(
-        color: Colors.black,
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           children: [
             Text(
               AppStrings.of(context).connectedProfiles,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
+                color: Colors.black87,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               AppStrings.of(context).shareProfileExplainer,
-              style: const TextStyle(color: Colors.white70, fontSize: 15),
+              style: const TextStyle(color: Colors.black54, fontSize: 15),
             ),
             const SizedBox(height: 18),
             _InfoCard(
@@ -438,7 +437,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   Text(
                     AppStrings.of(context).shareThisProfile,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.black87,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -496,7 +495,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   Text(
                     AppStrings.of(context).whoHasAccess,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.black87,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -507,7 +506,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   else if (_shares.isEmpty)
                     Text(
                       AppStrings.of(context).noActiveProfileShares,
-                      style: const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Colors.black54),
                     )
                   else
                     ..._shares.map(_shareRow),
@@ -521,7 +520,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                   Text(
                     AppStrings.of(context).acceptSharedProfile,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.black87,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -542,7 +541,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                     Text(
                       AppStrings.of(context).shareCodeTitle,
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: Colors.black54,
                         fontSize: 13,
                         letterSpacing: 1,
                       ),
@@ -551,7 +550,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
                     SelectableText(
                       _lastInviteCode!,
                       style: const TextStyle(
-                        color: Color(0xFF78C7E7),
+                        color: Colors.blue,
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                       ),
@@ -563,7 +562,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               _InfoCard(
                 child: Text(
                   _message!,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.black87),
                 ),
               ),
             if (_saving)
@@ -580,24 +579,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
   Widget _field(TextEditingController controller, String label) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
-        filled: true,
-        fillColor: Colors.black,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF26384A)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF78C7E7)),
-        ),
-      ),
+      decoration: InputDecoration(labelText: label),
     );
   }
 
@@ -610,8 +592,7 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       contentPadding: EdgeInsets.zero,
       value: value,
       onChanged: onChanged,
-      activeThumbColor: const Color(0xFF78C7E7),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
+      title: Text(label, style: const TextStyle(color: Colors.black87)),
     );
   }
 
@@ -628,9 +609,9 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF26384A)),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.black38),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,14 +619,14 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black87,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             '$status • $sectionText',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(color: Colors.black54, fontSize: 13),
           ),
           if (status == 'pending' &&
               inviteCode != null &&
@@ -653,12 +634,12 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
             const SizedBox(height: 6),
             SelectableText(
               AppStrings.of(context).codeValue(inviteCode),
-              style: const TextStyle(color: Color(0xFF78C7E7)),
+              style: const TextStyle(color: Colors.blue),
             ),
             const SizedBox(height: 4),
             Text(
               AppStrings.of(context).expiresSixHours,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
             ),
           ],
           const SizedBox(height: 10),
@@ -669,16 +650,16 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
               if (status == 'pending')
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF78C7E7),
-                    side: const BorderSide(color: Color(0xFF78C7E7)),
+                    foregroundColor: Colors.blue,
+                    side: const BorderSide(color: Colors.blue),
                   ),
                   onPressed: _saving ? null : () => _sendInvite(share),
                   child: Text(AppStrings.of(context).copyShareCode),
                 ),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade200,
-                  side: BorderSide(color: Colors.red.shade300),
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade700),
                 ),
                 onPressed: _saving ? null : () => _confirmRevokeShare(share),
                 child: Text(AppStrings.of(context).revokeAccess),
@@ -704,8 +685,6 @@ class _ProfileSharingScreenState extends State<ProfileSharingScreen> {
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF78C7E7),
-          foregroundColor: Colors.black,
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
         onPressed: _saving ? null : onPressed,
@@ -729,11 +708,9 @@ class _InfoCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF78C7E7).withValues(alpha: .35),
-        ),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.black38),
       ),
       child: child,
     );
@@ -753,56 +730,10 @@ class _VitaLinkDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF111827),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: const Color(0xFF78C7E7).withValues(alpha: .45),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: .45),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 15,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              alignment: WrapAlignment.end,
-              children: actions,
-            ),
-          ],
-        ),
-      ),
+    return AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: actions,
     );
   }
 }
@@ -822,13 +753,14 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? Colors.red.shade700 : const Color(0xFF78C7E7);
+    final color =
+        danger ? Colors.red.shade700 : Theme.of(context).colorScheme.primary;
 
     if (outlined) {
       return OutlinedButton(
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF78C7E7),
-          side: const BorderSide(color: Color(0xFF78C7E7)),
+          foregroundColor: Colors.blue,
+          side: const BorderSide(color: Colors.blue),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         ),
         onPressed: onPressed,
@@ -839,7 +771,7 @@ class _DialogButton extends StatelessWidget {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        foregroundColor: danger ? Colors.white : Colors.black,
+        foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       ),
       onPressed: onPressed,
